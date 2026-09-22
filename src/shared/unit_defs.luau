@@ -121,7 +121,7 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = 0,
-		build_options = { "advanced_constructor", "arbiter", "gunslinger", "sharpshooter", "sumo", "fatboy", "mammoth" },
+		build_options = { "advanced_constructor", "arbiter", "gunslinger", "sharpshooter", "sumo", "fatboy", "mammoth", "anti_nuke_prevailer" },
 		weapon = nil,
 		color = Color3.fromRGB(122, 134, 148),
 	},
