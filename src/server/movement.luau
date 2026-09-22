@@ -1,3 +1,4 @@
+--!native
 -- Unit steering. There is no pathfinding yet: a unit drives straight at its goal, slowing down so
 -- that it stops on the spot rather than overshooting, and pushes gently away from its neighbours
 -- so a group that shares a destination spreads into a blob instead of stacking into one point.
