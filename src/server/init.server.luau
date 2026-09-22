@@ -40,6 +40,7 @@ local replication = require(script.replication)
 local scavengers = require(script.scavengers)
 local spawning = require(script.spawning)
 local pause = require(script.pause)
+local profiler = require(script.profiler)
 
 type TeamId = types.TeamId
 
@@ -105,42 +106,61 @@ end
 -- One simulation step. Work is gathered first and settled afterwards so that a resource stall is
 -- shared fairly between every builder instead of being decided by iteration order.
 local function step(delta: number)
+	profiler.mark "flush"
 	-- anything a remote handler created between steps joins the world before this step reads it
 	state.flush()
 
+	profiler.mark "wind"
 	wind.tick(delta)
+	profiler.mark "economy"
 	flows.begin_tick()
 	economy.accrue(delta)
 	-- before the goals are cleared below: the scavengers read last tick's to tell which units are stuck
+	profiler.mark "scavengers"
 	scavengers.tick(delta)
 
+	profiler.mark "begin_tick"
 	construction.begin_tick()
 	reclaim.begin_tick()
 	resurrection.begin_tick()
 	movement.begin_tick()
 
+	profiler.mark "production"
 	production.tick(delta)
+	profiler.mark "drones"
 	drones.tick(delta)
+	profiler.mark "orders"
 	orders.tick(delta)
 
+	profiler.mark "construction"
 	construction.resolve(delta)
 	construction.decay(delta)
+	profiler.mark "reclaim_resurrection"
 	reclaim.resolve(delta)
 	resurrection.resolve(delta)
 
+	profiler.mark "movement"
 	movement.tick(delta)
 	-- whatever is in water it cannot stand in, however it got there, is losing its life to it
+	profiler.mark "drowning"
 	drowning.tick(delta)
 	-- whatever mends itself does
+	profiler.mark "autoheal"
 	autoheal.tick(delta)
 	-- what a transport carries hangs from it where it has moved to
+	profiler.mark "transport"
 	transport.tick()
+	profiler.mark "combat"
 	combat.tick(delta)
+	profiler.mark "shields"
 	shields.tick(delta)
+	profiler.mark "projectiles"
 	projectiles.tick(delta, combat.apply_damage)
 	-- every crater this step made is drawn and sent once, now that nothing more will be blown up until the next
+	profiler.mark "deformation"
 	deformation.flush()
 
+	profiler.mark "reap"
 	for _, id in state.reap() do
 		instances.destroy(id)
 		production.forget(id)
@@ -152,7 +172,10 @@ local function step(delta: number)
 		state.drop_hold(id)
 	end
 	-- entities created during this step join the world now that nothing is iterating it
+	profiler.mark "flush"
 	state.flush()
+	profiler.mark(nil)
+	profiler.step_done()
 end
 
 local function init()
@@ -194,13 +217,17 @@ local function init()
 			step(config.TICK_DELTA)
 		end
 		if steps > 0 then
+			profiler.mark "instances_sync"
 			instances.sync()
+			profiler.mark(nil)
 		end
 
 		broadcast_timer += delta
 		if broadcast_timer >= RESOURCE_BROADCAST_INTERVAL then
 			broadcast_timer = 0
+			profiler.mark "broadcast_resources"
 			broadcast_resources()
+			profiler.mark(nil)
 		end
 	end)
 end

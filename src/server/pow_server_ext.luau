@@ -3,13 +3,17 @@
 -- pow calls its extension modules to let them register commands, so this one returns a function
 -- rather than the dictionary RULES.md asks of every other module.
 
+local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
+
+local config = require(ReplicatedStorage.Shared.config)
 
 local alliances = require(ServerScriptService.Server.alliances)
 local godmode = require(ServerScriptService.Server.godmode)
 local nocost = require(ServerScriptService.Server.nocost)
 local pause = require(ServerScriptService.Server.pause)
 local players = require(ServerScriptService.Server.players)
+local profiler = require(ServerScriptService.Server.profiler)
 local scavengers = require(ServerScriptService.Server.scavengers)
 local spawning = require(ServerScriptService.Server.spawning)
 local state = require(ServerScriptService.Server.state)
@@ -65,6 +69,52 @@ return function(extras: { commands: { [string]: any } })
 				type = "info",
 				value = if paused then "Paused" else "Unpaused",
 			})
+		end,
+	}
+
+	commands.profile = {
+		description = "Shows where each simulation step's time has gone since the last /profile reset, heaviest first.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+		},
+		server_run = function(context: any)
+			local rows = profiler.report()
+			if #rows == 0 then
+				context:log({ type = "info", value = "No profiler data yet" })
+				return
+			end
+			local steps = profiler.step_count()
+			local elapsed = profiler.elapsed_since_reset()
+			local sim_seconds = steps * config.TICK_DELTA
+			context:log({
+				type = "info",
+				value = `{steps} steps over {string.format("%.1f", elapsed)}s wall time ({string.format(
+					"%.1f",
+					sim_seconds
+				)}s of sim time; over 1.0x is falling behind)`,
+			})
+			for _, row in rows do
+				context:log({
+					type = "info",
+					value = `  {row.label}: {string.format("%.2f", row.ms_per_step)}ms/step, {string.format(
+						"%.1f",
+						row.fraction * 100
+					)}%`,
+				})
+			end
+		end,
+	}
+
+	commands.profile_reset = {
+		description = "Clears the /profile counters and starts a fresh window.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+		},
+		server_run = function(context: any)
+			profiler.reset()
+			context:log({ type = "info", value = "Profiler reset" })
 		end,
 	}
 
