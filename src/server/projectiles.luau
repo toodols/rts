@@ -49,8 +49,8 @@ local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
 local HIT_STEP = 0.5
 -- How big the burst is where a shield swallows a shell.
 local SHIELD_BURST_RADIUS = 3
--- The rocket's own thickness.
-local ROCKET_RADIUS = 0.3
+-- The projectile's own thickness.
+local PROJECTILE_RADIUS = 0.3
 -- A rocket that has flown this long is gone, whatever it hit.
 local MAX_AGE = 30
 -- What is left of a blast at its very edge, as a fraction of the damage at its centre.
@@ -132,7 +132,7 @@ local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: type
 	})
 
 	weapon_fired:FireAllClients({
-		rocket = { id = id, from = origin, direction = direction.Unit, params = params, aim = aim },
+		projectile = { id = id, from = origin, direction = direction.Unit, params = params, aim = aim },
 		team = owner.team,
 	})
 end
@@ -142,8 +142,8 @@ local function inside(at: Vector3, other: Entity): boolean
 	local def = unit_defs.get(other.def_name)
 	local sideways = Vector2.new(at.X - other.position.X, at.Z - other.position.Z).Magnitude
 	local vertical = math.abs(at.Y - other.position.Y)
-	return sideways <= unit_defs.collider_radius(def) + ROCKET_RADIUS
-		and vertical <= unit_defs.collider_height(def) / 2 + ROCKET_RADIUS
+	return sideways <= unit_defs.collider_radius(def) + PROJECTILE_RADIUS
+		and vertical <= unit_defs.collider_height(def) / 2 + PROJECTILE_RADIUS
 end
 
 -- The first thing solid enough to stop the rocket where it is now. Its launcher does not count while the
