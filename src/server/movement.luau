@@ -35,10 +35,24 @@ local hovers: { [EntityId]: number } = {}
 -- How long each aircraft has had nowhere to go, in seconds. One that has never been sent anywhere is not in
 -- here, and is on the ground.
 local idle_for: { [EntityId]: number } = {}
+-- How much longer the unit is stunned/impulsed (cannot accelerate), in seconds. Applies when a unit is hit by weapons.
+local impulse_remaining: { [EntityId]: number } = {}
 
 local function begin_tick()
 	table.clear(goals)
 	table.clear(hovers)
+end
+
+-- Reduce impulse timers by delta. Called at the start of the movement tick.
+local function update_impulses(delta: number)
+	for id, remaining in impulse_remaining do
+		remaining -= delta
+		if remaining <= 0 then
+			impulse_remaining[id] = nil
+		else
+			impulse_remaining[id] = remaining
+		end
+	end
 end
 
 local function set_goal(entity: Entity, position: Vector3, stop_radius: number, through: boolean)
@@ -59,6 +73,11 @@ end
 -- Tells an aircraft to hover at `height` this tick, wherever that is, instead of at its flying altitude.
 local function set_hover(entity: Entity, height: number)
 	hovers[entity.id] = height
+end
+
+-- Stuns a unit when hit by a weapon, reducing acceleration for `duration` seconds.
+local function set_impulse(entity: Entity, duration: number)
+	impulse_remaining[entity.id] = duration
 end
 
 local function is_mobile(entity: Entity): boolean
@@ -145,6 +164,7 @@ local function fly(entity: Entity, def: types.EntityDef, aircraft: types.Aircraf
 end
 
 local function tick(delta: number)
+	update_impulses(delta)
 	for _, entity in state.all() do
 		if entity.alive == false or is_mobile(entity) == false then
 			continue
@@ -154,6 +174,11 @@ local function tick(delta: number)
 		local max_speed = def.max_speed :: number
 		local acceleration = def.acceleration :: number
 		local radius = unit_defs.collider_radius(def)
+
+		-- Reduce acceleration if the unit is impulsed (hit by a weapon)
+		if impulse_remaining[entity.id] ~= nil and impulse_remaining[entity.id] > 0 then
+			acceleration = 0
+		end
 
 		local desired_velocity = Vector3.zero
 		local goal = goals[entity.id]
@@ -194,9 +219,16 @@ local function tick(delta: number)
 			end
 			-- Water it cannot stand in, and ground too steep for it, are walls: it slides along them, or stops.
 			-- Something already standing where it should not, like a wader that was pushed in, may move freely
-			-- to get out.
+			-- to get out. Exception: ships that need water cannot move while on land - they must stop.
 			local here = entity.position
-			if standable(def, next_position.X, next_position.Z) == false and standable(def, here.X, here.Z) then
+			local current_standable = standable(def, here.X, here.Z)
+			local next_standable = standable(def, next_position.X, next_position.Z)
+
+			-- If a floating unit (ship) is on land, prevent any movement
+			if unit_defs.floats(def) and current_standable == false then
+				next_position = here
+				entity.velocity = Vector3.zero
+			elseif next_standable == false and current_standable then
 				if standable(def, next_position.X, here.Z) then
 					next_position = Vector3.new(next_position.X, next_position.Y, here.Z)
 					entity.velocity = Vector3.new(entity.velocity.X, 0, 0)
@@ -237,6 +269,7 @@ end
 
 local function forget(entity_id: EntityId)
 	idle_for[entity_id] = nil
+	impulse_remaining[entity_id] = nil
 end
 
 return table.freeze({
@@ -244,6 +277,7 @@ return table.freeze({
 	set_goal = set_goal,
 	set_tracking_goal = set_tracking_goal,
 	set_hover = set_hover,
+	set_impulse = set_impulse,
 	tick = tick,
 	forget = forget,
 	is_mobile = is_mobile,

@@ -26,6 +26,7 @@ local docking = require(script.Parent.docking)
 local projectiles = require(script.Parent.projectiles)
 local air = require(script.Parent.air)
 local deformation = require(script.Parent.deformation)
+local movement = require(script.Parent.movement)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -274,10 +275,14 @@ explode = function(source: Entity)
 end
 
 -- `weapon` hits `struck`: it takes the weapon's damage, or a fraction of it if it is an aircraft and the
--- weapon is not dedicated anti air.
+-- weapon is not dedicated anti air. The unit also loses acceleration for a short time due to the impact.
 local function hit(struck: Entity, weapon: types.Weapon)
 	local def = unit_defs.get(struck.def_name)
 	apply_damage(struck, unit_defs.damage_against(weapon.anti_air == true, def, weapon.damage))
+	-- Apply impulse/stun to reduce acceleration for ~0.5 seconds
+	if def.max_speed ~= nil and def.acceleration ~= nil then
+		movement.set_impulse(struck, 0.5)
+	end
 end
 
 -- Pays the energy a shot costs, and says whether it could be paid.
