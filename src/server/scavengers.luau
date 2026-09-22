@@ -1171,10 +1171,13 @@ local function tick(delta: number)
 	clock += delta
 	paths_left = PATHS_PER_TICK
 
-	-- Scavengers have no economy: their weapons never want for energy, however many are firing.
+	-- Scavengers have no economy: their weapons never want for metal or energy, however many are
+	-- firing, or however much a single shot costs - a capacity-capped refill is not enough for
+	-- something like the Calamity's 18000 energy per shot, well past any normal team's capacity.
 	local team = state.get_team(config.SCAVENGER_TEAM)
 	if team ~= nil then
-		team.energy = team.energy_capacity
+		team.metal = math.huge
+		team.energy = math.huge
 	end
 
 	local shown: number? = if enabled then round_significant(budget(), SHOWN_DIGITS) else nil

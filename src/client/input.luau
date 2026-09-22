@@ -412,10 +412,13 @@ local function order_on_entity(target: Model, queue: boolean)
 		return
 	end
 	-- What an order means depends on whose side the target is on, judged from the first selected
-	-- unit. That is the player's own team in a normal game; in godmode it can be any team.
-	local team = first.model:GetAttribute "team"
+	-- unit. That is the player's own team in a normal game; in godmode it can be any team. An ally's
+	-- things are treated the same as your own: `ally_group` is the same for every team in an
+	-- alliance, itself included, so this catches both without the client needing the alliance graph.
+	local own_group = first.model:GetAttribute "ally_group"
 
 	local target_team = target:GetAttribute "team"
+	local target_group = target:GetAttribute "ally_group"
 	local target_kind = target:GetAttribute "kind"
 	local target_state = target:GetAttribute "state"
 	local target_position = world.position_of(target)
@@ -423,7 +426,7 @@ local function order_on_entity(target: Model, queue: boolean)
 	local capable: { EntityId } = {}
 	local leftover: { EntityId } = {}
 
-	if target_kind ~= "wreck" and target_team ~= team and target_team ~= 0 then
+	if target_kind ~= "wreck" and target_group ~= own_group and target_team ~= 0 then
 		-- a transport picks up an enemy it can carry, a tower or a unit; everything else attacks it
 		local target_def_name = target:GetAttribute "def_name"
 		local target_def = if typeof(target_def_name) == "string" then unit_defs.defs[target_def_name] else nil
@@ -452,7 +455,7 @@ local function order_on_entity(target: Model, queue: boolean)
 			end
 		end
 		send_targeted("reclaim", capable, target_id, queue)
-	elseif target_team == team and target_state == "blueprint" then
+	elseif target_group == own_group and target_state == "blueprint" then
 		for _, entry in entries do
 			if entry.def.assisting then
 				table.insert(capable, entry.id)
@@ -463,7 +466,7 @@ local function order_on_entity(target: Model, queue: boolean)
 			end
 		end
 		send_targeted("assist", capable, target_id, queue)
-	elseif target_team == team then
+	elseif target_group == own_group then
 		-- anything else of yours is guarded: followed, or for builders, helped. A transport takes aboard
 		-- what it can carry instead, and guards what it cannot.
 		local target_def_name = target:GetAttribute "def_name"
@@ -758,14 +761,12 @@ local function click_attack_mode()
 	local target = entity_under_mouse()
 	local target_id = if target ~= nil then world.id_of(target) else nil
 	-- an enemy is judged from the first attacker's side, which in godmode need not be your own; a
-	-- wreck is neutral, team 0, same as any other piece of scenery, but is a valid target in its own right
-	local own_team = first:GetAttribute "team"
+	-- wreck is neutral, team 0, same as any other piece of scenery, but is a valid target in its own
+	-- right, and an ally is never a valid target at all
+	local own_group = first:GetAttribute "ally_group"
 	local is_wreck = target ~= nil and target:GetAttribute "kind" == "wreck"
-	if
-		target ~= nil
-		and target_id ~= nil
-		and (is_wreck or (target:GetAttribute "team" ~= own_team and target:GetAttribute "team" ~= 0))
-	then
+	local is_ally = target ~= nil and target:GetAttribute "ally_group" == own_group
+	if target ~= nil and target_id ~= nil and (is_wreck or (is_ally == false and target:GetAttribute "team" ~= 0)) then
 		send_targeted("attack", ids, target_id, queue)
 	else
 		local point = ground_point()

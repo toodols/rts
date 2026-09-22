@@ -23,6 +23,7 @@ local state = require(script.Parent.state)
 local construction = require(script.Parent.construction)
 local reclaim = require(script.Parent.reclaim)
 local resurrection = require(script.Parent.resurrection)
+local alliances = require(script.Parent.alliances)
 local combat = require(script.Parent.combat)
 local flows = require(script.Parent.flows)
 local shields = require(script.Parent.shields)
@@ -367,6 +368,9 @@ local function apply_attributes(entity: Entity, model: Model)
 	local def = unit_defs.get(entity.def_name)
 	set_attribute(model, "entity_id", entity.id)
 	set_attribute(model, "team", entity.team)
+	-- the same for every team in its alliance, so the client can tell an ally from an enemy without
+	-- knowing the alliance graph itself: two things are allied exactly when this matches
+	set_attribute(model, "ally_group", alliances.root_of(entity.team))
 	set_attribute(model, "def_name", entity.def_name)
 	set_attribute(model, "kind", entity.kind)
 	-- every entity carries its team's name and the colour to show it in, for the selection panel and a

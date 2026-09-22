@@ -49,4 +49,5 @@ return table.freeze({
 	ally = ally,
 	are_allied = are_allied,
 	group_of = group_of,
+	root_of = root_of,
 })

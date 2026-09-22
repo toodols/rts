@@ -195,13 +195,10 @@ end
 -- What `attacker` shoots at when it fires from `origin`: the highest reward enemy in range it has a clear
 -- shot at, skipping any target already `claimed`. Reward score is the unit's power (metal cost + 60x energy
 -- cost) divided by its max health, so targets closest to dying get priority. With none it holds fire: a shot
--- that a friend is standing in is never taken on purpose. A weapon with a stockpile picks nothing, and fires
--- only on an order.
+-- that a friend is standing in is never taken on purpose. A weapon with a stockpile picks the same way as
+-- any other once it has a missile ready - an order still overrides this, but nothing sits on a full silo
+-- doing nothing just because nobody told it what to hit.
 local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weapon, claimed: { EntityId }): Entity?
-	-- a stockpiled missile is too dear to spend on whatever comes by: it goes only where it is sent
-	if weapon.stockpile ~= nil then
-		return nil
-	end
 	local lobbed = flies_over(weapon)
 	local candidates: { Entity } = {}
 	for _, other in state.all() do

@@ -283,7 +283,7 @@ end
 local function run_assist(entity: Entity, order: Order)
 	local target_id = order.target_id
 	local target = if target_id ~= nil then state.get(target_id) else nil
-	if target == nil or target.state ~= "blueprint" then
+	if target == nil or target.state ~= "blueprint" or alliances.are_allied(entity.team, target.team) == false then
 		pop(entity)
 		return
 	end
@@ -571,7 +571,12 @@ local function run_static_builder(entity: Entity)
 	local best: Entity? = nil
 	local best_distance = reach
 	for _, other in state.all() do
-		if other.alive == false or other.state ~= "blueprint" or other.team ~= entity.team or other.id == entity.id then
+		if
+			other.alive == false
+			or other.state ~= "blueprint"
+			or alliances.are_allied(entity.team, other.team) == false
+			or other.id == entity.id
+		then
 			continue
 		end
 		local distance = geometry.distance_2d(entity.position, other.position)
