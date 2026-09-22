@@ -308,7 +308,8 @@ local function fire(attacker: Entity, target: Entity, weapon: types.Weapon, orig
 			origin,
 			target.position,
 			with_chosen_arc(attacker, weapon, origin, target.position, target.id),
-			target.velocity
+			target.velocity,
+			target
 		)
 		return true
 	end

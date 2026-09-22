@@ -16,6 +16,7 @@ local projectile_mod = require(ReplicatedStorage.Shared.projectile)
 local state = require(script.Parent.state)
 local deformation = require(script.Parent.deformation)
 local shields = require(script.Parent.shields)
+local alliances = require(script.Parent.alliances)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -33,6 +34,8 @@ type Projectile = {
 	clear_of_owner: boolean,
 	-- the shields it was fired from inside, which do not stop it
 	exempt: { [EntityId]: boolean },
+	-- the target entity ID for homing projectiles, if any
+	target_id: EntityId?,
 }
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
@@ -66,8 +69,8 @@ local function strayed(direction: Vector3, half_angle: number): Vector3
 end
 
 -- Fires a rocket from `origin` toward `aim`. A lobbed shell is angled to come down on `aim`, ahead of it
--- by however far `aim_velocity` says it will have gone by then.
-local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: types.Weapon, aim_velocity: Vector3?)
+-- by however far `aim_velocity` says it will have gone by then. For homing projectiles, the target entity is needed.
+local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: types.Weapon, aim_velocity: Vector3?, target: Entity?)
 	local params = weapon.projectile
 	if params == nil then
 		return
@@ -119,6 +122,7 @@ local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: type
 		anti_air = weapon.anti_air == true,
 		clear_of_owner = false,
 		exempt = shields.covering(origin),
+		target_id = if params.homing == true and target ~= nil then target.id else nil,
 	})
 
 	weapon_fired:FireAllClients({
@@ -190,6 +194,10 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 		if other.alive == false or (struck ~= nil and other.id == struck.id) then
 			continue
 		end
+		-- Skip friendly units and wrecks in AoE blast
+		if alliances.are_allied(other.team, projectile.team) or other.kind == "wreck" then
+			continue
+		end
 		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
 		local distance = (other.position - at).Magnitude
 		if distance <= projectile.params.aoe_radius + reach then
@@ -206,6 +214,15 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 	local index = 1
 	while index <= #projectiles do
 		local projectile = projectiles[index]
+
+		-- Update target for homing projectiles
+		if projectile.target_id ~= nil and projectile.flight.target ~= nil then
+			local target = state.get(projectile.target_id)
+			if target ~= nil and target.alive then
+				projectile.flight.target = target.position
+			end
+		end
+
 		local steps = math.max(1, math.ceil(projectile.flight.velocity.Magnitude * delta / HIT_STEP))
 		local sub_delta = delta / steps
 
