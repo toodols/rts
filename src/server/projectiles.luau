@@ -230,10 +230,6 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 		if other.alive == false or (struck ~= nil and other.id == struck.id) then
 			continue
 		end
-		-- a wreck is neutral, never allied, so this only skips friendly units
-		if alliances.are_allied(other.team, projectile.team) then
-			continue
-		end
 		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
 		local distance = (other.position - at).Magnitude
 		if distance <= projectile.params.aoe_radius + reach then
