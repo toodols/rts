@@ -37,12 +37,14 @@ local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
 -- Runs a line-of-sight check (any of sight.verdict/verdict_along/verdict_to_point/first_hit/
 -- first_hit_at) under its own profiler label, `combat_los`, split out of the general `combat` one -
 -- sight.luau does its own scan for blockers, so it is worth seeing apart from targeting, firing and
--- everything else combat.tick does. profiler.mark closes out whatever was open (combat, almost
--- always) and reopens it the moment this returns, so nothing outside the call is misattributed.
+-- everything else combat.tick does. Whatever section was open - combat's own, or orders' when a
+-- fight order asks has_target - is reopened the moment this returns, so nothing outside the call is
+-- misattributed.
 local function los(check: (...any) -> any, ...: any): any
+	local previous = profiler.current()
 	profiler.mark "combat_los"
 	local result = check(...)
-	profiler.mark "combat"
+	profiler.mark(previous)
 	return result
 end
 

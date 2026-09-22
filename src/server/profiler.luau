@@ -53,6 +53,12 @@ local function mark(label: string?)
 	last_time = now
 end
 
+-- The label currently open, so something that briefly marks its own section can hand control back
+-- to whatever section it interrupted rather than assuming which one that was.
+local function current(): string?
+	return last_label
+end
+
 -- Call once per step, after the last `mark`, so `steps` only counts whole steps.
 local function step_done()
 	steps += 1
@@ -147,6 +153,7 @@ end
 
 return table.freeze({
 	mark = mark,
+	current = current,
 	step_done = step_done,
 	reset = reset,
 	report = report,
