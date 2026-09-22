@@ -98,32 +98,83 @@ local function standable(def: types.EntityDef, x: number, z: number): boolean
 	return unit_defs.tolerates_water(def, depth, depth) and passability.passable_at(def.slope_class, x, z)
 end
 
+-- Ground and water traffic push each other apart; aircraft do not. In BAR, planes mostly fly
+-- through one another rather than jostling for space, and skipping them here means the crowd that
+-- actually needs separation - everyone standing on the ground - is not paying to scan over every
+-- aircraft in the sky, or the other way round.
+--
+-- Neighbours are found through a flat (X, Z) grid rebuilt once a tick (see `rebuild_grid`), not by
+-- scanning every entity for every mover: collider extents in this game are small next to the map, so
+-- a mover only ever needs to look at its own cell and the ring of cells around it, however many
+-- entities are alive in total.
+local SEPARATION_CELL = 64
+
+type Grid = { [number]: { [number]: { Entity } } }
+
+local function cell_of(x: number, z: number): (number, number)
+	return math.floor(x / SEPARATION_CELL), math.floor(z / SEPARATION_CELL)
+end
+
+-- Rebuilt once at the top of every tick from every alive, non-aircraft entity: units and buildings
+-- alike push, and are pushed against, since a builder is as real an obstacle as another unit.
+local function rebuild_grid(): Grid
+	local grid: Grid = {}
+	for _, entity in state.all() do
+		if entity.alive == false or air.is_aircraft(entity) then
+			continue
+		end
+		local cx, cz = cell_of(entity.position.X, entity.position.Z)
+		local column = grid[cx]
+		if column == nil then
+			column = {}
+			grid[cx] = column
+		end
+		local bucket = column[cz]
+		if bucket == nil then
+			bucket = {}
+			column[cz] = bucket
+		end
+		table.insert(bucket, entity)
+	end
+	return grid
+end
+
 -- Push away from any neighbour whose capsule is overlapping ours, scaled by how deep the overlap
--- is so that lightly touching units barely react.
-local function separation(entity: Entity, radius: number): Vector3
+-- is so that lightly touching units barely react. Only ever called for a non-aircraft entity - see
+-- `rebuild_grid` - so nothing here needs to check for one.
+local function separation(entity: Entity, radius: number, grid: Grid): Vector3
 	local push = Vector3.zero
-	for _, other in state.all() do
-		if other.id == entity.id or other.alive == false then
+	local cx, cz = cell_of(entity.position.X, entity.position.Z)
+	for x = cx - 1, cx + 1 do
+		local column = grid[x]
+		if column == nil then
 			continue
 		end
-		-- aircraft fly over everything else and are flown over by it, so they only crowd each other
-		if air.is_aircraft(entity) ~= air.is_aircraft(other) then
-			continue
+		for z = cz - 1, cz + 1 do
+			local bucket = column[z]
+			if bucket == nil then
+				continue
+			end
+			for _, other in bucket do
+				if other.id == entity.id then
+					continue
+				end
+				local other_radius = unit_defs.collider_radius(unit_defs.get(other.def_name))
+				local minimum = radius + other_radius + config.SEPARATION_RADIUS_PADDING
+				local offset = geometry.flatten(entity.position - other.position)
+				local distance = offset.Magnitude
+				if distance >= minimum then
+					continue
+				end
+				if distance < 1e-3 then
+					-- exactly co-located: shove apart along an arbitrary but stable axis
+					local angle = entity.id * 2.399963
+					push += Vector3.new(math.cos(angle), 0, math.sin(angle))
+					continue
+				end
+				push += (offset / distance) * ((minimum - distance) / minimum)
+			end
 		end
-		local other_radius = unit_defs.collider_radius(unit_defs.get(other.def_name))
-		local minimum = radius + other_radius + config.SEPARATION_RADIUS_PADDING
-		local offset = geometry.flatten(entity.position - other.position)
-		local distance = offset.Magnitude
-		if distance >= minimum then
-			continue
-		end
-		if distance < 1e-3 then
-			-- exactly co-located: shove apart along an arbitrary but stable axis
-			local angle = entity.id * 2.399963
-			push += Vector3.new(math.cos(angle), 0, math.sin(angle))
-			continue
-		end
-		push += (offset / distance) * ((minimum - distance) / minimum)
 	end
 	return push
 end
@@ -165,6 +216,7 @@ end
 
 local function tick(delta: number)
 	update_impulses(delta)
+	local grid = rebuild_grid()
 	for _, entity in state.all() do
 		if entity.alive == false or is_mobile(entity) == false then
 			continue
@@ -197,7 +249,9 @@ local function tick(delta: number)
 			desired_velocity += goal.velocity
 		end
 
-		desired_velocity += separation(entity, radius) * config.SEPARATION_STRENGTH
+		if air.is_aircraft(entity) == false then
+			desired_velocity += separation(entity, radius, grid) * config.SEPARATION_STRENGTH
+		end
 		if desired_velocity.Magnitude > max_speed then
 			desired_velocity = desired_velocity.Unit * max_speed
 		end
