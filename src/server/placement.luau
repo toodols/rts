@@ -42,13 +42,19 @@ local function clearable(other: Entity, team: types.TeamId): boolean
 		and unit_defs.get(other.def_name).max_speed ~= nil
 end
 
+-- Whether `other` is the finished T1 mex that a T2 mex (`def_name`) is upgrading in place: it does
+-- not block the T2's footprint, the way a wreck or a movable unit does not.
+local function is_upgrade_target(def_name: string, other: Entity): boolean
+	return def_name == "advanced_metal_extractor" and other.kind == "building" and other.def_name == "metal_extractor"
+end
+
 -- Everything standing in the way of a footprint at `position`.
 local function overlapping(def_name: string, position: Vector3, facing: number, ignore_id: EntityId?): { Entity }
 	local def = unit_defs.get(def_name)
 	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
 	local found: { Entity } = {}
 	for id, other in state.all() do
-		if other.alive == false or id == ignore_id or air.is_airborne(other) then
+		if other.alive == false or id == ignore_id or air.is_airborne(other) or is_upgrade_target(def_name, other) then
 			continue
 		end
 		if geometry.aabb_overlap(position, half, other.position, half_extents_for(other), OVERLAP_PADDING) then
@@ -116,6 +122,9 @@ local function can_place(
 		if clearing_team ~= nil and clearable(other, clearing_team) then
 			continue
 		end
+		if is_upgrade_target(def_name, other) then
+			continue
+		end
 		if geometry.aabb_overlap(position, half, other.position, half_extents_for(other), OVERLAP_PADDING) then
 			return false, "blocked"
 		end
@@ -141,7 +150,7 @@ local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string
 		end
 		if other.kind == "building" and unit_defs.get(other.def_name).requires_metal_spot == true then
 			-- Allow T2 mex to use a spot already occupied by T1 mex (fix #4)
-			if def_name == "advanced_metal_extractor" and other.def_name == "metal_extractor" then
+			if def_name ~= nil and is_upgrade_target(def_name, other) then
 				continue
 			end
 			if geometry.distance_2d(other.position, spot) < TAKEN_RADIUS then

@@ -71,6 +71,9 @@ local right_down_world: Vector3? = nil
 -- Where the left button went down in a location-based mode (attack, fight, path, unload): letting go on
 -- the same spot is the click, and letting go further off is a line of them.
 local mode_drag_from: Vector3? = nil
+-- The same, but for the right button: a plain right click still cancels the mode, but dragging lays
+-- the same line of orders down instead of cancelling.
+local right_mode_drag_from: Vector3? = nil
 local drag_rect: DragRect? = nil
 local rect_listeners: { (rect: DragRect?) -> () } = {}
 local mode_listeners: { (mode: string?) -> () } = {}
@@ -212,7 +215,7 @@ local function box_select(rect: DragRect, take_all: boolean): { EntityId }
 		if kind ~= "unit" and kind ~= "building" then
 			continue
 		end
-		if model:GetAttribute("carried") == true then
+		if model:GetAttribute "carried" == true then
 			continue
 		end
 		local point, on_screen = camera:WorldToViewportPoint(world.position_of(model))
@@ -815,7 +818,8 @@ local function order_mode_line(mode: string, from: Vector3, to: Vector3)
 	markers.flash_points(positions, ORDER_MARKER_SECONDS)
 
 	-- Determine the order kind based on the mode
-	local kind = if mode == "attack" then "attack_ground"
+	local kind = if mode == "attack"
+		then "attack_ground"
 		elseif mode == "fight" then "fight"
 		elseif mode == "path" then "path"
 		elseif mode == "unload" then "unload"
@@ -1067,6 +1071,15 @@ local function on_left_up()
 end
 
 local function on_right_down()
+	if target_mode == "attack" or target_mode == "fight" or target_mode == "path" or target_mode == "unload" then
+		-- what it does waits for the button to come up, so a plain right click can still cancel the
+		-- mode while a right-drag lays down a line of orders instead
+		right_mode_drag_from = ground_point()
+		if right_mode_drag_from == nil then
+			target_mode = nil
+		end
+		return
+	end
 	if target_mode ~= nil then
 		target_mode = nil
 		right_down_world = nil
@@ -1087,6 +1100,25 @@ local function on_right_down()
 end
 
 local function on_right_up()
+	local mode_from = right_mode_drag_from
+	right_mode_drag_from = nil
+	if mode_from ~= nil then
+		markers.clear_points()
+		local mode = target_mode
+		local finished = ground_point()
+		if
+			mode ~= nil
+			and finished ~= nil
+			and geometry.distance_2d(mode_from, finished) >= config.FORMATION_DRAG_THRESHOLD
+		then
+			order_mode_line(mode, mode_from, finished)
+		else
+			-- a right click with no drag cancels the mode, unlike a left click, which places a single order
+			target_mode = nil
+		end
+		return
+	end
+
 	local started = right_down_world
 	right_down_world = nil
 	-- the preview belongs to the held button; whatever happens next puts its own dots up
@@ -1412,7 +1444,10 @@ local HOVER_ATTACK_COLOR = Color3.fromRGB(238, 88, 74)
 local function update_hover()
 	-- whatever is under the cursor is lit, so it is plain what a click would land on. The colour follows
 	-- the mode: yellow for repairing, amber for reclaiming.
-	local dragging = right_down_world ~= nil or left_down_at ~= nil or mode_drag_from ~= nil
+	local dragging = right_down_world ~= nil
+		or left_down_at ~= nil
+		or mode_drag_from ~= nil
+		or right_mode_drag_from ~= nil
 	-- a fight or pathfind click lands on the ground whatever is under it, so nothing is lit for it
 	local model = if dragging or target_mode == "fight" or target_mode == "path" then nil else entity_under_mouse()
 	local color = HOVER_COLOR
@@ -1513,7 +1548,7 @@ local function on_render()
 		preview_order(aiming)
 	end
 
-	local mode_from = mode_drag_from
+	local mode_from = if mode_drag_from ~= nil then mode_drag_from else right_mode_drag_from
 	local mode = target_mode
 	if mode_from ~= nil and mode ~= nil then
 		local to = ground_point()

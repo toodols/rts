@@ -55,10 +55,16 @@ end
 -- buildings themselves, and the build orders every unit publishes in its `path`.
 local TAKEN_RADIUS = 1.5
 
-local function taken_positions(): { Vector2 }
+-- Whether `model` is the finished T1 mex that `placing_def_name` (a T2 mex) is upgrading in place:
+-- it does not count as taking its spot, mirroring the server's placement.is_upgrade_target.
+local function is_upgrade_target(placing_def_name: string, model: Model): boolean
+	return placing_def_name == "advanced_metal_extractor" and model:GetAttribute "def_name" == "metal_extractor"
+end
+
+local function taken_positions(placing_def_name: string): { Vector2 }
 	local taken = {}
 	for _, model in world.all() do
-		if model:GetAttribute "kind" == "building" then
+		if model:GetAttribute "kind" == "building" and is_upgrade_target(placing_def_name, model) == false then
 			local def_name = model:GetAttribute "def_name"
 			local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
 			if def ~= nil and def.requires_metal_spot == true then
@@ -133,12 +139,10 @@ local function can_place(def_name: string, position: Vector3, yaw: number): bool
 		local other_kind = model:GetAttribute "kind"
 		if
 			other_kind == "wreck"
-			or (
-				other_kind == "unit"
-				and model:GetAttribute "state" == "active"
-				and other_def.max_speed ~= nil
-				and world.is_mine(model)
-			)
+			or (other_kind == "unit" and model:GetAttribute "state" == "active" and other_def.max_speed ~= nil and world.is_mine(
+				model
+			))
+			or is_upgrade_target(def_name, model)
 		then
 			continue
 		end
@@ -323,7 +327,7 @@ local function update(point: Vector3?): (Vector3?, boolean)
 	local z = point.Z
 	local locked: Vector3? = nil
 	if def.requires_metal_spot == true then
-		local taken = taken_positions()
+		local taken = taken_positions(def_name)
 		locked = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, function(spot: Vector3): boolean
 			for _, at in taken do
 				if (at - Vector2.new(spot.X, spot.Z)).Magnitude < TAKEN_RADIUS then
