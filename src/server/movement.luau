@@ -107,7 +107,15 @@ end
 -- scanning every entity for every mover: collider extents in this game are small next to the map, so
 -- a mover only ever needs to look at its own cell and the ring of cells around it, however many
 -- entities are alive in total.
-local SEPARATION_CELL = 64
+--
+-- The cell has to be at least as wide as the biggest interaction distance two colliders can have
+-- (their two radii plus the separation padding), or the 1-cell ring this scans would miss a real
+-- neighbour sitting just past it. The biggest building collider is a 5x5-cell box, radius 10 studs,
+-- so two of those plus padding tops out around 20.5 studs - 24 leaves headroom. It used to be 64,
+-- which was safe but far larger than it needed to be: a crowd spawned at normal unit spacing (a few
+-- studs to ~20 apart) packs dozens of units into one 64-stud cell, so every mover's 3x3-cell scan was
+-- checking most of the crowd against itself every tick, overlapping or not.
+local SEPARATION_CELL = 24
 
 type Grid = { [number]: { [number]: { Entity } } }
 
