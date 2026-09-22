@@ -557,19 +557,31 @@ end
 
 -- Works on the next missile of a stockpile: it is finished once its time is up and its price can be paid, and
 -- one whose price cannot be paid yet waits, done, until it can be. Nothing is made once the stockpile is full.
+-- Resources drain frame-by-frame at a rate of cost/build_time per second. Progress stalls (not reverts)
+-- if resources aren't available; it resumes once resources are available again.
 local function grow_stockpile(entity: Entity, stockpile: types.Stockpile, delta: number)
 	if entity.stockpile >= stockpile.limit then
 		entity.stockpile_progress = 0
 		return
 	end
-	entity.stockpile_progress = math.min(stockpile.build_time, entity.stockpile_progress + delta)
-	if
-		entity.stockpile_progress >= stockpile.build_time
-		and economy.try_spend(entity.team, stockpile.metal, stockpile.energy)
-	then
-		entity.stockpile += 1
-		entity.stockpile_progress = 0
+
+	-- Calculate this frame's progress and resource cost
+	local frame_progress = delta / stockpile.build_time
+	local frame_metal = frame_progress * stockpile.metal
+	local frame_energy = frame_progress * stockpile.energy
+
+	-- Try to drain this frame's resources
+	if economy.try_spend(entity.team, frame_metal, frame_energy) then
+		-- Resources available, increment progress
+		entity.stockpile_progress = entity.stockpile_progress + delta
+
+		-- Check if we've finished building this stockpile item
+		if entity.stockpile_progress >= stockpile.build_time then
+			entity.stockpile += 1
+			entity.stockpile_progress = 0
+		end
 	end
+	-- If resources not available, progress stalls (doesn't change)
 end
 
 local function tick(delta: number)
