@@ -33,6 +33,8 @@ type Projectile = {
 	clear_of_owner: boolean,
 	-- the shields it was fired from inside, which do not stop it
 	exempt: { [EntityId]: boolean },
+	-- for homing projectiles: the entity ID of the target to home in on
+	homing_target_id: EntityId?,
 }
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
@@ -66,8 +68,9 @@ local function strayed(direction: Vector3, half_angle: number): Vector3
 end
 
 -- Fires a rocket from `origin` toward `aim`. A lobbed shell is angled to come down on `aim`, ahead of it
--- by however far `aim_velocity` says it will have gone by then.
-local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: types.Weapon, aim_velocity: Vector3?)
+-- by however far `aim_velocity` says it will have gone by then. For homing projectiles, `target_id` specifies
+-- which entity to home in on.
+local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: types.Weapon, aim_velocity: Vector3?, target_id: EntityId?)
 	local params = weapon.projectile
 	if params == nil then
 		return
@@ -119,6 +122,7 @@ local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: type
 		anti_air = weapon.anti_air == true,
 		clear_of_owner = false,
 		exempt = shields.covering(origin),
+		homing_target_id = target_id,
 	})
 
 	weapon_fired:FireAllClients({
@@ -211,6 +215,14 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 
 		local finished = false
 		for _ = 1, steps do
+			-- Update homing target for homing projectiles
+			if projectile.params.homing == true and projectile.homing_target_id ~= nil then
+				local target = state.get(projectile.homing_target_id)
+				if target ~= nil and target.alive then
+					projectile.flight.homing_target = target.position
+				end
+			end
+
 			projectile_mod.step(projectile.flight, projectile.params, sub_delta)
 			local at = projectile.flight.position
 

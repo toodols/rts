@@ -303,7 +303,8 @@ local function fire(attacker: Entity, target: Entity, weapon: types.Weapon, orig
 			origin,
 			target.position,
 			with_chosen_arc(attacker, weapon, origin, target.position, target.id),
-			target.velocity
+			target.velocity,
+			target.id
 		)
 		return true
 	end
@@ -330,7 +331,7 @@ local function fire_at_ground(attacker: Entity, point: Vector3, weapon: types.We
 	end
 
 	if weapon.projectile ~= nil then
-		projectiles.launch(attacker, origin, point, with_chosen_arc(attacker, weapon, origin, point, attacker.id), nil)
+		projectiles.launch(attacker, origin, point, with_chosen_arc(attacker, weapon, origin, point, attacker.id), nil, nil)
 		return true
 	end
 
