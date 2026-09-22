@@ -581,30 +581,56 @@ local function run_static_builder(entity: Entity)
 
 	-- with nothing to build it repairs the nearest damaged unit or building in reach that is its own team's or an ally's
 	if def.repairing == false then
-		return
-	end
-	local hurt: Entity? = nil
-	local hurt_distance = reach
-	for _, other in state.all() do
-		if
-			other.alive == false
-			or other.kind == "wreck"
-			or other.state ~= "active"
-			or alliances.are_allied(entity.team, other.team) == false
-			or other.health >= other.max_health
-			-- there is no point mending what someone is taking apart
-			or reclaim.is_reclaimed_by_ally(other)
-		then
-			continue
+		-- with nothing to build and cannot repair, try reclaiming nearby wrecks
+		if def.reclaiming == false then
+			return
 		end
-		local distance = geometry.distance_2d(entity.position, other.position)
-		if distance <= hurt_distance then
-			hurt = other
-			hurt_distance = distance
+	else
+		local hurt: Entity? = nil
+		local hurt_distance = reach
+		for _, other in state.all() do
+			if
+				other.alive == false
+				or other.kind == "wreck"
+				or other.state ~= "active"
+				or alliances.are_allied(entity.team, other.team) == false
+				or other.health >= other.max_health
+				-- there is no point mending what someone is taking apart
+				or reclaim.is_reclaimed_by_ally(other)
+			then
+				continue
+			end
+			local distance = geometry.distance_2d(entity.position, other.position)
+			if distance <= hurt_distance then
+				hurt = other
+				hurt_distance = distance
+			end
+		end
+		if hurt ~= nil then
+			construction.repair(entity, hurt, config.TICK_DELTA)
+			return
 		end
 	end
-	if hurt ~= nil then
-		construction.repair(entity, hurt, config.TICK_DELTA)
+
+	-- with nothing else to do it reclaims the nearest wreck in reach if it can
+	if def.reclaiming ~= false then
+		local wreck: Entity? = nil
+		local wreck_distance = reach
+		for _, other in state.all() do
+			if other.alive == false or other.kind ~= "wreck" then
+				continue
+			end
+			if reclaim.can_reclaim(entity, other) then
+				local distance = geometry.distance_2d(entity.position, other.position)
+				if distance <= wreck_distance then
+					wreck = other
+					wreck_distance = distance
+				end
+			end
+		end
+		if wreck ~= nil then
+			reclaim.request(entity, wreck)
+		end
 	end
 end
 
