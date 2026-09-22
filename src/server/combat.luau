@@ -956,11 +956,13 @@ end
 -- tick's actual shot both see one fresh grid and share one cached result per (attacker, weapon).
 local function begin_tick()
 	rebuild_target_grid()
-	sight.begin_tick()
+	sight.rebuild()
 	table.clear(pick_target_cache)
 end
 
 local function tick(delta: number)
+	-- everything has moved since begin_tick, and a shot is judged against where things stand now
+	sight.rebuild()
 	local decay = RECENT_DAMAGE_DECAY ^ (delta * FRAMES_PER_SECOND)
 	for id, damage in recent_damage do
 		if damage * decay < 1e-3 or state.get(id) == nil then

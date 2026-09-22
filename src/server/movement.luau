@@ -16,6 +16,7 @@ local passability = require(ReplicatedStorage.Shared.passability)
 
 local state = require(script.Parent.state)
 local air = require(script.Parent.air)
+local flat_grid = require(script.Parent.flat_grid)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -104,11 +105,9 @@ end
 -- actually needs separation - everyone standing on the ground - is not paying to scan over every
 -- aircraft in the sky, or the other way round.
 --
--- Neighbours are found through flat (X, Z) grids rebuilt once a tick (see `rebuild_grids`), so a
--- mover only ever looks at its own cell and the ring of cells around it, however many entities are
--- alive in total. Each grid is a handful of flat per-field arrays filled by a counting sort - count
--- entries per cell, prefix-sum the counts, drop each entry's index into one flat array - so a rebuild
--- allocates nothing, and the inner loop reads plain numbers rather than fields off entity tables.
+-- Neighbours are found through flat grids (see flat_grid.luau) rebuilt once a tick (see
+-- `rebuild_grids`), so a mover only ever looks at its own cell and the ring of cells around it, however
+-- many entities are alive in total.
 --
 -- A 3x3 scan only finds every real neighbour if a cell is at least as wide as the furthest two
 -- colliders can interact (their radii plus the padding). Movers are all small, but buildings are
@@ -131,96 +130,12 @@ for _, def in unit_defs.defs do
 	widest_any = math.max(widest_any, radius)
 end
 
-type Grid = {
-	-- cell width in studs, and cells per side before the coordinates wrap round - wrapping only ever
-	-- puts far-off entries into the same cell as near ones, which costs a distance check, never a miss
-	size: number,
-	side: number,
-	count: number,
-	xs: { number },
-	zs: { number },
-	rs: { number },
-	cell: { number },
-	-- entries per cell while sorting, then each cell's fill cursor
-	counts: { number },
-	-- each cell's entries are order[starts[c]] up to order[stops[c] - 1]; both zero for an empty cell
-	starts: { number },
-	stops: { number },
-	order: { number },
-	-- the cells holding anything this tick, so a rebuild touches only those and not every cell there is
-	used: { number },
-	used_count: number,
-}
+type Grid = flat_grid.Grid
 
-local function new_grid(size: number, side: number): Grid
-	return {
-		size = size,
-		side = side,
-		count = 0,
-		xs = {},
-		zs = {},
-		rs = {},
-		cell = {},
-		counts = table.create(side * side, 0),
-		starts = table.create(side * side, 0),
-		stops = table.create(side * side, 0),
-		order = {},
-		used = {},
-		used_count = 0,
-	}
-end
-
-local mover_grid = new_grid(2 * widest_mover + PAD, 256)
-local other_grid = new_grid(widest_mover + widest_any + PAD, 128)
+local mover_grid = flat_grid.new(2 * widest_mover + PAD, 256)
+local other_grid = flat_grid.new(widest_mover + widest_any + PAD, 128)
 -- Where each mover sits in mover_grid this tick, by id.
 local mover_slot: { [EntityId]: number } = {}
-
-local function grid_add(grid: Grid, x: number, z: number, radius: number): number
-	local k = grid.count + 1
-	grid.count = k
-	grid.xs[k] = x
-	grid.zs[k] = z
-	grid.rs[k] = radius
-	return k
-end
-
--- A counting sort over only the cells in use: how entries are laid out across cells doesn't matter, only
--- that each cell's are contiguous, so there is no need to sweep the cells that are empty.
-local function grid_sort(grid: Grid)
-	local size, side = grid.size, grid.side
-	local xs, zs, cell, counts, starts, stops, order, used =
-		grid.xs, grid.zs, grid.cell, grid.counts, grid.starts, grid.stops, grid.order, grid.used
-	for u = 1, grid.used_count do
-		local c = used[u]
-		counts[c] = 0
-		starts[c] = 0
-		stops[c] = 0
-	end
-	local used_count = 0
-	for k = 1, grid.count do
-		local c = (math.floor(zs[k] / size) % side) * side + (math.floor(xs[k] / size) % side) + 1
-		cell[k] = c
-		if counts[c] == 0 then
-			used_count += 1
-			used[used_count] = c
-		end
-		counts[c] += 1
-	end
-	grid.used_count = used_count
-	local sum = 1
-	for u = 1, used_count do
-		local c = used[u]
-		starts[c] = sum
-		sum += counts[c]
-		stops[c] = sum
-		counts[c] = starts[c]
-	end
-	for k = 1, grid.count do
-		local c = cell[k]
-		order[counts[c]] = k
-		counts[c] += 1
-	end
-end
 
 -- Rebuilt once at the top of every tick from every alive, non-aircraft entity: units and buildings
 -- alike push, and are pushed against, since a builder is as real an obstacle as another unit. Wrecks
@@ -228,8 +143,8 @@ end
 -- a fight, giving each one a collider would mean every unit near a battlefield pushing against all of
 -- them for the rest of the match.
 local function rebuild_grids()
-	mover_grid.count = 0
-	other_grid.count = 0
+	flat_grid.clear(mover_grid)
+	flat_grid.clear(other_grid)
 	table.clear(mover_slot)
 	for _, entity in state.all() do
 		if entity.alive == false or entity.kind == "wreck" or air.is_aircraft(entity) then
@@ -238,13 +153,13 @@ local function rebuild_grids()
 		local radius = unit_defs.collider_radius(unit_defs.get(entity.def_name))
 		local position = entity.position
 		if is_mobile(entity) then
-			mover_slot[entity.id] = grid_add(mover_grid, position.X, position.Z, radius)
+			mover_slot[entity.id] = flat_grid.add(mover_grid, position.X, position.Z, radius)
 		else
-			grid_add(other_grid, position.X, position.Z, radius)
+			flat_grid.add(other_grid, position.X, position.Z, radius)
 		end
 	end
-	grid_sort(mover_grid)
-	grid_sort(other_grid)
+	flat_grid.sort(mover_grid)
+	flat_grid.sort(other_grid)
 end
 
 -- Adds to (px, pz) the push from every entry of `grid` overlapping a collider of `radius` at (x, z),

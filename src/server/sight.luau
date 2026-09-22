@@ -13,6 +13,7 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
 local state = require(script.Parent.state)
 local alliances = require(script.Parent.alliances)
+local flat_grid = require(script.Parent.flat_grid)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -27,82 +28,143 @@ local SAMPLE_STEP = 2
 -- Slack on how far above or below something a line can pass and still touch it.
 local HEIGHT_SLACK = 0.5
 
--- What might stand in a line's way is found through a flat (X, Z) grid rebuilt once a tick (see
--- begin_tick), not by testing every entity on the map against every line: a check only visits the
--- cells near its own segment.
-local LOS_CELL = 24
--- How far the grid can be out of date by the time a check reads it: it is built at the start of the
--- tick, before anything has moved, so a line is searched this much wider to still catch something that
--- has since stepped into it. Well over what the fastest unit covers in one tick.
-local MOVE_SLACK = 8
+-- What might stand in a line's way is found through flat grids (see flat_grid.luau), not by testing
+-- every entity on the map against every line: a check only visits the cells near its own segment. A
+-- cell counts as near if the line passes within half its diagonal plus the widest collider it can hold,
+-- so small units and big buildings live in separate grids - one cell size for both would have to allow
+-- for a building's width everywhere, widening every check through a crowd of small units several times
+-- over. Wrecks never block a line, only a hitscan shot can strike one, so they have a grid of their own.
+--
+-- The grids are rebuilt both before orders (whose fight orders ask for sight) and again after movement,
+-- before combat fires (see `rebuild`), so every check reads exactly where things stand.
+local SMALL_RADIUS = 4
 
-local grid: { [number]: { [number]: { Entity } } } = {}
-
--- The widest collider of anything that can exist, so a cell is only skipped when nothing standing in it
--- could reach the line.
 local widest_collider = 0
 for _, def in unit_defs.defs do
 	widest_collider = math.max(widest_collider, unit_defs.collider_radius(def))
 end
 
-local function begin_tick()
-	table.clear(grid)
+type Layer = {
+	grid: flat_grid.Grid,
+	-- the widest collider this layer can hold
+	widest: number,
+	ys: { number },
+	half_heights: { number },
+	ids: { EntityId },
+	entities: { Entity },
+}
+
+local function new_layer(cell: number, side: number, widest: number): Layer
+	return {
+		grid = flat_grid.new(cell, side),
+		widest = widest,
+		ys = {},
+		half_heights = {},
+		ids = {},
+		entities = {},
+	}
+end
+
+local small_blockers = new_layer(8, 256, SMALL_RADIUS)
+local large_blockers = new_layer(24, 64, widest_collider)
+local wrecks = new_layer(24, 64, widest_collider)
+
+local function layer_add(layer: Layer, entity: Entity, radius: number, half_height: number)
+	local position = entity.position
+	local k = flat_grid.add(layer.grid, position.X, position.Z, radius)
+	layer.ys[k] = position.Y
+	layer.half_heights[k] = half_height
+	layer.ids[k] = entity.id
+	layer.entities[k] = entity
+end
+
+local function rebuild()
+	flat_grid.clear(small_blockers.grid)
+	flat_grid.clear(large_blockers.grid)
+	flat_grid.clear(wrecks.grid)
 	for _, entity in state.all() do
 		if entity.alive == false then
 			continue
 		end
-		local gx = math.floor(entity.position.X / LOS_CELL)
-		local gz = math.floor(entity.position.Z / LOS_CELL)
-		local column = grid[gx]
-		if column == nil then
-			column = {}
-			grid[gx] = column
+		local def = unit_defs.get(entity.def_name)
+		local radius = unit_defs.collider_radius(def)
+		local half_height = unit_defs.collider_height(def) / 2
+		if entity.kind == "wreck" then
+			layer_add(wrecks, entity, radius, half_height)
+		elseif entity.state == "active" then
+			layer_add(if radius <= SMALL_RADIUS then small_blockers else large_blockers, entity, radius, half_height)
 		end
-		local bucket = column[gz]
-		if bucket == nil then
-			bucket = {}
-			column[gz] = bucket
-		end
-		table.insert(bucket, entity)
 	end
+	flat_grid.sort(small_blockers.grid)
+	flat_grid.sort(large_blockers.grid)
+	flat_grid.sort(wrecks.grid)
 end
 
--- Calls `visit` with everything in a cell close enough to the segment from `from` to `to` that
--- something standing in it could touch the line. Each entity is in exactly one cell, so none is visited
--- twice.
-local function each_near_segment(from: Vector3, to: Vector3, visit: (Entity) -> ())
-	local pad = widest_collider + MOVE_SLACK
-	-- a cell counts if the line passes within this of its centre: half its diagonal, plus the padding
-	local reach = LOS_CELL * 0.7072 + pad
-	local ax, az = from.X, from.Z
-	local dx, dz = to.X - ax, to.Z - az
+-- The nearest thing in `layer` the line from `from` to `to` touches, nearer than `best_t` along it (0 at
+-- `from`, 1 at `to`), other than the two `ignored`: its position along the line, and the thing itself.
+local function nearest_on_segment(
+	layer: Layer,
+	from: Vector3,
+	to: Vector3,
+	ignored_a: EntityId,
+	ignored_b: EntityId,
+	best_t: number
+): (number, Entity?)
+	local grid = layer.grid
+	local size, side = grid.size, grid.side
+	local xs, zs, rs, order, starts, stops = grid.xs, grid.zs, grid.rs, grid.order, grid.starts, grid.stops
+	local ys, half_heights, ids, entities = layer.ys, layer.half_heights, layer.ids, layer.entities
+	local pad = layer.widest
+	local reach = size * 0.7072 + pad
+	local ax, ay, az = from.X, from.Y, from.Z
+	local dx, dy, dz = to.X - ax, to.Y - ay, to.Z - az
 	local length_squared = dx * dx + dz * dz
-	local min_gx = math.floor((math.min(ax, to.X) - pad) / LOS_CELL)
-	local max_gx = math.floor((math.max(ax, to.X) + pad) / LOS_CELL)
-	local min_gz = math.floor((math.min(az, to.Z) - pad) / LOS_CELL)
-	local max_gz = math.floor((math.max(az, to.Z) + pad) / LOS_CELL)
-	for gx = min_gx, max_gx do
-		local column = grid[gx]
-		if column == nil then
-			continue
-		end
-		for gz = min_gz, max_gz do
-			local bucket = column[gz]
-			if bucket == nil then
+	local best: Entity? = nil
+	for gx = math.floor((math.min(ax, to.X) - pad) / size), math.floor((math.max(ax, to.X) + pad) / size) do
+		for gz = math.floor((math.min(az, to.Z) - pad) / size), math.floor((math.max(az, to.Z) + pad) / size) do
+			local c = (gz % side) * side + (gx % side) + 1
+			local first = starts[c]
+			if first == 0 then
 				continue
 			end
-			local cx = (gx + 0.5) * LOS_CELL - ax
-			local cz = (gz + 0.5) * LOS_CELL - az
-			local t = if length_squared > 1e-6 then math.clamp((cx * dx + cz * dz) / length_squared, 0, 1) else 0
-			local ox, oz = cx - dx * t, cz - dz * t
-			if ox * ox + oz * oz > reach * reach then
+			-- skip a cell the line passes too far from for anything in it to touch
+			local cx = (gx + 0.5) * size - ax
+			local cz = (gz + 0.5) * size - az
+			local tc = if length_squared > 1e-6 then math.clamp((cx * dx + cz * dz) / length_squared, 0, 1) else 0
+			local ocx, ocz = cx - dx * tc, cz - dz * tc
+			if ocx * ocx + ocz * ocz > reach * reach then
 				continue
 			end
-			for _, entity in bucket do
-				visit(entity)
+			for s = first, stops[c] - 1 do
+				local k = order[s]
+				local id = ids[k]
+				if id == ignored_a or id == ignored_b then
+					continue
+				end
+				local ox, oz = xs[k] - ax, zs[k] - az
+				local t = if length_squared > 1e-6 then math.clamp((ox * dx + oz * dz) / length_squared, 0, 1) else 0
+				if t >= best_t then
+					continue
+				end
+				local sx, sz = ox - dx * t, oz - dz * t
+				local radius = rs[k]
+				if sx * sx + sz * sz > radius * radius then
+					continue
+				end
+				if math.abs(ay + dy * t - ys[k]) > half_heights[k] + HEIGHT_SLACK then
+					continue
+				end
+				local entity = entities[k]
+				-- something can die after the rebuild, part way through combat's own tick
+				if entity.alive == false then
+					continue
+				end
+				best = entity
+				best_t = t
 			end
 		end
 	end
+	return best_t, best
 end
 
 local function muzzle_of(shooter: Entity): Vector3
@@ -133,36 +195,9 @@ end
 
 -- The first solid thing the line from `from` to `to` touches, other than the two `ignored`, if any.
 local function first_in_way(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
-	local along = Vector2.new(to.X - from.X, to.Z - from.Z)
-	local length_squared = along:Dot(along)
-
-	local nearest: Entity? = nil
-	local nearest_t = math.huge
-	each_near_segment(from, to, function(other: Entity)
-		if other.alive == false or other.id == ignored_a or other.id == ignored_b then
-			return
-		end
-		if other.kind == "wreck" or other.state ~= "active" then
-			return
-		end
-
-		local def = unit_defs.get(other.def_name)
-		local to_other = Vector2.new(other.position.X - from.X, other.position.Z - from.Z)
-		local t = if length_squared > 1e-6 then math.clamp(to_other:Dot(along) / length_squared, 0, 1) else 0
-		local closest = from:Lerp(to, t)
-
-		local sideways = Vector2.new(closest.X - other.position.X, closest.Z - other.position.Z).Magnitude
-		local vertical = math.abs(closest.Y - other.position.Y)
-		if
-			sideways <= unit_defs.collider_radius(def)
-			and vertical <= unit_defs.collider_height(def) / 2 + HEIGHT_SLACK
-			and t < nearest_t
-		then
-			nearest = other
-			nearest_t = t
-		end
-	end)
-	return nearest
+	local best_t, nearest = nearest_on_segment(small_blockers, from, to, ignored_a, ignored_b, math.huge)
+	local _, large = nearest_on_segment(large_blockers, from, to, ignored_a, ignored_b, best_t)
+	return large or nearest
 end
 
 -- Whether `shooter`, firing from `origin`, has a shot at `target`.
@@ -209,35 +244,7 @@ end
 
 -- The first wreck the line from `from` to `to` touches, if any. Wrecks can be hit by hitscan weapons like beam lasers.
 local function first_wreck_in_way(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
-	local along = Vector2.new(to.X - from.X, to.Z - from.Z)
-	local length_squared = along:Dot(along)
-
-	local nearest: Entity? = nil
-	local nearest_t = math.huge
-	each_near_segment(from, to, function(other: Entity)
-		if other.alive == false or other.kind ~= "wreck" then
-			return
-		end
-		if other.id == ignored_a or other.id == ignored_b then
-			return
-		end
-
-		local def = unit_defs.get(other.def_name)
-		local to_other = Vector2.new(other.position.X - from.X, other.position.Z - from.Z)
-		local t = if length_squared > 1e-6 then math.clamp(to_other:Dot(along) / length_squared, 0, 1) else 0
-		local closest = from:Lerp(to, t)
-
-		local sideways = Vector2.new(closest.X - other.position.X, closest.Z - other.position.Z).Magnitude
-		local vertical = math.abs(closest.Y - other.position.Y)
-		if
-			sideways <= unit_defs.collider_radius(def)
-			and vertical <= unit_defs.collider_height(def) / 2 + HEIGHT_SLACK
-			and t < nearest_t
-		then
-			nearest = other
-			nearest_t = t
-		end
-	end)
+	local _, nearest = nearest_on_segment(wrecks, from, to, ignored_a, ignored_b, math.huge)
 	return nearest
 end
 
@@ -262,7 +269,7 @@ local function first_hit_at(shooter: Entity, point: Vector3, origin: Vector3): E
 end
 
 return table.freeze({
-	begin_tick = begin_tick,
+	rebuild = rebuild,
 	muzzle_of = muzzle_of,
 	verdict = verdict,
 	verdict_to_point = verdict_to_point,
