@@ -12,12 +12,20 @@ local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local projectile_mod = require(ReplicatedStorage.Shared.projectile)
 
+local world = require(ReplicatedStorage.Client.world)
+
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
+
+type EntityId = types.EntityId
 
 type FlyingProjectile = {
 	part: Part,
 	flight: projectile_mod.Flight,
 	params: types.ProjectileParams,
+	-- the entity this steers toward every frame, for a homing weapon (an AA missile, say): drawing it
+	-- on a plain ballistic path would have it visibly miss a target the server's own copy is curving
+	-- to hit, since the server steers the same way (see projectiles.steer_toward on the server).
+	homing_target_id: EntityId?,
 }
 
 -- How long a beam stays up when its weapon does not say, and how see-through it has become by the end.
@@ -157,7 +165,8 @@ local function launch_projectile(
 	from: Vector3,
 	direction: Vector3,
 	params: types.ProjectileParams,
-	aim: Vector3?
+	aim: Vector3?,
+	homing_target_id: EntityId?
 )
 	local part = Instance.new "Part"
 	part.Name = "Projectile"
@@ -177,7 +186,12 @@ local function launch_projectile(
 	part.Size = if params.missile ~= nil then Vector3.new(0.9, 0.9, 3.4) else Vector3.new(0.5, 0.5, 1.8)
 	part.CFrame = CFrame.lookAt(from, from + (if params.missile ~= nil then Vector3.yAxis else direction))
 	part.Parent = effects_folder()
-	projectiles[id] = { part = part, flight = projectile_mod.launch(from, direction, params, aim), params = params }
+	projectiles[id] = {
+		part = part,
+		flight = projectile_mod.launch(from, direction, params, aim),
+		params = params,
+		homing_target_id = homing_target_id,
+	}
 end
 
 local function remove_projectile(id: number)
@@ -188,9 +202,30 @@ local function remove_projectile(id: number)
 	end
 end
 
+-- Steers a homing projectile toward its target's current position, the same way the server's own copy
+-- does (projectiles.steer_toward), so the drawn missile curves in step with the one that actually hits.
+local function steer_toward(flight: projectile_mod.Flight, target_position: Vector3, delta: number)
+	local to_target = target_position - flight.position
+	if to_target.Magnitude > 1e-3 then
+		local desired_direction = to_target.Unit
+		local current_direction = if flight.velocity.Magnitude > 1e-3 then flight.velocity.Unit else desired_direction
+		local turned = current_direction:Lerp(desired_direction, math.min(1, config.MISSILE_TURN_RATE * delta))
+		local direction = if turned.Magnitude > 1e-3 then turned.Unit else desired_direction
+		flight.velocity = direction * flight.velocity.Magnitude
+	end
+end
+
 -- Flies every projectile the same way the server does, so it is drawn where it really is without being told.
 local function fly_projectiles(delta: number)
 	for id, projectile in projectiles do
+		if projectile.homing_target_id ~= nil then
+			local target = world.get(projectile.homing_target_id)
+			if target ~= nil then
+				steer_toward(projectile.flight, world.position_of(target), delta)
+			else
+				projectile.homing_target_id = nil
+			end
+		end
 		projectile_mod.step(projectile.flight, projectile.params, delta)
 		local at = projectile.flight.position
 		local max_age = if projectile.params.missile ~= nil then config.MISSILE_MAX_AGE else PROJECTILE_MAX_AGE
@@ -213,7 +248,14 @@ local function init()
 		beam_time: number?,
 		beam_thickness: number?,
 		beam_color: Color3?,
-		projectile: { id: number, from: Vector3, direction: Vector3, params: types.ProjectileParams, aim: Vector3? }?,
+		projectile: {
+			id: number,
+			from: Vector3,
+			direction: Vector3,
+			params: types.ProjectileParams,
+			aim: Vector3?,
+			homing_target_id: EntityId?,
+		}?,
 		impact: { id: number, at: Vector3, radius: number }?,
 	})
 		if shot.projectile ~= nil then
@@ -222,7 +264,8 @@ local function init()
 				shot.projectile.from,
 				shot.projectile.direction,
 				shot.projectile.params,
-				shot.projectile.aim
+				shot.projectile.aim,
+				shot.projectile.homing_target_id
 			)
 			return
 		end

@@ -48,6 +48,10 @@ local recent_damage: { [EntityId]: number } = {}
 -- How many candidate targets are checked for line of sight, nearest first, before giving up.
 local MAX_SIGHT_CHECKS = 6
 
+-- The gap between shots within a burst, for a burst weapon that does not say its own (`burst_interval`).
+-- Short enough to read as one rapid burst rather than a weapon that simply reloads fast.
+local DEFAULT_BURST_INTERVAL = 0.1
+
 -- Locked targets, kept outside Entity so the record stays flat.
 local locked: { [EntityId]: EntityId } = {}
 -- Points on the ground that shooters were ordered to attack; a shooter has one of these or a locked
@@ -500,17 +504,21 @@ local function tick_turrets(entity: Entity, turrets: { types.Turret }, delta: nu
 		-- prefer a target the other turrets are not already shooting, but take the same one over none
 		local fired, at = shoot(entity, weapon, origin, claimed)
 		if fired then
-			-- handle burst fire logic for turret
+			-- handle burst fire logic for turret: the short gap between shots in a burst, or the full
+			-- reload once it completes
+			local reload_time = weapon.reload
 			if weapon.burst_count ~= nil and weapon.burst_count > 1 then
 				entity.turret_burst_remaining[index] += 1
 				if entity.turret_burst_remaining[index] >= weapon.burst_count then
 					entity.turret_burst_remaining[index] = 0
+				else
+					reload_time = weapon.burst_interval or DEFAULT_BURST_INTERVAL
 				end
 			end
 			if shared then
-				entity.reload_remaining = weapon.reload
+				entity.reload_remaining = reload_time
 			else
-				entity.turret_reloads[index] = weapon.reload
+				entity.turret_reloads[index] = reload_time
 			end
 			if at ~= nil then
 				table.insert(claimed, at)
@@ -716,11 +724,6 @@ local function tick(delta: number)
 			grow_stockpile(entity, weapon.stockpile, delta)
 		end
 
-		-- Handle burst fire state initialization
-		if weapon.burst_count ~= nil and entity.burst_state == nil then
-			entity.burst_state = { fired = 0, burst_remaining = weapon.burst_count }
-		end
-
 		if entity.reload_remaining > 0 then
 			entity.reload_remaining = math.max(0, entity.reload_remaining - delta)
 			continue
@@ -735,12 +738,12 @@ local function tick(delta: number)
 			if weapon.burst_count ~= nil and weapon.burst_count > 1 then
 				entity.burst_remaining += 1
 				if entity.burst_remaining >= weapon.burst_count then
-					-- burst complete, full reload time before next burst
+					-- burst complete, full reload time before the next one starts
 					entity.reload_remaining = weapon.reload
 					entity.burst_remaining = 0
 				else
-					-- more shots in burst, short interval
-					entity.reload_remaining = weapon.reload
+					-- more shots left in this burst, so only the short gap between them applies
+					entity.reload_remaining = weapon.burst_interval or DEFAULT_BURST_INTERVAL
 				end
 			else
 				-- no burst, standard reload

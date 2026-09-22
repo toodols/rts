@@ -61,7 +61,7 @@ local function is_upgrade_target(placing_def_name: string, model: Model): boolea
 	return placing_def_name == "advanced_metal_extractor" and model:GetAttribute "def_name" == "metal_extractor"
 end
 
-local function taken_positions(placing_def_name: string): { Vector2 }
+local function taken_positions(placing_def_name: string, builder_id: EntityId?): { Vector2 }
 	local taken = {}
 	for _, model in world.all() do
 		if model:GetAttribute "kind" == "building" and is_upgrade_target(placing_def_name, model) == false then
@@ -71,6 +71,12 @@ local function taken_positions(placing_def_name: string): { Vector2 }
 				local position = world.position_of(model)
 				table.insert(taken, Vector2.new(position.X, position.Z))
 			end
+		end
+
+		-- this builder's own queued mexes do not count as taking their spot, mirroring the server's
+		-- placement.spot_taken, so it can requeue past a spot it has already queued itself
+		if builder_id ~= nil and world.id_of(model) == builder_id then
+			continue
 		end
 
 		local path = model:GetAttribute "path"
@@ -312,8 +318,9 @@ local function show_layout(centers: { Vector3 })
 end
 
 -- Moves the ghost onto the ground under `point` and recolours it by validity. Returns the placement
--- the client would send, or nil when there is nothing to place.
-local function update(point: Vector3?): (Vector3?, boolean)
+-- the client would send, or nil when there is nothing to place. `builder_id` is the unit that would be
+-- sent to build it, whose own queued mexes are not treated as taking their spot.
+local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolean)
 	local def_name = current_def
 	local part = ghost
 	if def_name == nil or part == nil or point == nil then
@@ -327,7 +334,7 @@ local function update(point: Vector3?): (Vector3?, boolean)
 	local z = point.Z
 	local locked: Vector3? = nil
 	if def.requires_metal_spot == true then
-		local taken = taken_positions(def_name)
+		local taken = taken_positions(def_name, builder_id)
 		locked = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, function(spot: Vector3): boolean
 			for _, at in taken do
 				if (at - Vector2.new(spot.X, spot.Z)).Magnitude < TAKEN_RADIUS then

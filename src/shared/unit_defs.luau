@@ -2439,6 +2439,9 @@ local defs: { [string]: EntityDef } = {
 			damage = 350,
 			reload = 0.5,
 			burst_count = 2,
+			-- the two bombs drop this far apart, almost together; the full 0.5s reload only applies once
+			-- both are out, before it can drop again on a later pass
+			burst_interval = 0.15,
 			range = 4,
 			energy_per_shot = 0,
 			target_layer = "ground",

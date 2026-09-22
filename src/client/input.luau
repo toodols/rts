@@ -580,6 +580,18 @@ local function order_at_point(point: Vector3, queue: boolean)
 	send_move(ids, positions, queue)
 end
 
+-- The first selected unit that can build `def_name`, the same one the server treats as the builder
+-- for spot-snapping (placement.resolve_center takes only one), so the client's own metal-spot search
+-- exempts the same builder's queue that the server's does.
+local function primary_builder_id(def_name: string): EntityId?
+	for _, entry in selected_with_def(false) do
+		if entry.def.build_options ~= nil and table.find(entry.def.build_options, def_name) ~= nil then
+			return entry.id
+		end
+	end
+	return nil
+end
+
 -- Sends every selected builder to put `def_name` at each of `centers` that fits. They go out in order, or
 -- backwards when the orders go on the front of the queue, so the first place ends up first.
 local function send_placements(def_name: string, centers: { Vector3 })
@@ -618,7 +630,7 @@ local function confirm_placement()
 	if def_name == nil then
 		return
 	end
-	local center, valid = build_mode.update(ground_point())
+	local center, valid = build_mode.update(ground_point(), primary_builder_id(def_name))
 	if center == nil or valid == false then
 		return
 	end
@@ -632,7 +644,7 @@ end
 
 -- The line or grid a shift-drag has laid out so far, from where it began to where the cursor is.
 local function dragged_layout(def_name: string, from: Vector3): { Vector3 }
-	local center = build_mode.update(ground_point())
+	local center = build_mode.update(ground_point(), primary_builder_id(def_name))
 	if center == nil then
 		return { from }
 	end
@@ -745,14 +757,14 @@ local function click_attack_mode()
 	local queue = shift_held()
 	local target = entity_under_mouse()
 	local target_id = if target ~= nil then world.id_of(target) else nil
-	-- an enemy is judged from the first attacker's side, which in godmode need not be your own
+	-- an enemy is judged from the first attacker's side, which in godmode need not be your own; a
+	-- wreck is neutral, team 0, same as any other piece of scenery, but is a valid target in its own right
 	local own_team = first:GetAttribute "team"
+	local is_wreck = target ~= nil and target:GetAttribute "kind" == "wreck"
 	if
 		target ~= nil
 		and target_id ~= nil
-		and target:GetAttribute "kind" ~= "wreck"
-		and target:GetAttribute "team" ~= own_team
-		and target:GetAttribute "team" ~= 0
+		and (is_wreck or (target:GetAttribute "team" ~= own_team and target:GetAttribute "team" ~= 0))
 	then
 		send_targeted("attack", ids, target_id, queue)
 	else
@@ -997,7 +1009,7 @@ local function on_left_down()
 	if build_mode.active() ~= nil then
 		if shift_held() then
 			-- shift starts a line, or with alt a grid, that the drag stretches and letting go places
-			local center = build_mode.update(ground_point())
+			local center = build_mode.update(ground_point(), primary_builder_id(build_mode.active() :: string))
 			placing_from = center
 		else
 			confirm_placement()
@@ -1528,10 +1540,10 @@ local function on_render()
 	report_mode()
 	report_hover()
 	if build_mode.active() ~= nil then
-		build_mode.update(ground_point())
+		local def_name = build_mode.active() :: string
+		build_mode.update(ground_point(), primary_builder_id(def_name))
 		local from = placing_from
-		local def_name = build_mode.active()
-		if from ~= nil and def_name ~= nil then
+		if from ~= nil then
 			build_mode.show_layout(dragged_layout(def_name, from))
 		end
 	else

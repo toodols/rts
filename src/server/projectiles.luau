@@ -125,6 +125,11 @@ local function launch(
 
 	local id = next_projectile_id
 	next_projectile_id += 1
+	local homing_entity_id = if weapon.anti_nuke ~= true
+			and params.homing == true
+			and target ~= nil
+		then target.id
+		else nil
 	table.insert(projectiles, {
 		id = id,
 		owner_id = owner.id,
@@ -138,15 +143,20 @@ local function launch(
 		is_nuclear = params.nuclear == true,
 		is_anti_nuke = weapon.anti_nuke == true,
 		homing_target_id = nil,
-		homing_entity_id = if weapon.anti_nuke ~= true
-				and params.homing == true
-				and target ~= nil
-			then target.id
-			else nil,
+		homing_entity_id = homing_entity_id,
 	})
 
 	weapon_fired:FireAllClients({
-		projectile = { id = id, from = origin, direction = direction.Unit, params = params, aim = aim },
+		-- homing_target_id lets the client steer the projectile it draws the same way this one
+		-- actually flies, instead of a plain ballistic path that happens to land where it should
+		projectile = {
+			id = id,
+			from = origin,
+			direction = direction.Unit,
+			params = params,
+			aim = aim,
+			homing_target_id = homing_entity_id,
+		},
 		team = owner.team,
 	})
 end
@@ -220,8 +230,8 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 		if other.alive == false or (struck ~= nil and other.id == struck.id) then
 			continue
 		end
-		-- Skip friendly units and wrecks in AoE blast
-		if alliances.are_allied(other.team, projectile.team) or other.kind == "wreck" then
+		-- a wreck is neutral, never allied, so this only skips friendly units
+		if alliances.are_allied(other.team, projectile.team) then
 			continue
 		end
 		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
