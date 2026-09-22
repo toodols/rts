@@ -42,6 +42,7 @@ local spawning = require(script.spawning)
 local pause = require(script.pause)
 local warp = require(script.warp)
 local profiler = require(script.profiler)
+local benchmark = require(script.benchmark)
 
 type TeamId = types.TeamId
 
@@ -133,6 +134,9 @@ local function step(delta: number)
 	reclaim.begin_tick()
 	resurrection.begin_tick()
 	movement.begin_tick()
+	-- before orders.tick(), so a fight order's has_target check and this tick's actual shot share
+	-- one fresh target grid and one cached pick_target result instead of each scanning from scratch
+	combat.begin_tick()
 
 	profiler.mark "production"
 	production.tick(delta)
@@ -206,6 +210,23 @@ local function init()
 
 	commands.init()
 	scavengers.init()
+
+	-- Lets a Studio MCP client run /benchmark unattended: set the "AutoBenchmark" attribute on
+	-- Workspace before starting a Run (no player needed - the sim steps off Heartbeat regardless),
+	-- and this prints the report between sentinel lines. TestService has no supported way to end a
+	-- Play-test session from server code, so a caller has to start Run, poll the output for
+	-- BENCHMARK_END, and stop the session itself from there (as well as read what is between).
+	if RunService:IsStudio() and Workspace:GetAttribute("AutoBenchmark") == true then
+		task.spawn(function()
+			task.wait(1)
+			print "BENCHMARK_BEGIN"
+			local ok, err = pcall(benchmark.run, print)
+			if not ok then
+				print(`BENCHMARK_ERROR: {err}`)
+			end
+			print "BENCHMARK_END"
+		end)
+	end
 
 	Players.PlayerAdded:Connect(on_player_added)
 	Players.PlayerRemoving:Connect(function(player: Player)

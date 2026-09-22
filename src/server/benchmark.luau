@@ -1,7 +1,9 @@
 -- Automated performance scenarios for /benchmark: each spawns a batch of real entities in a corner
--- of the map, lets the simulation run under them for a fixed span while the profiler measures it,
--- kills everything it made, and moves on to the next. The result is a block of text meant to be
--- pasted back for analysis, not read off the console as it happens.
+-- of the map, warps the simulation under them for a fixed number of ticks while the profiler
+-- measures it, kills everything it made, and moves on to the next. Warping (rather than waiting
+-- out a span of real time) means a scenario's step count - and so its results - doesn't depend on
+-- how fast the machine running it happens to be. The result is a block of text meant to be pasted
+-- back for analysis, not read off the console as it happens.
 --
 -- Entities are created directly with state.create_entity, not through the normal build/command
 -- path, so none of this costs metal or energy and none of it depends on a player being present.
@@ -20,6 +22,7 @@ local profiler = require(script.Parent.profiler)
 local production = require(script.Parent.production)
 local transport = require(script.Parent.transport)
 local scavengers = require(script.Parent.scavengers)
+local warp = require(script.Parent.warp)
 
 type EntityId = types.EntityId
 type TeamId = types.TeamId
@@ -244,7 +247,9 @@ end
 export type Scenario = {
 	name: string,
 	description: string,
-	duration: number,
+	-- how many simulation steps the scenario runs for, measured in ticks rather than wall-clock
+	-- seconds, so a run is the same length regardless of how fast warp manages to go
+	ticks: number,
 	setup: () -> (),
 	-- run after clear_arena(), for anything a scenario made that could have wandered outside the
 	-- bounding box by the time it is torn down - a scavenger beacon's own hunters, say
@@ -267,30 +272,30 @@ end
 local SCENARIOS: { Scenario } = {
 	{
 		name = "idle",
-		description = "400 idle grunts, scattered, doing nothing",
-		duration = 5,
+		description = "900 idle grunts, scattered, doing nothing",
+		ticks = 100,
 		setup = function()
 			ensure_team(TEAM_A)
-			grid_spawn("grunt", TEAM_A, ARENA_X - 160, ARENA_Z - 160, 400, 8, 20, 0, nil)
+			grid_spawn("grunt", TEAM_A, ARENA_X - 260, ARENA_Z - 260, 900, 8, 30, 0, nil)
 		end,
 	},
 	{
 		name = "melee",
-		description = "150 v 150 grunts, closing in and fighting to the death",
-		duration = 10,
+		description = "350 v 350 grunts, closing in and fighting to the death",
+		ticks = 200,
 		setup = function()
 			ensure_team(TEAM_A)
 			ensure_team(TEAM_B)
-			local center_a = Vector3.new(ARENA_X - 300, 0, ARENA_Z - 150)
-			local center_b = Vector3.new(ARENA_X - 150, 0, ARENA_Z - 300)
+			local center_a = Vector3.new(ARENA_X - 320, 0, ARENA_Z - 160)
+			local center_b = Vector3.new(ARENA_X - 160, 0, ARENA_Z - 320)
 			grid_spawn(
 				"grunt",
 				TEAM_A,
 				center_a.X,
 				center_a.Z,
-				150,
+				350,
 				7,
-				13,
+				19,
 				0,
 				{ { kind = "fight", position = center_b } }
 			)
@@ -299,9 +304,9 @@ local SCENARIOS: { Scenario } = {
 				TEAM_B,
 				center_b.X,
 				center_b.Z,
-				150,
+				350,
 				7,
-				13,
+				19,
 				0,
 				{ { kind = "fight", position = center_a } }
 			)
@@ -309,21 +314,21 @@ local SCENARIOS: { Scenario } = {
 	},
 	{
 		name = "ranged",
-		description = "100 v 100 aggravators (rockets), closing in and fighting to the death",
-		duration = 10,
+		description = "220 v 220 aggravators (rockets), closing in and fighting to the death",
+		ticks = 200,
 		setup = function()
 			ensure_team(TEAM_A)
 			ensure_team(TEAM_B)
-			local center_a = Vector3.new(ARENA_X - 350, 0, ARENA_Z - 175)
-			local center_b = Vector3.new(ARENA_X - 175, 0, ARENA_Z - 350)
+			local center_a = Vector3.new(ARENA_X - 330, 0, ARENA_Z - 170)
+			local center_b = Vector3.new(ARENA_X - 170, 0, ARENA_Z - 330)
 			grid_spawn(
 				"aggravator",
 				TEAM_A,
 				center_a.X,
 				center_a.Z,
-				100,
+				220,
 				9,
-				10,
+				15,
 				0,
 				{ { kind = "fight", position = center_b } }
 			)
@@ -332,9 +337,9 @@ local SCENARIOS: { Scenario } = {
 				TEAM_B,
 				center_b.X,
 				center_b.Z,
-				100,
+				220,
 				9,
-				10,
+				15,
 				0,
 				{ { kind = "fight", position = center_a } }
 			)
@@ -342,22 +347,22 @@ local SCENARIOS: { Scenario } = {
 	},
 	{
 		name = "movement",
-		description = "400 ticks, all given the same far move order at once",
-		duration = 8,
+		description = "900 ticks, all given the same far move order at once",
+		ticks = 160,
 		setup = function()
 			ensure_team(TEAM_A)
 			local from_x, from_z = ARENA_X - 350, ARENA_Z - 350
 			local target = heightmap.ground_position(ARENA_X, ARENA_Z)
-			grid_spawn("tick", TEAM_A, from_x, from_z, 400, 6, 20, 0, { { kind = "move", position = target } })
+			grid_spawn("tick", TEAM_A, from_x, from_z, 900, 6, 30, 0, { { kind = "move", position = target } })
 		end,
 	},
 	{
 		name = "production",
-		description = "8 bot labs, each queued 30 grunts deep, building continuously",
-		duration = 10,
+		description = "16 bot labs, each queued 30 grunts deep, building continuously",
+		ticks = 200,
 		setup = function()
 			ensure_team(TEAM_A)
-			local ids = grid_spawn("bot_lab", TEAM_A, ARENA_X - 200, ARENA_Z - 200, 8, 20, 4, 0, nil)
+			local ids = grid_spawn("bot_lab", TEAM_A, ARENA_X - 200, ARENA_Z - 200, 16, 20, 4, 0, nil)
 			for _, id in ids do
 				local factory = state.get(id)
 				if factory ~= nil then
@@ -370,21 +375,21 @@ local SCENARIOS: { Scenario } = {
 	},
 	{
 		name = "construction",
-		description = "80 blueprints, each assisted by its own constructor from the moment it appears",
-		duration = 10,
+		description = "180 blueprints, each assisted by its own constructor from the moment it appears",
+		ticks = 200,
 		setup = function()
 			ensure_team(TEAM_A)
-			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 320, ARENA_Z - 320, 80, 12, 10)
-			grid_spawn_targeting("constructor", TEAM_A, ARENA_X - 320, ARENA_Z - 300, 80, 12, 10, "assist", blueprints)
+			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 320, ARENA_Z - 320, 180, 12, 13)
+			grid_spawn_targeting("constructor", TEAM_A, ARENA_X - 320, ARENA_Z - 300, 180, 12, 13, "assist", blueprints)
 		end,
 	},
 	{
 		name = "reclaim_resurrect",
-		description = "150 wrecks; 25 graverobbers reclaiming half of them, 25 resurrecting the other half",
-		duration = 10,
+		description = "300 wrecks; 45 graverobbers reclaiming half of them, 45 resurrecting the other half",
+		ticks = 200,
 		setup = function()
 			ensure_team(TEAM_A)
-			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 350, ARENA_Z - 350, 150, 6, 15)
+			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 350, ARENA_Z - 350, 300, 6, 18)
 			local half = #wrecks // 2
 			local to_reclaim, to_resurrect = {}, {}
 			for i, id in wrecks do
@@ -394,15 +399,15 @@ local SCENARIOS: { Scenario } = {
 					table.insert(to_resurrect, id)
 				end
 			end
-			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 350, ARENA_Z - 320, 25, 12, 10, "reclaim", to_reclaim)
+			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 350, ARENA_Z - 320, 45, 12, 12, "reclaim", to_reclaim)
 			grid_spawn_targeting(
 				"graverobber",
 				TEAM_A,
 				ARENA_X - 200,
 				ARENA_Z - 320,
-				25,
+				45,
 				12,
-				10,
+				12,
 				"resurrect",
 				to_resurrect
 			)
@@ -410,15 +415,15 @@ local SCENARIOS: { Scenario } = {
 	},
 	{
 		name = "transport",
-		description = "30 loaded transports shuttling between two points",
-		duration = 8,
+		description = "70 loaded transports shuttling between two points",
+		ticks = 160,
 		setup = function()
 			ensure_team(TEAM_A)
 			local from = Vector3.new(ARENA_X - 350, 0, ARENA_Z - 350)
 			local to = Vector3.new(ARENA_X - 50, 0, ARENA_Z - 50)
 			local transport_ids =
-				grid_spawn("hercules", TEAM_A, from.X, from.Z, 30, 15, 10, 0, { { kind = "move", position = to } })
-			local cargo_ids = grid_spawn("grunt", TEAM_A, from.X, from.Z + 200, 60, 8, 20, 0, nil)
+				grid_spawn("hercules", TEAM_A, from.X, from.Z, 70, 15, 10, 0, { { kind = "move", position = to } })
+			local cargo_ids = grid_spawn("grunt", TEAM_A, from.X, from.Z + 200, 140, 8, 20, 0, nil)
 			for i, transport_id in transport_ids do
 				local carrier = state.get(transport_id)
 				local first = state.get(cargo_ids[i * 2 - 1])
@@ -436,7 +441,7 @@ local SCENARIOS: { Scenario } = {
 		name = "mixed",
 		description = "a late-game slice: two mixed armies fighting, factories producing, builders "
 			.. "building and reclaiming, loaded transports, and an active scavenger beacon, all at once",
-		duration = 20,
+		ticks = 400,
 		teardown = function()
 			clear_scavengers()
 			scavengers.set_enabled(false)
@@ -555,6 +560,7 @@ local function run(log: (string) -> ())
 		return false
 	end
 	running = true
+	local started_at = os.clock()
 
 	local ok, err = pcall(function()
 		local lines: { string } = { `Benchmark: {#SCENARIOS} scenarios` }
@@ -575,6 +581,12 @@ local function run(log: (string) -> ())
 		local was_enabled = scavengers.is_enabled()
 		scavengers.set_enabled(false)
 
+		-- warped for the whole run so every scenario is measured over a fixed number of ticks
+		-- rather than however many ticks real time happens to buy it - restored to whatever it
+		-- actually was once every scenario is done, win or not, same as scavengers above
+		local was_warping = warp.is_warping()
+		warp.set(true)
+
 		task.wait(config.TICK_DELTA * 3)
 
 		for _, scenario in SCENARIOS do
@@ -582,7 +594,9 @@ local function run(log: (string) -> ())
 			-- let the spawn itself settle for a tick before the clock starts
 			task.wait(config.TICK_DELTA)
 			profiler.reset()
-			task.wait(scenario.duration)
+			repeat
+				task.wait()
+			until profiler.step_count() >= scenario.ticks
 
 			local steps = profiler.step_count()
 			local elapsed = profiler.elapsed_since_reset()
@@ -616,8 +630,13 @@ local function run(log: (string) -> ())
 		end
 
 		scavengers.set_enabled(was_enabled)
+		warp.set(was_warping)
 
 		table.insert(lines, "")
+		-- wall-clock, not sim time: with every scenario now warped to a fixed tick count (see
+		-- SCENARIOS above), this is what actually moves when a change makes a step cheaper, so it
+		-- doubles as the one number worth diffing between two versions' runs
+		table.insert(lines, `Total time: {string.format("%.2f", os.clock() - started_at)}s`)
 		table.insert(lines, "Benchmark complete")
 		log(table.concat(lines, "\n"))
 	end)
