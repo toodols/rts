@@ -329,7 +329,7 @@ local function on_place_blueprint(player: Player, payload: unknown)
 	end
 
 	local facing = geometry.snap_facing(if typeof(data.facing) == "number" then data.facing else 0)
-	local center = placement.resolve_center(data.def_name, data.position.X, data.position.Z, facing)
+	local center = placement.resolve_center(data.def_name, data.position.X, data.position.Z, facing, builders[1].id)
 	if center == nil then
 		return
 	end

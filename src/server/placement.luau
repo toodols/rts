@@ -132,12 +132,18 @@ local function ground_center(def_name: string, x: number, z: number): Vector3
 end
 
 -- Whether something spot-bound already stands on `spot`, or is waiting in some builder's queue to.
-local function spot_taken(spot: Vector3): boolean
+-- If `builder_id` is provided, mexes queued by that same builder are ignored (not considered taken).
+-- If `def_name` equals "advanced_metal_extractor", spots with T1 mexes are not considered taken.
+local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string?): boolean
 	for _, other in state.all() do
 		if other.alive == false then
 			continue
 		end
 		if other.kind == "building" and unit_defs.get(other.def_name).requires_metal_spot == true then
+			-- Allow T2 mex to use a spot already occupied by T1 mex (fix #4)
+			if def_name == "advanced_metal_extractor" and other.def_name == "metal_extractor" then
+				continue
+			end
 			if geometry.distance_2d(other.position, spot) < TAKEN_RADIUS then
 				return true
 			end
@@ -147,6 +153,10 @@ local function spot_taken(spot: Vector3): boolean
 				then unit_defs.get(order.def_name)
 				else nil
 			if queued_def ~= nil and queued_def.requires_metal_spot == true and order.position ~= nil then
+				-- Only ignore this queued mex if it's queued by the same builder (fix #10)
+				if builder_id ~= nil and other.id == builder_id then
+					continue
+				end
 				if geometry.distance_2d(order.position, spot) < TAKEN_RADIUS then
 					return true
 				end
@@ -158,11 +168,14 @@ end
 
 -- Where a building asked for at (x, z) would actually go, turned to `facing`. Buildings sit on the
 -- building grid, and a spot-bound one goes on the nearest metal spot instead, or nowhere if there is
--- none close enough.
-local function resolve_center(def_name: string, x: number, z: number, facing: number): Vector3?
+-- none close enough. If `builder_id` is provided and this is a metal spot building, spots queued by
+-- that builder are not considered taken. T2 mexes can use spots already occupied by T1 mexes.
+local function resolve_center(def_name: string, x: number, z: number, facing: number, builder_id: EntityId?): Vector3?
 	local def = unit_defs.get(def_name)
 	if def.requires_metal_spot == true then
-		local spot = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, spot_taken)
+		local spot = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, function(s)
+			return spot_taken(s, builder_id, def_name)
+		end)
 		if spot == nil then
 			return nil
 		end
