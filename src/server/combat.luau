@@ -336,7 +336,7 @@ local function fire_at_ground(attacker: Entity, point: Vector3, weapon: types.We
 	end
 
 	if weapon.projectile ~= nil then
-		projectiles.launch(attacker, origin, point, with_chosen_arc(attacker, weapon, origin, point, attacker.id), nil)
+		projectiles.launch(attacker, origin, point, with_chosen_arc(attacker, weapon, origin, point, attacker.id), nil, nil)
 		return true
 	end
 
@@ -606,6 +606,11 @@ local function tick(delta: number)
 			grow_stockpile(entity, weapon.stockpile, delta)
 		end
 
+		-- Handle burst fire state initialization
+		if weapon.burst_count ~= nil and entity.burst_state == nil then
+			entity.burst_state = { fired = 0, burst_remaining = weapon.burst_count }
+		end
+
 		if entity.reload_remaining > 0 then
 			entity.reload_remaining = math.max(0, entity.reload_remaining - delta)
 			continue
@@ -616,7 +621,24 @@ local function tick(delta: number)
 		end
 
 		if shoot(entity, weapon, sight.muzzle_of(entity), {}) then
-			entity.reload_remaining = weapon.reload
+			if weapon.burst_count ~= nil and entity.burst_state ~= nil then
+				-- Burst fire logic
+				entity.burst_state.fired += 1
+				entity.burst_state.burst_remaining -= 1
+
+				if entity.burst_state.burst_remaining > 0 then
+					-- More shots in this burst, use reduced reload time
+					entity.reload_remaining = weapon.reload / weapon.burst_count
+				else
+					-- Burst complete, use full reload and reset burst state
+					entity.reload_remaining = weapon.reload
+					entity.burst_state = nil
+				end
+			else
+				-- Regular non-burst weapon
+				entity.reload_remaining = weapon.reload
+			end
+
 			if weapon.stockpile ~= nil then
 				entity.stockpile -= 1
 				launched[entity.id] = true

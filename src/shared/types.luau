@@ -88,6 +88,8 @@ export type ProjectileParams = {
 	missile: Missile?,
 	-- a plasma shell: one that a plasma deflector stops. Rockets, missiles and beams are not.
 	plasma: boolean?,
+	-- whether this projectile actively homes in on its target after launch
+	homing: boolean?,
 }
 
 -- How a missile flies: straight up from its launcher to `climb` studs above it, over to its target at that
@@ -124,6 +126,8 @@ export type Weapon = {
 	-- a weapon that fires from a stockpile of missiles that it builds up over time, rather than from a
 	-- reload alone. It shoots only when it is told to, never at what happens to come within its range.
 	stockpile: Stockpile?,
+	-- for a weapon that fires multiple times per reload cycle; nil if weapon fires once per reload
+	burst_count: number?,
 }
 
 -- What building up missiles takes: every `build_time` seconds one more is finished, at the price of `metal` and
@@ -330,6 +334,8 @@ export type Entity = {
 	-- missiles held ready, and seconds spent on the next one, if its weapon stockpiles them
 	stockpile: number,
 	stockpile_progress: number,
+	-- tracks burst fire state: how many shots fired in current burst and how many remain
+	burst_state: { fired: number, burst_remaining: number }?,
 	-- seconds a blueprint has gone without anyone building it; it starts to decay past a limit
 	unfed_time: number,
 	wreck: Wreck?,
