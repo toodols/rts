@@ -1314,8 +1314,6 @@ local function on_input_began(input: InputObject, processed: boolean)
 		start_target_mode "load"
 	elseif input.KeyCode == Enum.KeyCode.U then
 		start_target_mode "unload"
-	elseif input.KeyCode == Enum.KeyCode.O then
-		start_target_mode "guard"
 	elseif input.KeyCode == Enum.KeyCode.LeftBracket then
 		build_mode.rotate(1)
 	elseif input.KeyCode == Enum.KeyCode.RightBracket then
@@ -1361,6 +1359,18 @@ local function cycle_commander(_, input_state: Enum.UserInputState): Enum.Contex
 	local chosen = commanders[next_index]
 	selection.set({ chosen.id })
 	camera_mod.look_at(world.position_of(chosen.model))
+	return Enum.ContextActionResult.Sink
+end
+
+local GUARD_ACTION = "rts_guard_mode"
+
+-- O: starts guard mode. Bound above the default so that Roblox's own reserved use of O never sees
+-- it (as with Tab above), even though nothing else in the game wants it.
+local function start_guard_mode(_, input_state: Enum.UserInputState): Enum.ContextActionResult
+	if input_state ~= Enum.UserInputState.Begin then
+		return Enum.ContextActionResult.Pass
+	end
+	start_target_mode "guard"
 	return Enum.ContextActionResult.Sink
 end
 
@@ -1537,6 +1547,13 @@ local function init()
 		false,
 		Enum.ContextActionPriority.High.Value,
 		Enum.KeyCode.Tab
+	)
+	ContextActionService:BindActionAtPriority(
+		GUARD_ACTION,
+		start_guard_mode,
+		false,
+		Enum.ContextActionPriority.High.Value,
+		Enum.KeyCode.O
 	)
 	UserInputService.InputBegan:Connect(on_input_began)
 	UserInputService.InputEnded:Connect(on_input_ended)
