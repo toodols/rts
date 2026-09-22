@@ -32,12 +32,66 @@ local TEAM_B: TeamId = 90002
 -- litters a live game near anyone's base. The bounding box is swept clean of everything - any team,
 -- any kind, wrecks included - between scenarios, since combat leaves wrecks that the set of ids a
 -- setup spawned would not otherwise catch.
+--
+-- Every scenario only ever offsets inward from these two (ARENA_X - n, ARENA_Z - n), never out past
+-- them, so resolve_arena() below can move the corner itself without anything else needing to change.
 local ARENA_MARGIN = 60
+local ARENA_SPAN = 420
 local ARENA_X = config.MAP_CELLS_X * config.CELL_STUDS / 2 - ARENA_MARGIN
 local ARENA_Z = config.MAP_CELLS_Z * config.CELL_STUDS / 2 - ARENA_MARGIN
-local ARENA_SPAN = 420
 local ARENA_MIN_X = ARENA_X - ARENA_SPAN
 local ARENA_MIN_Z = ARENA_Z - ARENA_SPAN
+
+-- How far inward each retry step moves the corner along its own diagonal, and how many tries before
+-- giving up on finding dry land at all.
+local ARENA_RETRY_STEP = 60
+local ARENA_RETRY_LIMIT = 10
+local arena_resolved = false
+
+-- Whether the arena's whole footprint, corner at (x, z), is dry enough to spawn land units on: a
+-- coarse sample of the corner, the far inward corner of the footprint, and its centre. A map preset
+-- can just as easily put ocean in the corner this used to assume was always safe, and a land unit
+-- (max_water_depth 0, most of them) spawned in water it cannot tolerate drowns within moments of
+-- existing - exactly what happened to the "idle" scenario's grunts.
+local function arena_is_dry(x: number, z: number): boolean
+	for _, sample in
+		{
+			{ x, z },
+			{ x - ARENA_SPAN, z },
+			{ x, z - ARENA_SPAN },
+			{ x - ARENA_SPAN, z - ARENA_SPAN },
+			{ x - ARENA_SPAN / 2, z - ARENA_SPAN / 2 },
+		}
+	do
+		if heightmap.water_depth(sample[1], sample[2]) > 0 then
+			return false
+		end
+	end
+	return true
+end
+
+-- Moves the arena's corner inward along its own diagonal, up to ARENA_RETRY_LIMIT tries, until its
+-- footprint tests dry. Called once, at the start of a run. Returns a warning line for the report
+-- (rather than logging it directly) if nothing dry was found at all, so the whole benchmark still
+-- comes out as the one message run() promises, not an extra print ahead of it.
+local function resolve_arena(): string?
+	if arena_resolved then
+		return nil
+	end
+	arena_resolved = true
+	for attempt = 0, ARENA_RETRY_LIMIT do
+		local x = ARENA_X - attempt * ARENA_RETRY_STEP
+		local z = ARENA_Z - attempt * ARENA_RETRY_STEP
+		if arena_is_dry(x, z) then
+			ARENA_X = x
+			ARENA_Z = z
+			ARENA_MIN_X = x - ARENA_SPAN
+			ARENA_MIN_Z = z - ARENA_SPAN
+			return nil
+		end
+	end
+	return "No dry spot found for the benchmark arena along its usual corner; results may include drowning"
+end
 
 local running = false
 
@@ -501,6 +555,11 @@ local function run(log: (string) -> ())
 
 	task.spawn(function()
 		local lines: { string } = { `Benchmark: {#SCENARIOS} scenarios` }
+		local arena_warning = resolve_arena()
+		if arena_warning ~= nil then
+			table.insert(lines, arena_warning)
+		end
+
 		-- in case a previous run was interrupted partway through and left its own debris behind, a
 		-- surviving scavenger beacon included
 		clear_arena()
