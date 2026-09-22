@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local state = require(script.Parent.state)
 local economy = require(script.Parent.economy)
@@ -54,6 +55,21 @@ local function complete(entity: Entity)
 	entity.health += def.health - entity.max_health
 	entity.max_health = def.health
 	entity.health = math.clamp(entity.health, 1, def.health)
+
+	-- If this is a T2 mex built on top of a T1 mex, refund the T1
+	if entity.def_name == "advanced_metal_extractor" then
+		for _, other in state.all() do
+			if other.alive and other.def_name == "metal_extractor"
+				and other.state == "active"
+				and geometry.distance_2d(entity.position, other.position) < 1 then
+				-- Refund the T1 mex
+				local other_def = unit_defs.get(other.def_name)
+				economy.add_metal(other.team, other_def.metal_cost)
+				state.mark_dead(other)
+				break
+			end
+		end
+	end
 end
 
 -- Registers `builder` as working on `target` for this tick. Does nothing if the builder has no
