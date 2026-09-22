@@ -27,8 +27,8 @@ local BEAM_THICKNESS = 0.25
 local BLAST_LIFETIME = 0.6
 local BLAST_COLOR = Color3.fromRGB(238, 60, 48)
 local BLAST_HEIGHT = 3
--- A rocket the server has not reported back on is dropped after this long, in case its impact was lost.
-local ROCKET_MAX_AGE = 35
+-- A projectile the server has not reported back on is dropped after this long, in case its impact was lost.
+local PROJECTILE_MAX_AGE = 35
 -- Plasma is drawn glowing. Everything else that flies, rockets, missiles and bombs, is a casing of metal: plastic, and
 -- a dull grey that does not light up.
 local PLASMA_COLOR = Color3.fromRGB(255, 196, 96)
@@ -160,7 +160,7 @@ local function launch_projectile(
 	aim: Vector3?
 )
 	local part = Instance.new "Part"
-	part.Name = "Rocket"
+	part.Name = "Projectile"
 	part.Anchored = true
 	part.CanCollide = false
 	part.CanQuery = false
@@ -193,7 +193,7 @@ local function fly_projectiles(delta: number)
 	for id, projectile in projectiles do
 		projectile_mod.step(projectile.flight, projectile.params, delta)
 		local at = projectile.flight.position
-		local max_age = if projectile.params.missile ~= nil then config.MISSILE_MAX_AGE else ROCKET_MAX_AGE
+		local max_age = if projectile.params.missile ~= nil then config.MISSILE_MAX_AGE else PROJECTILE_MAX_AGE
 		if projectile.flight.age > max_age or at.Y < heightmap.height_at(at.X, at.Z) - 2 then
 			remove_projectile(id)
 		else
@@ -213,16 +213,16 @@ local function init()
 		beam_time: number?,
 		beam_thickness: number?,
 		beam_color: Color3?,
-		rocket: { id: number, from: Vector3, direction: Vector3, params: types.ProjectileParams, aim: Vector3? }?,
+		projectile: { id: number, from: Vector3, direction: Vector3, params: types.ProjectileParams, aim: Vector3? }?,
 		impact: { id: number, at: Vector3, radius: number }?,
 	})
-		if shot.rocket ~= nil then
+		if shot.projectile ~= nil then
 			launch_projectile(
-				shot.rocket.id,
-				shot.rocket.from,
-				shot.rocket.direction,
-				shot.rocket.params,
-				shot.rocket.aim
+				shot.projectile.id,
+				shot.projectile.from,
+				shot.projectile.direction,
+				shot.projectile.params,
+				shot.projectile.aim
 			)
 			return
 		end
