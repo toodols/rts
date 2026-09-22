@@ -219,15 +219,17 @@ local function tick(delta: number)
 			end
 			-- Water it cannot stand in, and ground too steep for it, are walls: it slides along them, or stops.
 			-- Something already standing where it should not, like a wader that was pushed in, may move freely
-			-- to get out. Exception: ships that need water cannot move while on land - they must stop.
+			-- to get out. Exception: ships that need water cannot move forward onto land - they must reverse course.
 			local here = entity.position
 			local current_standable = standable(def, here.X, here.Z)
 			local next_standable = standable(def, next_position.X, next_position.Z)
 
-			-- If a floating unit (ship) is on land, prevent any movement
+			-- If a floating unit (ship) is on land, push it back toward water by reversing its velocity
 			if unit_defs.floats(def) and current_standable == false then
+				-- Reverse velocity to push back the way it came
+				entity.velocity = -entity.velocity
+				-- Don't move this tick; next tick it will move back toward water
 				next_position = here
-				entity.velocity = Vector3.zero
 			elseif next_standable == false and current_standable then
 				if standable(def, next_position.X, here.Z) then
 					next_position = Vector3.new(next_position.X, next_position.Y, here.Z)
