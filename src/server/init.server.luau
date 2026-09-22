@@ -40,6 +40,7 @@ local replication = require(script.replication)
 local scavengers = require(script.scavengers)
 local spawning = require(script.spawning)
 local pause = require(script.pause)
+local warp = require(script.warp)
 local profiler = require(script.profiler)
 
 type TeamId = types.TeamId
@@ -50,6 +51,14 @@ local MAP_SEED = 1337
 -- What the ground is like: "highlands" or "islands". See shared/map_presets.luau.
 local MAP_PRESET = "koth"
 local RESOURCE_BROADCAST_INTERVAL = 0.2
+
+-- While warping, how much real time each Heartbeat may spend running steps back to back before it
+-- has to yield and let the engine schedule the next one - not a step count, since how many steps fit
+-- in that time depends entirely on what is actually happening in the game right now.
+local WARP_TIME_BUDGET = 0.15
+-- An absolute cap regardless of the time budget, so a pathologically slow step() cannot still hold a
+-- single Heartbeat for a very long time.
+local WARP_MAX_STEPS = 500
 
 local accumulator = 0
 local broadcast_timer = 0
@@ -210,13 +219,26 @@ local function init()
 		if pause.is_paused() then
 			return
 		end
-		accumulator += delta
-		-- cap catch-up so a long hitch does not spiral into a burst of steps
+
 		local steps = 0
-		while accumulator >= config.TICK_DELTA and steps < 5 do
-			accumulator -= config.TICK_DELTA
-			steps += 1
-			step(config.TICK_DELTA)
+		if warp.is_warping() then
+			-- real time is not being tracked toward anything while warping - every step is owed
+			-- right away, not caught up on later - so a hitch right after warp turns off would
+			-- otherwise replay as a burst of catch-up steps for time that was never real
+			accumulator = 0
+			local budget_ends_at = os.clock() + WARP_TIME_BUDGET
+			while steps < WARP_MAX_STEPS and os.clock() < budget_ends_at do
+				steps += 1
+				step(config.TICK_DELTA)
+			end
+		else
+			accumulator += delta
+			-- cap catch-up so a long hitch does not spiral into a burst of steps
+			while accumulator >= config.TICK_DELTA and steps < 5 do
+				accumulator -= config.TICK_DELTA
+				steps += 1
+				step(config.TICK_DELTA)
+			end
 		end
 		if steps > 0 then
 			profiler.mark "instances_sync"

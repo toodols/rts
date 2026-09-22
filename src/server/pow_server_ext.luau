@@ -20,6 +20,7 @@ local profiler = require(ServerScriptService.Server.profiler)
 local scavengers = require(ServerScriptService.Server.scavengers)
 local spawning = require(ServerScriptService.Server.spawning)
 local state = require(ServerScriptService.Server.state)
+local warp = require(ServerScriptService.Server.warp)
 
 return function(extras: { commands: { [string]: any } })
 	local commands = extras.commands
@@ -71,6 +72,25 @@ return function(extras: { commands: { [string]: any } })
 			context:log({
 				type = "info",
 				value = if paused then "Paused" else "Unpaused",
+			})
+		end,
+	}
+
+	commands.warp = {
+		description = "Runs the simulation as fast as it can, every step right after the last with no "
+			.. "real-time pacing between them, instead of the usual one tick per (roughly) 1/20th of a "
+			.. "second. With no argument it toggles.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { { name = "Warping", type = "boolean" } } },
+		},
+		server_run = function(context: any)
+			local warping = if context.args[1] ~= nil then context.args[1] else warp.is_warping() == false
+			warp.set(warping)
+			context:log({
+				type = "info",
+				value = if warping then "Warping" else "Warp off",
 			})
 		end,
 	}
