@@ -458,6 +458,27 @@ local function spawn_beacon(allow_sea: boolean): boolean
 	return false
 end
 
+-- Puts a beacon down at (x, z) regardless of players or roaming room, for testing: it still snaps to
+-- the nearest valid land or sea spot the way spawn_beacon does, but skips is_beacon_site_clear and
+-- has_room_to_roam, and starts making things right away rather than waiting out the usual initial
+-- delay. Returns whether one went down; it can still fail if there is nowhere for it to stand at all.
+local function force_beacon(x: number, z: number): boolean
+	local sea = heightmap.water_depth(x, z) > 0
+	local def_name = if sea then SEA_BEACON_DEF else BEACON_DEF
+	local center = placement.resolve_center(def_name, x, z, 0)
+	if center == nil or placement.can_place(def_name, center, 0, nil) == false then
+		return false
+	end
+	local beacon = state.create_entity(def_name, config.SCAVENGER_TEAM, center, 0, "active")
+	state.flush()
+	beacons[beacon.id] = {
+		next_unit_at = clock,
+		next_defense_at = clock,
+		sea = sea,
+	}
+	return true
+end
+
 local function beacon_interval(): number
 	return rng:NextNumber(config.SCAVENGER_BEACON_INTERVAL_MIN, config.SCAVENGER_BEACON_INTERVAL_MAX)
 end
@@ -1211,6 +1232,7 @@ return table.freeze({
 	set_enabled = set_enabled,
 	is_enabled = is_enabled,
 	summon_beacon = summon_beacon,
+	force_beacon = force_beacon,
 	progress = progress,
 	set_progress = set_progress,
 	set_difficulty = set_difficulty,

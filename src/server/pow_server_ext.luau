@@ -201,4 +201,20 @@ return function(extras: { commands: { [string]: any } })
 			})
 		end,
 	}
+
+	commands.force_beacon = {
+		description = "Puts a scavenger beacon down at (X, Z) right now, even next to players, for testing. "
+			.. "It still needs valid ground or water to stand on.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = { { name = "X", type = "number" }, { name = "Z", type = "number" } } },
+		},
+		server_run = function(context: any)
+			local placed = scavengers.force_beacon(context.args[1], context.args[2])
+			context:log({
+				type = if placed then "info" else "error",
+				value = if placed then "A beacon has appeared" else "Nowhere to stand there",
+			})
+		end,
+	}
 end
