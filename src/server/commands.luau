@@ -220,6 +220,15 @@ local function on_issue_order(player: Player, payload: unknown)
 			order.position = heightmap.ground_position(raw.X, raw.Z)
 		end
 
+		-- For reclaim orders, capture the target's current position so waypoints stay at the original
+		-- location, not following the target as it moves or gets reclaimed
+		if kind == "reclaim" and target_id ~= nil then
+			local target = state.get(target_id)
+			if target ~= nil then
+				order.position = target.position
+			end
+		end
+
 		if kind == "move" then
 			-- positions run parallel to ids so each unit gets its own point on the formation line
 			local raw = if positions ~= nil then positions[index] else nil

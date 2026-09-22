@@ -53,6 +53,10 @@ local locked: { [EntityId]: EntityId } = {}
 -- target, never both.
 local locked_ground: { [EntityId]: Vector3 } = {}
 
+-- Progress value from the previous frame for each entity's stockpile, used to calculate incremental
+-- resource drain.
+local stockpile_progress_previous: { [EntityId]: number } = {}
+
 -- Shooters that have launched a stockpiled missile since their orders last looked, which is what ends the attack
 -- order that told them to.
 local launched: { [EntityId]: boolean } = {}
@@ -171,9 +175,11 @@ local function can_target(weapon: types.Weapon, target: Entity): boolean
 	return in_air == false or is_lobbed(weapon) == false
 end
 
--- What `attacker` shoots at when it fires from `origin`: the nearest enemy in range it has a clear shot
--- at, skipping any target already `claimed`. With none it holds fire: a shot that a friend is standing in
--- is never taken on purpose. A weapon with a stockpile picks nothing, and fires only on an order.
+-- What `attacker` shoots at when it fires from `origin`: the highest reward enemy in range it has a clear
+-- shot at, skipping any target already `claimed`. Reward score is the unit's power (metal cost + 60x energy
+-- cost) divided by its max health, so targets closest to dying get priority. With none it holds fire: a shot
+-- that a friend is standing in is never taken on purpose. A weapon with a stockpile picks nothing, and fires
+-- only on an order.
 local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weapon, claimed: { EntityId }): Entity?
 	-- a stockpiled missile is too dear to spend on whatever comes by: it goes only where it is sent
 	if weapon.stockpile ~= nil then
@@ -192,6 +198,19 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 		end
 	end
 	table.sort(candidates, function(a: Entity, b: Entity): boolean
+		-- Calculate power score: metal_cost + 60 * energy_cost
+		local def_a = unit_defs.get(a.def_name)
+		local def_b = unit_defs.get(b.def_name)
+		local power_a = def_a.metal_cost + 60 * def_a.energy_cost
+		local power_b = def_b.metal_cost + 60 * def_b.energy_cost
+		-- Calculate reward score: power / max_health (targets closer to dying get priority)
+		local reward_a = power_a / a.max_health
+		local reward_b = power_b / b.max_health
+		-- Sort by highest reward first
+		if reward_a ~= reward_b then
+			return reward_a > reward_b
+		end
+		-- Tiebreaker: closest distance
 		return geometry.distance_2d(attacker.position, a.position) < geometry.distance_2d(attacker.position, b.position)
 	end)
 
@@ -549,20 +568,44 @@ local function set_forced_ground(attacker: Entity, point: Vector3)
 	locked_ground[attacker.id] = point
 end
 
--- Works on the next missile of a stockpile: it is finished once its time is up and its price can be paid, and
--- one whose price cannot be paid yet waits, done, until it can be. Nothing is made once the stockpile is full.
+-- Works on the next missile of a stockpile: it is finished once its time is up and its price can be paid
+-- incrementally as progress accumulates. Resources are drained proportionally to progress each frame, so
+-- that the full cost is paid by the time the missile is complete. Nothing is made once the stockpile is full.
 local function grow_stockpile(entity: Entity, stockpile: types.Stockpile, delta: number)
 	if entity.stockpile >= stockpile.limit then
 		entity.stockpile_progress = 0
+		stockpile_progress_previous[entity.id] = 0
 		return
 	end
+
+	-- Track previous progress to calculate incremental resource drain
+	local previous_progress = stockpile_progress_previous[entity.id] or 0
 	entity.stockpile_progress = math.min(stockpile.build_time, entity.stockpile_progress + delta)
-	if
-		entity.stockpile_progress >= stockpile.build_time
-		and economy.try_spend(entity.team, stockpile.metal, stockpile.energy)
-	then
+
+	-- Calculate how much progress accumulated this frame and drain resources incrementally
+	local progress_delta = entity.stockpile_progress - previous_progress
+	if progress_delta > 0 then
+		-- Calculate proportional resource cost for this frame's progress
+		local metal_per_build_time = stockpile.metal / stockpile.build_time
+		local energy_per_build_time = stockpile.energy / stockpile.build_time
+		local metal_to_drain = progress_delta * metal_per_build_time
+		local energy_to_drain = progress_delta * energy_per_build_time
+
+		-- Try to spend resources incrementally
+		if economy.try_spend(entity.team, metal_to_drain, energy_to_drain) then
+			stockpile_progress_previous[entity.id] = entity.stockpile_progress
+		else
+			-- If we can't afford this frame's progress, revert progress and stop building
+			entity.stockpile_progress = previous_progress
+			return
+		end
+	end
+
+	-- Once progress reaches build_time, increment the stockpile
+	if entity.stockpile_progress >= stockpile.build_time then
 		entity.stockpile += 1
 		entity.stockpile_progress = 0
+		stockpile_progress_previous[entity.id] = 0
 	end
 end
 
@@ -639,6 +682,7 @@ local function forget(entity_id: EntityId)
 	locked[entity_id] = nil
 	locked_ground[entity_id] = nil
 	starved_at[entity_id] = nil
+	stockpile_progress_previous[entity_id] = nil
 end
 
 return table.freeze({
