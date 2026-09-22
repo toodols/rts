@@ -1861,9 +1861,55 @@ local defs: { [string]: EntityDef } = {
 				aoe_radius = aoe(studs(1920)),
 				edge_effectiveness = 0.1,
 				missile = { climb = 300, dive_angle = math.rad(80) },
+				nuclear = true,
 			},
 		},
 		color = Color3.fromRGB(198, 86, 72),
+	},
+
+	-- Anti-nuke interceptor: defends against incoming nuclear missiles by launching homing interceptors
+	-- that track and collide with nukes before they detonate. Continuously searches for nuclear missiles
+	-- and launches interceptors as long as energy is available.
+	prevailer = {
+		name = "prevailer",
+		display_name = "Prevailer",
+		subtitle = "Anti-nuke interceptor",
+		kind = "building",
+		-- Similar footprint to other missile defense structures
+		collider = { shape = "box", width = cells(2), height = cells(3), length = cells(2) },
+		metal_cost = 12000,
+		energy_cost = 45000,
+		buildpower_cost = 120000,
+		health = 3200,
+		buildpower = nil,
+		acceleration = nil,
+		max_speed = nil,
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		build_options = nil,
+		-- homing interceptor weapon that searches for nuclear missiles
+		weapon = {
+			damage = 2000,
+			reload = 2,
+			-- range out to which it searches for nukes to intercept
+			range = studs(5000),
+			energy_per_shot = 4000,
+			anti_nuke = true,
+			projectile = {
+				speed = studs(600),
+				acceleration = 0,
+				thrust_time = 0,
+				gravity = 0,
+				drag = 0,
+				aoe_radius = aoe(studs(400)),
+				edge_effectiveness = 0.2,
+				homing = true,
+			},
+		},
+		color = Color3.fromRGB(100, 150, 200),
 	},
 
 	-- corbuzz, Cortex's Calamity: a plasma cannon that fires shell after shell at a range nothing else reaches. A
@@ -2364,10 +2410,10 @@ local defs: { [string]: EntityDef } = {
 		max_water_depth = studs(9999),
 		build_options = nil,
 		air = { altitude = 24, climb_speed = 12, bombing_runs = true },
-		-- divergence from BAR - bomber drops 1 bomb only, but has more radius and damage
+		-- divergence from BAR - bomber drops 2 bombs in quick succession, more radius and damage per bomb
 		weapon = {
 			damage = 350,
-			reload = 2,
+			reload = 0.5,
 			burst_count = 2,
 			range = 4,
 			energy_per_shot = 0,

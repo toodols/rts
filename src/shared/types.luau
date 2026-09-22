@@ -88,8 +88,10 @@ export type ProjectileParams = {
 	missile: Missile?,
 	-- a plasma shell: one that a plasma deflector stops. Rockets, missiles and beams are not.
 	plasma: boolean?,
-	-- whether this projectile actively homes in on its target after launch
+	-- a projectile that homes onto a target after launch, tracking it automatically
 	homing: boolean?,
+	-- a nuclear missile: used to distinguish nuke projectiles from other missiles for anti-nuke targeting
+	nuclear: boolean?,
 }
 
 -- How a missile flies: straight up from its launcher to `climb` studs above it, over to its target at that
@@ -113,6 +115,8 @@ export type Weapon = {
 	-- a dedicated anti air weapon does its full damage to aircraft; any other does only a fraction of it
 	-- (`config.NON_AA_AIR_DAMAGE_FRACTION`)
 	anti_air: boolean?,
+	-- a weapon dedicated to intercepting nuclear missiles in flight
+	anti_nuke: boolean?,
 	-- what it can shoot at: nil for both layers, and a weapon that names one never fires at the other
 	target_layer: TargetLayer?,
 	-- set for a weapon that throws a rocket rather than hitting its target instantly
@@ -126,7 +130,8 @@ export type Weapon = {
 	-- a weapon that fires from a stockpile of missiles that it builds up over time, rather than from a
 	-- reload alone. It shoots only when it is told to, never at what happens to come within its range.
 	stockpile: Stockpile?,
-	-- for a weapon that fires multiple times per reload cycle; nil if weapon fires once per reload
+	-- a weapon that fires multiple shots before reloading; fires `burst_count` shots at `reload` interval,
+	-- then reloads for the full `reload` time before the next burst
 	burst_count: number?,
 }
 
@@ -331,6 +336,10 @@ export type Entity = {
 	manual_reload_remaining: number,
 	-- seconds until each of its turrets can fire again, by turret
 	turret_reloads: { number },
+	-- tracks burst fire state: number of shots remaining in current burst for main weapon
+	burst_remaining: number,
+	-- tracks burst fire state for each turret, if they have burst weapons
+	turret_burst_remaining: { number },
 	-- missiles held ready, and seconds spent on the next one, if its weapon stockpiles them
 	stockpile: number,
 	stockpile_progress: number,
