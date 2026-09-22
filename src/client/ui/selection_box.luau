@@ -53,6 +53,7 @@ local MODE_HINTS: { [string]: string } = {
 	path = "In pathfinding (P) mode · click the ground to have each unit find its own way there, over ground it can stand on · shift keeps the mode and queues the route · right click cancels",
 	load = "In loading (J) mode · click a friendly unit to have the selected transports pick it up · shift keeps the mode · right click cancels",
 	unload = "In unloading (U) mode · click the ground to set everything aboard down there · shift keeps the mode · right click cancels",
+	guard = "In guarding (O) mode · click a friendly unit or building to follow and defend it, assisting what it builds or reclaims · shift keeps the mode · right click cancels",
 	disintegrator = "In disintegrator (D) mode · click to have the commander close in and fire at that spot · shift queues the shot and keeps aiming · right click cancels",
 }
 
