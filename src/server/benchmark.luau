@@ -544,8 +544,11 @@ end
 
 -- Runs every scenario in turn and calls `log` exactly once, with the whole report as a single
 -- newline-joined string, once it is all done - pow prints one call as one message, which is what
--- makes the result copyable in one go instead of scattered across a run of separate prints. Returns
--- false without doing anything if a run is already in progress.
+-- makes the result copyable in one go instead of scattered across a run of separate prints. Blocks
+-- the calling coroutine for the whole run (a couple of minutes) rather than kicking it off in the
+-- background, so a caller waiting on this - like pow's server_run, which the client invokes and
+-- blocks on - only gets control back once the report is actually ready. Returns false without doing
+-- anything if a run is already in progress.
 local function run(log: (string) -> ())
 	if running then
 		log "A benchmark is already running"
@@ -553,7 +556,7 @@ local function run(log: (string) -> ())
 	end
 	running = true
 
-	task.spawn(function()
+	local ok, err = pcall(function()
 		local lines: { string } = { `Benchmark: {#SCENARIOS} scenarios` }
 		local arena_warning = resolve_arena()
 		if arena_warning ~= nil then
@@ -617,8 +620,12 @@ local function run(log: (string) -> ())
 		table.insert(lines, "")
 		table.insert(lines, "Benchmark complete")
 		log(table.concat(lines, "\n"))
-		running = false
 	end)
+
+	running = false
+	if not ok then
+		error(err, 0)
+	end
 
 	return true
 end

@@ -314,21 +314,15 @@ return function(extras: { commands: { [string]: any } })
 			.. "(idle units, melee combat, ranged combat, mass movement, production, construction, "
 			.. "reclaim/resurrect, transport, and a mixed late-game slice of all of it at once), each "
 			.. "timed by the profiler, and prints the whole report as text to paste elsewhere once it "
-			.. "is done. Takes a couple of minutes.",
+			.. "is done. Blocks until the run finishes, which takes a couple of minutes.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
 		},
 		server_run = function(context: any)
-			local started = benchmark.run(function(line: string)
+			benchmark.run(function(line: string)
 				context:log({ type = "info", value = line })
 			end)
-			if started then
-				context:log({
-					type = "info",
-					value = "Benchmark started - this takes a while, results print when it's done",
-				})
-			end
 		end,
 	}
 
