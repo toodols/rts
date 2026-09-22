@@ -103,30 +103,122 @@ end
 -- actually needs separation - everyone standing on the ground - is not paying to scan over every
 -- aircraft in the sky, or the other way round.
 --
--- Neighbours are found through a flat (X, Z) grid rebuilt once a tick (see `rebuild_grid`), not by
--- scanning every entity for every mover: collider extents in this game are small next to the map, so
--- a mover only ever needs to look at its own cell and the ring of cells around it, however many
--- entities are alive in total.
+-- Neighbours are found through flat (X, Z) grids rebuilt once a tick (see `rebuild_grids`), so a
+-- mover only ever looks at its own cell and the ring of cells around it, however many entities are
+-- alive in total. Each grid is a handful of flat per-field arrays filled by a counting sort - count
+-- entries per cell, prefix-sum the counts, drop each entry's index into one flat array - so a rebuild
+-- allocates nothing, and the inner loop reads plain numbers rather than fields off entity tables.
 --
--- The cell has to be at least as wide as the biggest interaction distance two colliders can have
--- (their two radii plus the separation padding), or the 1-cell ring this scans would miss a real
--- neighbour sitting just past it. The biggest building collider is a 5x5-cell box, radius 10 studs,
--- so two of those plus padding tops out around 20.5 studs - 24 leaves headroom. It used to be 64,
--- which was safe but far larger than it needed to be: a crowd spawned at normal unit spacing (a few
--- studs to ~20 apart) packs dozens of units into one 64-stud cell, so every mover's 3x3-cell scan was
--- checking most of the crowd against itself every tick, overlapping or not.
-local SEPARATION_CELL = 24
+-- A 3x3 scan only finds every real neighbour if a cell is at least as wide as the furthest two
+-- colliders can interact (their radii plus the padding). Movers are all small, but buildings are
+-- not, and one cell size for both would have to fit the biggest building - packing a crowd of small
+-- movers many to a cell, each checking all of them. So there are two grids: movers in cells sized to
+-- two of the widest mover, and everything else that pushes (buildings, blueprints, anything that
+-- cannot move) in cells sized to the widest mover plus the widest anything. Only movers ever ask.
+local PAD = config.SEPARATION_RADIUS_PADDING
 
--- An entity's collider radius alongside it, computed once when the grid is built rather than once
--- per neighbour that examines it: a crowded cell can have dozens of movers each looking at dozens of
--- neighbours, and unit_defs.get + collider_radius on every one of those looks - for a value that
--- only ever depends on the neighbour's def_name - added up to real, avoidable cost at any real
--- density.
-type GridEntry = { entity: Entity, radius: number }
-type Grid = { [number]: { [number]: { GridEntry } } }
+local widest_mover = 0
+local widest_any = 0
+for _, def in unit_defs.defs do
+	if def.air ~= nil then
+		continue
+	end
+	local radius = unit_defs.collider_radius(def)
+	if def.kind == "unit" and def.max_speed ~= nil and def.acceleration ~= nil then
+		widest_mover = math.max(widest_mover, radius)
+	end
+	widest_any = math.max(widest_any, radius)
+end
 
-local function cell_of(x: number, z: number): (number, number)
-	return math.floor(x / SEPARATION_CELL), math.floor(z / SEPARATION_CELL)
+type Grid = {
+	-- cell width in studs, and cells per side before the coordinates wrap round - wrapping only ever
+	-- puts far-off entries into the same cell as near ones, which costs a distance check, never a miss
+	size: number,
+	side: number,
+	count: number,
+	xs: { number },
+	zs: { number },
+	rs: { number },
+	cell: { number },
+	-- entries per cell while sorting, then each cell's fill cursor
+	counts: { number },
+	-- each cell's entries are order[starts[c]] up to order[stops[c] - 1]; both zero for an empty cell
+	starts: { number },
+	stops: { number },
+	order: { number },
+	-- the cells holding anything this tick, so a rebuild touches only those and not every cell there is
+	used: { number },
+	used_count: number,
+}
+
+local function new_grid(size: number, side: number): Grid
+	return {
+		size = size,
+		side = side,
+		count = 0,
+		xs = {},
+		zs = {},
+		rs = {},
+		cell = {},
+		counts = table.create(side * side, 0),
+		starts = table.create(side * side, 0),
+		stops = table.create(side * side, 0),
+		order = {},
+		used = {},
+		used_count = 0,
+	}
+end
+
+local mover_grid = new_grid(2 * widest_mover + PAD, 256)
+local other_grid = new_grid(widest_mover + widest_any + PAD, 128)
+-- Where each mover sits in mover_grid this tick, by id.
+local mover_slot: { [EntityId]: number } = {}
+
+local function grid_add(grid: Grid, x: number, z: number, radius: number): number
+	local k = grid.count + 1
+	grid.count = k
+	grid.xs[k] = x
+	grid.zs[k] = z
+	grid.rs[k] = radius
+	return k
+end
+
+-- A counting sort over only the cells in use: how entries are laid out across cells doesn't matter, only
+-- that each cell's are contiguous, so there is no need to sweep the cells that are empty.
+local function grid_sort(grid: Grid)
+	local size, side = grid.size, grid.side
+	local xs, zs, cell, counts, starts, stops, order, used =
+		grid.xs, grid.zs, grid.cell, grid.counts, grid.starts, grid.stops, grid.order, grid.used
+	for u = 1, grid.used_count do
+		local c = used[u]
+		counts[c] = 0
+		starts[c] = 0
+		stops[c] = 0
+	end
+	local used_count = 0
+	for k = 1, grid.count do
+		local c = (math.floor(zs[k] / size) % side) * side + (math.floor(xs[k] / size) % side) + 1
+		cell[k] = c
+		if counts[c] == 0 then
+			used_count += 1
+			used[used_count] = c
+		end
+		counts[c] += 1
+	end
+	grid.used_count = used_count
+	local sum = 1
+	for u = 1, used_count do
+		local c = used[u]
+		starts[c] = sum
+		sum += counts[c]
+		stops[c] = sum
+		counts[c] = starts[c]
+	end
+	for k = 1, grid.count do
+		local c = cell[k]
+		order[counts[c]] = k
+		counts[c] += 1
+	end
 end
 
 -- Rebuilt once at the top of every tick from every alive, non-aircraft entity: units and buildings
@@ -134,66 +226,85 @@ end
 -- are left out: BAR doesn't collide units against them, and with dozens of wrecks lying around after
 -- a fight, giving each one a collider would mean every unit near a battlefield pushing against all of
 -- them for the rest of the match.
-local function rebuild_grid(): Grid
-	local grid: Grid = {}
+local function rebuild_grids()
+	mover_grid.count = 0
+	other_grid.count = 0
+	table.clear(mover_slot)
 	for _, entity in state.all() do
 		if entity.alive == false or entity.kind == "wreck" or air.is_aircraft(entity) then
 			continue
 		end
-		local cx, cz = cell_of(entity.position.X, entity.position.Z)
-		local column = grid[cx]
-		if column == nil then
-			column = {}
-			grid[cx] = column
+		local radius = unit_defs.collider_radius(unit_defs.get(entity.def_name))
+		local position = entity.position
+		if is_mobile(entity) then
+			mover_slot[entity.id] = grid_add(mover_grid, position.X, position.Z, radius)
+		else
+			grid_add(other_grid, position.X, position.Z, radius)
 		end
-		local bucket = column[cz]
-		if bucket == nil then
-			bucket = {}
-			column[cz] = bucket
-		end
-		table.insert(bucket, { entity = entity, radius = unit_defs.collider_radius(unit_defs.get(entity.def_name)) })
 	end
-	return grid
+	grid_sort(mover_grid)
+	grid_sort(other_grid)
 end
 
--- Push away from any neighbour whose capsule is overlapping ours, scaled by how deep the overlap
--- is so that lightly touching units barely react. Only ever called for a non-aircraft entity - see
--- `rebuild_grid` - so nothing here needs to check for one.
-local function separation(entity: Entity, radius: number, grid: Grid): Vector3
-	local push = Vector3.zero
-	local cx, cz = cell_of(entity.position.X, entity.position.Z)
-	for x = cx - 1, cx + 1 do
-		local column = grid[x]
-		if column == nil then
-			continue
-		end
-		for z = cz - 1, cz + 1 do
-			local bucket = column[z]
-			if bucket == nil then
-				continue
-			end
-			for _, entry in bucket do
-				local other = entry.entity
-				if other.id == entity.id then
+-- Adds to (px, pz) the push from every entry of `grid` overlapping a collider of `radius` at (x, z),
+-- skipping entry `self` (0 for none). The push is away from each, scaled by how deep the overlap is so
+-- that lightly touching units barely react.
+local function push_from(
+	grid: Grid,
+	x: number,
+	z: number,
+	radius: number,
+	id: EntityId,
+	self: number,
+	px: number,
+	pz: number
+): (number, number)
+	local size, side = grid.size, grid.side
+	local xs, zs, rs, order, starts, stops = grid.xs, grid.zs, grid.rs, grid.order, grid.starts, grid.stops
+	local cx, cz = math.floor(x / size), math.floor(z / size)
+	for dz = -1, 1 do
+		local row = ((cz + dz) % side) * side
+		for dx = -1, 1 do
+			local c = row + ((cx + dx) % side) + 1
+			for s = starts[c], stops[c] - 1 do
+				local k = order[s]
+				if k == self then
 					continue
 				end
-				local minimum = radius + entry.radius + config.SEPARATION_RADIUS_PADDING
-				local offset = geometry.flatten(entity.position - other.position)
-				local distance = offset.Magnitude
-				if distance >= minimum then
+				local ox, oz = x - xs[k], z - zs[k]
+				local minimum = radius + rs[k] + PAD
+				local distance_squared = ox * ox + oz * oz
+				if distance_squared >= minimum * minimum then
 					continue
 				end
-				if distance < 1e-3 then
+				if distance_squared < 1e-6 then
 					-- exactly co-located: shove apart along an arbitrary but stable axis
-					local angle = entity.id * 2.399963
-					push += Vector3.new(math.cos(angle), 0, math.sin(angle))
+					local angle = id * 2.399963
+					px += math.cos(angle)
+					pz += math.sin(angle)
 					continue
 				end
-				push += (offset / distance) * ((minimum - distance) / minimum)
+				local distance = math.sqrt(distance_squared)
+				local scale = (minimum - distance) / (minimum * distance)
+				px += ox * scale
+				pz += oz * scale
 			end
 		end
 	end
-	return push
+	return px, pz
+end
+
+-- The push on a mover from everything overlapping it, judged from where everything stood at the top
+-- of the tick. Only movers that are not aircraft have a slot - see `rebuild_grids`.
+local function separation(entity: Entity): Vector3
+	local k = mover_slot[entity.id]
+	if k == nil then
+		return Vector3.zero
+	end
+	local x, z, radius = mover_grid.xs[k], mover_grid.zs[k], mover_grid.rs[k]
+	local px, pz = push_from(mover_grid, x, z, radius, entity.id, k, 0, 0)
+	px, pz = push_from(other_grid, x, z, radius, entity.id, 0, px, pz)
+	return Vector3.new(px, 0, pz)
 end
 
 -- Climbs or descends an aircraft toward the height it should be at: its flying altitude while it has
@@ -233,7 +344,7 @@ end
 
 local function tick(delta: number)
 	update_impulses(delta)
-	local grid = rebuild_grid()
+	rebuild_grids()
 	for _, entity in state.all() do
 		if entity.alive == false or is_mobile(entity) == false then
 			continue
@@ -242,7 +353,6 @@ local function tick(delta: number)
 		local def = unit_defs.get(entity.def_name)
 		local max_speed = def.max_speed :: number
 		local acceleration = def.acceleration :: number
-		local radius = unit_defs.collider_radius(def)
 
 		-- Reduce acceleration if the unit is impulsed (hit by a weapon)
 		if impulse_remaining[entity.id] ~= nil and impulse_remaining[entity.id] > 0 then
@@ -267,7 +377,7 @@ local function tick(delta: number)
 		end
 
 		if air.is_aircraft(entity) == false then
-			desired_velocity += separation(entity, radius, grid) * config.SEPARATION_STRENGTH
+			desired_velocity += separation(entity) * config.SEPARATION_STRENGTH
 		end
 		if desired_velocity.Magnitude > max_speed then
 			desired_velocity = desired_velocity.Unit * max_speed
