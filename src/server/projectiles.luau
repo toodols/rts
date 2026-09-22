@@ -214,7 +214,8 @@ local function damage_to(projectile: Projectile, target: Entity, amount: number)
 end
 
 -- The rocket goes off at `at`. What it struck takes the whole damage; everything else within the blast
--- takes less the further from the centre it is, friend and foe alike.
+-- takes less the further from the centre it is, friend and foe alike - except the shooter itself,
+-- which its own blast never reaches.
 local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, apply_damage: (Entity, number) -> ())
 	weapon_fired:FireAllClients({
 		impact = { id = projectile.id, at = at, radius = projectile.params.aoe_radius },
@@ -227,7 +228,9 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 		apply_damage(struck, damage_to(projectile, struck, projectile.damage))
 	end
 	for _, other in state.all() do
-		if other.alive == false or (struck ~= nil and other.id == struck.id) then
+		-- the shooter itself never takes its own blast - a bomber flying away from a bomb it just
+		-- dropped, say - but nobody else is spared for being on its side: that stays real friendly fire
+		if other.alive == false or (struck ~= nil and other.id == struck.id) or other.id == projectile.owner_id then
 			continue
 		end
 		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
