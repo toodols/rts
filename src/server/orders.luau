@@ -367,6 +367,12 @@ local function run_guard(entity: Entity, order: Order)
 		settled = approach(entity, target.position, gap)
 	end
 
+	-- If settled and there are other orders queued, drop guard and do the queued work instead
+	if settled and #entity.orders > 1 then
+		pop(entity)
+		return
+	end
+
 	local reach = work_range(entity, config.BUILD_RANGE) * RANGE_MARGIN
 	if
 		settled
