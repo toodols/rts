@@ -11,6 +11,7 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local alliances = require(ServerScriptService.Server.alliances)
+local benchmark = require(ServerScriptService.Server.benchmark)
 local godmode = require(ServerScriptService.Server.godmode)
 local nocost = require(ServerScriptService.Server.nocost)
 local pause = require(ServerScriptService.Server.pause)
@@ -221,7 +222,8 @@ return function(extras: { commands: { [string]: any } })
 				end
 				context:log({
 					type = "info",
-					value = `{id}: "{team.name}" | player: {if #names > 0 then table.concat(names, ", ") else "none"} | allies: {if #allies > 0
+					value = `{id}: "{team.name}" | player: {if #names > 0 then table.concat(names, ", ") else "none"} | allies: {if #allies
+							> 0
 						then table.concat(allies, ", ")
 						else "none"} | metal {math.floor(team.metal)} / {math.floor(team.metal_capacity)}, energy {math.floor(
 						team.energy
@@ -292,6 +294,27 @@ return function(extras: { commands: { [string]: any } })
 		end,
 	}
 
+	commands.benchmark = {
+		description = "Runs a fixed set of performance scenarios one after another in a corner of the map "
+			.. "(idle units, melee combat, ranged combat, mass movement), each timed by the profiler, "
+			.. "and prints the whole report as text to paste elsewhere once it is done. Takes about a minute.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+		},
+		server_run = function(context: any)
+			local started = benchmark.run(function(line: string)
+				context:log({ type = "info", value = line })
+			end)
+			if started then
+				context:log({
+					type = "info",
+					value = "Benchmark started - this takes a while, results print when it's done",
+				})
+			end
+		end,
+	}
+
 	commands.scavprogress = {
 		description = "Sets how far the scavengers' game has got, from 0 to 1. Their difficulty follows it, and it goes on rising from there.",
 		permissions = { "admin" },
@@ -320,7 +343,10 @@ return function(extras: { commands: { [string]: any } })
 			local progress, budget = scavengers.set_difficulty(context.args[1])
 			context:log({
 				type = "info",
-				value = `Scavenger difficulty {string.format("%.0f", budget)}, progress {string.format("%.3f", progress)}`,
+				value = `Scavenger difficulty {string.format("%.0f", budget)}, progress {string.format(
+					"%.3f",
+					progress
+				)}`,
 			})
 		end,
 	}
