@@ -274,7 +274,7 @@ local function layout(def_name: string, from: Vector3, to: Vector3, as_grid: boo
 	return centers
 end
 
--- Shows boxes at every place of a layout but the first, which the ghost itself covers, each coloured
+-- Shows boxes at every place of a layout but the last, which the ghost itself covers, each coloured
 -- by whether a building fits there.
 local function show_layout(centers: { Vector3 })
 	local part = ghost
@@ -300,7 +300,7 @@ local function show_layout(centers: { Vector3 })
 		table.insert(preview_parts, box)
 	end
 	for index = 1, extra do
-		local center = centers[index + 1]
+		local center = centers[index]
 		local box = preview_parts[index]
 		box.CFrame = CFrame.new(center) * CFrame.Angles(0, facing, 0)
 		box.Color = if can_place(def_name, center, facing) then VALID_COLOR else INVALID_COLOR
