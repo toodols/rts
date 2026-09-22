@@ -80,6 +80,18 @@ local function is_enemy(attacker: Entity, other: Entity): boolean
 	return other.team ~= 0
 end
 
+-- Whether `other` can be shot given an explicit attack order: the same as `is_enemy`, but a wreck is
+-- also a valid target, so a weapon (a beam laser included) can be ordered to finish one off.
+local function is_valid_forced_target(attacker: Entity, other: Entity): boolean
+	if other.alive == false then
+		return false
+	end
+	if other.kind == "wreck" then
+		return true
+	end
+	return is_enemy(attacker, other)
+end
+
 -- A shell of any arc comes down where its target was, so it is never thrown at something in the air. Neither
 -- is a missile, which goes up and comes down on where its target was.
 local function is_lobbed(weapon: types.Weapon): boolean
@@ -204,9 +216,9 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 		local def_b = unit_defs.get(b.def_name)
 		local power_a = def_a.metal_cost + 60 * def_a.energy_cost
 		local power_b = def_b.metal_cost + 60 * def_b.energy_cost
-		-- Calculate reward score: power / max_health (targets closer to dying get priority)
-		local reward_a = power_a / a.max_health
-		local reward_b = power_b / b.max_health
+		-- Calculate reward score: power / current health (targets closer to dying get priority)
+		local reward_a = power_a / a.health
+		local reward_b = power_b / b.health
 		-- Sort by highest reward first
 		if reward_a ~= reward_b then
 			return reward_a > reward_b
@@ -383,7 +395,7 @@ local function forced_target(attacker: Entity, weapon: types.Weapon, origin: Vec
 	local forced = state.get(forced_id)
 	if
 		forced == nil
-		or is_enemy(attacker, forced) == false
+		or is_valid_forced_target(attacker, forced) == false
 		or can_target(weapon, forced) == false
 		or geometry.distance_2d(attacker.position, forced.position) > reach_at(weapon, origin, forced.position)
 	then
@@ -762,6 +774,7 @@ return table.freeze({
 	set_forced_target = set_forced_target,
 	set_forced_ground = set_forced_ground,
 	is_enemy = is_enemy,
+	is_valid_forced_target = is_valid_forced_target,
 	can_target = can_target,
 	has_target = has_target,
 	take_launch = take_launch,

@@ -124,8 +124,10 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 	-- a unit or building has a bar only once it is hurt; blueprints and wrecks always have theirs
 	local show_track = true
 	local eta: any = nil
-	-- a second bar under the first: a hurt blueprint's health, or how far along raising a wreck is
+	-- a second bar under the first: a hurt blueprint's health, or a wreck's own health
 	local health_track: any = nil
+	-- a third bar, under the wreck's health, for how far along raising it is
+	local resurrect_track: any = nil
 
 	if is_wreck then
 		local total = math.max(1, number_of(model, "reclaim_total", 1))
@@ -134,12 +136,30 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 		-- wrecks always show their reclaim bar
 		show_track = true
 
-		-- a wreck being raised shows how far along that is, in purple, under what is left of it
+		-- a wreck can still be shot at and destroyed outright, so it shows its own health under what
+		-- is left of it to reclaim
+		local max_health = math.max(1, number_of(model, "max_health", 1))
+		local health = math.clamp(number_of(model, "health", max_health) / max_health, 0, 1)
+		local health_tag = if health <= LOW_HEALTH
+			then "bar-fill health low"
+			elseif health <= MID_HEALTH then "bar-fill health mid"
+			else "bar-fill health"
+		health_track = React.createElement("Frame", {
+			[React.Tag] = "bar-track",
+			LayoutOrder = 2,
+		}, {
+			Fill = React.createElement("Frame", {
+				[React.Tag] = health_tag,
+				Size = UDim2.new(health, 0, 1, 0),
+			}),
+		})
+
+		-- a wreck being raised shows how far along that is, in purple, under its health
 		local raised = math.clamp(number_of(model, "resurrect_progress", 0), 0, 1)
 		if raised > 0 then
-			health_track = React.createElement("Frame", {
+			resurrect_track = React.createElement("Frame", {
 				[React.Tag] = "bar-track",
-				LayoutOrder = 2,
+				LayoutOrder = 3,
 			}, {
 				Fill = React.createElement("Frame", {
 					[React.Tag] = "bar-fill resurrect",
@@ -319,6 +339,7 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 		Name = nametag,
 		Track = track,
 		Health = health_track,
+		Resurrect = resurrect_track,
 		Eta = eta,
 		Reload = reload_track,
 		Stockpile = stockpile_track,

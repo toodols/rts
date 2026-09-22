@@ -419,14 +419,16 @@ end
 
 -- Puts a beacon down at a random empty place well away from the players, on dry level ground or floating on the
 -- sea: where there is water at the spot it is the kind that floats, and where there is not it is the land kind.
--- Returns whether one went down: on a crowded map, or one with nowhere it will stand, it can fail to find room.
-local function spawn_beacon(): boolean
+-- The very first beacon of the game is never a sea one, so a player never faces an opening threat they have no
+-- way to reach. Returns whether one went down: on a crowded map, or one with nowhere it will stand, it can fail
+-- to find room.
+local function spawn_beacon(allow_sea: boolean): boolean
 	local extent_x = config.MAP_CELLS_X * config.CELL_STUDS / 2 - config.SCAVENGER_BEACON_EDGE_MARGIN
 	local extent_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2 - config.SCAVENGER_BEACON_EDGE_MARGIN
 	for _ = 1, BEACON_ATTEMPTS do
 		local x = rng:NextNumber(-extent_x, extent_x)
 		local z = rng:NextNumber(-extent_z, extent_z)
-		local sea = heightmap.water_depth(x, z) > 0
+		local sea = allow_sea and heightmap.water_depth(x, z) > 0
 		local def_name = if sea then SEA_BEACON_DEF else BEACON_DEF
 		local center = placement.resolve_center(def_name, x, z, 0)
 		if
@@ -631,7 +633,7 @@ local function run_beacon_schedule()
 	end
 	if count_beacons() >= config.SCAVENGER_MAX_BEACONS then
 		next_beacon_at = clock + beacon_interval()
-	elseif spawn_beacon() then
+	elseif spawn_beacon(count_beacons() > 0) then
 		next_beacon_at = clock + beacon_interval()
 	else
 		next_beacon_at = clock + BEACON_RETRY_DELAY
@@ -1195,7 +1197,7 @@ end
 
 -- Puts a beacon down now, whatever the schedule says. Returns whether there was room.
 local function summon_beacon(): boolean
-	return spawn_beacon()
+	return spawn_beacon(count_beacons() > 0)
 end
 
 local function forget(entity_id: EntityId)

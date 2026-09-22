@@ -175,7 +175,7 @@ local function run_attack(entity: Entity, order: Order)
 	local target_id = order.target_id
 	local target = if target_id ~= nil then state.get(target_id) else nil
 	local def = unit_defs.get(entity.def_name)
-	if target == nil or combat.is_enemy(entity, target) == false then
+	if target == nil or combat.is_valid_forced_target(entity, target) == false then
 		combat.set_forced_target(entity, nil)
 		pop(entity)
 		return

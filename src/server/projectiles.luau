@@ -40,6 +40,8 @@ type Projectile = {
 	is_anti_nuke: boolean,
 	-- the nuke projectile this interceptor is homing onto, if any
 	homing_target_id: number?,
+	-- the entity a homing (non anti-nuke) missile, such as an AA missile, tracks onto, if any
+	homing_entity_id: EntityId?,
 }
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
@@ -74,7 +76,14 @@ end
 
 -- Fires a rocket from `origin` toward `aim`. A lobbed shell is angled to come down on `aim`, ahead of it
 -- by however far `aim_velocity` says it will have gone by then. For homing projectiles, the target entity is needed.
-local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: types.Weapon, aim_velocity: Vector3?, target: Entity?)
+local function launch(
+	owner: Entity,
+	origin: Vector3,
+	aim: Vector3,
+	weapon: types.Weapon,
+	aim_velocity: Vector3?,
+	target: Entity?
+)
 	local params = weapon.projectile
 	if params == nil then
 		return
@@ -129,6 +138,11 @@ local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: type
 		is_nuclear = params.nuclear == true,
 		is_anti_nuke = weapon.anti_nuke == true,
 		homing_target_id = nil,
+		homing_entity_id = if weapon.anti_nuke ~= true
+				and params.homing == true
+				and target ~= nil
+			then target.id
+			else nil,
 	})
 
 	weapon_fired:FireAllClients({
@@ -165,6 +179,12 @@ local function struck_by(projectile: Projectile): Entity?
 			elseif projectile.clear_of_owner == false then
 				continue
 			end
+		end
+		-- Don't let a direct hit strike a unit allied with the shooter (e.g. a bomber flying
+		-- through its own swarm), matching the AoE splash's ally check below. The owner itself
+		-- is still a valid strike (a rocket falling back onto its own launcher).
+		if touching and other.id ~= projectile.owner_id and alliances.are_allied(other.team, projectile.team) then
+			continue
 		end
 		if touching then
 			return other
@@ -234,18 +254,22 @@ end
 -- Updates a homing interceptor to track its target. Steers the projectile's velocity toward the target's
 -- current position using a turn rate similar to missiles, allowing the interceptor to adjust course as
 -- the nuke moves.
-local function update_homing(interceptor: Projectile, target: Projectile, delta: number)
-	local to_target = target.flight.position - interceptor.flight.position
+local function steer_toward(missile: Projectile, target_position: Vector3, delta: number)
+	local to_target = target_position - missile.flight.position
 	if to_target.Magnitude > 1e-3 then
 		local desired_direction = to_target.Unit
-		local current_direction = if interceptor.flight.velocity.Magnitude > 1e-3
-			then interceptor.flight.velocity.Unit
+		local current_direction = if missile.flight.velocity.Magnitude > 1e-3
+			then missile.flight.velocity.Unit
 			else desired_direction
 		-- use missile turn rate for smooth steering
 		local turned = current_direction:Lerp(desired_direction, math.min(1, config.MISSILE_TURN_RATE * delta))
 		local direction = if turned.Magnitude > 1e-3 then turned.Unit else desired_direction
-		interceptor.flight.velocity = direction * interceptor.flight.velocity.Magnitude
+		missile.flight.velocity = direction * missile.flight.velocity.Magnitude
 	end
+end
+
+local function update_homing(interceptor: Projectile, target: Projectile, delta: number)
+	steer_toward(interceptor, target.flight.position, delta)
 end
 
 -- Flies every rocket forward one tick. `apply_damage` is handed in rather than required, because combat
@@ -259,7 +283,8 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 		if projectile.is_anti_nuke and projectile.params.homing then
 			-- re-acquire target if lost
 			if projectile.homing_target_id == nil then
-				local target = pick_nuke_target(projectile.flight.position, projectile.team, projectile.params.range or 1000)
+				local target =
+					pick_nuke_target(projectile.flight.position, projectile.team, projectile.params.range or 1000)
 				if target ~= nil then
 					projectile.homing_target_id = target.id
 				end
@@ -289,6 +314,17 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 				else
 					-- target lost, clear it for re-acquisition next tick
 					projectile.homing_target_id = nil
+				end
+			end
+
+			-- homing logic: an AA missile (or other non anti-nuke homing weapon) steers toward the
+			-- entity it was fired at for as long as that entity is still alive
+			if projectile.homing_entity_id ~= nil then
+				local target = state.get(projectile.homing_entity_id)
+				if target ~= nil and target.alive then
+					steer_toward(projectile, target.position, sub_delta)
+				else
+					projectile.homing_entity_id = nil
 				end
 			end
 
