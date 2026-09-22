@@ -369,8 +369,9 @@ local function apply_attributes(entity: Entity, model: Model)
 	set_attribute(model, "team", entity.team)
 	set_attribute(model, "def_name", entity.def_name)
 	set_attribute(model, "kind", entity.kind)
-	-- a commander carries its team's name, and the colour to show it in
-	if def.nametag == true then
+	-- every entity carries its team's name and the colour to show it in, for the selection panel and a
+	-- commander's own nametag alike
+	do
 		local team = state.get_team(entity.team)
 		if team ~= nil then
 			set_attribute(model, "team_name", team.name)

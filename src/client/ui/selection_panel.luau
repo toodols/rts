@@ -12,7 +12,7 @@ type EntityView = use_entities.EntityView
 
 local cancel_production: RemoteEvent = ReplicatedStorage.Shared.CancelProduction
 
-local function Stat(props: { label: string, value: string, LayoutOrder: number })
+local function Stat(props: { label: string, value: string, LayoutOrder: number, value_color: Color3? })
 	return React.createElement("Frame", {
 		[React.Tag] = "stat",
 		LayoutOrder = props.LayoutOrder,
@@ -27,6 +27,7 @@ local function Stat(props: { label: string, value: string, LayoutOrder: number }
 			[React.Tag] = "stat-value",
 			LayoutOrder = 2,
 			Text = props.value,
+			TextColor3 = props.value_color,
 		}),
 	})
 end
@@ -83,6 +84,15 @@ local function Single(props: { view: EntityView })
 		else math.clamp(view.health / math.max(1, view.max_health), 0, 1)
 
 	local stats = {
+		Team = React.createElement(Stat, {
+			label = "Team",
+			value = if view.team_name ~= nil
+				then view.team_name
+				elseif view.team == 0 then "Neutral"
+				else `Team {view.team}`,
+			value_color = view.team_color,
+			LayoutOrder = 0,
+		}),
 		Health = React.createElement(Stat, {
 			label = "Health",
 			value = `{math.floor(view.health)} / {math.floor(view.max_health)}`,

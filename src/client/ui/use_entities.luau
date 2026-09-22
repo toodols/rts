@@ -24,6 +24,11 @@ export type EntityView = {
 	subtitle: string?,
 	kind: string,
 	state: string,
+	-- who it belongs to: the numeric team, its name if it has one, and the colour to show it in.
+	-- Team 0 is neutral scenery, a wreck say, and has neither a name nor a set colour.
+	team: number,
+	team_name: string?,
+	team_color: Color3?,
 	health: number,
 	max_health: number,
 	build_progress: number,
@@ -114,6 +119,7 @@ local function view_of(id: EntityId): EntityView?
 	if def == nil then
 		return nil
 	end
+	local team_color = model:GetAttribute "team_color"
 	return {
 		id = id,
 		def_name = def_name,
@@ -121,6 +127,9 @@ local function view_of(id: EntityId): EntityView?
 		subtitle = def.subtitle,
 		kind = tostring(model:GetAttribute "kind"),
 		state = tostring(model:GetAttribute "state"),
+		team = (model:GetAttribute "team" :: number?) or 0,
+		team_name = string_attribute(model, "team_name"),
+		team_color = if typeof(team_color) == "Color3" then team_color else nil,
 		health = (model:GetAttribute "health" :: number?) or 0,
 		max_health = (model:GetAttribute "max_health" :: number?) or 1,
 		build_progress = (model:GetAttribute "build_progress" :: number?) or 0,

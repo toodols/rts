@@ -41,8 +41,11 @@ type Weapon = types.Weapon
 type Spawn = {
 	def_name: string,
 	weight: number,
-	-- made by a beacon that floats on the sea, and by no other; everything else is made by a land one
+	-- made by a beacon that floats on the sea, and by no other; everything else is made by a land one,
+	-- unless it is amphibious
 	sea: boolean?,
+	-- an aircraft: it takes off from wherever it is made, so a beacon of either kind can make it
+	amphibious: boolean?,
 }
 
 -- Units and defences are made on separate clocks, so that a beacon ringed with all the defences it will take
@@ -271,6 +274,7 @@ local function build_roster(): { Spawn }
 				def_name = name,
 				weight = ROSTER_WEIGHT / math.sqrt(difficulty_of(name)),
 				sea = def.min_water_depth ~= nil,
+				amphibious = def.air ~= nil,
 			})
 		end
 	end
@@ -557,7 +561,7 @@ local function choose_spawn(defense: boolean, headroom: number, sea: boolean, ai
 	local options: { Spawn } = {}
 	for _, option in SPAWNS do
 		local is_defense = unit_defs.get(option.def_name).kind == "building"
-		if is_defense ~= defense or (option.sea == true) ~= sea then
+		if is_defense ~= defense or (option.amphibious ~= true and (option.sea == true) ~= sea) then
 			continue
 		end
 		-- what only shoots at aircraft is made only while there are aircraft to shoot at
