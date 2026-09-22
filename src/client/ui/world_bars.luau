@@ -131,8 +131,8 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 		local total = math.max(1, number_of(model, "reclaim_total", 1))
 		fraction = math.clamp(number_of(model, "reclaim_left", total) / total, 0, 1)
 		fill_tags = "bar-fill reclaim"
-		-- a wreck nobody has started on has nothing to say about how much is left
-		show_track = fraction < 1
+		-- wrecks always show their reclaim bar
+		show_track = true
 
 		-- a wreck being raised shows how far along that is, in purple, under what is left of it
 		local raised = math.clamp(number_of(model, "resurrect_progress", 0), 0, 1)

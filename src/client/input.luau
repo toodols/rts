@@ -211,6 +211,9 @@ local function box_select(rect: DragRect, take_all: boolean): { EntityId }
 		if kind ~= "unit" and kind ~= "building" then
 			continue
 		end
+		if model:GetAttribute("carried") == true then
+			continue
+		end
 		local point, on_screen = camera:WorldToViewportPoint(world.position_of(model))
 		if on_screen == false then
 			continue
