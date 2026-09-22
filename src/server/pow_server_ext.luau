@@ -291,8 +291,10 @@ return function(extras: { commands: { [string]: any } })
 
 	commands.benchmark = {
 		description = "Runs a fixed set of performance scenarios one after another in a corner of the map "
-			.. "(idle units, melee combat, ranged combat, mass movement), each timed by the profiler, "
-			.. "and prints the whole report as text to paste elsewhere once it is done. Takes about a minute.",
+			.. "(idle units, melee combat, ranged combat, mass movement, production, construction, "
+			.. "reclaim/resurrect, transport, and a mixed late-game slice of all of it at once), each "
+			.. "timed by the profiler, and prints the whole report as text to paste elsewhere once it "
+			.. "is done. Takes a couple of minutes.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },

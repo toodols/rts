@@ -17,6 +17,9 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
 local profiler = require(script.Parent.profiler)
+local production = require(script.Parent.production)
+local transport = require(script.Parent.transport)
+local scavengers = require(script.Parent.scavengers)
 
 type EntityId = types.EntityId
 type TeamId = types.TeamId
@@ -53,10 +56,19 @@ local function clear_arena()
 	end
 end
 
+-- Generous enough that production, construction and resurrection never stall on affordability
+-- partway through a scenario - a late-game team's stockpile, not a fresh one's - since what is being
+-- measured is what that work costs to simulate, not how quickly a starting economy runs dry.
+local BENCHMARK_RESOURCES = 1e7
+
 local function ensure_team(team_id: TeamId)
 	if state.get_team(team_id) == nil then
 		local team = state.create_team(team_id)
 		team.name = `Benchmark {team_id}`
+		team.metal = BENCHMARK_RESOURCES
+		team.energy = BENCHMARK_RESOURCES
+		team.metal_capacity = BENCHMARK_RESOURCES
+		team.energy_capacity = BENCHMARK_RESOURCES
 	end
 end
 
@@ -85,6 +97,90 @@ local function grid_spawn(
 		if orders ~= nil then
 			entity.orders = table.clone(orders)
 		end
+		table.insert(ids, entity.id)
+	end
+	state.flush()
+	return ids
+end
+
+-- Like grid_spawn, but each unit's order targets one of `target_ids` in turn (cycling if there are
+-- fewer targets than units), for reclaim/resurrect/assist - anything that needs a specific per-unit
+-- target rather than one shared order.
+local function grid_spawn_targeting(
+	def_name: string,
+	team_id: TeamId,
+	origin_x: number,
+	origin_z: number,
+	count: number,
+	spacing: number,
+	columns: number,
+	kind: types.OrderKind,
+	target_ids: { EntityId }
+): { EntityId }
+	local def = unit_defs.get(def_name)
+	local ids = {}
+	for i = 0, count - 1 do
+		local row = i // columns
+		local col = i % columns
+		local x = origin_x + col * spacing
+		local z = origin_z + row * spacing
+		local y = unit_defs.surface_height(def, x, z)
+		local entity = state.create_entity(def_name, team_id, Vector3.new(x, y, z), 0, "active")
+		local target_id = target_ids[(i % #target_ids) + 1]
+		entity.orders = { { kind = kind, target_id = target_id } }
+		table.insert(ids, entity.id)
+	end
+	state.flush()
+	return ids
+end
+
+-- Wrecks of `def_name` in a grid: a real source entity is made active, wrecked on the spot, and
+-- thrown away - state.create_wreck only ever reads a source's def, position and facing, so this is
+-- the same wreck a real death leaves, without needing one.
+local function spawn_wreck_grid(
+	def_name: string,
+	origin_x: number,
+	origin_z: number,
+	count: number,
+	spacing: number,
+	columns: number
+): { EntityId }
+	local def = unit_defs.get(def_name)
+	local ids = {}
+	for i = 0, count - 1 do
+		local row = i // columns
+		local col = i % columns
+		local x = origin_x + col * spacing
+		local z = origin_z + row * spacing
+		local y = unit_defs.surface_height(def, x, z)
+		local source = state.create_entity(def_name, 0, Vector3.new(x, y, z), 0, "active")
+		local wreck = state.create_wreck(source)
+		state.mark_dead(source)
+		table.insert(ids, wreck.id)
+	end
+	state.flush()
+	return ids
+end
+
+-- Blueprints of `def_name` in a grid, already standing (not travelled to), at 0 progress.
+local function spawn_blueprint_grid(
+	def_name: string,
+	team_id: TeamId,
+	origin_x: number,
+	origin_z: number,
+	count: number,
+	spacing: number,
+	columns: number
+): { EntityId }
+	local def = unit_defs.get(def_name)
+	local ids = {}
+	for i = 0, count - 1 do
+		local row = i // columns
+		local col = i % columns
+		local x = origin_x + col * spacing
+		local z = origin_z + row * spacing
+		local y = unit_defs.surface_height(def, x, z)
+		local entity = state.create_entity(def_name, team_id, Vector3.new(x, y, z), 0, "blueprint")
 		table.insert(ids, entity.id)
 	end
 	state.flush()
@@ -183,6 +279,179 @@ local SCENARIOS: { Scenario } = {
 			local from_x, from_z = ARENA_X - 350, ARENA_Z - 350
 			local target = heightmap.ground_position(ARENA_X, ARENA_Z)
 			grid_spawn("tick", TEAM_A, from_x, from_z, 400, 6, 20, 0, { { kind = "move", position = target } })
+		end,
+	},
+	{
+		name = "production",
+		description = "8 bot labs, each queued 30 grunts deep, building continuously",
+		duration = 10,
+		setup = function()
+			ensure_team(TEAM_A)
+			local ids = grid_spawn("bot_lab", TEAM_A, ARENA_X - 200, ARENA_Z - 200, 8, 20, 4, 0, nil)
+			for _, id in ids do
+				local factory = state.get(id)
+				if factory ~= nil then
+					for _ = 1, 30 do
+						production.enqueue(factory, "grunt")
+					end
+				end
+			end
+		end,
+	},
+	{
+		name = "construction",
+		description = "80 blueprints, each assisted by its own constructor from the moment it appears",
+		duration = 10,
+		setup = function()
+			ensure_team(TEAM_A)
+			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 320, ARENA_Z - 320, 80, 12, 10)
+			grid_spawn_targeting("constructor", TEAM_A, ARENA_X - 320, ARENA_Z - 300, 80, 12, 10, "assist", blueprints)
+		end,
+	},
+	{
+		name = "reclaim_resurrect",
+		description = "150 wrecks; 25 graverobbers reclaiming half of them, 25 resurrecting the other half",
+		duration = 10,
+		setup = function()
+			ensure_team(TEAM_A)
+			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 350, ARENA_Z - 350, 150, 6, 15)
+			local half = #wrecks // 2
+			local to_reclaim, to_resurrect = {}, {}
+			for i, id in wrecks do
+				if i <= half then
+					table.insert(to_reclaim, id)
+				else
+					table.insert(to_resurrect, id)
+				end
+			end
+			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 350, ARENA_Z - 320, 25, 12, 10, "reclaim", to_reclaim)
+			grid_spawn_targeting(
+				"graverobber",
+				TEAM_A,
+				ARENA_X - 200,
+				ARENA_Z - 320,
+				25,
+				12,
+				10,
+				"resurrect",
+				to_resurrect
+			)
+		end,
+	},
+	{
+		name = "transport",
+		description = "30 loaded transports shuttling between two points",
+		duration = 8,
+		setup = function()
+			ensure_team(TEAM_A)
+			local from = Vector3.new(ARENA_X - 350, 0, ARENA_Z - 350)
+			local to = Vector3.new(ARENA_X - 50, 0, ARENA_Z - 50)
+			local transport_ids =
+				grid_spawn("hercules", TEAM_A, from.X, from.Z, 30, 15, 10, 0, { { kind = "move", position = to } })
+			local cargo_ids = grid_spawn("grunt", TEAM_A, from.X, from.Z + 200, 60, 8, 20, 0, nil)
+			for i, transport_id in transport_ids do
+				local carrier = state.get(transport_id)
+				local first = state.get(cargo_ids[i * 2 - 1])
+				local second = state.get(cargo_ids[i * 2])
+				if carrier ~= nil and first ~= nil then
+					transport.load(carrier, first)
+				end
+				if carrier ~= nil and second ~= nil then
+					transport.load(carrier, second)
+				end
+			end
+		end,
+	},
+	{
+		name = "mixed",
+		description = "a late-game slice: two mixed armies fighting, factories producing, builders "
+			.. "building and reclaiming, loaded transports, and an active scavenger beacon, all at once",
+		duration = 20,
+		setup = function()
+			ensure_team(TEAM_A)
+			ensure_team(TEAM_B)
+
+			local center_a = Vector3.new(ARENA_X - 300, 0, ARENA_Z - 100)
+			local center_b = Vector3.new(ARENA_X - 100, 0, ARENA_Z - 300)
+			grid_spawn(
+				"grunt",
+				TEAM_A,
+				center_a.X,
+				center_a.Z,
+				100,
+				7,
+				10,
+				0,
+				{ { kind = "fight", position = center_b } }
+			)
+			grid_spawn(
+				"grunt",
+				TEAM_B,
+				center_b.X,
+				center_b.Z,
+				100,
+				7,
+				10,
+				0,
+				{ { kind = "fight", position = center_a } }
+			)
+			grid_spawn(
+				"aggravator",
+				TEAM_A,
+				center_a.X - 100,
+				center_a.Z,
+				50,
+				9,
+				10,
+				0,
+				{ { kind = "fight", position = center_b } }
+			)
+			grid_spawn(
+				"aggravator",
+				TEAM_B,
+				center_b.X,
+				center_b.Z - 100,
+				50,
+				9,
+				10,
+				0,
+				{ { kind = "fight", position = center_a } }
+			)
+
+			local factories = grid_spawn("bot_lab", TEAM_A, ARENA_X - 400, ARENA_Z - 400, 4, 20, 4, 0, nil)
+			for _, id in factories do
+				local factory = state.get(id)
+				if factory ~= nil then
+					for _ = 1, 30 do
+						production.enqueue(factory, "grunt")
+					end
+				end
+			end
+
+			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 400, ARENA_Z - 320, 40, 12, 10)
+			grid_spawn_targeting("constructor", TEAM_A, ARENA_X - 400, ARENA_Z - 300, 40, 12, 10, "assist", blueprints)
+
+			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 400, ARENA_Z - 280, 60, 6, 15)
+			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 400, ARENA_Z - 260, 20, 12, 10, "reclaim", wrecks)
+
+			local from = Vector3.new(ARENA_X - 400, 0, ARENA_Z - 240)
+			local to = Vector3.new(ARENA_X - 50, 0, ARENA_Z - 50)
+			local transport_ids =
+				grid_spawn("hercules", TEAM_A, from.X, from.Z, 10, 15, 10, 0, { { kind = "move", position = to } })
+			local cargo_ids = grid_spawn("grunt", TEAM_A, from.X, from.Z + 30, 20, 8, 20, 0, nil)
+			for i, transport_id in transport_ids do
+				local carrier = state.get(transport_id)
+				local first = state.get(cargo_ids[i * 2 - 1])
+				local second = state.get(cargo_ids[i * 2])
+				if carrier ~= nil and first ~= nil then
+					transport.load(carrier, first)
+				end
+				if carrier ~= nil and second ~= nil then
+					transport.load(carrier, second)
+				end
+			end
+
+			scavengers.force_beacon(ARENA_X - 50, ARENA_Z - 400)
 		end,
 	},
 }
