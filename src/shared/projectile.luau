@@ -25,6 +25,8 @@ export type Flight = {
 	phase: ("climb" | "cruise" | "dive")?,
 	target: Vector3?,
 	ceiling: number?,
+	-- for homing projectiles: the current target position to home in on
+	homing_target: Vector3?,
 }
 
 -- A rocket is launched along `direction`; a missile ignores it and is launched straight up, toward `aim`.
@@ -146,6 +148,20 @@ local function step(flight: Flight, params: ProjectileParams, delta: number)
 	local target = flight.target
 	if missile ~= nil and target ~= nil then
 		step_missile(flight, params, missile, target, delta)
+		return
+	end
+
+	-- Homing projectile logic
+	if params.homing and flight.homing_target ~= nil then
+		local to_target = flight.homing_target - flight.position
+		if to_target.Magnitude > 1e-3 then
+			-- Turn toward the target with a smooth turn rate similar to missiles
+			local desired = to_target.Unit
+			local turned = flight.velocity.Unit:Lerp(desired, math.min(1, config.MISSILE_TURN_RATE * delta))
+			flight.velocity = (if turned.Magnitude > 1e-3 then turned.Unit else desired) * params.speed
+		end
+		flight.age += delta
+		flight.position += flight.velocity * delta
 		return
 	end
 
