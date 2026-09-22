@@ -195,9 +195,10 @@ local function format_count_row(row: profiler.CountRow): string
 	return `    {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`
 end
 
--- Runs every scenario in turn and logs the whole report through `log` (one call per line, matching
--- how the console prints a multi-line result) once it is all done. Returns false without doing
--- anything if a run is already in progress.
+-- Runs every scenario in turn and calls `log` exactly once, with the whole report as a single
+-- newline-joined string, once it is all done - pow prints one call as one message, which is what
+-- makes the result copyable in one go instead of scattered across a run of separate prints. Returns
+-- false without doing anything if a run is already in progress.
 local function run(log: (string) -> ())
 	if running then
 		log "A benchmark is already running"
@@ -248,9 +249,7 @@ local function run(log: (string) -> ())
 
 		table.insert(lines, "")
 		table.insert(lines, "Benchmark complete")
-		for _, line in lines do
-			log(line)
-		end
+		log(table.concat(lines, "\n"))
 		running = false
 	end)
 

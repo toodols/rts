@@ -90,35 +90,31 @@ return function(extras: { commands: { [string]: any } })
 			local steps = profiler.step_count()
 			local elapsed = profiler.elapsed_since_reset()
 			local sim_seconds = steps * config.TICK_DELTA
-			context:log({
-				type = "info",
-				value = `{steps} steps over {string.format("%.1f", elapsed)}s wall time ({string.format(
-					"%.1f",
-					sim_seconds
-				)}s of sim time; over 1.0x is falling behind)`,
-			})
+
+			-- one log call, everything newline-joined into it: pow prints a call as a single
+			-- message, which is what makes the result copyable in one go
+			local lines = {
+				`{steps} steps over {string.format("%.1f", elapsed)}s wall time ({string.format("%.1f", sim_seconds)}s of sim time; over 1.0x is falling behind)`,
+			}
 			for _, row in rows do
-				context:log({
-					type = "info",
-					value = `  {row.label}: {string.format("%.2f", row.ms_per_step)}ms/step, {string.format(
+				table.insert(
+					lines,
+					`  {row.label}: {string.format("%.2f", row.ms_per_step)}ms/step, {string.format(
 						"%.1f",
 						row.fraction * 100
-					)}%`,
-				})
+					)}%`
+				)
 			end
 
 			-- entity counts, to catch a leak - something that only ever grows and never comes back down
 			profiler.sample_entities()
 			local summary = profiler.entity_report()
-			context:log({
-				type = "info",
-				value = `entities: {summary.total} ({if summary.total_delta >= 0 then "+" else ""}{summary.total_delta} since reset)`,
-			})
+			table.insert(
+				lines,
+				`entities: {summary.total} ({if summary.total_delta >= 0 then "+" else ""}{summary.total_delta} since reset)`
+			)
 			for _, row in summary.by_kind do
-				context:log({
-					type = "info",
-					value = `  {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`,
-				})
+				table.insert(lines, `  {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`)
 			end
 			-- def names past the top few are rarely the thing worth looking at; the kind breakdown
 			-- above already says whether it's units, buildings or wrecks piling up
@@ -126,11 +122,10 @@ return function(extras: { commands: { [string]: any } })
 				if index > 8 then
 					break
 				end
-				context:log({
-					type = "info",
-					value = `  {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`,
-				})
+				table.insert(lines, `  {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`)
 			end
+
+			context:log({ type = "info", value = table.concat(lines, "\n") })
 		end,
 	}
 
