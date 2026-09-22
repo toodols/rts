@@ -197,6 +197,10 @@ local SCAVENGER_DETECTION_RANGE = 220
 local SCAVENGER_SEEKER_SHARE = 1
 local SCAVENGER_ROAM_MIN = 100
 local SCAVENGER_ROAM_MAX = 300
+-- Multiplier to spawn intervals for sea beacons, so they spawn scavengers less often
+local SCAVENGER_SEA_SPAWN_MULTIPLIER = 2
+-- Delay in seconds before a beacon's first spawn, preventing initial spawn threat
+local SCAVENGER_INITIAL_SPAWN_DELAY = 15
 
 local SELECTION_DRAG_THRESHOLD = 6
 -- A right-drag shorter than this is treated as a plain right-click rather than a formation line.
@@ -311,6 +315,8 @@ return table.freeze({
 	SCAVENGER_SEEKER_SHARE = SCAVENGER_SEEKER_SHARE,
 	SCAVENGER_ROAM_MIN = SCAVENGER_ROAM_MIN,
 	SCAVENGER_ROAM_MAX = SCAVENGER_ROAM_MAX,
+	SCAVENGER_SEA_SPAWN_MULTIPLIER = SCAVENGER_SEA_SPAWN_MULTIPLIER,
+	SCAVENGER_INITIAL_SPAWN_DELAY = SCAVENGER_INITIAL_SPAWN_DELAY,
 
 	SELECTION_DRAG_THRESHOLD = SELECTION_DRAG_THRESHOLD,
 	FORMATION_DRAG_THRESHOLD = FORMATION_DRAG_THRESHOLD,

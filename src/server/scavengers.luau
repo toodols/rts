@@ -438,9 +438,16 @@ local function spawn_beacon(): boolean
 			local beacon = state.create_entity(def_name, config.SCAVENGER_TEAM, center, 0, "active")
 			-- published at once, so the next beacon's site check and this one's first spawns can see it
 			state.flush()
+			local unit_interval = config.SCAVENGER_SPAWN_INTERVAL
+			local defense_interval = config.SCAVENGER_DEFENSE_SPAWN_INTERVAL
+			-- Sea beacons spawn scavengers less frequently
+			if sea then
+				unit_interval *= config.SCAVENGER_SEA_SPAWN_MULTIPLIER
+				defense_interval *= config.SCAVENGER_SEA_SPAWN_MULTIPLIER
+			end
 			beacons[beacon.id] = {
-				next_unit_at = clock + config.SCAVENGER_SPAWN_INTERVAL,
-				next_defense_at = clock + config.SCAVENGER_DEFENSE_SPAWN_INTERVAL,
+				next_unit_at = clock + config.SCAVENGER_INITIAL_SPAWN_DELAY + unit_interval,
+				next_defense_at = clock + config.SCAVENGER_INITIAL_SPAWN_DELAY + defense_interval,
 				sea = sea,
 			}
 			return true
