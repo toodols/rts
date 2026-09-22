@@ -35,8 +35,10 @@ local HEIGHT_SLACK = 0.5
 -- for a building's width everywhere, widening every check through a crowd of small units several times
 -- over. Wrecks never block a line, only a hitscan shot can strike one, so they have a grid of their own.
 --
--- The grids are rebuilt both before orders (whose fight orders ask for sight) and again after movement,
--- before combat fires (see `rebuild`), so every check reads exactly where things stand.
+-- The grids are marked stale both before orders (whose fight orders ask for sight) and again after
+-- movement, before combat fires (see `invalidate`), so every check reads exactly where things stand. A
+-- stale grid is only rebuilt when something actually asks - so a tick in which nothing looks costs
+-- nothing, which is most ticks for most of a map that is not at war.
 local SMALL_RADIUS = 4
 
 local widest_collider = 0
@@ -78,7 +80,14 @@ local function layer_add(layer: Layer, entity: Entity, radius: number, half_heig
 	layer.entities[k] = entity
 end
 
+local stale = true
+
+local function invalidate()
+	stale = true
+end
+
 local function rebuild()
+	stale = false
 	flat_grid.clear(small_blockers.grid)
 	flat_grid.clear(large_blockers.grid)
 	flat_grid.clear(wrecks.grid)
@@ -195,6 +204,9 @@ end
 
 -- The first solid thing the line from `from` to `to` touches, other than the two `ignored`, if any.
 local function first_in_way(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
+	if stale then
+		rebuild()
+	end
 	local best_t, nearest = nearest_on_segment(small_blockers, from, to, ignored_a, ignored_b, math.huge)
 	local _, large = nearest_on_segment(large_blockers, from, to, ignored_a, ignored_b, best_t)
 	return large or nearest
@@ -244,6 +256,9 @@ end
 
 -- The first wreck the line from `from` to `to` touches, if any. Wrecks can be hit by hitscan weapons like beam lasers.
 local function first_wreck_in_way(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
+	if stale then
+		rebuild()
+	end
 	local _, nearest = nearest_on_segment(wrecks, from, to, ignored_a, ignored_b, math.huge)
 	return nearest
 end
@@ -269,7 +284,7 @@ local function first_hit_at(shooter: Entity, point: Vector3, origin: Vector3): E
 end
 
 return table.freeze({
-	rebuild = rebuild,
+	invalidate = invalidate,
 	muzzle_of = muzzle_of,
 	verdict = verdict,
 	verdict_to_point = verdict_to_point,
