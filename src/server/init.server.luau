@@ -39,6 +39,7 @@ local players = require(script.players)
 local replication = require(script.replication)
 local scavengers = require(script.scavengers)
 local spawning = require(script.spawning)
+local pause = require(script.pause)
 
 type TeamId = types.TeamId
 
@@ -181,6 +182,9 @@ local function init()
 	end
 
 	RunService.Heartbeat:Connect(function(delta: number)
+		if pause.is_paused() then
+			return
+		end
 		accumulator += delta
 		-- cap catch-up so a long hitch does not spiral into a burst of steps
 		local steps = 0

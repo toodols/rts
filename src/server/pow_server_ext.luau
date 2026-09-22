@@ -8,6 +8,7 @@ local ServerScriptService = game:GetService "ServerScriptService"
 local alliances = require(ServerScriptService.Server.alliances)
 local godmode = require(ServerScriptService.Server.godmode)
 local nocost = require(ServerScriptService.Server.nocost)
+local pause = require(ServerScriptService.Server.pause)
 local players = require(ServerScriptService.Server.players)
 local scavengers = require(ServerScriptService.Server.scavengers)
 local spawning = require(ServerScriptService.Server.spawning)
@@ -46,6 +47,23 @@ return function(extras: { commands: { [string]: any } })
 			context:log({
 				type = "info",
 				value = if enabled then "Nocost on: everything builds free and instantly" else "Nocost off",
+			})
+		end,
+	}
+
+	commands.pause = {
+		description = "Stops the simulation stepping at all, as if the game's speed were zero. With no argument it toggles.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { { name = "Paused", type = "boolean" } } },
+		},
+		server_run = function(context: any)
+			local paused = if context.args[1] ~= nil then context.args[1] else pause.is_paused() == false
+			pause.set(paused)
+			context:log({
+				type = "info",
+				value = if paused then "Paused" else "Unpaused",
 			})
 		end,
 	}
