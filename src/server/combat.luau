@@ -72,16 +72,19 @@ local TARGET_CELL = 256
 -- saving real work, so pick_target falls back to a plain scan instead.
 local TARGET_GRID_MAX_RINGS = 8
 
-type TargetGrid = { [number]: { [number]: { Entity } } }
+-- Each cell buckets its entities again by alliance root (alliances.root_of), not just by position: two
+-- entities can only be enemies if their roots differ, so a search for `attacker`'s targets can skip
+-- straight past its own root's bucket in every cell it visits, rather than visiting every nearby
+-- friend and rejecting each one with is_enemy. In a crowd that is mostly or entirely one side - a solo
+-- army with nobody around to fight, or just everyone's own front line - that is most of the cell.
+type TargetCell = { [number]: { Entity } }
+type TargetGrid = { [number]: { [number]: TargetCell } }
 
 local target_grid: TargetGrid = {}
 
--- Alliance roots (alliances.root_of) seen on any living, non-wreck entity this tick. Two entities can
--- only be enemies if their roots differ, so a shooter whose own root is the only one in here has
--- nothing in the game it could possibly shoot - no amount of grid partitioning saves a search that
--- was always going to come back empty, and with only one team on the map (as in a solo benchmark
--- scenario, or a lone player with nothing else spawned yet) every shooter is in exactly that spot,
--- every tick.
+-- Alliance roots seen on any living, non-wreck, non-neutral entity this tick, checked before a search
+-- bothers walking the grid at all: with only one root anywhere on the map (a solo benchmark scenario,
+-- or a lone player with nothing else spawned yet), nothing anywhere could possibly be an enemy.
 local present_roots: { [number]: boolean } = {}
 local present_root_count = 0
 
@@ -105,17 +108,25 @@ local function rebuild_target_grid()
 			column = {}
 			target_grid[cx] = column
 		end
-		local bucket = column[cz]
+		local cell = column[cz]
+		if cell == nil then
+			cell = {}
+			column[cz] = cell
+		end
+		-- wrecks are bucketed under their own team's root, same as anything else - is_valid_forced_target
+		-- lets a forced attack finish one off regardless of root, and that path does not go through
+		-- each_within at all (it looks the wreck up by id directly), so nothing here needs to special-case it
+		local root = alliances.root_of(entity.team)
+		local bucket = cell[root]
 		if bucket == nil then
 			bucket = {}
-			column[cz] = bucket
+			cell[root] = bucket
 		end
 		table.insert(bucket, entity)
 
 		-- team 0 is neutral scenery, never a target (see is_enemy), so it never makes a shooter think
 		-- an enemy might be out there
 		if entity.kind ~= "wreck" and entity.team ~= 0 then
-			local root = alliances.root_of(entity.team)
 			if present_roots[root] == nil then
 				present_roots[root] = true
 				present_root_count += 1
@@ -137,14 +148,14 @@ local function has_any_possible_enemy(attacker: Entity): boolean
 	return present_roots[alliances.root_of(attacker.team)] == nil
 end
 
--- Calls `visit` with every living entity that could possibly be within `radius` of (x, z): everyone,
--- if `radius` is wide enough that the grid would not save anything, or otherwise everyone in the
--- cells the search radius actually touches.
-local function each_within(x: number, z: number, radius: number, visit: (Entity) -> ())
+-- Calls `visit` with every living entity that could possibly be within `radius` of (x, z) and is not
+-- of `own_root`: everyone but that root, if `radius` is wide enough that the grid would not save
+-- anything, or otherwise everyone but that root in the cells the search radius actually touches.
+local function each_within(x: number, z: number, radius: number, own_root: number, visit: (Entity) -> ())
 	local rings = math.ceil(radius / TARGET_CELL)
 	if rings > TARGET_GRID_MAX_RINGS then
 		for _, entity in state.all() do
-			if entity.alive then
+			if entity.alive and alliances.root_of(entity.team) ~= own_root then
 				visit(entity)
 			end
 		end
@@ -155,10 +166,14 @@ local function each_within(x: number, z: number, radius: number, visit: (Entity)
 		local column = target_grid[gx]
 		if column ~= nil then
 			for gz = cz - rings, cz + rings do
-				local bucket = column[gz]
-				if bucket ~= nil then
-					for _, entity in bucket do
-						visit(entity)
+				local cell = column[gz]
+				if cell ~= nil then
+					for root, bucket in cell do
+						if root ~= own_root then
+							for _, entity in bucket do
+								visit(entity)
+							end
+						end
 					end
 				end
 			end
@@ -326,7 +341,8 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 	-- below it), so the grid is searched a little wider than the weapon's flat range and reach_at
 	-- still gets the exact, final say per candidate below
 	local search_radius = weapon.range * 1.25 + 100
-	each_within(attacker.position.X, attacker.position.Z, search_radius, function(other: Entity)
+	local own_root = alliances.root_of(attacker.team)
+	each_within(attacker.position.X, attacker.position.Z, search_radius, own_root, function(other: Entity)
 		if
 			is_enemy(attacker, other)
 			and can_target(weapon, other)
