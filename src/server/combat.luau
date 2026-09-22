@@ -82,6 +82,16 @@ type TargetGrid = { [number]: { [number]: TargetCell } }
 
 local target_grid: TargetGrid = {}
 
+-- pick_target's result for (attacker, weapon), cached for the rest of the tick it was computed in -
+-- orders.run_fight asks has_target purely to decide whether to keep walking or stand and fight, and
+-- combat.tick asks the exact same question (same attacker, same weapon, same empty `claimed`) a
+-- moment later to actually take the shot. Without this, every unit on a fight order pays for that
+-- scan-and-sort twice a tick for no reason. Only valid when `claimed` is empty - the one case both
+-- call sites share - so a turret already skipping a claimed target always computes fresh. Cleared in
+-- begin_tick(), which also runs before orders.tick(), so it holds for the whole tick, not just
+-- within a single call to tick().
+local pick_target_cache: { [EntityId]: { [types.Weapon]: Entity | false } } = {}
+
 -- Alliance roots seen on any living, non-wreck, non-neutral entity this tick, checked before a search
 -- bothers walking the grid at all: with only one root anywhere on the map (a solo benchmark scenario,
 -- or a lone player with nothing else spawned yet), nothing anywhere could possibly be an enemy.
@@ -380,6 +390,34 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 	return nil
 end
 
+-- pick_target, but reused for the rest of the tick if something else already asked the same
+-- question for this attacker and weapon with nothing claimed - see pick_target_cache above. A dead
+-- or gone result is never reused: the cache only ever holds what was true the moment it was made,
+-- and something dying between the two calls that share it (rare, but a shot landing between them can
+-- do it) is exactly the case a fresh pick_target must catch.
+local function cached_pick_target(attacker: Entity, origin: Vector3, weapon: types.Weapon, claimed: { EntityId }): Entity?
+	if #claimed > 0 then
+		return pick_target(attacker, origin, weapon, claimed)
+	end
+	local by_weapon = pick_target_cache[attacker.id]
+	if by_weapon == nil then
+		by_weapon = {}
+		pick_target_cache[attacker.id] = by_weapon
+	end
+	local cached = by_weapon[weapon]
+	if cached ~= nil then
+		if cached == false then
+			return nil
+		end
+		if cached.alive then
+			return cached
+		end
+	end
+	local result = pick_target(attacker, origin, weapon, claimed)
+	by_weapon[weapon] = if result ~= nil then result else false
+	return result
+end
+
 -- Defined below, after the damage it deals, which can kill something that explodes in turn.
 local explode: (source: Entity) -> ()
 
@@ -593,11 +631,11 @@ local function shoot(
 
 	local target = forced_target(attacker, weapon, origin)
 	if target == nil then
-		target = pick_target(attacker, origin, weapon, claimed)
+		target = cached_pick_target(attacker, origin, weapon, claimed)
 	end
 	-- take a target another weapon is already shooting over none
 	if target == nil and #claimed > 0 then
-		target = pick_target(attacker, origin, weapon, {})
+		target = cached_pick_target(attacker, origin, weapon, {})
 	end
 	if target == nil then
 		return false, nil
@@ -670,13 +708,13 @@ end
 -- fight order stop walking.
 local function has_target(entity: Entity): boolean
 	local def = unit_defs.get(entity.def_name)
-	if def.weapon ~= nil and pick_target(entity, sight.muzzle_of(entity), def.weapon, {}) ~= nil then
+	if def.weapon ~= nil and cached_pick_target(entity, sight.muzzle_of(entity), def.weapon, {}) ~= nil then
 		return true
 	end
 	if def.turrets ~= nil then
 		local frame = CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0)
 		for _, turret in def.turrets do
-			if pick_target(entity, frame:PointToWorldSpace(turret.offset), turret.weapon, {}) ~= nil then
+			if cached_pick_target(entity, frame:PointToWorldSpace(turret.offset), turret.weapon, {}) ~= nil then
 				return true
 			end
 		end
@@ -828,8 +866,15 @@ local function burst_reload(weapon: types.Weapon, shots_fired_in_burst: number):
 	return weapon.reload
 end
 
-local function tick(delta: number)
+-- Rebuilds the target grid and clears the pick_target cache for the tick about to run - called
+-- before orders.tick() (see init.server.luau), so a fight order's has_target check and this same
+-- tick's actual shot both see one fresh grid and share one cached result per (attacker, weapon).
+local function begin_tick()
 	rebuild_target_grid()
+	table.clear(pick_target_cache)
+end
+
+local function tick(delta: number)
 	local decay = RECENT_DAMAGE_DECAY ^ (delta * FRAMES_PER_SECOND)
 	for id, damage in recent_damage do
 		if damage * decay < 1e-3 or state.get(id) == nil then
@@ -920,6 +965,7 @@ local function forget(entity_id: EntityId)
 end
 
 return table.freeze({
+	begin_tick = begin_tick,
 	tick = tick,
 	apply_damage = apply_damage,
 	manual_fire = manual_fire,
