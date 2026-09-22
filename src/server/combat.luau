@@ -181,12 +181,20 @@ local function each_within(x: number, z: number, radius: number, own_root: numbe
 		return
 	end
 	local cx, cz = target_cell_of(x, z)
+	local radius_squared = radius * radius
 	for gx = cx - rings, cx + rings do
 		local column = target_grid[gx]
-		if column ~= nil then
+		-- how far (x, z) is from this column of cells along X, zero if it is inside it
+		local cell_min_x = gx * TARGET_CELL
+		local dx = math.max(cell_min_x - x, 0, x - (cell_min_x + TARGET_CELL))
+		if column ~= nil and dx * dx <= radius_squared then
 			for gz = cz - rings, cz + rings do
 				local cell = column[gz]
-				if cell ~= nil then
+				local cell_min_z = gz * TARGET_CELL
+				local dz = math.max(cell_min_z - z, 0, z - (cell_min_z + TARGET_CELL))
+				-- a cell whose nearest point is out past the radius - the corners of the square, mostly -
+				-- has nothing in it that could be in reach
+				if cell ~= nil and dx * dx + dz * dz <= radius_squared then
 					for root, bucket in cell do
 						if root ~= own_root then
 							for _, entity in bucket do
@@ -373,14 +381,20 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 	local search_radius = search_radius_of(weapon)
 	local own_root = alliances.root_of(attacker.team)
 	each_within(attacker.position.X, attacker.position.Z, search_radius, own_root, function(other: Entity)
+		-- distance first: out of reach is by far the most common reason to reject, and the cheapest
+		local distance = geometry.distance_2d(attacker.position, other.position)
+		if distance > search_radius then
+			return nil
+		end
 		if
 			is_enemy(attacker, other)
 			and can_target(weapon, other)
 			and table.find(claimed, other.id) == nil
-			and geometry.distance_2d(attacker.position, other.position) <= reach_at(weapon, origin, other.position)
+			and distance <= reach_at(weapon, origin, other.position)
 		then
 			table.insert(candidates, other)
 		end
+		return nil
 	end)
 	table.sort(candidates, function(a: Entity, b: Entity): boolean
 		-- Calculate power score: metal_cost + 60 * energy_cost
@@ -461,10 +475,13 @@ local function any_target(attacker: Entity, origin: Vector3, weapon: types.Weapo
 	local found = false
 	local blocked = 0
 	each_within(attacker.position.X, attacker.position.Z, search_radius, own_root, function(other: Entity): boolean?
+		-- distance first: out of reach is by far the most common reason to reject, and the cheapest
+		local distance = geometry.distance_2d(attacker.position, other.position)
 		if
-			is_enemy(attacker, other) == false
+			distance > search_radius
+			or is_enemy(attacker, other) == false
 			or can_target(weapon, other) == false
-			or geometry.distance_2d(attacker.position, other.position) > reach_at(weapon, origin, other.position)
+			or distance > reach_at(weapon, origin, other.position)
 		then
 			return nil
 		end
