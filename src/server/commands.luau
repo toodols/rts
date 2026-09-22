@@ -130,8 +130,8 @@ local function on_issue_order(player: Player, payload: unknown)
 
 	-- one spot for everyone, unlike a move, which gives each unit its own
 	local ground: Vector3? = nil
-	-- a fight or a ground attack dragged out along a line gives every unit a point of its own instead
-	local per_unit = positions ~= nil and (kind == "fight" or kind == "attack_ground")
+	-- a fight, ground attack, path, or unload dragged out along a line gives every unit a point of its own instead
+	local per_unit = positions ~= nil and (kind == "fight" or kind == "attack_ground" or kind == "path" or kind == "unload")
 	local at_a_point = kind == "fight"
 		or kind == "attack_ground"
 		or kind == "unload"
@@ -182,17 +182,33 @@ local function on_issue_order(player: Player, payload: unknown)
 		-- a route is a chain of moves, so it is issued as the orders it is made of and not as an order of its own
 		if kind == "path" and factory then
 			-- a lab has no route to work out: what it makes is sent to the spot
-			if ground ~= nil then
-				production.set_rally(entity, { kind = "move", position = ground, target_id = nil }, should_queue)
+			local path_target: Vector3? = ground
+			if per_unit then
+				local raw = if positions ~= nil then positions[index] else nil
+				if typeof(raw) ~= "Vector3" or heightmap.in_bounds(raw.X, raw.Z) == false then
+					continue
+				end
+				path_target = heightmap.ground_position(raw.X, raw.Z)
+			end
+			if path_target ~= nil then
+				production.set_rally(entity, { kind = "move", position = path_target, target_id = nil }, should_queue)
 			end
 			continue
 		end
 		if kind == "path" then
-			if unit_defs.get(entity.def_name).max_speed == nil or ground == nil then
+			local path_target: Vector3? = ground
+			if per_unit then
+				local raw = if positions ~= nil then positions[index] else nil
+				if typeof(raw) ~= "Vector3" or heightmap.in_bounds(raw.X, raw.Z) == false then
+					continue
+				end
+				path_target = heightmap.ground_position(raw.X, raw.Z)
+			end
+			if unit_defs.get(entity.def_name).max_speed == nil or path_target == nil then
 				continue
 			end
 			local front = data.front == true
-			local route = route_to(entity, ground, should_queue and front == false, searches < PATH_MAX_SEARCHES)
+			local route = route_to(entity, path_target, should_queue and front == false, searches < PATH_MAX_SEARCHES)
 			searches += 1
 			if #route > 0 then
 				orders.issue(entity, route, should_queue, front)

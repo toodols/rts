@@ -11,13 +11,14 @@
 --   click on ground                move there
 --   click on an entity            attack, reclaim or assist depending on what it is
 --
--- In attack and fight mode the left button can also be dragged, and the units are spread along the line the
--- way a right-drag spreads a move.
+-- In attack, fight, path, and unload mode the left button can also be dragged, and the units are spread
+-- along the line the way a right-drag spreads a move.
 -- Attack mode (A) sends the next left click as an attack: on an enemy it attacks that enemy, and anywhere
 -- else it attacks that spot on the ground and keeps shooting at it. Fight mode (F) sends it as a fight
 -- waypoint: the units walk there, stopping to shoot whatever they can on the way. Pathfind mode (P) sends it
 -- as a request for a route: the server finds a way there for each unit that stays on ground it can stand
--- on, and gives it the waypoints of the way.
+-- on, and gives it the waypoints of the way. Unload mode (U) sends it as an unload order: the units go
+-- there and drop what they carry.
 -- G stops: every selected unit drops all its orders.
 --   drag a line                   spread the selection evenly along that line
 --   shift                         queues the order instead of replacing the queue
@@ -67,8 +68,8 @@ local left_down_at: Vector2? = nil
 -- Set while a building is being dragged out with shift held: where the line or grid starts.
 local placing_from: Vector3? = nil
 local right_down_world: Vector3? = nil
--- Where the left button went down in attack or fight mode: letting go on the same spot is the click, and
--- letting go further off is a line of them.
+-- Where the left button went down in a location-based mode (attack, fight, path, unload): letting go on
+-- the same spot is the click, and letting go further off is a line of them.
 local mode_drag_from: Vector3? = nil
 local drag_rect: DragRect? = nil
 local rect_listeners: { (rect: DragRect?) -> () } = {}
@@ -764,10 +765,13 @@ local function click_attack_mode()
 	end
 end
 
--- The selected units a line of orders in `mode` (attack or fight) spreads over.
+-- The selected units a line of orders in `mode` (attack, fight, path, or unload) spreads over.
 local function line_entries(mode: string): { { id: EntityId, model: Model, def: types.EntityDef } }
-	if mode == "fight" then
+	if mode == "fight" or mode == "path" then
 		return mobile_entries()
+	end
+	if mode == "unload" then
+		return workers "unload"
 	end
 	local result = {}
 	for _, entry in selected_with_def(false) do
@@ -778,8 +782,8 @@ local function line_entries(mode: string): { { id: EntityId, model: Model, def: 
 	return result
 end
 
--- Attack and fight mode, dragged: the units are spread along the line the way a move is, each fighting its
--- way to, or attacking the ground at, its own point. The mode ends, unless shift is held, which also queues
+-- Location-based mode dragged: the units are spread along the line the way a move is, each going to, or
+-- fighting/attacking/unloading at, its own point. The mode ends, unless shift is held, which also queues
 -- the orders and keeps it on.
 local function order_mode_line(mode: string, from: Vector3, to: Vector3)
 	local entries = line_entries(mode)
@@ -806,8 +810,16 @@ local function order_mode_line(mode: string, from: Vector3, to: Vector3)
 
 	local queue = shift_held()
 	markers.flash_points(positions, ORDER_MARKER_SECONDS)
+
+	-- Determine the order kind based on the mode
+	local kind = if mode == "attack" then "attack_ground"
+		elseif mode == "fight" then "fight"
+		elseif mode == "path" then "path"
+		elseif mode == "unload" then "unload"
+		else "attack_ground" -- fallback
+
 	issue_order:FireServer({
-		kind = if mode == "fight" then "fight" else "attack_ground",
+		kind = kind,
 		ids = ids,
 		positions = positions,
 		queue = queue,
@@ -959,7 +971,7 @@ local function preview_manual()
 end
 
 local function on_left_down()
-	if target_mode == "attack" or target_mode == "fight" then
+	if target_mode == "attack" or target_mode == "fight" or target_mode == "path" or target_mode == "unload" then
 		-- what it does waits for the button to come up, to tell a click from a line
 		mode_drag_from = ground_point()
 		if mode_drag_from == nil then
@@ -994,7 +1006,7 @@ local function on_left_up()
 	if mode_from ~= nil then
 		markers.clear_points()
 		local mode = target_mode
-		if mode == "attack" or mode == "fight" then
+		if mode == "attack" or mode == "fight" or mode == "path" or mode == "unload" then
 			local finished = ground_point()
 			if finished ~= nil and geometry.distance_2d(mode_from, finished) >= config.FORMATION_DRAG_THRESHOLD then
 				order_mode_line(mode, mode_from, finished)
