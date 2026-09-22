@@ -82,6 +82,8 @@ export type ProjectileParams = {
 	-- fired ahead of a moving target, at where it will be by the time the rocket gets there, and not at where it
 	-- is. Rockets do not home, so a missile that has to hit something quick, like an aircraft, needs it.
 	leads: boolean?,
+	-- homes on its target, tracking it in flight rather than aiming ahead. Used by anti-air weapons.
+	homing: boolean?,
 	-- a missile that goes up and comes down on its target rather than flying at it
 	missile: Missile?,
 	-- a plasma shell: one that a plasma deflector stops. Rockets, missiles and beams are not.

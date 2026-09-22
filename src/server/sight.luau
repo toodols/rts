@@ -129,12 +129,51 @@ local function verdict_to_point(shooter: Entity, point: Vector3, origin: Vector3
 	return "clear"
 end
 
+-- The first wreck the line from `from` to `to` touches, if any. Wrecks can be hit by hitscan weapons like beam lasers.
+local function first_wreck_in_way(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
+	local along = Vector2.new(to.X - from.X, to.Z - from.Z)
+	local length_squared = along:Dot(along)
+
+	local nearest: Entity? = nil
+	local nearest_t = math.huge
+	for _, other in state.all() do
+		if other.alive == false or other.kind ~= "wreck" then
+			continue
+		end
+		if other.id == ignored_a or other.id == ignored_b then
+			continue
+		end
+
+		local def = unit_defs.get(other.def_name)
+		local to_other = Vector2.new(other.position.X - from.X, other.position.Z - from.Z)
+		local t = if length_squared > 1e-6 then math.clamp(to_other:Dot(along) / length_squared, 0, 1) else 0
+		local closest = from:Lerp(to, t)
+
+		local sideways = Vector2.new(closest.X - other.position.X, closest.Z - other.position.Z).Magnitude
+		local vertical = math.abs(closest.Y - other.position.Y)
+		if
+			sideways <= unit_defs.collider_radius(def)
+			and vertical <= unit_defs.collider_height(def) / 2 + HEIGHT_SLACK
+			and t < nearest_t
+		then
+			nearest = other
+			nearest_t = t
+		end
+	end
+	return nearest
+end
+
 -- What a shot aimed at `target` actually strikes: whatever solid thing is first in its way, which is
--- the target itself unless something stands between.
+-- the target itself unless something stands between. Wrecks can be hit by hitscan weapons like beam lasers.
 local function first_hit(shooter: Entity, target: Entity, origin: Vector3): Entity
 	local blocker = first_in_way(origin, target.position, shooter.id, target.id)
 	if blocker ~= nil then
 		return blocker
+	end
+	-- Check for wrecks between shooter and target
+	local wreck = first_wreck_in_way(origin, target.position, shooter.id, target.id)
+	if wreck ~= nil then
+		return wreck
 	end
 	return target
 end
