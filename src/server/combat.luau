@@ -69,10 +69,14 @@ local MAX_SIGHT_CHECKS = 6
 -- enough to make that expensive; the rare ones that do (a nuclear silo's whole-map range, say) just
 -- fall back to the plain scan below, since at that range almost everything is a candidate cell
 -- anyway and partitioning buys nothing.
-local TARGET_CELL = 256
+--
+-- The cell is small next to typical weapon ranges on purpose: the search visits whole cells, so the
+-- square it covers overshoots the weapon's reach circle by up to a cell on every side, and every
+-- entity in that overshoot is visited and rejected on every scan.
+local TARGET_CELL = 64
 -- Past this many rings out from the shooter, the grid is visiting more empty cells than it is
 -- saving real work, so pick_target falls back to a plain scan instead.
-local TARGET_GRID_MAX_RINGS = 8
+local TARGET_GRID_MAX_RINGS = 16
 
 -- Each cell buckets its entities again by alliance root (alliances.root_of), not just by position: two
 -- entities can only be enemies if their roots differ, so a search for `attacker`'s targets can skip
@@ -329,6 +333,18 @@ local function reach_at(weapon: types.Weapon, origin: Vector3, target_position: 
 	return weapon.range
 end
 
+-- How far out a target search for `weapon` has to look. reach_at varies per candidate only for an
+-- arced weapon (it reaches further from above its target than below it), so only that needs searching
+-- a little wider than its flat range, with reach_at still getting the exact, final say per candidate;
+-- anything else reaches exactly its range, and every stud past that is entities visited for nothing.
+local function search_radius_of(weapon: types.Weapon): number
+	local params = weapon.projectile
+	if params ~= nil and params.arc ~= nil then
+		return weapon.range * 1.25 + 100
+	end
+	return weapon.range
+end
+
 -- Whether `weapon` can be turned on `target` at all. A weapon that names a layer shoots only at that one,
 -- and a lobbed shell comes down where its target was, so it is never thrown at something in the air.
 local function can_target(weapon: types.Weapon, target: Entity): boolean
@@ -354,10 +370,7 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 	end
 	local lobbed = flies_over(weapon)
 	local candidates: { Entity } = {}
-	-- reach_at varies per candidate (an arced weapon reaches further from above its target than
-	-- below it), so the grid is searched a little wider than the weapon's flat range and reach_at
-	-- still gets the exact, final say per candidate below
-	local search_radius = weapon.range * 1.25 + 100
+	local search_radius = search_radius_of(weapon)
 	local own_root = alliances.root_of(attacker.team)
 	each_within(attacker.position.X, attacker.position.Z, search_radius, own_root, function(other: Entity)
 		if
@@ -443,7 +456,7 @@ local function any_target(attacker: Entity, origin: Vector3, weapon: types.Weapo
 		return false
 	end
 	local lobbed = flies_over(weapon)
-	local search_radius = weapon.range * 1.25 + 100
+	local search_radius = search_radius_of(weapon)
 	local own_root = alliances.root_of(attacker.team)
 	local found = false
 	local blocked = 0
