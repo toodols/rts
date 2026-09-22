@@ -86,6 +86,10 @@ export type ProjectileParams = {
 	missile: Missile?,
 	-- a plasma shell: one that a plasma deflector stops. Rockets, missiles and beams are not.
 	plasma: boolean?,
+	-- a projectile that homes onto a target after launch, tracking it automatically
+	homing: boolean?,
+	-- a nuclear missile: used to distinguish nuke projectiles from other missiles for anti-nuke targeting
+	nuclear: boolean?,
 }
 
 -- How a missile flies: straight up from its launcher to `climb` studs above it, over to its target at that
@@ -109,6 +113,8 @@ export type Weapon = {
 	-- a dedicated anti air weapon does its full damage to aircraft; any other does only a fraction of it
 	-- (`config.NON_AA_AIR_DAMAGE_FRACTION`)
 	anti_air: boolean?,
+	-- a weapon dedicated to intercepting nuclear missiles in flight
+	anti_nuke: boolean?,
 	-- what it can shoot at: nil for both layers, and a weapon that names one never fires at the other
 	target_layer: TargetLayer?,
 	-- set for a weapon that throws a rocket rather than hitting its target instantly

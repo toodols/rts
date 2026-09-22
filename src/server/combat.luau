@@ -389,13 +389,24 @@ end
 
 -- Picks a shot for `weapon` and takes it: the point or the target an attack order names if it can be shot
 -- now, and otherwise the nearest enemy that can be seen, preferring one that is not `claimed`. Returns
--- whether the shot went off, and the entity it was at, if it was at one.
+-- whether the shot went off, and the entity it was at, if it was at one. Anti-nuke weapons search for
+-- nuclear missiles in flight instead of targeting entities.
 local function shoot(
 	attacker: Entity,
 	weapon: types.Weapon,
 	origin: Vector3,
 	claimed: { EntityId }
 ): (boolean, EntityId?)
+	-- anti-nuke weapons search for nuclear missiles to intercept instead of targeting entities
+	if weapon.anti_nuke == true then
+		local nuke = projectiles.pick_nuke_target(origin, attacker.team, weapon.range)
+		if nuke ~= nil then
+			-- fire at the nuke's current position as if it were a ground target
+			return fire_at_ground(attacker, nuke.flight.position, weapon, origin), nil
+		end
+		return false, nil
+	end
+
 	local point = forced_point(attacker, weapon, origin)
 	if point ~= nil then
 		return fire_at_ground(attacker, point, weapon, origin), nil

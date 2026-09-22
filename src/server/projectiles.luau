@@ -33,6 +33,12 @@ type Projectile = {
 	clear_of_owner: boolean,
 	-- the shields it was fired from inside, which do not stop it
 	exempt: { [EntityId]: boolean },
+	-- whether this is a nuclear missile
+	is_nuclear: boolean,
+	-- whether this is an anti-nuke interceptor that homes onto nuclear missiles
+	is_anti_nuke: boolean,
+	-- the nuke projectile this interceptor is homing onto, if any
+	homing_target_id: number?,
 }
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
@@ -119,6 +125,9 @@ local function launch(owner: Entity, origin: Vector3, aim: Vector3, weapon: type
 		anti_air = weapon.anti_air == true,
 		clear_of_owner = false,
 		exempt = shields.covering(origin),
+		is_nuclear = params.nuclear == true,
+		is_anti_nuke = weapon.anti_nuke == true,
+		homing_target_id = nil,
 	})
 
 	weapon_fired:FireAllClients({
@@ -200,12 +209,58 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 	end
 end
 
+-- Finds the nearest nuclear missile projectile within `max_range` that a shooter can target.
+-- Excludes nukes from the shooter's own team.
+local function pick_nuke_target(shooter_position: Vector3, shooter_team: types.TeamId, max_range: number): Projectile?
+	local nearest: Projectile? = nil
+	local nearest_distance = max_range
+	for _, projectile in projectiles do
+		if projectile.is_nuclear and projectile.team ~= shooter_team then
+			local distance = (projectile.flight.position - shooter_position).Magnitude
+			if distance < nearest_distance then
+				nearest = projectile
+				nearest_distance = distance
+			end
+		end
+	end
+	return nearest
+end
+
+-- Updates a homing interceptor to track its target. Steers the projectile's velocity toward the target's
+-- current position using a turn rate similar to missiles, allowing the interceptor to adjust course as
+-- the nuke moves.
+local function update_homing(interceptor: Projectile, target: Projectile, delta: number)
+	local to_target = target.flight.position - interceptor.flight.position
+	if to_target.Magnitude > 1e-3 then
+		local desired_direction = to_target.Unit
+		local current_direction = if interceptor.flight.velocity.Magnitude > 1e-3
+			then interceptor.flight.velocity.Unit
+			else desired_direction
+		-- use missile turn rate for smooth steering
+		local turned = current_direction:Lerp(desired_direction, math.min(1, config.MISSILE_TURN_RATE * delta))
+		local direction = if turned.Magnitude > 1e-3 then turned.Unit else desired_direction
+		interceptor.flight.velocity = direction * interceptor.flight.velocity.Magnitude
+	end
+end
+
 -- Flies every rocket forward one tick. `apply_damage` is handed in rather than required, because combat
 -- launches rockets and so depends on this module.
 local function tick(delta: number, apply_damage: (Entity, number) -> ())
 	local index = 1
 	while index <= #projectiles do
 		local projectile = projectiles[index]
+
+		-- anti-nuke interceptors find and track nuclear missiles
+		if projectile.is_anti_nuke and projectile.params.homing then
+			-- re-acquire target if lost
+			if projectile.homing_target_id == nil then
+				local target = pick_nuke_target(projectile.flight.position, projectile.team, projectile.params.range or 1000)
+				if target ~= nil then
+					projectile.homing_target_id = target.id
+				end
+			end
+		end
+
 		local steps = math.max(1, math.ceil(projectile.flight.velocity.Magnitude * delta / HIT_STEP))
 		local sub_delta = delta / steps
 
@@ -213,6 +268,24 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 		for _ = 1, steps do
 			projectile_mod.step(projectile.flight, projectile.params, sub_delta)
 			local at = projectile.flight.position
+
+			-- homing logic: steer interceptor toward tracked nuke
+			if projectile.is_anti_nuke and projectile.params.homing and projectile.homing_target_id ~= nil then
+				-- find the target nuke
+				local target: Projectile? = nil
+				for _, p in projectiles do
+					if p.id == projectile.homing_target_id then
+						target = p
+						break
+					end
+				end
+				if target ~= nil then
+					update_homing(projectile, target, sub_delta)
+				else
+					-- target lost, clear it for re-acquisition next tick
+					projectile.homing_target_id = nil
+				end
+			end
 
 			-- a plasma shell that runs into an enemy shield goes off on it, and does no harm
 			if
@@ -225,6 +298,25 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 				})
 				finished = true
 				break
+			end
+
+			-- anti-nuke interceptors can collide with nuclear missiles in flight
+			if projectile.is_anti_nuke and projectile.homing_target_id ~= nil then
+				for target_index, target in projectiles do
+					if target.id == projectile.homing_target_id then
+						local distance = (target.flight.position - at).Magnitude
+						if distance < 2 then
+							-- interceptor and nuke collided: detonate interceptor, destroy nuke
+							detonate(projectile, at, nil, apply_damage)
+							finished = true
+							table.remove(projectiles, target_index)
+							break
+						end
+					end
+				end
+				if finished then
+					break
+				end
 			end
 
 			local struck = struck_by(projectile)
@@ -260,4 +352,5 @@ end
 return table.freeze({
 	launch = launch,
 	tick = tick,
+	pick_nuke_target = pick_nuke_target,
 })
