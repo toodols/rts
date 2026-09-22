@@ -48,6 +48,77 @@ local recent_damage: { [EntityId]: number } = {}
 -- How many candidate targets are checked for line of sight, nearest first, before giving up.
 local MAX_SIGHT_CHECKS = 6
 
+-- Target acquisition scans a flat (X, Z) grid instead of every living thing, the same idea as
+-- movement's separation: rebuilt once a tick (see `rebuild_target_grid`), a search only visits the
+-- cells within a weapon's own reach instead of the whole map. Most weapons reach nowhere near far
+-- enough to make that expensive; the rare ones that do (a nuclear silo's whole-map range, say) just
+-- fall back to the plain scan below, since at that range almost everything is a candidate cell
+-- anyway and partitioning buys nothing.
+local TARGET_CELL = 256
+-- Past this many rings out from the shooter, the grid is visiting more empty cells than it is
+-- saving real work, so pick_target falls back to a plain scan instead.
+local TARGET_GRID_MAX_RINGS = 8
+
+type TargetGrid = { [number]: { [number]: { Entity } } }
+
+local target_grid: TargetGrid = {}
+
+local function target_cell_of(x: number, z: number): (number, number)
+	return math.floor(x / TARGET_CELL), math.floor(z / TARGET_CELL)
+end
+
+-- Rebuilt once at the top of every combat tick, from every living thing on the map - a target search
+-- does not care what kind or team something is; `is_enemy` still does all of that filtering.
+local function rebuild_target_grid()
+	table.clear(target_grid)
+	for _, entity in state.all() do
+		if entity.alive == false then
+			continue
+		end
+		local cx, cz = target_cell_of(entity.position.X, entity.position.Z)
+		local column = target_grid[cx]
+		if column == nil then
+			column = {}
+			target_grid[cx] = column
+		end
+		local bucket = column[cz]
+		if bucket == nil then
+			bucket = {}
+			column[cz] = bucket
+		end
+		table.insert(bucket, entity)
+	end
+end
+
+-- Calls `visit` with every living entity that could possibly be within `radius` of (x, z): everyone,
+-- if `radius` is wide enough that the grid would not save anything, or otherwise everyone in the
+-- cells the search radius actually touches.
+local function each_within(x: number, z: number, radius: number, visit: (Entity) -> ())
+	local rings = math.ceil(radius / TARGET_CELL)
+	if rings > TARGET_GRID_MAX_RINGS then
+		for _, entity in state.all() do
+			if entity.alive then
+				visit(entity)
+			end
+		end
+		return
+	end
+	local cx, cz = target_cell_of(x, z)
+	for gx = cx - rings, cx + rings do
+		local column = target_grid[gx]
+		if column ~= nil then
+			for gz = cz - rings, cz + rings do
+				local bucket = column[gz]
+				if bucket ~= nil then
+					for _, entity in bucket do
+						visit(entity)
+					end
+				end
+			end
+		end
+	end
+end
+
 -- The gap between shots within a burst, for a burst weapon that does not say its own (`burst_interval`).
 -- Short enough to read as one rapid burst rather than a weapon that simply reloads fast.
 local DEFAULT_BURST_INTERVAL = 0.1
@@ -201,7 +272,11 @@ end
 local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weapon, claimed: { EntityId }): Entity?
 	local lobbed = flies_over(weapon)
 	local candidates: { Entity } = {}
-	for _, other in state.all() do
+	-- reach_at varies per candidate (an arced weapon reaches further from above its target than
+	-- below it), so the grid is searched a little wider than the weapon's flat range and reach_at
+	-- still gets the exact, final say per candidate below
+	local search_radius = weapon.range * 1.25 + 100
+	each_within(attacker.position.X, attacker.position.Z, search_radius, function(other: Entity)
 		if
 			is_enemy(attacker, other)
 			and can_target(weapon, other)
@@ -210,7 +285,7 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 		then
 			table.insert(candidates, other)
 		end
-	end
+	end)
 	table.sort(candidates, function(a: Entity, b: Entity): boolean
 		-- Calculate power score: metal_cost + 60 * energy_cost
 		local def_a = unit_defs.get(a.def_name)
@@ -688,6 +763,7 @@ local function burst_reload(weapon: types.Weapon, shots_fired_in_burst: number):
 end
 
 local function tick(delta: number)
+	rebuild_target_grid()
 	local decay = RECENT_DAMAGE_DECAY ^ (delta * FRAMES_PER_SECOND)
 	for id, damage in recent_damage do
 		if damage * decay < 1e-3 or state.get(id) == nil then
