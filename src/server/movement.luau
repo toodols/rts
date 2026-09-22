@@ -116,11 +116,14 @@ local function cell_of(x: number, z: number): (number, number)
 end
 
 -- Rebuilt once at the top of every tick from every alive, non-aircraft entity: units and buildings
--- alike push, and are pushed against, since a builder is as real an obstacle as another unit.
+-- alike push, and are pushed against, since a builder is as real an obstacle as another unit. Wrecks
+-- are left out: BAR doesn't collide units against them, and with dozens of wrecks lying around after
+-- a fight, giving each one a collider would mean every unit near a battlefield pushing against all of
+-- them for the rest of the match.
 local function rebuild_grid(): Grid
 	local grid: Grid = {}
 	for _, entity in state.all() do
-		if entity.alive == false or air.is_aircraft(entity) then
+		if entity.alive == false or entity.kind == "wreck" or air.is_aircraft(entity) then
 			continue
 		end
 		local cx, cz = cell_of(entity.position.X, entity.position.Z)
@@ -263,7 +266,7 @@ local function tick(delta: number)
 		end
 		entity.velocity += change
 
-		if entity.velocity.Magnitude > 1e-3 then
+		if entity.velocity.Magnitude > config.MOVEMENT_SETTLE_SPEED then
 			local next_position = entity.position + entity.velocity * delta
 			if heightmap.in_bounds(next_position.X, next_position.Z) then
 				entity.facing = math.atan2(entity.velocity.X, entity.velocity.Z)

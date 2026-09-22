@@ -101,6 +101,12 @@ local BLUEPRINT_DECAY_RATE = 30
 local ARRIVAL_RADIUS = 1.5
 local SEPARATION_STRENGTH = 6
 local SEPARATION_RADIUS_PADDING = 0.5
+-- A unit whose velocity is below this never bothers with terrain/passability checks or moving at
+-- all this tick: it counts as settled. Without a floor here, units at rest but slightly overlapping
+-- (idle crowds, builders waiting by a blueprint) get just enough separation push every tick to keep
+-- crossing a near-zero threshold, which was paying for a full terrain lookup forever without ever
+-- visibly moving.
+local MOVEMENT_SETTLE_SPEED = 0.05
 
 -- How far in front of a factory its finished unit is placed, measured from the edge of the
 -- factory's footprint along its facing.
@@ -265,6 +271,7 @@ return table.freeze({
 	ARRIVAL_RADIUS = ARRIVAL_RADIUS,
 	SEPARATION_STRENGTH = SEPARATION_STRENGTH,
 	SEPARATION_RADIUS_PADDING = SEPARATION_RADIUS_PADDING,
+	MOVEMENT_SETTLE_SPEED = MOVEMENT_SETTLE_SPEED,
 
 	PRODUCTION_SPOT_GAP = PRODUCTION_SPOT_GAP,
 	PRODUCTION_RALLY_GAP = PRODUCTION_RALLY_GAP,
