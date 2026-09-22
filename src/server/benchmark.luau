@@ -192,7 +192,23 @@ export type Scenario = {
 	description: string,
 	duration: number,
 	setup: () -> (),
+	-- run after clear_arena(), for anything a scenario made that could have wandered outside the
+	-- bounding box by the time it is torn down - a scavenger beacon's own hunters, say
+	teardown: (() -> ())?,
 }
+
+-- Kills every scavenger-team entity, anywhere on the map, not just in the arena: a beacon's hunters
+-- roam toward whatever they are hunting and can end up outside the bounding box clear_arena sweeps,
+-- and a beacon left alive would otherwise go on making more of them for every scenario after it -
+-- exactly what happened to a later /benchmark run's "idle" scenario, whose grunts a previous run's
+-- surviving beacon had been hunting the whole time.
+local function clear_scavengers()
+	for _, entity in state.all() do
+		if entity.alive and entity.team == config.SCAVENGER_TEAM then
+			state.mark_dead(entity)
+		end
+	end
+end
 
 local SCENARIOS: { Scenario } = {
 	{
@@ -367,6 +383,7 @@ local SCENARIOS: { Scenario } = {
 		description = "a late-game slice: two mixed armies fighting, factories producing, builders "
 			.. "building and reclaiming, loaded transports, and an active scavenger beacon, all at once",
 		duration = 20,
+		teardown = clear_scavengers,
 		setup = function()
 			ensure_team(TEAM_A)
 			ensure_team(TEAM_B)
@@ -477,8 +494,10 @@ local function run(log: (string) -> ())
 
 	task.spawn(function()
 		local lines: { string } = { `Benchmark: {#SCENARIOS} scenarios` }
-		-- in case a previous run was interrupted partway through and left its own debris behind
+		-- in case a previous run was interrupted partway through and left its own debris behind, a
+		-- surviving scavenger beacon included
 		clear_arena()
+		clear_scavengers()
 		task.wait(config.TICK_DELTA * 3)
 
 		for _, scenario in SCENARIOS do
@@ -511,6 +530,9 @@ local function run(log: (string) -> ())
 			end
 
 			clear_arena()
+			if scenario.teardown ~= nil then
+				scenario.teardown()
+			end
 			-- give the normal step loop a couple of ticks to actually reap what was just killed
 			-- before the next scenario's counts start from a clean slate
 			task.wait(config.TICK_DELTA * 3)

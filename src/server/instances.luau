@@ -54,6 +54,13 @@ local models: { [EntityId]: Model } = {}
 -- and a model that is finished has to go back to exactly what its art said: materials as well as
 -- colour, and parts that were meant to be see-through, like a rig's root part, staying that way.
 local originals: { [BasePart]: Original } = {}
+-- What kind, state and team each model was last painted for. Repainting means walking every part of
+-- the model (GetDescendants included), which is real cost to pay every sync for every entity when
+-- what it looks like has, almost always, not changed since the tick before.
+local appearance_keys: { [EntityId]: string } = {}
+-- Where each model was last pivoted to, so a building or a unit standing still is not handed the
+-- same PivotTo it already has every single sync.
+local transforms: { [EntityId]: { position: Vector3, facing: number } } = {}
 local container: Folder? = nil
 
 local function get_container(): Folder
@@ -202,6 +209,11 @@ end
 -- Every model is moved whole: art and placeholder are both built around their pivot, so placing an
 -- entity is one :PivotTo and nothing here has to know which part is which.
 local function apply_transform(entity: Entity, model: Model)
+	local last = transforms[entity.id]
+	if last ~= nil and last.position == entity.position and last.facing == entity.facing then
+		return
+	end
+	transforms[entity.id] = { position = entity.position, facing = entity.facing }
 	model:PivotTo(CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0))
 end
 
@@ -229,6 +241,12 @@ local function all_parts(model: Model): { BasePart }
 end
 
 local function apply_appearance(entity: Entity, model: Model)
+	local key = `{entity.kind}|{entity.state}|{entity.team}`
+	if appearance_keys[entity.id] == key then
+		return
+	end
+	appearance_keys[entity.id] = key
+
 	local def = unit_defs.get(entity.def_name)
 
 	if entity.kind == "wreck" then
@@ -486,6 +504,8 @@ local function destroy(id: EntityId)
 	end
 	model:Destroy()
 	models[id] = nil
+	appearance_keys[id] = nil
+	transforms[id] = nil
 end
 
 local function sync_entity(entity: Entity, carried: boolean)
