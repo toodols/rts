@@ -53,6 +53,78 @@ local HIT_STEP = 0.5
 local SHIELD_BURST_RADIUS = 3
 -- The projectile's own thickness.
 local PROJECTILE_RADIUS = 0.3
+
+-- Direct-hit and splash checks scan a flat (X, Z) grid instead of every living thing, the same idea
+-- as movement's separation and combat's target acquisition: rebuilt once a tick (see
+-- `rebuild_collision_grid`), a check only visits the cells its own reach - a collider's width, or a
+-- blast's radius - actually touches. A blast wide enough to make that not worth it (a nuke's, say)
+-- just falls back to the plain scan, past `COLLISION_GRID_MAX_RINGS`.
+local COLLISION_CELL = 64
+local COLLISION_GRID_MAX_RINGS = 8
+
+type CollisionGrid = { [number]: { [number]: { Entity } } }
+
+local collision_grid: CollisionGrid = {}
+
+local function collision_cell_of(x: number, z: number): (number, number)
+	return math.floor(x / COLLISION_CELL), math.floor(z / COLLISION_CELL)
+end
+
+-- Rebuilt once at the top of every projectile tick, from every living thing on the map.
+local function rebuild_collision_grid()
+	table.clear(collision_grid)
+	for _, entity in state.all() do
+		if entity.alive == false then
+			continue
+		end
+		local cx, cz = collision_cell_of(entity.position.X, entity.position.Z)
+		local column = collision_grid[cx]
+		if column == nil then
+			column = {}
+			collision_grid[cx] = column
+		end
+		local bucket = column[cz]
+		if bucket == nil then
+			bucket = {}
+			column[cz] = bucket
+		end
+		table.insert(bucket, entity)
+	end
+end
+
+-- Calls `visit` with every living entity that could possibly be within `radius` of (x, z): everyone,
+-- if `radius` is wide enough that the grid would not save anything, or otherwise everyone in the
+-- cells the radius actually touches.
+local function each_near(x: number, z: number, radius: number, visit: (Entity) -> ())
+	local rings = math.ceil(radius / COLLISION_CELL)
+	if rings > COLLISION_GRID_MAX_RINGS then
+		for _, entity in state.all() do
+			if entity.alive then
+				visit(entity)
+			end
+		end
+		return
+	end
+	local cx, cz = collision_cell_of(x, z)
+	for gx = cx - rings, cx + rings do
+		local column = collision_grid[gx]
+		if column ~= nil then
+			for gz = cz - rings, cz + rings do
+				local bucket = column[gz]
+				if bucket ~= nil then
+					for _, entity in bucket do
+						visit(entity)
+					end
+				end
+			end
+		end
+	end
+end
+
+-- The widest any collider gets, plus a shot's own thickness and a little slack: comfortably covers
+-- struck_by's search without having to know a candidate's exact collider size in advance, which is
+-- the thing being looked up.
+local MAX_STRUCK_BY_RADIUS = 60
 -- A rocket that has flown this long is gone, whatever it hit.
 local MAX_AGE = 30
 -- What is left of a blast at its very edge, as a fraction of the damage at its centre.
@@ -178,29 +250,30 @@ local function struck_by(projectile: Projectile): Entity?
 		return nil
 	end
 	local at = projectile.flight.position
-	for _, other in state.all() do
-		if other.alive == false or other.kind == "wreck" then
-			continue
+	local found: Entity? = nil
+	each_near(at.X, at.Z, MAX_STRUCK_BY_RADIUS, function(other: Entity)
+		if found ~= nil or other.kind == "wreck" then
+			return
 		end
 		local touching = inside(at, other)
 		if other.id == projectile.owner_id then
 			if touching == false then
 				projectile.clear_of_owner = true
 			elseif projectile.clear_of_owner == false then
-				continue
+				return
 			end
 		end
 		-- Don't let a direct hit strike a unit allied with the shooter (e.g. a bomber flying
 		-- through its own swarm), matching the AoE splash's ally check below. The owner itself
 		-- is still a valid strike (a rocket falling back onto its own launcher).
 		if touching and other.id ~= projectile.owner_id and alliances.are_allied(other.team, projectile.team) then
-			continue
+			return
 		end
 		if touching then
-			return other
+			found = other
 		end
-	end
-	return nil
+	end)
+	return found
 end
 
 -- What `amount` of the rocket's damage comes to against `target`: an aircraft takes only a fraction of it
@@ -227,11 +300,13 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 	if struck ~= nil then
 		apply_damage(struck, damage_to(projectile, struck, projectile.damage))
 	end
-	for _, other in state.all() do
+	-- the widest any collider gets (see MAX_STRUCK_BY_RADIUS), added to the blast itself, comfortably
+	-- covers the search without having to know a candidate's exact collider size in advance
+	each_near(at.X, at.Z, projectile.params.aoe_radius + MAX_STRUCK_BY_RADIUS, function(other: Entity)
 		-- the shooter itself never takes its own blast - a bomber flying away from a bomb it just
 		-- dropped, say - but nobody else is spared for being on its side: that stays real friendly fire
-		if other.alive == false or (struck ~= nil and other.id == struck.id) or other.id == projectile.owner_id then
-			continue
+		if (struck ~= nil and other.id == struck.id) or other.id == projectile.owner_id then
+			return
 		end
 		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
 		local distance = (other.position - at).Magnitude
@@ -240,7 +315,7 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 			local falloff = 1 - (1 - edge) * math.clamp(distance / projectile.params.aoe_radius, 0, 1)
 			apply_damage(other, damage_to(projectile, other, projectile.damage * falloff))
 		end
-	end
+	end)
 end
 
 -- Finds the nearest nuclear missile projectile within `max_range` that a shooter can target.
@@ -284,6 +359,9 @@ end
 -- Flies every rocket forward one tick. `apply_damage` is handed in rather than required, because combat
 -- launches rockets and so depends on this module.
 local function tick(delta: number, apply_damage: (Entity, number) -> ())
+	if #projectiles > 0 then
+		rebuild_collision_grid()
+	end
 	local index = 1
 	while index <= #projectiles do
 		local projectile = projectiles[index]
