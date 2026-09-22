@@ -941,6 +941,7 @@ end
 -- tick's actual shot both see one fresh grid and share one cached result per (attacker, weapon).
 local function begin_tick()
 	rebuild_target_grid()
+	sight.begin_tick()
 	table.clear(pick_target_cache)
 end
 
