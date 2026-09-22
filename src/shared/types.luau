@@ -86,6 +86,8 @@ export type ProjectileParams = {
 	missile: Missile?,
 	-- a plasma shell: one that a plasma deflector stops. Rockets, missiles and beams are not.
 	plasma: boolean?,
+	-- whether this projectile actively homes in on its target after launch
+	homing: boolean?,
 }
 
 -- How a missile flies: straight up from its launcher to `climb` studs above it, over to its target at that
