@@ -611,6 +611,28 @@ local function run_static_builder(entity: Entity)
 	end
 	if hurt ~= nil then
 		construction.repair(entity, hurt, config.TICK_DELTA)
+		return
+	end
+
+	-- with nothing else to do it reclaims the nearest wreck in reach if it can
+	if def.reclaiming ~= false then
+		local wreck: Entity? = nil
+		local wreck_distance = reach
+		for _, other in state.all() do
+			if other.alive == false or other.kind ~= "wreck" then
+				continue
+			end
+			if reclaim.can_reclaim(entity, other) then
+				local distance = geometry.distance_2d(entity.position, other.position)
+				if distance <= wreck_distance then
+					wreck = other
+					wreck_distance = distance
+				end
+			end
+		end
+		if wreck ~= nil then
+			reclaim.request(entity, wreck)
+		end
 	end
 end
 
