@@ -683,6 +683,9 @@ local function can_do(mode: string, def: types.EntityDef): boolean
 	if mode == "fight" or mode == "path" then
 		return can_go(def)
 	end
+	if mode == "guard" then
+		return true
+	end
 	if mode == "unload" or mode == "load" then
 		return def.transport ~= nil
 	end
