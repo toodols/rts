@@ -122,6 +122,9 @@ export type Weapon = {
 	-- a weapon that fires from a stockpile of missiles that it builds up over time, rather than from a
 	-- reload alone. It shoots only when it is told to, never at what happens to come within its range.
 	stockpile: Stockpile?,
+	-- a weapon that fires multiple shots before reloading; fires `burst_count` shots at `reload` interval,
+	-- then reloads for the full `reload` time before the next burst
+	burst_count: number?,
 }
 
 -- What building up missiles takes: every `build_time` seconds one more is finished, at the price of `metal` and
@@ -325,6 +328,10 @@ export type Entity = {
 	manual_reload_remaining: number,
 	-- seconds until each of its turrets can fire again, by turret
 	turret_reloads: { number },
+	-- tracks burst fire state: number of shots remaining in current burst for main weapon
+	burst_remaining: number,
+	-- tracks burst fire state for each turret, if they have burst weapons
+	turret_burst_remaining: { number },
 	-- missiles held ready, and seconds spent on the next one, if its weapon stockpiles them
 	stockpile: number,
 	stockpile_progress: number,
