@@ -103,6 +103,31 @@ return function(extras: { commands: { [string]: any } })
 					)}%`,
 				})
 			end
+
+			-- entity counts, to catch a leak - something that only ever grows and never comes back down
+			profiler.sample_entities()
+			local summary = profiler.entity_report()
+			context:log({
+				type = "info",
+				value = `entities: {summary.total} ({if summary.total_delta >= 0 then "+" else ""}{summary.total_delta} since reset)`,
+			})
+			for _, row in summary.by_kind do
+				context:log({
+					type = "info",
+					value = `  {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`,
+				})
+			end
+			-- def names past the top few are rarely the thing worth looking at; the kind breakdown
+			-- above already says whether it's units, buildings or wrecks piling up
+			for index, row in summary.by_def do
+				if index > 8 then
+					break
+				end
+				context:log({
+					type = "info",
+					value = `  {row.label}: {row.count} ({if row.delta >= 0 then "+" else ""}{row.delta})`,
+				})
+			end
 		end,
 	}
 

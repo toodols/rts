@@ -174,6 +174,8 @@ local function step(delta: number)
 	-- entities created during this step join the world now that nothing is iterating it
 	profiler.mark "flush"
 	state.flush()
+	profiler.mark "entity_count"
+	profiler.sample_entities()
 	profiler.mark(nil)
 	profiler.step_done()
 end

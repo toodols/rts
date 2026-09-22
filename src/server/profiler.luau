@@ -1,16 +1,45 @@
--- Where each simulation step's time actually goes. `mark(label)` closes out whatever section was
--- open (attributing the time since the last mark to it) and opens the next one under `label`, so a
--- step just calls it once between each piece of work it does - no per-call closures, no wrapping.
--- `mark(nil)` closes the last section without opening a new one, for the end of a step.
+-- Where each simulation step's time actually goes, and how many entities are alive, so a leak - one
+-- kind or def quietly never being cleaned up - shows up as a count that only ever grows rather than
+-- having to be guessed at from lag alone.
+--
+-- `mark(label)` closes out whatever section was open (attributing the time since the last mark to it)
+-- and opens the next one under `label`, so a step just calls it once between each piece of work it
+-- does - no per-call closures, no wrapping. `mark(nil)` closes the last section without opening a new
+-- one, for the end of a step.
 --
 -- Time accumulates into a running total per label, alongside how many steps have gone by since the
 -- last reset, so `report()` can give both a share of the step and an average time per step. It always
 -- runs - `os.clock()` twice a section is cheap next to what a step actually does - so it is there
 -- the moment something needs looking into, with no separate switch to remember to flip first.
 
+local state = require(script.Parent.state)
+
 local totals: { [string]: number } = {}
 local steps = 0
 local reset_at = os.clock()
+
+-- Live entity counts, by kind ("unit", "building", "wreck") and by def name, alongside what each
+-- count was at the last reset, so a growing one stands out as a positive delta rather than needing
+-- two /profile runs compared by eye.
+local by_kind: { [string]: number } = {}
+local by_kind_at_reset: { [string]: number } = {}
+local by_def: { [string]: number } = {}
+local by_def_at_reset: { [string]: number } = {}
+local entity_total = 0
+local entity_total_at_reset = 0
+
+-- Recounts every live entity. Call once a step; state.all() is already walked by several other
+-- systems every step, so one more pass here is not what a leak would be hiding behind.
+local function sample_entities()
+	table.clear(by_kind)
+	table.clear(by_def)
+	entity_total = 0
+	for _, entity in state.all() do
+		entity_total += 1
+		by_kind[entity.kind] = (by_kind[entity.kind] or 0) + 1
+		by_def[entity.def_name] = (by_def[entity.def_name] or 0) + 1
+	end
+end
 
 local last_label: string? = nil
 local last_time = 0
@@ -34,6 +63,11 @@ local function reset()
 	steps = 0
 	reset_at = os.clock()
 	last_label = nil
+
+	sample_entities()
+	by_kind_at_reset = table.clone(by_kind)
+	by_def_at_reset = table.clone(by_def)
+	entity_total_at_reset = entity_total
 end
 
 export type Row = {
@@ -75,6 +109,42 @@ local function step_count(): number
 	return steps
 end
 
+export type CountRow = {
+	label: string,
+	count: number,
+	delta: number,
+}
+
+export type EntitySummary = {
+	total: number,
+	total_delta: number,
+	by_kind: { CountRow },
+	by_def: { CountRow },
+}
+
+local function count_rows(counts: { [string]: number }, at_reset: { [string]: number }): { CountRow }
+	local rows: { CountRow } = {}
+	for label, count in counts do
+		table.insert(rows, { label = label, count = count, delta = count - (at_reset[label] or 0) })
+	end
+	table.sort(rows, function(a, b)
+		return a.count > b.count
+	end)
+	return rows
+end
+
+-- The live entity count, its change since the last reset, and both broken down by kind and by def
+-- name, heaviest first. Uses whatever the last `sample_entities` found - call it fresh first for a
+-- live number, since a step_done() ago is close but not exact.
+local function entity_report(): EntitySummary
+	return {
+		total = entity_total,
+		total_delta = entity_total - entity_total_at_reset,
+		by_kind = count_rows(by_kind, by_kind_at_reset),
+		by_def = count_rows(by_def, by_def_at_reset),
+	}
+end
+
 return table.freeze({
 	mark = mark,
 	step_done = step_done,
@@ -82,4 +152,6 @@ return table.freeze({
 	report = report,
 	elapsed_since_reset = elapsed_since_reset,
 	step_count = step_count,
+	sample_entities = sample_entities,
+	entity_report = entity_report,
 })
