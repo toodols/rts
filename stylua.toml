@@ -1,0 +1,7 @@
+column_width = 120
+line_endings = "Unix"
+indent_type = "Tabs"
+indent_width = 4
+quote_style = "AutoPreferDouble"
+# RULES.md rule 6: `func "string"` is preferred wherever it is legal
+call_parentheses = "NoSingleString"

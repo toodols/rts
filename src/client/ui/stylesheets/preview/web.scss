@@ -1,0 +1,11 @@
+// The sass entry for the browser preview: the same five partials `default.scss` compiles, loaded
+// the same way. It used to need `@import` and a hand-written `:root`, because dart-sass scoped
+// `@extend` more tightly than outlass did and would not evaluate a bare `$var` in a custom
+// property. Both divergences are gone — the leaf partials `@use "main"` for their `@extend`
+// targets, and `_theme.scss` interpolates its `:root` values — so this is now `default.scss` with
+// a different compiler pointed at it, which is what a reference render should be.
+@use "default/main";
+@use "default/resource_bar";
+@use "default/selection_panel";
+@use "default/build_menu";
+@use "default/selection_box";

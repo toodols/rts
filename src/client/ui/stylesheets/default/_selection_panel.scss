@@ -1,0 +1,126 @@
+@use "theme" as *;
+@use "mixins" as *;
+// `.selection-name` extends `.heading`, which _main.scss declares: an @extend only reaches
+// the stylesheet it is written in and the ones that stylesheet loads.
+@use "main" as *;
+
+// The row along the bottom left that holds the selection panel and, after it, the command panel.
+.bottom-left {
+	position: absolute;
+	left: space(5);
+	bottom: space(5);
+	width: auto;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: flex-end;
+}
+
+.selection-panel {
+	width: 330px;
+	height: auto;
+	@include stack(column, space(3));
+	padding: space(4);
+}
+
+.selection-title {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.selection-name {
+	@extend .heading;
+	flex-grow: 1;
+}
+
+// State badge. Square and hairline-outlined rather than a pill; `&-` suffixes keep the variants
+// beside the base rule.
+.badge {
+	width: auto;
+	height: 17px;
+	padding: 0 space(2);
+	outline: 1px solid $edge;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+
+	&-blueprint {
+		color: var(--Accent);
+		outline: 1px solid var(--Accent);
+	}
+
+	&-count {
+		color: var(--Accent);
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.stat-list {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+}
+
+.stat {
+	@include stack(row, space(2));
+	align-items: center;
+	width: 100%;
+	height: 17px;
+}
+
+.stat-label {
+	@include caption;
+	flex-grow: 1;
+}
+
+.stat-value {
+	font-family: RobotoMono;
+	font-size: 13px;
+	text-align: right;
+}
+
+.progress-track {
+	@include track(8px);
+}
+
+.progress-fill {
+	@include meter($buildpower);
+
+	&.blueprint-fill {
+		@include meter($accent);
+	}
+}
+
+.queue-strip {
+	// a width to wrap against
+	width: 100%;
+	height: auto;
+	@include stack(row, space(1));
+	flex-wrap: wrap;
+}
+
+.queue-chip {
+	width: 30px;
+	height: 30px;
+	@include cell;
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+
+	// cancelling is what clicking a chip does, so it warns rather than invites
+	&:hover {
+		outline: 1px solid var(--Danger);
+		color: var(--Danger);
+	}
+}
+
+// What the selected thing is in plain words, under its name.
+.selection-subtitle {
+	width: 100%;
+	height: auto;
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: left;
+}

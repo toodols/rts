@@ -1,0 +1,138 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// Bars floating over entities. Where one sits on the screen is set from code every frame, so nothing
+// here positions it; this is only what it looks like.
+.world-bar {
+	@include stack(column, 2px);
+	align-items: center;
+	width: 52px;
+	pointer-events: none;
+}
+
+// A commander's nametag: the team's name, in the team's colour (set from code, since only the
+// server knows it), with a dark contour so it stays readable over any ground.
+.bar-name {
+	font-family: Michroma;
+	font-size: 10px;
+	color: var(--Text);
+	text-shadow: 0 1px 2px black;
+	letter-spacing: 0.08em;
+	white-space: nowrap;
+}
+
+.bar-track {
+	@include track(6px);
+	background-color: veil($void, 0.85);
+	box-shadow: 0 1px 3px veil(black, 0.6);
+}
+
+// Left without `height: 100%`, which is how this would be written on the web. outlass turns that into
+// a Size with an automatic width, which collapses an empty fill to nothing and fights the fraction
+// the component sets inline, so the fill's size is left to that alone, as with the resource bars.
+.bar-fill {
+	&.health {
+		@include meter($buildpower);
+	}
+
+	&.health.mid {
+		@include meter($caution);
+	}
+
+	&.health.low {
+		@include meter($danger);
+	}
+
+	&.progress {
+		@include meter($accent);
+	}
+
+	// what is left of a wreck to reclaim
+	&.reclaim {
+		@include meter($metal);
+	}
+
+	// how far along a wreck is to being raised
+	&.resurrect {
+		@include meter($resurrect);
+	}
+}
+
+// A blueprint's channel is lit, so it reads as something being made rather than something alive.
+.world-bar.blueprint .bar-track {
+	outline: 1px solid var(--Accent);
+}
+
+.bar-eta {
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: var(--Accent);
+	text-shadow: 0 1px 2px black;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+
+	&.decaying {
+		color: $danger;
+	}
+
+	// The flash is driven from code, which toggles this state ten times a second, because the
+	// natural spelling below is not something outlass can turn into a Roblox tween yet.
+	&.decaying.lit {
+		color: white;
+	}
+}
+
+// How this would be written on the web: a hard two-step flash on the whole readout.
+@keyframes flash {
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0.2;
+	}
+}
+
+.bar-eta.decaying {
+	animation: flash 0.66s steps(1) infinite;
+}
+
+// What a shooter says when it cannot fire for want of energy. Energy is yellow; the flash is the same
+// state toggle the decay readout uses.
+.bar-warning {
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: var(--Energy);
+	text-shadow: 0 1px 2px black;
+	white-space: nowrap;
+
+	&.lit {
+		color: white;
+	}
+}
+
+// How far along a slow weapon is to its next shot.
+.bar-fill.reload {
+	@include meter($energy);
+}
+
+// How much power a plasma deflector's shield has left.
+.bar-fill.shield {
+	@include meter($accent);
+}
+
+// How far along a launcher's next missile is.
+.bar-fill.stockpile {
+	@include meter($metal);
+}
+
+// How many missiles a launcher holds, under its bar.
+.bar-count {
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: var(--Metal);
+	text-shadow: 0 1px 2px black;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}

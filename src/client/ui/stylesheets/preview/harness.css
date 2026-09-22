@@ -1,0 +1,111 @@
+
+/* ===================================================================================
+   HARNESS 2/3 -- the Roblox box model. None of this is in the stylesheet; it exists so the
+   browser's defaults for an unknown element do not stand in for Roblox's defaults for a
+   GuiObject. Every rule here is a claim about Roblox, and each one is worth arguing with.
+   =================================================================================== */
+rbx-frame,
+rbx-textlabel,
+rbx-textbutton {
+  display: block;           /* every GuiObject is a box; an unknown HTML element is inline */
+  box-sizing: border-box;   /* Size is the outer box and UIPadding eats into it */
+  position: relative;       /* every GuiObject is a positioning context for its children */
+  flex-shrink: 0;           /* a flex child only resizes when UIFlexItem says so */
+  min-width: 0;             /* Roblox has no min-content floor */
+}
+rbx-textlabel,
+rbx-textbutton {
+  align-content: center;    /* TextYAlignment.Center is the default (needs Chrome 129+ / Safari 17.6+) */
+  paint-order: stroke fill; /* TextStroke sits behind the glyph rather than cutting into it */
+}
+rbx-textbutton { cursor: pointer; -webkit-user-select: none; user-select: none; }
+
+/* ===================================================================================
+   HARNESS 3/3 -- page chrome. Everything is prefixed h- so it cannot collide with the sheet.
+   =================================================================================== */
+:root { color-scheme: dark; }
+body {
+  margin: 0; background: #0b0d10; color: #c8d2de;
+  font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+}
+.h-wrap { max-width: 1920px; margin: 0 auto; padding: 24px 16px 96px; }
+h1 { font: 600 19px/1.3 ui-sans-serif, system-ui, sans-serif; margin: 0 0 4px; color: #eef4fa; }
+h2 {
+  font: 600 13px/1.3 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+  color: #7ba6c8; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #1d2531;
+}
+.h-lede { margin: 0 0 20px; max-width: 82ch; color: #8b9aac; }
+.h-lede code, .h-note code, .h-list code { font-family: ui-monospace, monospace; color: #c8d2de; }
+.h-bar {
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+  padding: 10px 14px; background: #11151c; border: 1px solid #1d2531; margin-bottom: 20px;
+}
+.h-bar label { display: flex; gap: 7px; align-items: center; cursor: pointer; user-select: none; }
+.h-bar input { accent-color: #60d2f2; }
+.h-bar .h-dim { color: #6b7887; margin-left: auto; font-family: ui-monospace, monospace; }
+
+/* the 1920x1080 stage, scaled to fit the window by JS */
+.h-viewport { overflow: hidden; border: 1px solid #1d2531; }
+.h-stage {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  transform: scale(var(--h-fit, 1)); transform-origin: top left;
+  background: radial-gradient(120% 90% at 50% 0%, #2c3a30 0%, #151d19 55%, #0a0e0c 100%);
+}
+/* stands in for the 3D world, so a panel's 0.97 opacity has something to sit on */
+.h-stage::before {
+  content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image:
+    linear-gradient(0deg, transparent 49.5%, rgba(255,255,255,.07) 50%, transparent 50.5%),
+    linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,.07) 50%, transparent 50.5%);
+  background-size: 96px 96px;
+}
+body.h-checker .h-stage, body.h-checker .h-box { background: #7b8794; }
+body.h-checker .h-stage::before {
+  opacity: 1;
+  background-image: conic-gradient(#8e99a6 0 25%, #6c7783 0 50%, #8e99a6 0 75%, #6c7783 0);
+  background-size: 32px 32px;
+}
+/* the ScreenGui: IgnoreGuiInset = false, so it starts below the 36px topbar */
+.h-gui { position: absolute; left: 0; right: 0; bottom: 0; top: 36px; }
+body.h-noinset .h-gui { top: 0; }
+.h-topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 36px; background: rgba(0,0,0,.55);
+  color: #6b7887; font: 11px/36px ui-monospace, monospace; padding-left: 12px;
+}
+body.h-noinset .h-topbar { display: none; }
+
+/* element bounds overlay -- box-shadow, because the sheet uses outline for real borders */
+body.h-bounds rbx-frame { box-shadow: inset 0 0 0 1px rgba(255, 64, 190, .85); }
+body.h-bounds rbx-textlabel { box-shadow: inset 0 0 0 1px rgba(120, 255, 120, .7); }
+body.h-bounds rbx-textbutton { box-shadow: inset 0 0 0 1px rgba(255, 196, 64, .8); }
+
+/* variant and coverage cells */
+.h-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.h-cell { border: 1px solid #1d2531; background: #0e1116; margin: 0; }
+.h-cell > figcaption {
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid #1d2531; background: #11151c;
+}
+.h-cell > figcaption b { font: 600 12px ui-monospace, monospace; color: #eef4fa; }
+.h-cell > figcaption span { font: 11px ui-monospace, monospace; color: #6b7887; }
+.h-box {
+  position: relative; padding: 18px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #2c3a30 0%, #151d19 60%, #0a0e0c 100%);
+}
+.h-box.h-tall { height: 360px; }
+.h-box.h-anchor { padding: 0; }   /* for panels that position themselves */
+.h-note { margin: 0; padding: 8px 12px; border-top: 1px solid #1d2531; color: #7f8b99; font-size: 12px; }
+.h-list { max-width: 104ch; padding-left: 20px; }
+.h-list li { margin-bottom: 10px; }
+.h-list b { color: #eef4fa; font-weight: 600; }
+.h-tag {
+  display: inline-block; padding: 0 5px; border: 1px solid currentColor;
+  font: 10px/16px ui-monospace, monospace; vertical-align: 1px;
+}
+.h-tag.h-gap { color: #ee584a; }
+.h-tag.h-harness { color: #ecb844; }
+
+/* ===================================================================================
+   THE SHEET -- verbatim dart-sass output from default.scss, bar the four substitutions
+   listed in the comment at the top of this file.
+   =================================================================================== */

@@ -1,0 +1,14 @@
+# Project place file
+/rts.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+sourcemap.json
+
+Packages
+globalTypes.d.luau
+
+# outlass preview intermediate (only lingers if a build is killed mid-run)
+src/client/ui/stylesheets/preview/.compiled.css

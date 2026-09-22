@@ -1,0 +1,48 @@
+{
+	"name": "rts",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/shared"
+			},
+			"Packages": {
+				"$path": "Packages"
+			},
+			"Client": {
+				"$path": "src/client"
+			},
+			"Models": {
+				"$path": "src/models",
+				"$ignoreUnknownInstances": true
+			}
+		},
+		"ServerScriptService": {
+			"Server": {
+				"$path": "src/server",
+				"pow": {
+					"$path": "pow/package.project.json"
+				}
+			}
+		},
+		"Workspace": {
+			"$ignoreUnknownInstances": true,
+			"$properties": {
+				"StreamingEnabled": false
+			},
+			"Entities": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": true
+			},
+			"Effects": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": true
+			}
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"client_init": { "$path": "src/client_init.client.luau" }
+			}
+		}
+	}
+}

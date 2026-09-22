@@ -1,0 +1,45 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// The list of commands the selection can be given, beside the selection panel.
+.command-panel {
+	width: 210px;
+	height: auto;
+	@include stack(column, space(2));
+	padding: space(3);
+}
+
+.command-title {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+// One command: its name, and the key that starts it. The one whose mode is on is lit.
+.command-row {
+	width: 100%;
+	height: 28px;
+	@include cell;
+	@include stack(row, space(2));
+	align-items: center;
+	padding: 0 space(2);
+
+	&.active {
+		background-color: $steel-lit;
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.command-name {
+	color: var(--Text);
+	font-size: 13px;
+	text-align: left;
+}
+
+.command-key {
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 13px;
+	font-weight: bold;
+}

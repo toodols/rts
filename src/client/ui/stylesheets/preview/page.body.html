@@ -1,0 +1,578 @@
+</style>
+</head>
+<body>
+<div class="h-wrap">
+
+<h1>default.scss &mdash; browser reference render</h1>
+<p class="h-lede">
+  Every element the stylesheet styles, marked up the way the React components mark it up, rendered
+  by a browser from dart-sass output of the same SCSS. Compare against the Roblox render: anything
+  that differs is either outlass translating a property differently, Roblox lacking it, or one of
+  the harness assumptions at the top of this file being wrong. The stage is 1920&times;1080, the
+  resolution the sheet is authored against (<code>use_viewport.DESIGN_HEIGHT</code>), so
+  <code>UIScale</code> is 1 and every pixel value is directly comparable.
+</p>
+
+<div class="h-bar">
+  <label><input type="checkbox" id="h-noinset"> ignore GUI inset <code>(top: 0)</code></label>
+  <label><input type="checkbox" id="h-bounds"> element bounds</label>
+  <label><input type="checkbox" id="h-checker"> grey backdrop <code>(opacity: .97)</code></label>
+  <span class="h-dim" id="h-scale">stage 1:1</span>
+</div>
+
+<h2>1 &mdash; The HUD</h2>
+<div class="h-viewport">
+  <div class="h-stage">
+    <div class="h-topbar">Roblox topbar &mdash; 36px, ScreenGui.IgnoreGuiInset = false</div>
+    <div class="h-gui">
+
+      <!-- resource_bar.luau: ResourceBar -->
+      <rbx-frame class="resource-bar panel">
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">METAL</rbx-textlabel>
+            <rbx-textlabel class="resource-amount">1240</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/2000</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <!-- inline Size = UDim2.new(fraction, 0, 1, 0) -->
+            <rbx-frame class="resource-fill metal-fill" style="width: 62%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">+12/s</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="resource-divider"></rbx-frame>
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="resource-amount">18.4k</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/25.0k</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <rbx-frame class="resource-fill energy-fill" style="width: 73.6%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">+180/s</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+
+      <!-- selection_panel.luau: SelectionPanel -> Single -->
+      <rbx-frame class="selection-panel panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="selection-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel>
+          <rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="progress-track">
+          <rbx-frame class="progress-fill" style="width: 100%; height: 100%"></rbx-frame>
+        </rbx-frame>
+        <rbx-frame class="stat-list">
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">HEALTH</rbx-textlabel>
+            <rbx-textlabel class="stat-value">3000 / 3000</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">METAL</rbx-textlabel>
+            <rbx-textlabel class="stat-value">500</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="stat-value">10000</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">BUILDPOWER</rbx-textlabel>
+            <rbx-textlabel class="stat-value">100</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">ORDERS</rbx-textlabel>
+            <rbx-textlabel class="stat-value">0</rbx-textlabel>
+          </rbx-frame>
+        </rbx-frame>
+        <rbx-frame class="queue-strip">
+          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+          <rbx-textbutton class="queue-chip">Co</rbx-textbutton>
+          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        </rbx-frame>
+      </rbx-frame>
+
+      <!-- build_menu.luau: BuildMenu, a Bot Lab selected -->
+      <rbx-frame class="build-menu panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="build-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="heading grow">Bot Lab</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="build-grid">
+          <rbx-textbutton class="build-option">
+            <rbx-textlabel class="build-option-name">Constructor</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">200</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">3000</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+          <rbx-textbutton class="build-option">
+            <rbx-textlabel class="build-option-name">Grunt</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">50</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">500</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+        </rbx-frame>
+        <rbx-textlabel class="build-hint">Build orders always queue; shift adds five</rbx-textlabel>
+      </rbx-frame>
+
+      <!-- selection_box.luau: SelectionBox, inline Position/Size from the drag rect -->
+      <rbx-frame class="selection-box" style="left: 690px; top: 300px; width: 420px; height: 260px"></rbx-frame>
+
+    </div>
+  </div>
+</div>
+
+<h2>2 &mdash; States the HUD above does not show</h2>
+<div class="h-grid">
+
+  <figure class="h-cell">
+    <figcaption><b>.badge-blueprint · .blueprint-fill</b> <span>selection_panel.luau &rarr; Single, state == "blueprint"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="selection-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="selection-name">Constructor</rbx-textlabel>
+          <rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="progress-track">
+          <rbx-frame class="progress-fill blueprint-fill" style="width: 45%; height: 100%"></rbx-frame>
+        </rbx-frame>
+        <rbx-frame class="stat-list">
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">HEALTH</rbx-textlabel>
+            <rbx-textlabel class="stat-value">180 / 180</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">METAL</rbx-textlabel>
+            <rbx-textlabel class="stat-value">200</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">BUILDPOWER</rbx-textlabel>
+            <rbx-textlabel class="stat-value">70</rbx-textlabel>
+          </rbx-frame>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">The fill is the energy tone rather than buildpower green, and the badge outline
+      is <code>var(--Energy)</code>. Note <code>.badge-blueprint</code> is a sibling class, not
+      <code>.badge.badge-blueprint</code>, so it beats <code>.badge</code> on source order alone.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.badge-count</b> <span>selection_panel.luau &rarr; Many</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="selection-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="selection-name">SELECTION</rbx-textlabel>
+          <rbx-textlabel class="badge badge-count">7</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="stat-list">
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">GRUNT</rbx-textlabel>
+            <rbx-textlabel class="stat-value">x5</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="stat">
+            <rbx-textlabel class="stat-label">CONSTRUCTOR</rbx-textlabel>
+            <rbx-textlabel class="stat-value">x2</rbx-textlabel>
+          </rbx-frame>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">No progress track and no queue: <code>Many</code> renders the title and the
+      rows only, so the panel is whatever <code>height: auto</code> resolves to.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.unaffordable</b> <span>build_menu.luau &rarr; @extend .hazard</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="build-menu panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="build-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="heading grow">Constructor</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="build-grid">
+          <rbx-textbutton class="build-option unaffordable">
+            <rbx-textlabel class="build-option-name">Bot Lab</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">500</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">10000</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+          <rbx-textbutton class="build-option">
+            <rbx-textlabel class="build-option-name">Bot Lab</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">500</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">10000</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+        </rbx-frame>
+        <rbx-textlabel class="build-hint">Pick a building to place</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Affordable on the right for comparison. The hazard fill is sixteen hand-written
+      stops standing in for <code>repeating-linear-gradient</code>; in Roblox a UIGradient has 20
+      keypoints maximum, so this is close to the ceiling.</p>
+  </figure>
+
+  <figure class="h-cell" style="grid-column: 1 / -1">
+    <figcaption><b>.stalling</b> <span>resource_bar.luau &rarr; fraction &lt;= 0.02</span></figcaption>
+    <div class="h-box h-anchor" style="height: 200px">
+      <rbx-frame class="resource-bar panel" style="position: absolute; top: 20px">
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">METAL</rbx-textlabel>
+            <rbx-textlabel class="resource-amount stalling">30</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/2000</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <rbx-frame class="resource-fill metal-fill" style="width: 1.5%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">-4/s</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="resource-divider"></rbx-frame>
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="resource-amount">18.4k</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/25.0k</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <rbx-frame class="resource-fill energy-fill" style="width: 73.6%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">+180/s</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note"><code>position: absolute; top: 20px</code> is set inline here only so the bar
+      sits inside the cell. The looping fade is driven from Luau by TweenService, not by the sheet,
+      so it is absent here; only the red is the sheet's.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.placement-hint</b> <span>selection_box.luau &rarr; PlacementHint</span></figcaption>
+    <div class="h-box" style="height: 220px">
+      <rbx-textlabel class="placement-hint">[ ] rotate · right click cancels · hold shift to keep placing</rbx-textlabel>
+    </div>
+    <p class="h-note"><code>bottom: 128px</code> from the bottom of the ScreenGui, centred with
+      <code>left: 50%</code> plus <code>translateX(-50%)</code>. Width comes from the text, so this
+      is the one place the sheet relies on shrink-to-fit.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.selection-box</b> <span>selection_box.luau &rarr; SelectionBox</span></figcaption>
+    <div class="h-box" style="height: 220px">
+      <rbx-frame class="selection-box" style="left: 40px; top: 30px; width: 240px; height: 150px"></rbx-frame>
+    </div>
+    <p class="h-note">10% accent fill, 1px accent outline, <code>z-index: 100</code>. Position and
+      Size are always inline &mdash; the sheet only supplies the paint.</p>
+  </figure>
+
+</div>
+
+<h2>3 &mdash; Every class in the sheet</h2>
+<p class="h-lede">
+  One sample per selector, so nothing in the sheet goes unrendered. The source file is on the right
+  of each caption.
+</p>
+<div class="h-grid">
+
+  <figure class="h-cell">
+    <figcaption><b>.panel</b> <span>_main.scss · @include plate</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="panel">
+        <rbx-textlabel>brushed metal, lit lip, 16px padding, opacity .97</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">The lit lip is the first 3% of a 180&deg; gradient, then a hard step into the
+      body and a fall to <code>darken($steel, 10%)</code>. Tick the grey backdrop to see the .97.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.rail</b> <span>_main.scss · @include rail</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="panel" style="padding: 0">
+        <rbx-frame class="rail"></rbx-frame>
+      </rbx-frame>
+      <rbx-frame style="height: 12px"></rbx-frame>
+      <rbx-frame class="rail"></rbx-frame>
+    </div>
+    <p class="h-note">2px, accent, fading to transparent from 55% rightwards.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.hazard</b> <span>_main.scss · hazard()</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="hazard" style="height: 64px"></rbx-frame>
+    </div>
+    <p class="h-note">45&deg;, doubled stops so each transition is hard rather than blended.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.faint .metal .energy .accent</b> <span>_main.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-textlabel style="text-align: left">TextLabel default &mdash; var(--Text), 14px Source Sans Pro</rbx-textlabel>
+      <rbx-textlabel class="faint" style="text-align: left">.faint &mdash; var(--TextFaint)</rbx-textlabel>
+      <rbx-textlabel class="metal" style="text-align: left">.metal &mdash; var(--Metal)</rbx-textlabel>
+      <rbx-textlabel class="energy" style="text-align: left">.energy &mdash; var(--Energy)</rbx-textlabel>
+      <rbx-textlabel class="accent" style="text-align: left">.accent &mdash; var(--Accent)</rbx-textlabel>
+    </div>
+    <p class="h-note"><code>text-align: left</code> is inline here only, to make the colours easy to
+      line up; the sheet's base rule centres these. <code>.metal</code>, <code>.energy</code> and
+      <code>.accent</code> are not used by any component today.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.heading · .readout</b> <span>_main.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="panel">
+        <rbx-textlabel class="heading">BOT LAB &mdash; .heading, Michroma 13 bold</rbx-textlabel>
+        <rbx-textlabel class="readout" style="font-size: 19px">1240 &mdash; .readout</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Both carry a 2px void text-stroke so they survive the plate's lit lip. Sat on
+      a <code>.panel</code> here because that is the only place the stroke earns itself.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.resource-chip · .resource-divider</b> <span>_resource_bar.scss</span></figcaption>
+    <div class="h-box" style="display: flex; gap: 20px; align-items: center">
+      <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+      <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+      <rbx-frame class="resource-divider"></rbx-frame>
+      <rbx-textlabel class="faint" style="text-align: left">4&times;14 chips, 2&times;44 divider</rbx-textlabel>
+    </div>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.resource-track · .resource-fill</b> <span>_resource_bar.scss · @include track/meter</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="resource-track">
+        <rbx-frame class="resource-fill" style="width: 62%; height: 100%"></rbx-frame>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-frame class="resource-track">
+        <rbx-frame class="resource-fill energy-fill" style="width: 38%; height: 100%"></rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">6px channel, dark floor, 1px outline at <code>darken($edge, 25%)</code>. The
+      meter runs from <code>darken(tone, 45%)</code> to <code>lighten(tone, 25%)</code>.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.progress-track · .progress-fill</b> <span>_selection_panel.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="progress-track">
+        <rbx-frame class="progress-fill" style="width: 72%; height: 100%"></rbx-frame>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-frame class="progress-track">
+        <rbx-frame class="progress-fill blueprint-fill" style="width: 45%; height: 100%"></rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Same mixins as the resource meters at 8px: buildpower green for health,
+      energy blue for build progress.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.badge</b> <span>_selection_panel.scss</span></figcaption>
+    <div class="h-box" style="display: flex; gap: 10px; align-items: center">
+      <rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
+      <rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel>
+      <rbx-textlabel class="badge badge-count">12</rbx-textlabel>
+    </div>
+    <p class="h-note">17px tall, <code>width: auto</code>, 8px side padding &mdash; the only
+      shrink-to-fit box in a panel.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.stat-list · .stat · .stat-label · .stat-value</b> <span>_selection_panel.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="stat-list">
+        <rbx-frame class="stat">
+          <rbx-textlabel class="stat-label">HEALTH</rbx-textlabel>
+          <rbx-textlabel class="stat-value">3000 / 3000</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="stat">
+          <rbx-textlabel class="stat-label">BUILDPOWER</rbx-textlabel>
+          <rbx-textlabel class="stat-value">100</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">17px rows, 4px gaps. The label grows, the value is right-aligned RobotoMono 13.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.queue-strip · .queue-chip</b> <span>_selection_panel.scss · @include cell</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="queue-strip" style="width: 260px">
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Co</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Co</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Hover one: the cell lights, then the chip's own <code>:hover</code> overrides
+      the accent outline with danger red, because cancelling is what a click does. Constrained to
+      260px here so the wrap is visible.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.build-grid · .build-option</b> <span>_build_menu.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="build-grid">
+        <rbx-textbutton class="build-option">
+          <rbx-textlabel class="build-option-name">Constructor</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">200</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">3000</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+        <rbx-textbutton class="build-option">
+          <rbx-textlabel class="build-option-name">Grunt</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">50</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">500</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+        <rbx-textbutton class="build-option unaffordable">
+          <rbx-textlabel class="build-option-name">Bot Lab</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">500</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">10000</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+        <rbx-textbutton class="build-option">
+          <rbx-textlabel class="build-option-name">Grunt</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">50</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">500</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Three 76px columns, 8px gaps, content bottom-aligned
+      (<code>justify-content: flex-end</code>). Hover and press to see the <code>cell</code>
+      mixin's three states. Four options so the second row shows.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.build-hint · .grow</b> <span>_build_menu.scss, _main.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="build-title" style="width: 244px">
+        <rbx-textlabel class="heading grow">Bot Lab</rbx-textlabel>
+        <rbx-textlabel class="badge">.grow pushes me</rbx-textlabel>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-textlabel class="build-hint" style="width: 244px">Left click to place, [ ] to rotate, right click to cancel</rbx-textlabel>
+    </div>
+    <p class="h-note">Both at the menu's 244px content width. The hint is the sheet's only italic,
+      and its <code>width: 100%</code> exists purely to give the text something to wrap against.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.accent-bar</b> <span>not in the sheet <span class="h-tag h-gap">gap</span></span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="selection-title" style="width: 298px">
+        <rbx-frame class="accent-bar"></rbx-frame>
+        <rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel>
+        <rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Three components render an <code>accent-bar</code> Frame
+      (selection_panel.luau:96 and :154, build_menu.luau:146) and no rule defines it. In the browser
+      it collapses to nothing, as above. In Roblox an unstyled Frame keeps its defaults &mdash; a
+      white 100&times;100 box &mdash; so this is the one divergence where the two renders should
+      look nothing alike. <code>@include rail</code> in a <code>.accent-bar</code> rule, or dropping
+      the three Frames, settles it either way.</p>
+  </figure>
+
+</div>
+
+<h2>4 &mdash; What the two renders cannot agree on</h2>
+<ol class="h-list">
+  <li><b>Nothing here is authoritative about Roblox.</b> The harness block at the top of this file
+    is five guesses about GuiObject defaults (box, border-box, positioning context, no flex shrink,
+    vertically centred text). Where this render and Roblox differ, suspect those first.</li>
+  <li><b><code>opacity: .97</code> on <code>.panel</code> composites differently.</b> CSS opacity
+    applies to the whole subtree, so panel text is 97% opaque too; Roblox
+    <code>BackgroundTransparency</code> touches only the fill. Every panel is affected.</li>
+  <li><b><code>.resource</code> eats its bar's padding.</b> Measured here: the bar is 620&times;76
+    with 16px of vertical padding, leaving a 44px content box, and the column inside resolves to
+    68.5px (28px head + 6px track + 17.7px income + two 8px gaps). Centred, it runs from y=3.75 to
+    y=72.25, so it stays inside the plate but the 16px padding buys nothing. Whether Roblox clips,
+    overflows or grows the bar depends on what outlass does with <code>height: auto</code> &mdash;
+    probably the single most useful thing to diff.</li>
+  <li><b>Text that does not fit.</b> A <code>.build-option</code> is 76px wide with 8px padding, so
+    its content box is 60px; "Constructor" at 12px bold measures 63px and, because the option
+    centres rather than stretches its children, it overflows by 3px on each side instead of
+    wrapping. Where text does wrap &mdash; <code>.build-hint</code> at 244px &mdash; Roblox lays
+    lines out at the font's own height while the browser adds its <code>normal</code> leading of
+    about 1.2, so multi-line boxes will not agree on height either.</li>
+  <li><b><code>-webkit-text-stroke</code> is approximated.</b> The sheet writes the property both
+    sides understand, but Roblox strokes a glyph outward where the browser centres the stroke on
+    the outline, so <code>paint-order: stroke fill</code> is doing the work of keeping it behind
+    the glyph. Expect the browser's to read slightly heavier.</li>
+  <li><b><code>@priority 20</code> on <code>.stalling</code> does nothing here.</b> It is commented
+    out. The browser gets the same result anyway, by source order: <code>.stalling</code> comes
+    after <code>.resource-amount</code> at equal specificity.</li>
+  <li><b>The hazard stripes are a 16-keypoint expansion.</b> Both sides read the same
+    <code>repeating-linear-gradient</code>: the browser renders it natively, while outlass writes
+    the pattern out stop by stop into a UIGradient, which caps at 20 keypoints. Both interpolate in
+    sRGB, so the colour ramps should match closely &mdash; the stop positions are the thing to
+    check.</li>
+  <li><b><code>@include seam</code> is never called.</b> The mixin is defined in _mixins.scss and no
+    rule uses it, so there is nothing to render and nothing to compare.</li>
+  <li><b><code>.metal-fill</code> is referenced but undefined.</b> resource_bar.luau tags the metal
+    fill <code>resource-fill metal-fill</code>; only <code>.energy-fill</code> exists as a rule.
+    Harmless &mdash; <code>.resource-fill</code> is already the metal tone &mdash; but the class name
+    suggests a rule that is not there.</li>
+  <li><b>Hover and press states only exist here.</b> <code>.queue-chip</code> and
+    <code>.build-option</code> come from <code>@include cell</code>, which has
+    <code>:hover</code>, <code>:active</code> and <code>:disabled</code>. Nothing in the components
+    is ever disabled, so that branch is untested on both sides.</li>
+</ol>
+
+</div>
+
+<script>
+// Fit the 1920x1080 stage to the window, and report the scale so a screenshot can be matched.
+function fit() {
+  var vp = document.querySelector(".h-viewport");
+  var stage = document.querySelector(".h-stage");
+  var s = Math.min(1, vp.clientWidth / 1920);
+  stage.style.setProperty("--h-fit", s);
+  vp.style.height = Math.round(1080 * s) + "px";
+  document.getElementById("h-scale").textContent =
+    s === 1 ? "stage 1:1" : "stage " + (s * 100).toFixed(1) + "% of 1920×1080";
+}
+addEventListener("resize", fit);
+fit();
+
+[["h-noinset", "h-noinset"], ["h-bounds", "h-bounds"], ["h-checker", "h-checker"]].forEach(function (pair) {
+  var box = document.getElementById(pair[0]);
+  box.addEventListener("change", function () {
+    document.body.classList.toggle(pair[1], box.checked);
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+Frame,
+TextButton,
+TextLabel {
+	border: none;
+	background-color: transparent;
+}
+
+TextLabel,
+TextButton {
+	color: var(--Text);
+	font-family: Source Sans Pro;
+	font-size: 14px;
+	text-align: center;
+}
+
+.panel {
+	@include plate;
+	padding: space(4);
+}
+
+// The lit bar along a panel's top edge. It sits as the first child of a column panel, so it needs
+// no positioning; a row-direction panel takes its top lip from the plate gradient instead.
+.rail {
+	@include rail;
+}
+
+// Diagonal warning fill, used where something is unaffordable or failing.
+.hazard {
+	background-image: hazard(veil($danger, 0.9), veil($void, 0.9));
+}
+
+.faint {
+	color: var(--TextFaint);
+}
+.metal {
+	color: var(--Metal);
+}
+.energy {
+	color: var(--Energy);
+}
+.accent {
+	color: var(--Accent);
+}
+
+// Headings and numeric readouts take a dark contour so they stay legible over a lit plate lip.
+.heading {
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 13px;
+	text-align: left;
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+.readout {
+	font-family: RobotoMono;
+	font-weight: bold;
+	-webkit-text-stroke: 2px veil($void, 0.8);
+}
+
+.grow {
+	flex-grow: 1;
+}

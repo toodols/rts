@@ -1,0 +1,60 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// A targeting marquee: square, thin, and lit rather than a translucent bubble.
+.selection-box {
+	position: absolute;
+	background-color: veil($accent, 0.1);
+	outline: 1px solid var(--Accent);
+	z-index: 100;
+}
+
+.placement-hint {
+	position: absolute;
+	bottom: 128px;
+	left: 50%;
+	transform: translateX(-50%);
+	padding: space(2) space(4);
+	background-color: veil($void, 0.82);
+	outline: 1px solid $edge;
+	color: var(--Text);
+	font-family: RobotoMono;
+	font-size: 12px;
+}
+
+// The hint for a reclaim, repair or disintegrator mode: the same plate as the placement hint, but lit, so
+// it reads as something the cursor is doing rather than a tip.
+.mode-hint {
+	color: var(--Accent);
+	outline: 1px solid var(--Accent);
+}
+
+// Attacking is red, the same red as danger.
+.mode-hint.attack {
+	color: var(--Danger);
+	outline: 1px solid var(--Danger);
+}
+
+// Fighting is orange: an attack that is also on the move.
+.mode-hint.fight {
+	color: var(--Fight);
+	outline: 1px solid var(--Fight);
+}
+
+// Pathfinding is teal: a move that finds its own way.
+.mode-hint.path {
+	color: var(--Pathfind);
+	outline: 1px solid var(--Pathfind);
+}
+
+// Repairing is yellow, the same yellow as energy.
+.mode-hint.repair {
+	color: var(--Energy);
+	outline: 1px solid var(--Energy);
+}
+
+// Resurrecting is purple.
+.mode-hint.resurrect {
+	color: var(--Resurrect);
+	outline: 1px solid var(--Resurrect);
+}

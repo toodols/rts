@@ -1,0 +1,7 @@
+std = "roblox"
+[rules]
+empty_if = "allow"
+unused_variable = "allow"
+global_usage = "allow"
+if_same_then_else = "allow"
+roblox_manual_fromscale_or_fromoffset = "allow"

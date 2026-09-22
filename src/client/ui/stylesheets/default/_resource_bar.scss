@@ -1,0 +1,215 @@
+@use "sass:color";
+@use "theme" as *;
+@use "mixins" as *;
+// `.resource-amount` extends `.readout`, which _main.scss declares: an @extend only reaches the
+// stylesheet it is written in and the ones that stylesheet loads, so main has to be one of them.
+@use "main" as *;
+
+// Docked to the top edge like a console header rather than floating as a pill.
+.resource-bar {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 780px;
+	height: 76px;
+	@include stack(row, space(6));
+	align-items: center;
+	padding: space(4) space(7);
+	@include plate;
+
+	// The scavengers' difficulty is one more block and divider in the row: 130 and 2 wide, and two more gaps of 24
+	// to go with them, so the bar grows by 180 and the readouts keep the room they had.
+	&.with-scavengers {
+		width: 960px;
+	}
+}
+
+// `height: auto` and no width: the row's flex layout owns the width. Leaving both axes automatic
+// would let the 100%-wide children below feed back into it, and the column inflates past the bar.
+.resource {
+	height: auto;
+	@include stack(column, space(2));
+	align-items: stretch;
+	flex-grow: 1;
+}
+
+// A tally block standing in for a resource icon: square, no rounding.
+.resource-chip {
+	width: 4px;
+	height: 14px;
+
+	&.metal-chip {
+		background-color: var(--Metal);
+		background-image: linear-gradient(180deg, color.adjust($metal, $lightness: 20%), $metal);
+	}
+	&.energy-chip {
+		background-color: var(--Energy);
+		background-image: linear-gradient(180deg, color.adjust($energy, $lightness: 20%), $energy);
+	}
+}
+
+.resource-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.resource-name {
+	@include caption;
+	flex-grow: 1;
+}
+
+.resource-amount {
+	@extend .readout;
+	font-size: 19px;
+	text-align: right;
+}
+
+// Stretched by the column rather than sized at 100%, since this class also sits inside the head row.
+.resource-income {
+	font-family: RobotoMono;
+	font-size: 12px;
+	color: var(--Buildpower);
+	text-align: right;
+}
+
+// Under the bar: what came in each second on the left in green, what went out on the right in red.
+.resource-flow {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.resource-revenue {
+	font-family: RobotoMono;
+	font-size: 12px;
+	color: var(--Gain);
+	text-align: left;
+}
+
+.resource-expense {
+	font-family: RobotoMono;
+	font-size: 12px;
+	color: var(--Danger);
+	text-align: right;
+}
+
+.resource-track {
+	@include track(6px);
+}
+
+.resource-fill {
+	@include meter($metal);
+
+	&.energy-fill {
+		@include meter($energy);
+	}
+}
+
+// A stalled resource turns red; `@priority` lifts it over the tone classes it has to beat.
+.stalling {
+	color: var(--Danger);
+	@priority 20;
+}
+
+// Fades out at both ends, so it carries no `background-color`: the gradient is painted over the
+// colour, and an opaque one behind it would fill the fade back in.
+.resource-divider {
+	width: 2px;
+	height: 44px;
+	background-image: linear-gradient(180deg, transparent, $edge 35%, $edge 65%, transparent);
+}
+
+// The wind: a block beside metal and energy with a field of streaks drifting behind its readout. The streaks
+// are made and moved from code; this is only the frame they drift in and the text over it.
+.wind-block {
+	width: 130px;
+	height: 64px;
+	background-color: veil($void, 0.5);
+	outline: 1px solid $edge;
+}
+
+.wind-field {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+}
+
+.wind-content {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(1));
+	padding: space(2) space(3);
+}
+
+.wind-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.wind-speed {
+	@extend .readout;
+	font-size: 19px;
+	color: var(--Accent);
+	text-align: left;
+}
+
+.wind-gauge {
+	@include track(5px);
+	width: 100%;
+	background-color: veil($void, 0.85);
+}
+
+// Sized inline, as the other fills are.
+.wind-gauge-fill {
+	@include meter($accent);
+}
+
+.wind-range {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(1));
+}
+
+.wind-limit {
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 9px;
+	letter-spacing: 0.06em;
+	text-align: left;
+
+	&.right {
+		text-align: right;
+	}
+}
+
+// The scavengers' difficulty: the same size and plate as the wind block beside it, with a label over a
+// readout, in the danger colour because it is only ever a warning.
+.scavenger-block {
+	width: 130px;
+	height: 64px;
+	@include stack(column, space(1));
+	padding: space(2) space(3);
+	background-color: veil($void, 0.5);
+	outline: 1px solid $edge;
+}
+
+.scavenger-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.scavenger-value {
+	@extend .readout;
+	font-size: 19px;
+	color: var(--Danger);
+	text-align: left;
+}
