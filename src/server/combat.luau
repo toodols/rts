@@ -466,6 +466,12 @@ end
 -- Runs each of an entity's turrets on its own: its own reload, its own choice of target, and its own
 -- origin for the shot. A turret that is reloading is left alone, and one that finds nothing in range
 -- simply waits, without holding up the others.
+--
+-- A turret marked `shares_main_reload` has no reload of its own: it reads the entity's main weapon
+-- reload instead, and only ever fires while that is at zero. The decrementing happens once, in the
+-- main weapon's own reload block below (which runs after this), so it is not repeated here - this
+-- only reads it to decide whether the shared turret may fire this tick, and sets it (to its own
+-- weapon's reload time) when it does, which is what stops the main weapon from also firing this tick.
 local function tick_turrets(entity: Entity, turrets: { types.Turret }, delta: number)
 	local claimed: { EntityId } = {}
 	local frame = CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0)
@@ -476,10 +482,17 @@ local function tick_turrets(entity: Entity, turrets: { types.Turret }, delta: nu
 			entity.turret_burst_remaining[index] = 0
 		end
 
-		local remaining = entity.turret_reloads[index]
-		if remaining ~= nil and remaining > 0 then
-			entity.turret_reloads[index] = math.max(0, remaining - delta)
-			continue
+		local shared = turret.shares_main_reload == true
+		if shared then
+			if entity.reload_remaining > 0 then
+				continue
+			end
+		else
+			local remaining = entity.turret_reloads[index]
+			if remaining ~= nil and remaining > 0 then
+				entity.turret_reloads[index] = math.max(0, remaining - delta)
+				continue
+			end
 		end
 
 		local weapon = turret.weapon
@@ -491,15 +504,12 @@ local function tick_turrets(entity: Entity, turrets: { types.Turret }, delta: nu
 			if weapon.burst_count ~= nil and weapon.burst_count > 1 then
 				entity.turret_burst_remaining[index] += 1
 				if entity.turret_burst_remaining[index] >= weapon.burst_count then
-					-- burst complete, full reload time before next burst
-					entity.turret_reloads[index] = weapon.reload
 					entity.turret_burst_remaining[index] = 0
-				else
-					-- more shots in burst, use same reload interval
-					entity.turret_reloads[index] = weapon.reload
 				end
+			end
+			if shared then
+				entity.reload_remaining = weapon.reload
 			else
-				-- no burst, standard reload
 				entity.turret_reloads[index] = weapon.reload
 			end
 			if at ~= nil then

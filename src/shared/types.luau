@@ -149,6 +149,10 @@ export type Stockpile = {
 export type Turret = {
 	weapon: Weapon,
 	offset: Vector3,
+	-- true for a turret that does not reload on its own: it shares the entity's main weapon's reload
+	-- instead, and firing either one starts both reloading, so only one of the two ever fires at a
+	-- time. BAR's Lasher is this: one ground rocket, one anti-air missile, one cooldown between them.
+	shares_main_reload: boolean?,
 }
 
 -- What happens when something finished is destroyed: everything within `radius` takes `damage` at the

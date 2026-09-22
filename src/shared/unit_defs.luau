@@ -956,8 +956,9 @@ local defs: { [string]: EntityDef } = {
 		color = Color3.fromRGB(120, 150, 196),
 	},
 
-	-- cormist: a truck that throws missiles, which fly the way the aggravator's rockets do
-	-- it can also target aircraft
+	-- cormist: a truck with two missile racks, one for the ground and one for the air, that never fire
+	-- together: the ground rack does not track and the air one does, and both share the one 2.5s reload,
+	-- so only whichever finds a target first gets to fire.
 	lasher = {
 		name = "lasher",
 		slope_class = "TANK3",
@@ -986,7 +987,7 @@ local defs: { [string]: EntityDef } = {
 			reload = 2.5,
 			range = studs(575),
 			energy_per_shot = 0,
-			anti_air = true,
+			target_layer = "ground",
 			projectile = {
 				speed = studs(350),
 				acceleration = studs(110),
@@ -994,7 +995,30 @@ local defs: { [string]: EntityDef } = {
 				gravity = 12,
 				drag = 1.5,
 				aoe_radius = aoe(studs(48) / 3),
-				homing = true,
+				leads = true,
+			},
+		},
+		turrets = {
+			{
+				weapon = {
+					damage = 120,
+					reload = 2.5,
+					range = studs(700),
+					energy_per_shot = 0,
+					anti_air = true,
+					target_layer = "air",
+					projectile = {
+						speed = studs(350),
+						acceleration = studs(110),
+						thrust_time = 1.7,
+						gravity = 12,
+						drag = 1.5,
+						aoe_radius = aoe(studs(48) / 3),
+						homing = true,
+					},
+				},
+				offset = Vector3.new(0, 2, 0),
+				shares_main_reload = true,
 			},
 		},
 		color = Color3.fromRGB(176, 122, 88),
