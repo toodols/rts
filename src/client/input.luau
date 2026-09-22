@@ -58,7 +58,7 @@ local ORDER_MARKER_SECONDS = 1
 
 -- Set while a manual weapon is aimed: the next left click fires it instead of selecting.
 local manual_aiming = false
--- Set to "attack", "fight", "path", "reclaim", "repair", "resurrect", "load" or "unload" while that mode is on: the next left click on an entity sends
+-- Set to "attack", "fight", "path", "reclaim", "repair", "guard", "resurrect", "load" or "unload" while that mode is on: the next left click on an entity sends
 -- the selected units that can do it at that entity, in attack mode a click on the ground attacks that spot, and
 -- in fight mode a click sends them to fight their way to it.
 local target_mode: string? = nil
@@ -87,7 +87,7 @@ local function subscribe_rect(listener: (rect: DragRect?) -> ()): () -> ()
 	end
 end
 
--- Tells `listener` whenever the mode the cursor is in changes: "attack", "fight", "path", "reclaim", "repair", "resurrect", "load", "unload" or "disintegrator"
+-- Tells `listener` whenever the mode the cursor is in changes: "attack", "fight", "path", "reclaim", "repair", "guard", "resurrect", "load", "unload" or "disintegrator"
 -- while one is on, and nil otherwise.
 local function subscribe_mode(listener: (mode: string?) -> ()): () -> ()
 	table.insert(mode_listeners, listener)
@@ -1296,6 +1296,8 @@ local function on_input_began(input: InputObject, processed: boolean)
 		start_target_mode "load"
 	elseif input.KeyCode == Enum.KeyCode.U then
 		start_target_mode "unload"
+	elseif input.KeyCode == Enum.KeyCode.O then
+		start_target_mode "guard"
 	elseif input.KeyCode == Enum.KeyCode.LeftBracket then
 		build_mode.rotate(1)
 	elseif input.KeyCode == Enum.KeyCode.RightBracket then
@@ -1541,6 +1543,7 @@ local COMMANDS: { Command } = table.freeze({
 	{ mode = "resurrect", label = "Resurrect", key = "W" },
 	{ mode = "load", label = "Load", key = "J" },
 	{ mode = "unload", label = "Unload", key = "U" },
+	{ mode = "guard", label = "Guard", key = "O" },
 	{ mode = "disintegrator", label = "Disintegrator", key = "D" },
 })
 
