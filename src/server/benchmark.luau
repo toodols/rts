@@ -383,7 +383,10 @@ local SCENARIOS: { Scenario } = {
 		description = "a late-game slice: two mixed armies fighting, factories producing, builders "
 			.. "building and reclaiming, loaded transports, and an active scavenger beacon, all at once",
 		duration = 20,
-		teardown = clear_scavengers,
+		teardown = function()
+			clear_scavengers()
+			scavengers.set_enabled(false)
+		end,
 		setup = function()
 			ensure_team(TEAM_A)
 			ensure_team(TEAM_B)
@@ -468,6 +471,10 @@ local SCENARIOS: { Scenario } = {
 				end
 			end
 
+			-- on for exactly this scenario's window; the benchmark keeps it off the rest of the time
+			-- (see run()) so a fresh beacon never spawns on its own natural schedule mid-scenario and
+			-- hunts down units a scenario never meant to have an enemy at all
+			scavengers.set_enabled(true)
 			scavengers.force_beacon(ARENA_X - 50, ARENA_Z - 400)
 		end,
 	},
@@ -498,6 +505,14 @@ local function run(log: (string) -> ())
 		-- surviving scavenger beacon included
 		clear_arena()
 		clear_scavengers()
+
+		-- off for every scenario but "mixed" (which turns it back on for exactly its own window),
+		-- so a beacon can never spawn on its own natural schedule mid-scenario and go hunting units
+		-- a scenario never meant to have an enemy at all; restored to whatever it actually was once
+		-- every scenario is done, win or not
+		local was_enabled = scavengers.is_enabled()
+		scavengers.set_enabled(false)
+
 		task.wait(config.TICK_DELTA * 3)
 
 		for _, scenario in SCENARIOS do
@@ -537,6 +552,8 @@ local function run(log: (string) -> ())
 			-- before the next scenario's counts start from a clean slate
 			task.wait(config.TICK_DELTA * 3)
 		end
+
+		scavengers.set_enabled(was_enabled)
 
 		table.insert(lines, "")
 		table.insert(lines, "Benchmark complete")
