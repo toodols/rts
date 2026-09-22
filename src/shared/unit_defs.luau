@@ -2364,11 +2364,11 @@ local defs: { [string]: EntityDef } = {
 		max_water_depth = studs(9999),
 		build_options = nil,
 		air = { altitude = 24, climb_speed = 12, bombing_runs = true },
-		-- divergence from BAR - bomber drops 1 bomb only, but has more radius and damage
+		-- divergence from BAR - bomber drops 2 bombs in quick succession, more radius and damage per bomb
 		weapon = {
 			damage = 350,
-			reload = 2,
-			-- burst = 2,
+			reload = 0.5,
+			burst_count = 2,
 			range = 4,
 			energy_per_shot = 0,
 			target_layer = "ground",
