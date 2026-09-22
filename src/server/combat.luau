@@ -27,11 +27,24 @@ local projectiles = require(script.Parent.projectiles)
 local air = require(script.Parent.air)
 local deformation = require(script.Parent.deformation)
 local movement = require(script.Parent.movement)
+local profiler = require(script.Parent.profiler)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
+
+-- Runs a line-of-sight check (any of sight.verdict/verdict_along/verdict_to_point/first_hit/
+-- first_hit_at) under its own profiler label, `combat_los`, split out of the general `combat` one -
+-- sight.luau does its own scan for blockers, so it is worth seeing apart from targeting, firing and
+-- everything else combat.tick does. profiler.mark closes out whatever was open (combat, almost
+-- always) and reopens it the moment this returns, so nothing outside the call is misattributed.
+local function los(check: (...any) -> any, ...: any): any
+	profiler.mark "combat_los"
+	local result = check(...)
+	profiler.mark "combat"
+	return result
+end
 
 -- What a death leaves behind depends on how hard the unit was hit, as in BAR: its unit scripts read the
 -- severity of the death, the damage taken lately as a percentage of the unit's health, and leave a whole wreck
@@ -195,9 +208,9 @@ local function verdict_at(attacker: Entity, weapon: types.Weapon, target: Entity
 	local params = weapon.projectile
 	if params ~= nil and params.arc == "low" then
 		local path = projectile.trajectory(origin, target.position, params, ARC_CHECK_SPACING)
-		return sight.verdict_along(attacker, target.position, origin, path, target.id)
+		return los(sight.verdict_along, attacker, target.position, origin, path, target.id)
 	end
-	return sight.verdict(attacker, target, origin)
+	return los(sight.verdict, attacker, target, origin)
 end
 
 -- The same for a bare point on the ground.
@@ -205,9 +218,9 @@ local function verdict_at_point(attacker: Entity, weapon: types.Weapon, point: V
 	local params = weapon.projectile
 	if params ~= nil and params.arc == "low" then
 		local path = projectile.trajectory(origin, point, params, ARC_CHECK_SPACING)
-		return sight.verdict_along(attacker, point, origin, path, attacker.id)
+		return los(sight.verdict_along, attacker, point, origin, path, attacker.id)
 	end
-	return sight.verdict_to_point(attacker, point, origin)
+	return los(sight.verdict_to_point, attacker, point, origin)
 end
 
 -- A weapon on the automatic arc fires along the lowest arc that has a clear path: the low one, which is the faster,
@@ -231,7 +244,7 @@ local function with_chosen_arc(
 		local trial = table.clone(params)
 		trial.arc = arc :: "low" | "medium"
 		local path = projectile.trajectory(origin, target_position, trial, ARC_CHECK_SPACING)
-		if sight.verdict_along(attacker, target_position, origin, path, ignored) == "clear" then
+		if los(sight.verdict_along, attacker, target_position, origin, path, ignored) == "clear" then
 			shot.arc = arc :: "low" | "medium"
 			break
 		end
@@ -421,7 +434,7 @@ local function fire(attacker: Entity, target: Entity, weapon: types.Weapon, orig
 		return true
 	end
 
-	local struck = sight.first_hit(attacker, target, origin)
+	local struck = los(sight.first_hit, attacker, target, origin)
 	weapon_fired:FireAllClients({
 		from = origin,
 		to = struck.position,
@@ -447,7 +460,7 @@ local function fire_at_ground(attacker: Entity, point: Vector3, weapon: types.We
 		return true
 	end
 
-	local struck = sight.first_hit_at(attacker, point, origin)
+	local struck = los(sight.first_hit_at, attacker, point, origin)
 	weapon_fired:FireAllClients({
 		from = origin,
 		to = if struck ~= nil then struck.position else point,
