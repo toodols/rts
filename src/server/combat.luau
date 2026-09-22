@@ -76,6 +76,15 @@ type TargetGrid = { [number]: { [number]: { Entity } } }
 
 local target_grid: TargetGrid = {}
 
+-- Alliance roots (alliances.root_of) seen on any living, non-wreck entity this tick. Two entities can
+-- only be enemies if their roots differ, so a shooter whose own root is the only one in here has
+-- nothing in the game it could possibly shoot - no amount of grid partitioning saves a search that
+-- was always going to come back empty, and with only one team on the map (as in a solo benchmark
+-- scenario, or a lone player with nothing else spawned yet) every shooter is in exactly that spot,
+-- every tick.
+local present_roots: { [number]: boolean } = {}
+local present_root_count = 0
+
 local function target_cell_of(x: number, z: number): (number, number)
 	return math.floor(x / TARGET_CELL), math.floor(z / TARGET_CELL)
 end
@@ -84,6 +93,8 @@ end
 -- does not care what kind or team something is; `is_enemy` still does all of that filtering.
 local function rebuild_target_grid()
 	table.clear(target_grid)
+	table.clear(present_roots)
+	present_root_count = 0
 	for _, entity in state.all() do
 		if entity.alive == false then
 			continue
@@ -100,7 +111,30 @@ local function rebuild_target_grid()
 			column[cz] = bucket
 		end
 		table.insert(bucket, entity)
+
+		-- team 0 is neutral scenery, never a target (see is_enemy), so it never makes a shooter think
+		-- an enemy might be out there
+		if entity.kind ~= "wreck" and entity.team ~= 0 then
+			local root = alliances.root_of(entity.team)
+			if present_roots[root] == nil then
+				present_roots[root] = true
+				present_root_count += 1
+			end
+		end
 	end
+end
+
+-- Whether anything on the map could possibly be an enemy of `attacker` right now: some living,
+-- non-wreck entity whose alliance root differs from its own. Checked before a target search bothers
+-- scanning the grid at all.
+local function has_any_possible_enemy(attacker: Entity): boolean
+	if present_root_count > 1 then
+		return true
+	end
+	if present_root_count == 0 then
+		return false
+	end
+	return present_roots[alliances.root_of(attacker.team)] == nil
 end
 
 -- Calls `visit` with every living entity that could possibly be within `radius` of (x, z): everyone,
@@ -283,6 +317,9 @@ end
 -- any other once it has a missile ready - an order still overrides this, but nothing sits on a full silo
 -- doing nothing just because nobody told it what to hit.
 local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weapon, claimed: { EntityId }): Entity?
+	if has_any_possible_enemy(attacker) == false then
+		return nil
+	end
 	local lobbed = flies_over(weapon)
 	local candidates: { Entity } = {}
 	-- reach_at varies per candidate (an arced weapon reaches further from above its target than
