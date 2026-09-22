@@ -132,12 +132,17 @@ local function ground_center(def_name: string, x: number, z: number): Vector3
 end
 
 -- Whether something spot-bound already stands on `spot`, or is waiting in some builder's queue to.
-local function spot_taken(spot: Vector3): boolean
+-- If `def_name` is provided and equals "advanced_metal_extractor", spots with T1 mexes are not considered taken.
+local function spot_taken(spot: Vector3, def_name: string?): boolean
 	for _, other in state.all() do
 		if other.alive == false then
 			continue
 		end
 		if other.kind == "building" and unit_defs.get(other.def_name).requires_metal_spot == true then
+			-- Allow T2 mex to use a spot already occupied by T1 mex
+			if def_name == "advanced_metal_extractor" and other.def_name == "metal_extractor" then
+				continue
+			end
 			if geometry.distance_2d(other.position, spot) < TAKEN_RADIUS then
 				return true
 			end
@@ -158,11 +163,13 @@ end
 
 -- Where a building asked for at (x, z) would actually go, turned to `facing`. Buildings sit on the
 -- building grid, and a spot-bound one goes on the nearest metal spot instead, or nowhere if there is
--- none close enough.
+-- none close enough. T2 mexes can use spots already occupied by T1 mexes.
 local function resolve_center(def_name: string, x: number, z: number, facing: number): Vector3?
 	local def = unit_defs.get(def_name)
 	if def.requires_metal_spot == true then
-		local spot = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, spot_taken)
+		local spot = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, function(s)
+			return spot_taken(s, def_name)
+		end)
 		if spot == nil then
 			return nil
 		end
