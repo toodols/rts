@@ -88,14 +88,12 @@ type TargetGrid = { [number]: { [number]: TargetCell } }
 
 local target_grid: TargetGrid = {}
 
--- pick_target's result for (attacker, weapon), cached for the rest of the tick it was computed in -
--- orders.run_fight asks has_target purely to decide whether to keep walking or stand and fight, and
--- combat.tick asks the exact same question (same attacker, same weapon, same empty `claimed`) a
--- moment later to actually take the shot. Without this, every unit on a fight order pays for that
--- scan-and-sort twice a tick for no reason. Only valid when `claimed` is empty - the one case both
--- call sites share - so a turret already skipping a claimed target always computes fresh. Cleared in
--- begin_tick(), which also runs before orders.tick(), so it holds for the whole tick, not just
--- within a single call to tick().
+-- pick_target's result for (attacker, weapon), cached for the rest of the tick it was computed in, so
+-- nothing asks the same question twice in one tick. any_target (a fight order's has_target) reads it,
+-- and writes `false` into it when nothing at all is in reach, which spares shoot() the same fruitless
+-- scan moments later. Only valid when `claimed` is empty, so a turret already skipping a claimed
+-- target always computes fresh. Cleared in begin_tick(), which runs before orders.tick(), so it holds
+-- for the whole tick.
 local pick_target_cache: { [EntityId]: { [types.Weapon]: Entity | false } } = {}
 
 -- Alliance roots seen on any living, non-wreck, non-neutral entity this tick, checked before a search
