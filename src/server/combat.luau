@@ -163,12 +163,15 @@ end
 -- Calls `visit` with every living entity that could possibly be within `radius` of (x, z) and is not
 -- of `own_root`: everyone but that root, if `radius` is wide enough that the grid would not save
 -- anything, or otherwise everyone but that root in the cells the search radius actually touches.
-local function each_within(x: number, z: number, radius: number, own_root: number, visit: (Entity) -> ())
+-- A visit that returns true ends the search there.
+local function each_within(x: number, z: number, radius: number, own_root: number, visit: (Entity) -> boolean?)
 	local rings = math.ceil(radius / TARGET_CELL)
 	if rings > TARGET_GRID_MAX_RINGS then
 		for _, entity in state.all() do
 			if entity.alive and alliances.root_of(entity.team) ~= own_root then
-				visit(entity)
+				if visit(entity) == true then
+					return
+				end
 			end
 		end
 		return
@@ -183,7 +186,9 @@ local function each_within(x: number, z: number, radius: number, own_root: numbe
 					for root, bucket in cell do
 						if root ~= own_root then
 							for _, entity in bucket do
-								visit(entity)
+								if visit(entity) == true then
+									return
+								end
 							end
 						end
 					end
@@ -418,6 +423,56 @@ local function cached_pick_target(attacker: Entity, origin: Vector3, weapon: typ
 	local result = pick_target(attacker, origin, weapon, claimed)
 	by_weapon[weapon] = if result ~= nil then result else false
 	return result
+end
+
+-- Whether `weapon` has anything at all it could fire on from `origin` right now - not which target is
+-- best, which is what pick_target is for. A fight order asks this every tick just to decide whether to
+-- stand or keep walking, while the unit only actually picks and fires once per reload, so paying for a
+-- full scan-and-sort here was most of the cost of a battle. This stops at the first enemy in reach it
+-- has a shot at, and, like pick_target, gives up once MAX_SIGHT_CHECKS of them turn out to be blocked.
+-- Answers from pick_target's cache instead if something already worked the real answer out this tick.
+local function any_target(attacker: Entity, origin: Vector3, weapon: types.Weapon): boolean
+	local by_weapon = pick_target_cache[attacker.id]
+	local cached = if by_weapon ~= nil then by_weapon[weapon] else nil
+	if cached == false then
+		return false
+	elseif cached ~= nil and cached.alive then
+		return true
+	end
+	if has_any_possible_enemy(attacker) == false then
+		return false
+	end
+	local lobbed = flies_over(weapon)
+	local search_radius = weapon.range * 1.25 + 100
+	local own_root = alliances.root_of(attacker.team)
+	local found = false
+	local blocked = 0
+	each_within(attacker.position.X, attacker.position.Z, search_radius, own_root, function(other: Entity): boolean?
+		if
+			is_enemy(attacker, other) == false
+			or can_target(weapon, other) == false
+			or geometry.distance_2d(attacker.position, other.position) > reach_at(weapon, origin, other.position)
+		then
+			return nil
+		end
+		if lobbed or verdict_at(attacker, weapon, other, origin) == "clear" then
+			found = true
+			return true
+		end
+		blocked += 1
+		return blocked >= MAX_SIGHT_CHECKS
+	end)
+	-- Nothing in reach at all means pick_target has no candidates either, so its answer is already
+	-- known - and a shooter with nothing to shoot never starts a reload, so without this its own
+	-- shoot() would pay for the same fruitless scan again this very tick.
+	if found == false and blocked == 0 then
+		if by_weapon == nil then
+			by_weapon = {}
+			pick_target_cache[attacker.id] = by_weapon
+		end
+		by_weapon[weapon] = false
+	end
+	return found
 end
 
 -- Defined below, after the damage it deals, which can kill something that explodes in turn.
@@ -710,13 +765,13 @@ end
 -- fight order stop walking.
 local function has_target(entity: Entity): boolean
 	local def = unit_defs.get(entity.def_name)
-	if def.weapon ~= nil and cached_pick_target(entity, sight.muzzle_of(entity), def.weapon, {}) ~= nil then
+	if def.weapon ~= nil and any_target(entity, sight.muzzle_of(entity), def.weapon) then
 		return true
 	end
 	if def.turrets ~= nil then
 		local frame = CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0)
 		for _, turret in def.turrets do
-			if cached_pick_target(entity, frame:PointToWorldSpace(turret.offset), turret.weapon, {}) ~= nil then
+			if any_target(entity, frame:PointToWorldSpace(turret.offset), turret.weapon) then
 				return true
 			end
 		end
