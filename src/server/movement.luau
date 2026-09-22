@@ -117,7 +117,13 @@ end
 -- checking most of the crowd against itself every tick, overlapping or not.
 local SEPARATION_CELL = 24
 
-type Grid = { [number]: { [number]: { Entity } } }
+-- An entity's collider radius alongside it, computed once when the grid is built rather than once
+-- per neighbour that examines it: a crowded cell can have dozens of movers each looking at dozens of
+-- neighbours, and unit_defs.get + collider_radius on every one of those looks - for a value that
+-- only ever depends on the neighbour's def_name - added up to real, avoidable cost at any real
+-- density.
+type GridEntry = { entity: Entity, radius: number }
+type Grid = { [number]: { [number]: { GridEntry } } }
 
 local function cell_of(x: number, z: number): (number, number)
 	return math.floor(x / SEPARATION_CELL), math.floor(z / SEPARATION_CELL)
@@ -145,7 +151,7 @@ local function rebuild_grid(): Grid
 			bucket = {}
 			column[cz] = bucket
 		end
-		table.insert(bucket, entity)
+		table.insert(bucket, { entity = entity, radius = unit_defs.collider_radius(unit_defs.get(entity.def_name)) })
 	end
 	return grid
 end
@@ -166,12 +172,12 @@ local function separation(entity: Entity, radius: number, grid: Grid): Vector3
 			if bucket == nil then
 				continue
 			end
-			for _, other in bucket do
+			for _, entry in bucket do
+				local other = entry.entity
 				if other.id == entity.id then
 					continue
 				end
-				local other_radius = unit_defs.collider_radius(unit_defs.get(other.def_name))
-				local minimum = radius + other_radius + config.SEPARATION_RADIUS_PADDING
+				local minimum = radius + entry.radius + config.SEPARATION_RADIUS_PADDING
 				local offset = geometry.flatten(entity.position - other.position)
 				local distance = offset.Magnitude
 				if distance >= minimum then
