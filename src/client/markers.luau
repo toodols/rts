@@ -547,6 +547,15 @@ local function update_paths()
 			if built ~= nil then
 				point = unit_defs.surface_position(built, point.X, point.Z)
 			end
+			-- a reclaim or resurrect waypoint's height is whatever the wreck's actually is, not the
+			-- ground under it: a sea wreck floats, and dropping the dot to the seabed puts it nowhere
+			-- near what is being reclaimed
+			if (waypoint.kind == "reclaim" or waypoint.kind == "resurrect") and waypoint.target_id ~= nil then
+				local target = world.get(waypoint.target_id)
+				if target ~= nil then
+					point = world.position_of(target)
+				end
+			end
 			local guarded = if waypoint.kind == "guard" and waypoint.target_id ~= nil
 				then world.get(waypoint.target_id)
 				else nil
