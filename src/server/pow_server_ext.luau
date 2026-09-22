@@ -7,6 +7,8 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
 
 local config = require(ReplicatedStorage.Shared.config)
+local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local alliances = require(ServerScriptService.Server.alliances)
 local godmode = require(ServerScriptService.Server.godmode)
@@ -243,6 +245,49 @@ return function(extras: { commands: { [string]: any } })
 				value = if placed
 					then `Team {team_id} "{context.args[1]}" created`
 					else `Team {team_id} "{context.args[1]}" created, but there was no room for its commander`,
+			})
+		end,
+	}
+
+	commands.give = {
+		description = "Spawns a finished unit or building for a team at (X, Z) right now, for testing. It still needs room to stand.",
+		permissions = { "admin" },
+		overloads = {
+			{
+				returns = "nil",
+				args = {
+					{ name = "DefName", type = "string" },
+					{ name = "Team", type = "number" },
+					{ name = "X", type = "number" },
+					{ name = "Z", type = "number" },
+				},
+			},
+		},
+		server_run = function(context: any)
+			local def_name = context.args[1]
+			local team_id = context.args[2]
+			local x = context.args[3]
+			local z = context.args[4]
+
+			if unit_defs.defs[def_name] == nil then
+				context:log({ type = "error", value = `There is no def "{def_name}"` })
+				return
+			end
+			if state.get_team(team_id) == nil then
+				context:log({ type = "error", value = `There is no team {team_id}` })
+				return
+			end
+			if heightmap.in_bounds(x, z) == false then
+				context:log({ type = "error", value = `({x}, {z}) is off the map` })
+				return
+			end
+
+			local entity = spawning.spawn_near(def_name, team_id, heightmap.ground_position(x, z), 0)
+			context:log({
+				type = if entity ~= nil then "info" else "error",
+				value = if entity ~= nil
+					then `Gave team {team_id} a {def_name} at ({x}, {z})`
+					else `No room for a {def_name} near ({x}, {z})`,
 			})
 		end,
 	}

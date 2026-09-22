@@ -46,4 +46,5 @@ end
 
 return table.freeze({
 	give_starting_force = give_starting_force,
+	spawn_near = spawn_near,
 })
