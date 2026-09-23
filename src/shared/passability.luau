@@ -31,8 +31,9 @@ export type PassabilityMap = {
 }
 
 local CELL_STUDS = config.CELL_STUDS
-local WIDTH = config.MAP_CELLS_X
-local DEPTH = config.MAP_CELLS_Z
+-- The map's size in cells, taken from the heightmap by `initialize`, since maps are not all the same size.
+local width = config.MAP_CELLS_X
+local depth = config.MAP_CELLS_Z
 
 -- Movement class to its `maxslope`, in degrees.
 local SLOPE_CLASSES: { [string]: number } = {
@@ -42,9 +43,15 @@ local SLOPE_CLASSES: { [string]: number } = {
 	ABOT3 = 54,
 	SBOT2 = 54,
 	HBOT4 = 54,
+	VBOT6 = 54,
+	HABOT5 = 54,
+	TBOT3 = 90,
+	HTBOT6 = 90,
 	TANK2 = 27,
 	TANK3 = 27,
 	HTANK4 = 27,
+	MTANK3 = 27,
+	ATANK3 = 54,
 }
 
 -- Keyed by max slope, so classes with the same limit share.
@@ -74,31 +81,32 @@ end
 local function refresh(first_cx: number, first_cz: number, last_cx: number, last_cz: number)
 	local from_x = math.max(0, first_cx)
 	local from_z = math.max(0, first_cz)
-	local to_x = math.min(WIDTH - 1, last_cx)
-	local to_z = math.min(DEPTH - 1, last_cz)
+	local to_x = math.min(width - 1, last_cx)
+	local to_z = math.min(depth - 1, last_cz)
 	for max_slope, map in maps do
 		local limit = steepness_limit(max_slope)
 		for cz = from_z, to_z do
 			for cx = from_x, to_x do
-				buffer.writeu8(map.cells, cz * WIDTH + cx, if cell_steepness(cx, cz) <= limit then 1 else 0)
+				buffer.writeu8(map.cells, cz * width + cx, if cell_steepness(cx, cz) <= limit then 1 else 0)
 			end
 		end
 	end
 end
 
 local function initialize()
+	width, depth = heightmap.cells()
 	table.clear(maps)
 	for _, max_slope in SLOPE_CLASSES do
 		if maps[max_slope] == nil then
 			maps[max_slope] = {
-				width = WIDTH,
-				depth = DEPTH,
+				width = width,
+				depth = depth,
 				max_slope = max_slope,
-				cells = buffer.create(WIDTH * DEPTH),
+				cells = buffer.create(width * depth),
 			}
 		end
 	end
-	refresh(0, 0, WIDTH - 1, DEPTH - 1)
+	refresh(0, 0, width - 1, depth - 1)
 end
 
 -- The steepest angle, in degrees, that a slope class can stand on; nil for no class, which has no limit.
@@ -129,10 +137,10 @@ local function passable_cell(slope_class: string?, cx: number, cz: number): bool
 	if map == nil then
 		return true
 	end
-	if cx < 0 or cx >= WIDTH or cz < 0 or cz >= DEPTH then
+	if cx < 0 or cx >= width or cz < 0 or cz >= depth then
 		return false
 	end
-	return buffer.readu8(map.cells, cz * WIDTH + cx) == 1
+	return buffer.readu8(map.cells, cz * width + cx) == 1
 end
 
 -- Whether the point (x, z) in the world is on ground the class can stand on.
@@ -144,6 +152,8 @@ end
 return table.freeze({
 	initialize = initialize,
 	refresh = refresh,
+	cell_steepness = cell_steepness,
+	steepness_limit = steepness_limit,
 	max_slope = max_slope,
 	map_for = map_for,
 	passable_cell = passable_cell,

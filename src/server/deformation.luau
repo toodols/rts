@@ -4,6 +4,9 @@
 -- the voxels that draw it and the clients that keep their own copy of it are told once a tick, in one go, so
 -- a barrage of shells is one rewrite and one message and not hundreds.
 --
+-- Every edit sent to a client is labelled with the map generation it was made to (see shared/map_state.luau), so
+-- one that arrives after the map has been replaced is dropped rather than laid onto the new ground.
+--
 -- Buildings do not sink or float: the ground under their footprints is left as it is. Units and wrecks
 -- that stand where the ground has moved are set back down on it.
 
@@ -11,7 +14,9 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local map_state = require(ReplicatedStorage.Shared.map_state)
 local passability = require(ReplicatedStorage.Shared.passability)
+local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
@@ -93,8 +98,8 @@ local function flush()
 	local last_z = -math.huge
 	local changes = {}
 	for index in pending do
-		local cell_x = (index - 1) % heightmap.SAMPLES_X
-		local cell_z = (index - 1) // heightmap.SAMPLES_X
+		local cell_x = (index - 1) % heightmap.samples_across()
+		local cell_z = (index - 1) // heightmap.samples_across()
 		first_x = math.min(first_x, cell_x)
 		first_z = math.min(first_z, cell_z)
 		last_x = math.max(last_x, cell_x)
@@ -107,7 +112,8 @@ local function flush()
 	-- a sample moves the surface over the four cells around it
 	terrain.rewrite(first_x - 1, first_z - 1, last_x, last_z)
 	passability.refresh(first_x - 1, first_z - 1, last_x, last_z)
-	terrain_deformed:FireAllClients(changes)
+	pathfinder.refresh(first_x - 1, first_z - 1, last_x, last_z)
+	terrain_deformed:FireAllClients(map_state.generation(), changes)
 
 	local min_x, min_z = heightmap.grid_to_world(first_x - 1, first_z - 1)
 	local max_x, max_z = heightmap.grid_to_world(last_x + 1, last_z + 1)
@@ -115,17 +121,27 @@ local function flush()
 end
 
 local function init()
-	-- a client asks once it has built its own heightmap, and is sent every edit made before it got there
-	terrain_deformed.OnServerEvent:Connect(function(player: Player)
+	-- a client asks once it has built a map, and is sent every edit made to it so far; one that asks about a map that
+	-- has already been replaced is told nothing, since it will ask again once it has built the new one
+	terrain_deformed.OnServerEvent:Connect(function(player: Player, generation: unknown)
+		if generation ~= map_state.generation() then
+			return
+		end
 		local edits = heightmap.edited_heights()
 		if #edits > 0 then
-			terrain_deformed:FireClient(player, edits)
+			terrain_deformed:FireClient(player, generation, edits)
 		end
 	end)
+end
+
+-- Forgets the edits waiting to be drawn, which were made to a map that is being replaced.
+local function discard_pending()
+	table.clear(pending)
 end
 
 return table.freeze({
 	init = init,
 	crater = crater,
 	flush = flush,
+	discard_pending = discard_pending,
 })

@@ -1,15 +1,17 @@
 -- The scavengers gamemode. Every few minutes a beacon appears somewhere on the map, and for as long as it
 -- stands it keeps producing hostile units and defences around itself. The units scatter across the map and
--- hunt: anything of a player's that one notices, and has a straight run at, it attacks.
+-- hunt: anything of a player's that one notices, and has a way to, it attacks.
 --
 -- The scavengers are a team of their own (`config.SCAVENGER_TEAM`), so everything `combat` already knows
 -- about enemies applies to them without a special case: defences shoot whatever comes into range, and a
 -- player's units shoot them back. Only the beacon's schedule and what the units decide to do live here.
 --
--- A unit goes by a "straight run", a line across ground it can stand on (`has_direct_path`), whenever it has one,
--- because that is nearly free. Only when it has none does it ask `pathfinder` for a route round whatever is in the
--- way, which costs anything from a millisecond to a good deal more, so there is a limit on how many are asked for
--- and how far each may search, and a unit that is refused waits before it tries again.
+-- A unit on the ground only ever goes somewhere by a "straight run", a line across ground it can stand on all the
+-- way (`pathfinder.has_straight_path`), which is nearly free, or when there is none by a route from `pathfinder`.
+-- That holds for going after something it has noticed as well: it goes to where it will shoot from, and never just
+-- straight at the thing, which up on a cliff would run it into the cliff. A route costs anything from a millisecond
+-- to a good deal more, so there is a limit on how many are asked for and how far each may search, and a unit that
+-- is refused waits before it tries again.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
@@ -27,7 +29,6 @@ local orders = require(script.Parent.orders)
 local combat = require(script.Parent.combat)
 local movement = require(script.Parent.movement)
 local placement = require(script.Parent.placement)
-local sight = require(script.Parent.sight)
 
 type Entity = types.Entity
 type EntityDef = types.EntityDef
@@ -137,22 +138,17 @@ local STUCK_DISTANCE = 1
 local STUCK_LIMIT = 3
 local STUCK_IGNORE_TIME = 8
 
--- A path is walked in steps this long, looking for ground the unit cannot stand on.
-local PATH_SAMPLE_STEP = 4
 -- Tries at a long wander, and then as many at a short one, for a unit that is on ground with little room.
 local ROAM_ATTEMPTS = 8
 local ROAM_SHORT_MIN = 10
--- How many of the nearest things a unit notices it checks for a straight run at before giving up.
-local TARGET_PATH_CHECKS = 5
 -- A new unit heads off away from its beacon by up to this far either side of straight out, and leaves the
 -- hunting alone for this long, so that a wave does not stay bunched on the spot it appeared.
 local SCATTER_FAN = math.pi / 3
 local SCATTER_TIME = 5
 -- A hunter walks to a spot of its own on a ring round its target, spread over this much of the ring on the
--- side it comes from, and counts as there when it is this close. The spot comes from its id, so it stays the same
--- from one moment to the next, and different ids fall in different places.
+-- side it comes from. The spot comes from its id, so it stays the same from one moment to the next, and different
+-- ids fall in different places.
 local SLOT_SPREAD = math.pi
-local SLOT_ARRIVE_DISTANCE = 4
 local SLOT_ID_STRIDE = 0.618034
 -- Routes. Only this many are asked for in a step, and none may search more than this many cells, which is
 -- about twenty milliseconds at the worst. A route the search is cut off from still leads part of the way, and a unit
@@ -183,12 +179,17 @@ local clock = 0
 -- Added to the clock for the game's progress alone, so that progress can be set without moving the clock the
 -- schedules run on.
 local progress_offset = 0
+-- How many seconds the game takes to reach full progress; a match against harder scavengers is shorter (see
+-- `set_pace`).
+local game_length = config.SCAVENGER_GAME_LENGTH
 local enabled = config.SCAVENGERS_ENABLED
 local next_beacon_at = 0
 local beacons: { [EntityId]: Beacon } = {}
 local brains: { [EntityId]: Brain } = {}
 -- How many more routes this step may ask for.
 local paths_left = 0
+-- When the scavengers' manual-fire weapons next look for something to fire at (`aim_manual_weapons`).
+local next_aim_at = 0
 
 local function is_scavenger(entity: Entity): boolean
 	return entity.team == config.SCAVENGER_TEAM
@@ -198,17 +199,14 @@ local function is_beacon(entity: Entity): boolean
 	return entity.def_name == BEACON_DEF or entity.def_name == SEA_BEACON_DEF
 end
 
--- The weapon a unit's willingness to hunt is judged by: its own, or its first turret's.
+-- The weapon a unit's willingness to hunt is judged by: its first.
 local function main_weapon(def: EntityDef): Weapon?
-	if def.weapon ~= nil then
-		return def.weapon
-	end
-	if def.turrets ~= nil and #def.turrets > 0 then
-		return def.turrets[1].weapon
+	if def.weapons ~= nil and #def.weapons > 0 then
+		return def.weapons[1]
 	end
 	-- a carrier has nothing of its own, but its drones do
 	if def.carrier ~= nil then
-		return unit_defs.get(def.carrier.drone).weapon
+		return main_weapon(unit_defs.get(def.carrier.drone))
 	end
 	return nil
 end
@@ -222,10 +220,10 @@ local function reach_of(def: EntityDef): number?
 	return reach
 end
 
--- How far the game has got, from 0 to 1, rising steadily over `config.SCAVENGER_GAME_LENGTH` seconds. Nothing
+-- How far the game has got, from 0 to 1, rising steadily over `game_length` seconds. Nothing
 -- the scavengers do is decided by anything else: beacons wait for it, and it is what their budget grows with.
 local function progress(): number
-	return math.clamp((clock + progress_offset) / config.SCAVENGER_GAME_LENGTH, 0, 1)
+	return math.clamp((clock + progress_offset) / game_length, 0, 1)
 end
 
 -- How hard something is to face, for now just what it cost: its metal and its energy over 60. It is only a
@@ -237,18 +235,12 @@ end
 
 -- Whether every weapon it has can only be turned on aircraft.
 local function is_anti_air_only(def: EntityDef): boolean
-	local weapon = main_weapon(def)
-	if weapon == nil then
+	if def.weapons == nil or #def.weapons == 0 then
 		return false
 	end
-	if weapon.target_layer ~= "air" then
-		return false
-	end
-	if def.turrets ~= nil then
-		for _, turret in def.turrets do
-			if turret.weapon.target_layer ~= "air" then
-				return false
-			end
+	for _, weapon in def.weapons do
+		if weapon.target_layer ~= "air" then
+			return false
 		end
 	end
 	return true
@@ -338,32 +330,6 @@ local function round_significant(value: number, digits: number): number
 	return math.round(value / step) * step
 end
 
--- Whether something of `def` can drive in a straight line from `from` to `to`, stopping `stop_short` studs
--- before it: every step along the way has to be on the map, and on ground it may stand on, in water of the
--- right depth and not too steep.
-local function has_direct_path(def: EntityDef, from: Vector3, to: Vector3, stop_short: number): boolean
-	local offset = geometry.flatten(to - from)
-	local length = offset.Magnitude - stop_short
-	if length <= 0 then
-		return true
-	end
-	local direction = offset.Unit
-	for step = 1, math.ceil(length / PATH_SAMPLE_STEP) do
-		local point = from + direction * math.min(length, step * PATH_SAMPLE_STEP)
-		if heightmap.in_bounds(point.X, point.Z) == false then
-			return false
-		end
-		local depth = heightmap.water_depth(point.X, point.Z)
-		if
-			unit_defs.tolerates_water(def, depth, depth) == false
-			or passability.passable_at(def.slope_class, point.X, point.Z) == false
-		then
-			return false
-		end
-	end
-	return true
-end
-
 -- Whether something that walks could get away from `center`: enough of the directions round it are open.
 local function has_room_to_roam(center: Vector3, sea: boolean): boolean
 	local probe = unit_defs.get(if sea then SEA_BEACON_PROBE_DEF else BEACON_PROBE_DEF)
@@ -371,7 +337,7 @@ local function has_room_to_roam(center: Vector3, sea: boolean): boolean
 	for step = 0, 7 do
 		local angle = step * (math.pi / 4)
 		local to = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * BEACON_PROBE_LENGTH
-		if has_direct_path(probe, center, to, 0) then
+		if pathfinder.has_straight_path(probe, center, to) then
 			open += 1
 		end
 	end
@@ -406,7 +372,8 @@ end
 -- Whether a beacon could stand at `center` without being on top of a player or another beacon.
 local function is_beacon_site_clear(center: Vector3): boolean
 	for _, other in state.all() do
-		if other.alive == false or other.kind == "wreck" then
+		-- what lies about belonging to nobody is no player's
+		if other.alive == false or other.kind == "wreck" or other.kind == "reclaimable" then
 			continue
 		end
 		local distance = geometry.distance_2d(center, other.position)
@@ -427,8 +394,9 @@ end
 -- way to reach. Returns whether one went down: on a crowded map, or one with nowhere it will stand, it can fail
 -- to find room.
 local function spawn_beacon(allow_sea: boolean): boolean
-	local extent_x = config.MAP_CELLS_X * config.CELL_STUDS / 2 - config.SCAVENGER_BEACON_EDGE_MARGIN
-	local extent_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2 - config.SCAVENGER_BEACON_EDGE_MARGIN
+	local half_x, half_z = heightmap.half_extents()
+	local extent_x = half_x - config.SCAVENGER_BEACON_EDGE_MARGIN
+	local extent_z = half_z - config.SCAVENGER_BEACON_EDGE_MARGIN
 	for _ = 1, BEACON_ATTEMPTS do
 		local x = rng:NextNumber(-extent_x, extent_x)
 		local z = rng:NextNumber(-extent_z, extent_z)
@@ -665,43 +633,24 @@ local function run_beacon_schedule()
 	end
 end
 
--- The nearest thing of a player's that `unit` can shoot at and has noticed, and whether it has a straight run at
--- it. With none that it has a straight run at, it is the nearest of those it has not, for a route: they are worth
--- one only if a way round exists. `avoid` is one that is not to be considered, because there was no way to it.
-local function find_target(unit: Entity, def: EntityDef, weapon: Weapon, avoid: EntityId?): (Entity?, boolean)
-	local reach = reach_of(def)
-	if reach == nil then
-		return nil, false
+-- The nearest thing of a player's that `unit` can shoot at and has noticed. `avoid` is one that is not to be
+-- considered, because there was no way to it.
+local function find_target(unit: Entity, def: EntityDef, weapon: Weapon, avoid: EntityId?): Entity?
+	if reach_of(def) == nil then
+		return nil
 	end
-
-	local candidates: { Entity } = {}
+	local nearest: Entity? = nil
+	local nearest_distance = config.SCAVENGER_DETECTION_RANGE
 	for _, other in state.all() do
-		if
-			combat.is_enemy(unit, other)
-			and combat.can_target(weapon, other)
-			and other.id ~= avoid
-			and geometry.distance_2d(unit.position, other.position) <= config.SCAVENGER_DETECTION_RANGE
-		then
-			table.insert(candidates, other)
+		if combat.is_enemy(unit, other) and combat.can_target(weapon, other) and other.id ~= avoid then
+			local distance = geometry.distance_2d(unit.position, other.position)
+			if distance <= nearest_distance then
+				nearest = other
+				nearest_distance = distance
+			end
 		end
 	end
-	table.sort(candidates, function(a: Entity, b: Entity): boolean
-		return geometry.distance_2d(unit.position, a.position) < geometry.distance_2d(unit.position, b.position)
-	end)
-
-	local detour: Entity? = nil
-	for index, other in candidates do
-		if index > TARGET_PATH_CHECKS then
-			break
-		end
-		if has_direct_path(def, unit.position, other.position, reach * RANGE_MARGIN) then
-			return other, true
-		end
-		if detour == nil then
-			detour = other
-		end
-	end
-	return detour, false
+	return nearest
 end
 
 -- The spot of its own that a hunter goes to round its target, at shooting range on the side it is coming from,
@@ -721,48 +670,6 @@ local function hunt_slot(unit: Entity, def: EntityDef, target: Entity): Vector3?
 		return nil
 	end
 	return heightmap.ground_position(x, z)
-end
-
--- What a hunter does about `target`. Hidden behind the ground within reach where it cannot be shot, it walks on
--- toward it until it can be seen; a shell that is lobbed needs no sight. Otherwise it goes to a spot of its own
--- at shooting range on the side it is coming from, and attacks once it is there. Hunters that all made straight
--- for the target would stop in a clump at the front and leave the ones behind unable to get into range.
-local function hunt_order(unit: Entity, def: EntityDef, weapon: Weapon, target: Entity): Order
-	local attack: Order = { kind = "attack", target_id = target.id }
-	local reach = reach_of(def)
-	if reach == nil then
-		return attack
-	end
-	-- a bomber attacks by flying over its target, which an attack order is what makes it do
-	if def.air ~= nil and def.air.bombing_runs == true then
-		return attack
-	end
-	-- a carrier with nothing of its own to shoot goes to its spot and stays, and its drones do the fighting
-	if def.weapon == nil and def.turrets == nil and def.carrier ~= nil then
-		return { kind = "move", position = hunt_slot(unit, def, target) or unit.position }
-	end
-
-	local lobbed = weapon.projectile ~= nil and weapon.projectile.arc ~= nil
-	if
-		lobbed == false
-		and geometry.distance_2d(unit.position, target.position) <= reach
-		and sight.verdict(unit, target, sight.muzzle_of(unit)) == "terrain"
-	then
-		return { kind = "move", position = target.position }
-	end
-
-	local slot = hunt_slot(unit, def, target)
-	if slot == nil then
-		return attack
-	end
-	if geometry.distance_2d(unit.position, slot) <= SLOT_ARRIVE_DISTANCE then
-		return attack
-	end
-	-- no straight run to its spot: the plain attack order still gets it as close as it can
-	if has_direct_path(def, unit.position, slot, 0) == false then
-		return attack
-	end
-	return { kind = "move", position = slot }
 end
 
 local function is_same_order(current: Order?, wanted: Order): boolean
@@ -794,10 +701,16 @@ local function is_standable(def: EntityDef, x: number, z: number): boolean
 	return unit_defs.tolerates_water(def, depth, depth) and passability.passable_at(def.slope_class, x, z)
 end
 
--- Goes after `target`, which it has no straight run at, by a route: to its own spot beside it and then an attack.
--- It counts the route as good if it gets all the way, or, when there is water or a cliff between, as far as a
--- place that is within reach of it, since it can shoot across. Otherwise it gives the target up for a while.
-local function hunt_by_route(unit: Entity, brain: Brain, def: EntityDef, target: Entity)
+-- Goes after `target`: to its own spot at shooting range on the side it is coming from, and then an attack. Hunters
+-- that all made for the target itself would stop in a clump at the front and leave the ones behind unable to get
+-- into range. It goes there straight if it can walk the whole line, and otherwise by a route, so that it goes round
+-- a cliff or a lake rather than into it. From its spot, the attack order walks it on if the ground is in the way of
+-- its shot, and finds its way doing it, as any attack does.
+--
+-- It counts a route as good if it gets all the way, or, when there is water or a cliff between, as far as a place
+-- within reach of the target, since it can shoot across. Otherwise it gives the target up for a while. A carrier with
+-- nothing of its own to shoot goes to its spot and stays there, and its drones do the fighting.
+local function hunt(unit: Entity, brain: Brain, def: EntityDef, target: Entity)
 	local anchor = brain.route_anchor
 	if
 		brain.route_target == target.id
@@ -812,28 +725,37 @@ local function hunt_by_route(unit: Entity, brain: Brain, def: EntityDef, target:
 		return
 	end
 
-	local path = plan_route(unit, def, hunt_slot(unit, def, target) or target.position)
-	if path == nil then
-		return
-	end
-	brain.next_path_at = clock + ROUTE_COOLDOWN
+	local goal = hunt_slot(unit, def, target) or target.position
+	local route: { Order }
+	if pathfinder.has_straight_path(def, unit.position, goal) then
+		route = { { kind = "move", position = goal } }
+	else
+		local path = plan_route(unit, def, goal)
+		if path == nil then
+			return
+		end
+		brain.next_path_at = clock + ROUTE_COOLDOWN
 
-	local last = path.orders[#path.orders]
-	local reach = reach_of(def) or 0
-	local near_enough = path.complete
-		or (last ~= nil and geometry.distance_2d(last.position or unit.position, target.position) <= reach)
-	if last == nil or near_enough == false then
-		brain.hunting = false
-		brain.route_target = nil
-		brain.avoid_target = target.id
-		brain.avoid_until = clock + AVOID_TIME
-		brain.next_path_at = clock + PATH_RETRY_DELAY
-		unit.orders = {}
-		return
+		local last = path.orders[#path.orders]
+		local reach = reach_of(def) or 0
+		local near_enough = path.complete
+			or (last ~= nil and geometry.distance_2d(last.position or unit.position, target.position) <= reach)
+		if near_enough == false then
+			brain.hunting = false
+			brain.route_target = nil
+			brain.avoid_target = target.id
+			brain.avoid_until = clock + AVOID_TIME
+			brain.next_path_at = clock + PATH_RETRY_DELAY
+			unit.orders = {}
+			return
+		end
+		route = path.orders
 	end
 
-	local chain = table.clone(path.orders)
-	table.insert(chain, { kind = "attack", target_id = target.id })
+	local chain = table.clone(route)
+	if def.weapons ~= nil then
+		table.insert(chain, { kind = "attack", target_id = target.id })
+	end
 	orders.issue(unit, chain, false, false)
 	brain.route_target = target.id
 	brain.route_anchor = target.position
@@ -846,8 +768,7 @@ local function roam_by_route(unit: Entity, brain: Brain, def: EntityDef)
 	if clock < brain.next_path_at then
 		return
 	end
-	local extent_x = config.MAP_CELLS_X * config.CELL_STUDS / 2
-	local extent_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2
+	local extent_x, extent_z = heightmap.half_extents()
 	for _ = 1, ROAM_ROUTE_TRIES do
 		local x = rng:NextNumber(-extent_x, extent_x)
 		local z = rng:NextNumber(-extent_z, extent_z)
@@ -917,7 +838,7 @@ local function seek(unit: Entity, brain: Brain, def: EntityDef, weapon: Weapon):
 	local stage = heightmap.ground_position(x, z)
 
 	-- a straight run is nearly free, and needs no route
-	if has_direct_path(def, unit.position, stage, 0) then
+	if pathfinder.has_straight_path(def, unit.position, stage) then
 		orders.issue(unit, { { kind = "move", position = stage } }, false, false)
 		brain.seeking = true
 		brain.route_target = nil
@@ -961,7 +882,7 @@ local function pick_waypoint(unit: Entity, def: EntityDef): Vector3?
 		local z = unit.position.Z + math.sin(angle) * distance
 		if heightmap.in_bounds(x, z) then
 			local point = heightmap.ground_position(x, z)
-			if has_direct_path(def, unit.position, point, 0) then
+			if pathfinder.has_straight_path(def, unit.position, point) then
 				return point
 			end
 		end
@@ -981,7 +902,7 @@ local function pick_scatter_point(unit: Entity, def: EntityDef, outward: Vector3
 		local z = unit.position.Z + (outward.X * sine + outward.Z * cosine) * distance
 		if heightmap.in_bounds(x, z) then
 			local point = heightmap.ground_position(x, z)
-			if has_direct_path(def, unit.position, point, 0) then
+			if pathfinder.has_straight_path(def, unit.position, point) then
 				return point
 			end
 		end
@@ -1053,19 +974,21 @@ local function think(unit: Entity, brain: Brain)
 	local weapon = main_weapon(def)
 	if weapon ~= nil and clock >= brain.ignore_until then
 		local avoid = if clock < brain.avoid_until then brain.avoid_target else nil
-		local target, direct = find_target(unit, def, weapon, avoid)
+		local target = find_target(unit, def, weapon, avoid)
 		if target ~= nil then
 			brain.hunting = true
 			brain.seeking = false
-			if direct == false then
-				hunt_by_route(unit, brain, def, target)
+			-- an aircraft flies over whatever is in the way, so it needs no route; a bomber's attack order is what
+			-- makes it fly its bombing runs
+			if def.air ~= nil then
+				brain.route_target = nil
+				local wanted: Order = { kind = "attack", target_id = target.id }
+				if is_same_order(unit.orders[1], wanted) == false then
+					orders.issue(unit, { wanted }, false, false)
+				end
 				return
 			end
-			brain.route_target = nil
-			local wanted = hunt_order(unit, def, weapon, target)
-			if is_same_order(unit.orders[1], wanted) == false then
-				orders.issue(unit, { wanted }, false, false)
-			end
+			hunt(unit, brain, def, target)
 			return
 		end
 		-- whatever it was chasing is gone, or out of reach, so the chase is over
@@ -1086,6 +1009,55 @@ local function think(unit: Entity, brain: Brain)
 			orders.issue(unit, { { kind = "move", position = point } }, false, false)
 		else
 			roam_by_route(unit, brain, def)
+		end
+	end
+end
+
+-- A manual-fire weapon, a nuclear silo's, fires only when it is told what at (`Weapon.manual_fire`), so the
+-- scavengers tell theirs: one with a missile ready and nothing to do is ordered to attack the costliest thing of a
+-- player's that it can reach (`difficulty_of`). Every THINK_INTERVAL seconds, like their units' thinking.
+local function aim_manual_weapons()
+	if clock < next_aim_at then
+		return
+	end
+	next_aim_at = clock + THINK_INTERVAL
+	for _, shooter in state.all() do
+		if is_scavenger(shooter) == false or shooter.alive == false or shooter.state ~= "active" then
+			continue
+		end
+		if #shooter.orders > 0 then
+			continue
+		end
+		local def = unit_defs.get(shooter.def_name)
+		if def.weapons == nil then
+			continue
+		end
+		for index, weapon in def.weapons do
+			if weapon.manual_fire ~= true then
+				continue
+			end
+			if weapon.stockpile ~= nil and (shooter.weapon_stockpiles[index] or 0) < 1 then
+				continue
+			end
+			local best: Entity? = nil
+			local best_worth = -math.huge
+			for _, other in state.all() do
+				if
+					combat.is_enemy(shooter, other)
+					and combat.can_target(weapon, other)
+					and geometry.distance_2d(shooter.position, other.position) <= weapon.range
+				then
+					local worth = difficulty_of(other.def_name)
+					if worth > best_worth then
+						best = other
+						best_worth = worth
+					end
+				end
+			end
+			if best ~= nil then
+				shooter.orders = { { kind = "attack", position = nil, target_id = best.id } }
+				break
+			end
 		end
 	end
 end
@@ -1192,13 +1164,14 @@ local function tick(delta: number)
 	end
 	-- a beacon that stops making things does not stop what it already made
 	run_brains()
+	aim_manual_weapons()
 end
 
 -- Sets how far the game has got, from 0 to 1, from now on: it carries on rising from there. The budget follows it,
 -- and it is the only thing that does, so it is what sets the difficulty. Returns the progress it was set to.
 local function set_progress(fraction: number): number
 	local wanted = math.clamp(fraction, 0, 1)
-	progress_offset = wanted * config.SCAVENGER_GAME_LENGTH - clock
+	progress_offset = wanted * game_length - clock
 	return wanted
 end
 
@@ -1223,6 +1196,14 @@ local function is_enabled(): boolean
 	return enabled
 end
 
+-- Makes the game take `multiple` times config.SCAVENGER_GAME_LENGTH to reach full progress, keeping the progress it
+-- has now: under 1 the scavengers grow stronger sooner, which is what a lobby's difficulty sets.
+local function set_pace(multiple: number)
+	local now = progress()
+	game_length = config.SCAVENGER_GAME_LENGTH * math.max(multiple, 0.01)
+	set_progress(now)
+end
+
 -- Puts a beacon down now, whatever the schedule says. Returns whether there was room.
 local function summon_beacon(): boolean
 	return spawn_beacon(count_beacons() > 0)
@@ -1238,6 +1219,7 @@ return table.freeze({
 	tick = tick,
 	set_enabled = set_enabled,
 	is_enabled = is_enabled,
+	set_pace = set_pace,
 	summon_beacon = summon_beacon,
 	force_beacon = force_beacon,
 	progress = progress,

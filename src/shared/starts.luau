@@ -73,7 +73,14 @@ local function center(slot: number): Vector2
 	return centers[(slot - 1) % config.START_SLOTS + 1]
 end
 
+-- How many different starts the map has: slots past this are the same places over again.
+local function count(): number
+	local preset = map_presets.get(heightmap.get_preset())
+	return math.min(preset.start_count or config.START_SLOTS, config.START_SLOTS)
+end
+
 return table.freeze({
 	initialize = initialize,
 	center = center,
+	count = count,
 })

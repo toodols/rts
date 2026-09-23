@@ -9,10 +9,12 @@ local ServerScriptService = game:GetService "ServerScriptService"
 local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local environment = require(ReplicatedStorage.Shared.environment)
 
 local alliances = require(ServerScriptService.Server.alliances)
 local benchmark = require(ServerScriptService.Server.benchmark)
 local godmode = require(ServerScriptService.Server.godmode)
+local maps = require(ServerScriptService.Server.maps)
 local nocost = require(ServerScriptService.Server.nocost)
 local pause = require(ServerScriptService.Server.pause)
 local players = require(ServerScriptService.Server.players)
@@ -21,6 +23,7 @@ local scavengers = require(ServerScriptService.Server.scavengers)
 local spawning = require(ServerScriptService.Server.spawning)
 local state = require(ServerScriptService.Server.state)
 local warp = require(ServerScriptService.Server.warp)
+local wind = require(ServerScriptService.Server.wind)
 
 return function(extras: { commands: { [string]: any } })
 	local commands = extras.commands
@@ -39,6 +42,71 @@ return function(extras: { commands: { [string]: any } })
 				type = "info",
 				value = if enabled then "Godmode on: you can command every team" else "Godmode off",
 			})
+		end,
+	}
+
+	commands.load_map = {
+		description = "Replaces the map: clears everything off it, resets every team's stockpile and gives each "
+			.. "player a new commander at their start. The seed is kept unless one is given.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = { { name = "Map", type = "map" } } },
+			{ returns = "nil", args = { { name = "Map", type = "map" }, { name = "Seed", type = "number" } } },
+		},
+		server_run = function(context: any)
+			local name = context.args[1]
+			local ok, err = maps.load(name, context.args[2])
+			context:log({
+				type = if ok then "info" else "error",
+				value = if ok then `Loaded {name}` else `Could not load {name}: {err}`,
+			})
+		end,
+	}
+
+	commands.wind = {
+		description = "Sets the least and most the wind blows until the next map is loaded, which sets its own. "
+			.. "With no arguments it says what they are.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { { name = "Least", type = "number" }, { name = "Most", type = "number" } } },
+		},
+		server_run = function(context: any)
+			if context.args[1] ~= nil then
+				local ok, reason = environment.set_wind(context.args[1], context.args[2])
+				if ok == false then
+					context:log({ type = "error", value = reason })
+					return
+				end
+				wind.refit()
+			end
+			context:log({
+				type = "info",
+				value = `Wind {environment.min_wind()} to {environment.max_wind()}, blowing {string.format(
+					"%.1f",
+					wind.speed()
+				)}`,
+			})
+		end,
+	}
+
+	commands.tidal = {
+		description = "Sets the tidal strength, the energy a tidal generator makes a second, until the next map is "
+			.. "loaded, which sets its own. With no argument it says what it is.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { { name = "Strength", type = "number" } } },
+		},
+		server_run = function(context: any)
+			if context.args[1] ~= nil then
+				local ok, reason = environment.set_tidal(context.args[1])
+				if ok == false then
+					context:log({ type = "error", value = reason })
+					return
+				end
+			end
+			context:log({ type = "info", value = `Tidal strength {environment.tidal_strength()}` })
 		end,
 	}
 

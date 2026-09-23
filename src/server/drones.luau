@@ -1,8 +1,10 @@
--- Drones. A carrier keeps `carrier.count` drones parked on top of it. While an enemy is within its engage range
--- they take off and each attacks it with its own weapon, through the ordinary attack order; when nothing is in
--- range any longer they are sent back and park again, and a parked one is mended by its carrier. One that is shot
--- down is replaced after a delay. When
--- the carrier goes, so do they. Nothing here belongs to any one unit: any def with a `carrier` is served.
+-- Drones. A carrier keeps up to `carrier.count` drones out, parked on top of it. While an enemy is within its engage
+-- range they take off and each attacks it with its own weapon, through the ordinary attack order; when nothing is in
+-- range any longer they are sent back and park again, and a parked one is mended by its carrier. Drones are a
+-- stockpile, as a silo's missiles are (`stockpiles`): the carrier builds them ahead of time and pays for each, and
+-- a free place on it is filled at once from what it holds. One that is shot down is spent, like a missile that has
+-- been fired, and only comes back out of the stockpile. When the carrier goes, so do they. Nothing here belongs to
+-- any one unit: any def with a `carrier` is served.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -14,14 +16,14 @@ local state = require(script.Parent.state)
 local movement = require(script.Parent.movement)
 local combat = require(script.Parent.combat)
 local docking = require(script.Parent.docking)
+local stockpiles = require(script.Parent.stockpiles)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
 
 type Slot = {
-	-- the drone in this slot, or nil while it is being replaced
+	-- the drone in this place on the carrier, or nil while it has none
 	id: EntityId?,
-	respawn_left: number,
 }
 
 -- How close, across the ground and in height, a returning drone has to be to settle onto its perch.
@@ -49,20 +51,25 @@ local function spawn(carrier: Entity, def: types.EntityDef, spec: types.Carrier,
 	local at = perch(carrier, def, drone_def, index, spec.count)
 	local drone = state.create_entity(spec.drone, carrier.team, at, carrier.facing, "active")
 	docking.set(drone.id, true)
-	return { id = drone.id, respawn_left = 0 }
+	return { id = drone.id }
 end
 
 -- The nearest enemy the drones can fight, in range of the carrier.
 local function find_target(carrier: Entity, spec: types.Carrier, drone_def: types.EntityDef): Entity?
-	local weapon = drone_def.weapon
+	local weapons = drone_def.weapons
 	local best: Entity? = nil
 	local best_distance = spec.engage_range
 	for _, other in state.all() do
-		if
-			combat.is_enemy(carrier, other)
-			and (weapon == nil or combat.can_target(weapon, other))
-			and other.kind ~= "wreck"
-		then
+		local can_hit = weapons == nil
+		if can_hit == false then
+			for _, weapon in weapons :: { types.Weapon } do
+				if combat.can_target(weapon, other) then
+					can_hit = true
+					break
+				end
+			end
+		end
+		if combat.is_enemy(carrier, other) and can_hit and other.kind ~= "wreck" then
 			local distance = geometry.distance_2d(carrier.position, other.position)
 			if distance <= best_distance then
 				best = other
@@ -74,11 +81,16 @@ local function find_target(carrier: Entity, spec: types.Carrier, drone_def: type
 end
 
 local function serve(carrier: Entity, def: types.EntityDef, spec: types.Carrier, delta: number)
+	-- the next drone is built whatever the ones out are doing
+	carrier.drone_stockpile, carrier.drone_stockpile_progress =
+		stockpiles.grow(carrier.team, spec.stockpile, carrier.drone_stockpile, carrier.drone_stockpile_progress, delta)
+
 	local slots = carriers[carrier.id]
 	if slots == nil then
+		-- it comes with its first few for nothing
 		slots = {}
 		for index = 1, spec.count do
-			slots[index] = spawn(carrier, def, spec, index)
+			slots[index] = if index <= spec.starting then spawn(carrier, def, spec, index) else { id = nil }
 		end
 		carriers[carrier.id] = slots
 		return
@@ -90,14 +102,13 @@ local function serve(carrier: Entity, def: types.EntityDef, spec: types.Carrier,
 	for index, slot in slots do
 		local drone = if slot.id ~= nil then state.get(slot.id) else nil
 		if drone == nil or drone.alive == false then
-			-- shot down: a new one is made after a while
+			-- shot down, it is spent; the place is filled from the stockpile, if there is one ready
 			if slot.id ~= nil then
 				docking.forget(slot.id)
 				slot.id = nil
-				slot.respawn_left = spec.respawn_seconds
 			end
-			slot.respawn_left -= delta
-			if slot.respawn_left <= 0 then
+			if carrier.drone_stockpile >= 1 then
+				carrier.drone_stockpile -= 1
 				slots[index] = spawn(carrier, def, spec, index)
 			end
 			continue
@@ -138,7 +149,12 @@ end
 -- goals are cleared and before orders read them.
 local function tick(delta: number)
 	for _, entity in state.all() do
-		if entity.alive == false or entity.kind ~= "unit" or entity.state ~= "active" then
+		-- a carrier may be a unit, like the Mantis, or a building, like the Rampart
+		if
+			entity.alive == false
+			or (entity.kind ~= "unit" and entity.kind ~= "building")
+			or entity.state ~= "active"
+		then
 			continue
 		end
 		local def = unit_defs.get(entity.def_name)

@@ -1,6 +1,7 @@
 -- A fixed-pitch RTS camera. It looks at a focus point on the ground, pans with the arrow keys or by
--- dragging with the middle mouse button, and zooms by raising and lowering itself rather than changing
--- angle. The letter keys are left free for commands.
+-- dragging with the middle mouse button, turns around the focus by dragging with the middle mouse
+-- button while alt is held, and zooms by raising and lowering itself rather than changing angle. The
+-- letter keys are left free for commands.
 
 local ContextActionService = game:GetService "ContextActionService"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -16,6 +17,9 @@ local RENDER_STEP = "rts_camera"
 
 local focus = Vector3.zero
 local height = config.CAMERA_HEIGHT
+-- How far the view has turned about the vertical, in radians. At zero the camera sits south of the
+-- focus looking north.
+local yaw = 0
 
 local KEY_DIRECTIONS: { [Enum.KeyCode]: Vector2 } = {
 	[Enum.KeyCode.Up] = Vector2.new(0, -1),
@@ -27,9 +31,13 @@ local KEY_DIRECTIONS: { [Enum.KeyCode]: Vector2 } = {
 local held: { [Enum.KeyCode]: boolean } = {}
 
 -- Where the cursor was last frame while the middle mouse button has been held, if it has: the drag
--- pans by how far it has moved since. The button is polled every frame rather than followed through
--- input events, which the interface can swallow.
+-- pans or turns by how far it has moved since. The button is polled every frame rather than followed
+-- through input events, which the interface can swallow.
 local last_drag_location: Vector2? = nil
+
+local function alt_held(): boolean
+	return UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt)
+end
 
 local function keyboard_pan(): Vector2
 	local total = Vector2.zero
@@ -39,6 +47,20 @@ local function keyboard_pan(): Vector2
 		end
 	end
 	return total
+end
+
+-- Turns a movement given in screen terms, x to the right and y down, into one across the ground in the
+-- direction the view faces.
+local function screen_to_ground(offset: Vector2): Vector3
+	local c, s = math.cos(yaw), math.sin(yaw)
+	return Vector3.new(offset.X * c + offset.Y * s, 0, -offset.X * s + offset.Y * c)
+end
+
+-- The camera looking at `at_focus` from `at_height`, behind and above it along the pitch angle and
+-- turned by the current yaw.
+local function view_at(at_focus: Vector3, at_height: number): CFrame
+	local back = at_height / math.tan(-math.rad(config.CAMERA_PITCH))
+	return CFrame.new(at_focus + screen_to_ground(Vector2.new(0, back)) + Vector3.new(0, at_height, 0), at_focus)
 end
 
 -- Moves the focus by `delta` pixels of cursor movement. The camera looks down at a fixed
@@ -52,8 +74,8 @@ local function pan_by_pixels(delta: Vector2)
 	local elevation = math.rad(-config.CAMERA_PITCH)
 	local distance = height / math.sin(elevation)
 	local per_pixel = 2 * distance * math.tan(math.rad(camera.FieldOfView) / 2) / camera.ViewportSize.Y
-	-- the camera goes where the cursor goes: moving the mouse up pans it north, the way the view faces
-	focus += Vector3.new(delta.X * per_pixel, 0, delta.Y * per_pixel / math.sin(elevation))
+	-- the camera goes where the cursor goes: moving the mouse up pans it the way the view faces
+	focus += screen_to_ground(Vector2.new(delta.X * per_pixel, delta.Y * per_pixel / math.sin(elevation)))
 end
 
 local function apply(delta: number)
@@ -65,7 +87,13 @@ local function apply(delta: number)
 	if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton3) then
 		local location = UserInputService:GetMouseLocation()
 		if last_drag_location ~= nil then
-			pan_by_pixels(location - last_drag_location)
+			local moved = location - last_drag_location
+			if alt_held() then
+				-- the ground turns the way the cursor drags it
+				yaw -= moved.X * config.CAMERA_ROTATE_SPEED
+			else
+				pan_by_pixels(moved)
+			end
 		end
 		last_drag_location = location
 	else
@@ -74,20 +102,15 @@ local function apply(delta: number)
 
 	local direction = keyboard_pan()
 	if direction.Magnitude > 0 then
-		local unit = direction.Unit
 		-- pan speed scales with altitude so a zoomed-out camera crosses the map at the same
 		-- apparent rate as a zoomed-in one
 		local speed = config.CAMERA_PAN_SPEED * (height / config.CAMERA_HEIGHT)
-		focus += Vector3.new(unit.X, 0, unit.Y) * speed * delta
+		focus += screen_to_ground(direction.Unit) * speed * delta
 	end
 
 	focus = Vector3.new(focus.X, heightmap.height_at(focus.X, focus.Z), focus.Z)
 
-	local pitch = math.rad(config.CAMERA_PITCH)
-	-- place the camera behind and above the focus along the pitch angle
-	local back = height / math.tan(-pitch)
-	local position = focus + Vector3.new(0, height, back)
-	camera.CFrame = CFrame.new(position, focus)
+	camera.CFrame = view_at(focus, height)
 end
 
 -- Where on the flat ground at the focus's height the cursor would point if the camera were looking at
@@ -100,9 +123,7 @@ local function ground_under_cursor(cursor: Vector2, at_focus: Vector3, at_height
 	end
 	local size = camera.ViewportSize
 
-	local pitch = math.rad(config.CAMERA_PITCH)
-	local back = at_height / math.tan(-pitch)
-	local view = CFrame.new(at_focus + Vector3.new(0, at_height, back), at_focus)
+	local view = view_at(at_focus, at_height)
 
 	local tan_half = math.tan(math.rad(camera.FieldOfView) / 2)
 	local x = (2 * cursor.X / size.X - 1) * tan_half * (size.X / size.Y)

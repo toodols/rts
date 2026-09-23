@@ -37,8 +37,15 @@ local hovers: { [EntityId]: number } = {}
 -- How long each aircraft has had nowhere to go, in seconds. One that has never been sent anywhere is not in
 -- here, and is on the ground.
 local idle_for: { [EntityId]: number } = {}
--- How much longer the unit is stunned/impulsed (cannot accelerate), in seconds. Applies when a unit is hit by weapons.
+-- How much longer the unit is shaken by a hit, in seconds, and gets only HIT_ACCELERATION of its acceleration.
 local impulse_remaining: { [EntityId]: number } = {}
+-- The share of its acceleration a unit that has just been hit keeps. Never none: a unit under steady fire is hit again
+-- before it recovers, and one with no acceleration at all cannot turn or slow, so it would drift on in a straight line,
+-- often further into the fire, for as long as the fire kept up.
+local HIT_ACCELERATION = 0.5
+-- The lab each unit that has just been made is on its way out of. The two do not push each other apart until the
+-- unit is clear of it (see production.luau).
+local exiting: { [EntityId]: EntityId } = {}
 
 local function begin_tick()
 	table.clear(goals)
@@ -77,7 +84,7 @@ local function set_hover(entity: Entity, height: number)
 	hovers[entity.id] = height
 end
 
--- Stuns a unit when hit by a weapon, reducing acceleration for `duration` seconds.
+-- Shakes a unit hit by a weapon, reducing its acceleration for `duration` seconds.
 local function set_impulse(entity: Entity, duration: number)
 	impulse_remaining[entity.id] = duration
 end
@@ -136,18 +143,26 @@ local mover_grid = flat_grid.new(2 * widest_mover + PAD, 256)
 local other_grid = flat_grid.new(widest_mover + widest_any + PAD, 128)
 -- Where each mover sits in mover_grid this tick, by id.
 local mover_slot: { [EntityId]: number } = {}
+-- Who is in each slot of other_grid this tick.
+local other_ids: { EntityId } = {}
 
 -- Rebuilt once at the top of every tick from every alive, non-aircraft entity: units and buildings
 -- alike push, and are pushed against, since a builder is as real an obstacle as another unit. Wrecks
 -- are left out: BAR doesn't collide units against them, and with dozens of wrecks lying around after
 -- a fight, giving each one a collider would mean every unit near a battlefield pushing against all of
--- them for the rest of the match.
+-- them for the rest of the match. Reclaimables are left out for the same reason, as the wrecks they are like.
 local function rebuild_grids()
 	flat_grid.clear(mover_grid)
 	flat_grid.clear(other_grid)
 	table.clear(mover_slot)
+	table.clear(other_ids)
 	for _, entity in state.all() do
-		if entity.alive == false or entity.kind == "wreck" or air.is_aircraft(entity) then
+		if
+			entity.alive == false
+			or entity.kind == "wreck"
+			or entity.kind == "reclaimable"
+			or air.is_aircraft(entity)
+		then
 			continue
 		end
 		local radius = unit_defs.collider_radius(unit_defs.get(entity.def_name))
@@ -155,7 +170,7 @@ local function rebuild_grids()
 		if is_mobile(entity) then
 			mover_slot[entity.id] = flat_grid.add(mover_grid, position.X, position.Z, radius)
 		else
-			flat_grid.add(other_grid, position.X, position.Z, radius)
+			other_ids[flat_grid.add(other_grid, position.X, position.Z, radius)] = entity.id
 		end
 	end
 	flat_grid.sort(mover_grid)
@@ -163,7 +178,7 @@ local function rebuild_grids()
 end
 
 -- Adds to (px, pz) the push from every entry of `grid` overlapping a collider of `radius` at (x, z),
--- skipping entry `self` (0 for none). The push is away from each, scaled by how deep the overlap is so
+-- skipping entry `self` (0 for none) and the entry whose id in `ids` is `passes` (nil for none). The push is away from each, scaled by how deep the overlap is so
 -- that lightly touching units barely react.
 local function push_from(
 	grid: Grid,
@@ -172,6 +187,8 @@ local function push_from(
 	radius: number,
 	id: EntityId,
 	self: number,
+	ids: { EntityId }?,
+	passes: EntityId?,
 	px: number,
 	pz: number
 ): (number, number)
@@ -184,7 +201,7 @@ local function push_from(
 			local c = row + ((cx + dx) % side) + 1
 			for s = starts[c], stops[c] - 1 do
 				local k = order[s]
-				if k == self then
+				if k == self or (ids ~= nil and ids[k] == passes) then
 					continue
 				end
 				local ox, oz = x - xs[k], z - zs[k]
@@ -218,18 +235,20 @@ local function separation(entity: Entity): Vector3
 		return Vector3.zero
 	end
 	local x, z, radius = mover_grid.xs[k], mover_grid.zs[k], mover_grid.rs[k]
-	local px, pz = push_from(mover_grid, x, z, radius, entity.id, k, 0, 0)
-	px, pz = push_from(other_grid, x, z, radius, entity.id, 0, px, pz)
+	local px, pz = push_from(mover_grid, x, z, radius, entity.id, k, nil, nil, 0, 0)
+	local lab = exiting[entity.id]
+	px, pz = push_from(other_grid, x, z, radius, entity.id, 0, if lab ~= nil then other_ids else nil, lab, px, pz)
 	return Vector3.new(px, 0, pz)
 end
 
 -- Climbs or descends an aircraft toward the height it should be at: its flying altitude while it has
--- somewhere to go, and for a moment after, and the ground once it has been idle for a while.
+-- somewhere to go, and for a moment after, and the ground once it has been idle for a while. One on wings
+-- cannot wait in the air, so it comes down the moment it has nothing to do.
 local function fly(entity: Entity, def: types.EntityDef, aircraft: types.Aircraft, busy: boolean, delta: number)
 	local idle = idle_for[entity.id]
 	if busy then
 		idle = 0
-	elseif idle == nil then
+	elseif idle == nil or aircraft.wings ~= nil then
 		idle = config.AIR_LAND_DELAY
 	else
 		idle += delta
@@ -258,6 +277,44 @@ local function fly(entity: Entity, def: types.EntityDef, aircraft: types.Aircraf
 	entity.position = Vector3.new(x, math.max(y, floor), z)
 end
 
+-- The velocity an aircraft on `wings` flies at this tick. It only ever flies forward, along its heading, which it
+-- turns no faster than its turn rate toward `goal`, if it has one, or else circles. While it is `busy` it flies flat
+-- out; once it is not, it slows to a stop, which is what it does as it comes down to land. A goal behind it and
+-- nearer than its run-out is flown away from, straight, until it is not, as BAR's planes do, so that it comes
+-- round at the goal from far enough out to line up on it.
+local function steer_wings(
+	entity: Entity,
+	wings: types.Wings,
+	goal: Goal?,
+	busy: boolean,
+	max_speed: number,
+	acceleration: number,
+	delta: number
+): Vector3
+	local heading = entity.facing
+	local forward = Vector3.new(math.sin(heading), 0, math.cos(heading))
+	local speed = if busy then max_speed else 0
+	local wanted_heading = heading
+	local offset = if goal ~= nil then geometry.flatten(goal.position - entity.position) else Vector3.zero
+	if goal == nil or offset.Magnitude <= goal.stop_radius then
+		if busy then
+			wanted_heading = heading + math.pi / 2
+		end
+	elseif offset:Dot(forward) > 0 or offset.Magnitude >= wings.run_out then
+		wanted_heading = math.atan2(offset.X, offset.Z)
+	end
+
+	local max_turn = wings.turn_rate * delta
+	local turn = (wanted_heading - heading + math.pi) % (2 * math.pi) - math.pi
+	heading += math.clamp(turn, -max_turn, max_turn)
+	entity.facing = heading
+
+	local current = entity.velocity.Magnitude
+	local max_change = acceleration * delta
+	current += math.clamp(speed - current, -max_change, max_change)
+	return Vector3.new(math.sin(heading), 0, math.cos(heading)) * current
+end
+
 local function tick(delta: number)
 	update_impulses(delta)
 	rebuild_grids()
@@ -270,9 +327,9 @@ local function tick(delta: number)
 		local max_speed = def.max_speed :: number
 		local acceleration = def.acceleration :: number
 
-		-- Reduce acceleration if the unit is impulsed (hit by a weapon)
+		-- a unit that has just been hit answers slower, but still answers
 		if impulse_remaining[entity.id] ~= nil and impulse_remaining[entity.id] > 0 then
-			acceleration = 0
+			acceleration *= HIT_ACCELERATION
 		end
 
 		local desired_velocity = Vector3.zero
@@ -299,12 +356,22 @@ local function tick(delta: number)
 			desired_velocity = desired_velocity.Unit * max_speed
 		end
 
-		local change = desired_velocity - entity.velocity
-		local max_change = acceleration * delta
-		if change.Magnitude > max_change then
-			change = change.Unit * max_change
+		-- one with something hanging from it stays up, however idle it is, and so does one with orders left to
+		-- carry out, like a builder that has arrived and is working, or a gunship holding over its target
+		local aircraft = def.air
+		local wings = if aircraft ~= nil then aircraft.wings else nil
+		local busy = aircraft ~= nil and (goal ~= nil or #entity.orders > 0 or #state.cargo_of(entity.id) > 0)
+
+		if wings ~= nil then
+			entity.velocity = steer_wings(entity, wings, goal, busy, max_speed, acceleration, delta)
+		else
+			local change = desired_velocity - entity.velocity
+			local max_change = acceleration * delta
+			if change.Magnitude > max_change then
+				change = change.Unit * max_change
+			end
+			entity.velocity += change
 		end
-		entity.velocity += change
 
 		if entity.velocity.Magnitude > config.MOVEMENT_SETTLE_SPEED then
 			local next_position = entity.position + entity.velocity * delta
@@ -349,15 +416,10 @@ local function tick(delta: number)
 			entity.velocity = Vector3.zero
 		end
 
-		local aircraft = def.air
 		if aircraft ~= nil then
-			-- one with something hanging from it stays up, however idle it is, and so does one with orders left to
-			-- carry out, like a builder that has arrived and is working, or a gunship holding over its target
-			local busy = goal ~= nil
-				or entity.velocity.Magnitude > 1
-				or #state.cargo_of(entity.id) > 0
-				or #entity.orders > 0
-			fly(entity, def, aircraft, busy, delta)
+			-- one that hovers is also kept up by still moving; one on wings is always moving while it is up, and
+			-- lands as it slows
+			fly(entity, def, aircraft, busy or (wings == nil and entity.velocity.Magnitude > 1), delta)
 		end
 	end
 end
@@ -366,9 +428,24 @@ local function has_goal(entity_id: EntityId): boolean
 	return goals[entity_id] ~= nil
 end
 
+-- Lets `entity` pass through `lab`, and `lab` through it, until `end_exit`.
+local function begin_exit(entity: Entity, lab: Entity)
+	exiting[entity.id] = lab.id
+end
+
+local function end_exit(entity_id: EntityId)
+	exiting[entity_id] = nil
+end
+
+-- The lab `entity_id` is on its way out of, if it is.
+local function exiting_from(entity_id: EntityId): EntityId?
+	return exiting[entity_id]
+end
+
 local function forget(entity_id: EntityId)
 	idle_for[entity_id] = nil
 	impulse_remaining[entity_id] = nil
+	exiting[entity_id] = nil
 end
 
 return table.freeze({
@@ -381,4 +458,7 @@ return table.freeze({
 	forget = forget,
 	is_mobile = is_mobile,
 	has_goal = has_goal,
+	begin_exit = begin_exit,
+	end_exit = end_exit,
+	exiting_from = exiting_from,
 })

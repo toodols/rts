@@ -8,12 +8,21 @@
 -- Over the low ground lies a flat water part at `config.WATER_LEVEL`. It only draws the sea: what the
 -- sea means is worked out from the heightmap, where ground below that level is under water, and each
 -- def says how deep it may stand in it.
+--
+-- What each column is made of comes from the map preset's theme, painted by what can cross it (see
+-- shared/ground_paint.luau, which the lobby's pictures of the maps are painted with too).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
 local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local passability = require(ReplicatedStorage.Shared.passability)
+local ground_paint = require(ReplicatedStorage.Shared.ground_paint)
+
+type Theme = map_presets.Theme
+type Painter = ground_paint.Painter
 
 local CELL_STUDS = config.CELL_STUDS
 -- Voxels are written in blocks rather than all at once to keep any single WriteVoxels call small.
@@ -31,15 +40,18 @@ local SURFACE_BIAS = CELL_STUDS / 2
 local WATER_HEIGHT = config.WATER_LEVEL
 local WATER_THICKNESS = 4
 -- Wide enough that its own edge falls outside the fog, which ends at 3.1 map half-widths.
-local WATER_SPAN_FACTOR = 8
+local WATER_SPAN_FACTOR = 4
 -- A Part cannot be larger than this on any axis.
 local MAX_PART_STUDS = 2048
-local WATER_COLOR = Color3.fromRGB(38, 76, 108)
 local WATER_TRANSPARENCY = 0.35
 
+-- Built by `render` from the map's theme; every rewrite after that paints with the same one.
+local painter: Painter? = nil
+
 local function write_chunk(cell_x: number, cell_z: number, cells_x: number, cells_z: number)
-	local origin_x = heightmap.ORIGIN_X + cell_x * CELL_STUDS
-	local origin_z = heightmap.ORIGIN_Z + cell_z * CELL_STUDS
+	local low_x, low_z = heightmap.grid_to_world(cell_x, cell_z)
+	local origin_x = low_x
+	local origin_z = low_z
 
 	-- tall enough to cover the whole terrain range with room to spare
 	local _, highest = heightmap.height_bounds()
@@ -55,28 +67,38 @@ local function write_chunk(cell_x: number, cell_z: number, cells_x: number, cell
 		)
 	):ExpandToGrid(CELL_STUDS)
 
+	-- the surface and material of each column, worked out once rather than for every voxel up it
+	local paint = painter :: Painter
+	local surfaces = table.create(cells_x)
+	local column_materials = table.create(cells_x)
+	for x = 1, cells_x do
+		surfaces[x] = table.create(cells_z)
+		column_materials[x] = table.create(cells_z)
+		-- sample the terrain at the centre of this voxel column
+		local world_x = origin_x + (x - 0.5) * CELL_STUDS
+		for z = 1, cells_z do
+			local world_z = origin_z + (z - 0.5) * CELL_STUDS
+			local surface = heightmap.height_at(world_x, world_z)
+			local steepness = passability.cell_steepness(cell_x + x - 1, cell_z + z - 1)
+			surfaces[x][z] = surface
+			column_materials[x][z] = paint(world_x, world_z, surface, steepness)
+		end
+	end
+
 	local materials = {}
 	local occupancies = {}
 
 	for x = 1, cells_x do
 		materials[x] = {}
 		occupancies[x] = {}
-		-- sample the terrain at the centre of this voxel column
-		local world_x = origin_x + (x - 0.5) * CELL_STUDS
 		for y = 1, voxels_y do
 			materials[x][y] = {}
 			occupancies[x][y] = {}
 			local voxel_bottom = FLOOR_HEIGHT + (y - 1) * CELL_STUDS
 			for z = 1, cells_z do
-				local world_z = origin_z + (z - 0.5) * CELL_STUDS
-				local surface = heightmap.height_at(world_x, world_z)
 				-- how much of this voxel is below the surface, 0 to 1
-				local occupancy = math.clamp((surface - SURFACE_BIAS - voxel_bottom) / CELL_STUDS, 0, 1)
-				-- the sea bed is sand, so the shore reads from a distance
-				materials[x][y][z] = if occupancy <= 0
-					then Enum.Material.Air
-					elseif surface < config.WATER_LEVEL + 1 then Enum.Material.Sand
-					else Enum.Material.Ground
+				local occupancy = math.clamp((surfaces[x][z] - SURFACE_BIAS - voxel_bottom) / CELL_STUDS, 0, 1)
+				materials[x][y][z] = if occupancy <= 0 then Enum.Material.Air else column_materials[x][z]
 				occupancies[x][y][z] = occupancy
 			end
 		end
@@ -85,41 +107,53 @@ local function write_chunk(cell_x: number, cell_z: number, cells_x: number, cell
 	Workspace.Terrain:WriteVoxels(region, CELL_STUDS, materials, occupancies)
 end
 
--- The sea the map sits in: one part, rebuilt from scratch so that re-rendering the map cannot
--- leave two of them behind. Raycasts pass straight through it, so clicking past the shore still
--- finds nothing rather than ordering a unit out to sea.
-local function render_water()
+-- The sea the map sits in: a flat block of water whose top is the sea level, everywhere, so the water is never terrain.
+-- It is a few parts side by side where one cannot reach far enough, since a part is at most MAX_PART_STUDS across,
+-- and rebuilt from scratch, so that re-rendering the map cannot leave any of the last one's behind. Raycasts pass
+-- straight through it, so clicking past the shore still finds nothing rather than ordering a unit out to sea.
+local function render_water(theme: Theme)
 	local previous = Workspace:FindFirstChild "Water"
 	if previous ~= nil then
 		previous:Destroy()
 	end
+	local folder = Instance.new "Folder"
+	folder.Name = "Water"
 
-	local map_x = config.MAP_CELLS_X * CELL_STUDS
-	local map_z = config.MAP_CELLS_Z * CELL_STUDS
+	local half_x, half_z = heightmap.half_extents()
+	local span_x = half_x * 2 * WATER_SPAN_FACTOR
+	local span_z = half_z * 2 * WATER_SPAN_FACTOR
+	local tiles_x = math.ceil(span_x / MAX_PART_STUDS)
+	local tiles_z = math.ceil(span_z / MAX_PART_STUDS)
+	local tile_x = span_x / tiles_x
+	local tile_z = span_z / tiles_z
 
-	local water = Instance.new "Part"
-	water.Name = "Water"
-	water.Anchored = true
-	water.Locked = true
-	water.CanCollide = false
-	water.CanQuery = false
-	water.CanTouch = false
-	water.CastShadow = false
-	water.Size = Vector3.new(
-		math.min(map_x * WATER_SPAN_FACTOR, MAX_PART_STUDS),
-		WATER_THICKNESS,
-		math.min(map_z * WATER_SPAN_FACTOR, MAX_PART_STUDS)
-	)
-	-- hung below the surface height so that the face you see is exactly WATER_HEIGHT
-	water.CFrame =
-		CFrame.new(heightmap.ORIGIN_X + map_x / 2, WATER_HEIGHT - WATER_THICKNESS / 2, heightmap.ORIGIN_Z + map_z / 2)
-	water.Material = Enum.Material.Water
-	water.Color = WATER_COLOR
-	water.Transparency = WATER_TRANSPARENCY
-	water.Reflectance = 0.15
-	water.TopSurface = Enum.SurfaceType.Smooth
-	water.BottomSurface = Enum.SurfaceType.Smooth
-	water.Parent = Workspace
+	for ix = 1, tiles_x do
+		for iz = 1, tiles_z do
+			local water = Instance.new "Part"
+			water.Name = "Water"
+			water.Anchored = true
+			water.Locked = true
+			water.CanCollide = false
+			water.CanQuery = false
+			water.CanTouch = false
+			water.CastShadow = false
+			water.Size = Vector3.new(tile_x, WATER_THICKNESS, tile_z)
+			-- hung below the surface height so that the face you see is exactly WATER_HEIGHT
+			water.CFrame = CFrame.new(
+				-span_x / 2 + (ix - 0.5) * tile_x,
+				WATER_HEIGHT - WATER_THICKNESS / 2,
+				-span_z / 2 + (iz - 0.5) * tile_z
+			)
+			water.Material = Enum.Material.Water
+			water.Color = theme.water_color
+			water.Transparency = WATER_TRANSPARENCY
+			water.Reflectance = 0.15
+			water.TopSurface = Enum.SurfaceType.Smooth
+			water.BottomSurface = Enum.SurfaceType.Smooth
+			water.Parent = folder
+		end
+	end
+	folder.Parent = Workspace
 end
 
 -- What the simulation stands things on is `heightmap.height_at`; what the player sees is the mesh
@@ -136,6 +170,7 @@ local function check_surface()
 	params.FilterDescendantsInstances = { Workspace.Terrain }
 	params.IgnoreWater = true
 
+	local half_x, half_z = heightmap.half_extents()
 	local total = 0
 	local samples = 0
 	local lowest = math.huge
@@ -144,8 +179,8 @@ local function check_surface()
 	-- an even spread over the interior of the map, skipping the edges where the mesh falls away
 	for ix = 1, SURFACE_SAMPLES do
 		for iz = 1, SURFACE_SAMPLES do
-			local x = heightmap.ORIGIN_X + (ix / (SURFACE_SAMPLES + 1)) * config.MAP_CELLS_X * CELL_STUDS
-			local z = heightmap.ORIGIN_Z + (iz / (SURFACE_SAMPLES + 1)) * config.MAP_CELLS_Z * CELL_STUDS
+			local x = -half_x + (ix / (SURFACE_SAMPLES + 1)) * half_x * 2
+			local z = -half_z + (iz / (SURFACE_SAMPLES + 1)) * half_z * 2
 			local expected = heightmap.height_at(x, z)
 			local from = Vector3.new(x, expected + PROBE_HEIGHT, z)
 			local hit = Workspace:Raycast(from, Vector3.new(0, -PROBE_HEIGHT * 2, 0), params)
@@ -180,10 +215,10 @@ end
 local function report_flooding()
 	local wet = 0
 	local samples = 0
-	for cz = 0, config.MAP_CELLS_Z do
-		for cx = 0, config.MAP_CELLS_X do
-			local x = heightmap.ORIGIN_X + cx * CELL_STUDS
-			local z = heightmap.ORIGIN_Z + cz * CELL_STUDS
+	local cells_x, cells_z = heightmap.cells()
+	for cz = 0, cells_z do
+		for cx = 0, cells_x do
+			local x, z = heightmap.grid_to_world(cx, cz)
 			samples += 1
 			if heightmap.water_depth(x, z) > 0 then
 				wet += 1
@@ -193,14 +228,25 @@ local function report_flooding()
 	print(`{string.format("%.0f", wet / samples * 100)}% of the map is under water`)
 end
 
+-- The theme's own colours for its materials. Only the ones it names are changed.
+local function color_materials(theme: Theme)
+	for material, color in theme.colors do
+		Workspace.Terrain:SetMaterialColor(material, color)
+	end
+end
+
 local function render()
+	local theme = map_presets.get(heightmap.get_preset()).theme
+	painter = ground_paint.make_painter(theme, heightmap.get_seed())
 	Workspace.Terrain:Clear()
-	render_water()
+	color_materials(theme)
+	render_water(theme)
 	report_flooding()
-	for cell_z = 0, config.MAP_CELLS_Z - 1, CHUNK_CELLS do
-		for cell_x = 0, config.MAP_CELLS_X - 1, CHUNK_CELLS do
-			local cells_x = math.min(CHUNK_CELLS, config.MAP_CELLS_X - cell_x)
-			local cells_z = math.min(CHUNK_CELLS, config.MAP_CELLS_Z - cell_z)
+	local map_cells_x, map_cells_z = heightmap.cells()
+	for cell_z = 0, map_cells_z - 1, CHUNK_CELLS do
+		for cell_x = 0, map_cells_x - 1, CHUNK_CELLS do
+			local cells_x = math.min(CHUNK_CELLS, map_cells_x - cell_x)
+			local cells_z = math.min(CHUNK_CELLS, map_cells_z - cell_z)
 			write_chunk(cell_x, cell_z, cells_x, cells_z)
 		end
 		-- yield between rows so a large map does not stall the first server frame
@@ -215,8 +261,9 @@ end
 local function rewrite(first_x: number, first_z: number, last_x: number, last_z: number)
 	local from_x = math.max(0, first_x)
 	local from_z = math.max(0, first_z)
-	local to_x = math.min(config.MAP_CELLS_X - 1, last_x)
-	local to_z = math.min(config.MAP_CELLS_Z - 1, last_z)
+	local map_cells_x, map_cells_z = heightmap.cells()
+	local to_x = math.min(map_cells_x - 1, last_x)
+	local to_z = math.min(map_cells_z - 1, last_z)
 	for cell_z = from_z, to_z, CHUNK_CELLS do
 		for cell_x = from_x, to_x, CHUNK_CELLS do
 			write_chunk(

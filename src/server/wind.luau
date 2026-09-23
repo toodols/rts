@@ -1,5 +1,5 @@
--- Wind. It is a 2D vector, (x, z), that lives in an annulus: its length is never below MIN_WIND or above
--- MAX_WIND. Every WIND_INTERVAL seconds it moves to where it was plus a random delta, and then its length
+-- Wind. It is a 2D vector, (x, z), that lives in an annulus: its length is never below the least wind or above the
+-- most, which the map sets (`environment`). Every WIND_INTERVAL seconds it moves to where it was plus a random delta, and then its length
 -- is put back into the annulus, pulled in from beyond the outer edge or pushed out from inside the inner
 -- one, keeping its direction. It is sent to clients as the `wind` attribute of Workspace.
 
@@ -7,6 +7,7 @@ local Workspace = game:GetService "Workspace"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local config = require(ReplicatedStorage.Shared.config)
+local environment = require(ReplicatedStorage.Shared.environment)
 
 local random = Random.new()
 
@@ -16,15 +17,17 @@ local timer = 0
 -- Puts `wind` back into the annulus by changing its length only. Something with no direction to keep, at
 -- the very centre, gets the direction of `fallback`.
 local function constrain(wind: Vector2, fallback: Vector2): Vector2
+	local least = environment.min_wind()
+	local most = environment.max_wind()
 	local length = wind.Magnitude
-	if length > config.MAX_WIND then
-		return wind.Unit * config.MAX_WIND
+	if length > most then
+		return if length < 1e-6 then Vector2.zero else wind.Unit * most
 	end
-	if length < config.MIN_WIND then
+	if length < least then
 		if length < 1e-6 then
-			return fallback.Unit * config.MIN_WIND
+			return if fallback.Magnitude < 1e-6 then Vector2.new(least, 0) else fallback.Unit * least
 		end
-		return wind.Unit * config.MIN_WIND
+		return wind.Unit * least
 	end
 	return wind
 end
@@ -43,7 +46,7 @@ end
 -- Starts the wind somewhere in the annulus.
 local function init()
 	local angle = random:NextNumber(0, math.pi * 2)
-	local length = random:NextNumber(config.MIN_WIND, config.MAX_WIND)
+	local length = random:NextNumber(environment.min_wind(), environment.max_wind())
 	current = Vector2.new(math.cos(angle), math.sin(angle)) * length
 	timer = 0
 	publish()
@@ -56,6 +59,12 @@ local function tick(delta: number)
 	end
 	timer -= config.WIND_INTERVAL
 	current = constrain(current + random_vector(config.WIND_MAX_DELTA), current)
+	publish()
+end
+
+-- Puts the wind back inside the range at once, for a range that has just changed, as when a map is built.
+local function refit()
+	current = constrain(current, current)
 	publish()
 end
 
@@ -75,4 +84,5 @@ return table.freeze({
 	get = get,
 	speed = speed,
 	constrain = constrain,
+	refit = refit,
 })

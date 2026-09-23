@@ -10,8 +10,13 @@ local TICK_DELTA = 1 / TICK_RATE
 local CELL_STUDS = 4
 -- 192 cells is 768 studs a side, three times the 256 the map used to be. The fog is scaled from the map
 -- size, so the far edge still dissolves into the horizon rather than cutting off.
+-- That is the size of the maps made from a seed; a map brought over from BAR is as big as it is there (see
+-- map_presets' `Preset.size`).
 local MAP_CELLS_X = 192
 local MAP_CELLS_Z = 192
+-- BAR measures distance in elmos. One stud is 11 of them, because the Peewee's 22 elmo wide collision cylinder is a 2
+-- stud wide capsule; every length brought over from BAR, units and maps alike, goes through this one number.
+local ELMOS_PER_STUD = 11
 local TERRAIN_BASE_HEIGHT = 4
 -- Gentler relief, so a smaller map still leaves plenty of ground flat enough to build on.
 local TERRAIN_AMPLITUDE = 9
@@ -32,6 +37,11 @@ local DROWN_DEPTH_MARGIN = 0.5
 
 -- A weapon that takes longer than this many seconds to reload shows a bar over its owner for how far along it is.
 local RELOAD_BAR_MIN_SECONDS = 5
+
+-- How near a weapon's turret has to point to what it is shooting before it fires, in radians, for a turret that
+-- does not say, and how long it waits with nothing to shoot before turning back to face ahead, in seconds.
+local TURRET_TOLERANCE = math.rad(3)
+local TURRET_REST_DELAY = 3
 
 -- Explosions press a crater into the ground, but only very softly: the deepest a single one goes is
 -- DEFORM_MAX_DEPTH studs, which even a huge blast only approaches (depth is that times 1 - e^(-damage /
@@ -55,6 +65,8 @@ local MAX_BUILD_SLOPE_STUDS = 3
 -- nobody opens inside anybody else. Metal spots are laid out around the same points.
 local START_RING_RADIUS = 210
 local START_SLOTS = 4
+-- Once every player has loaded in and chosen a start, the game starts after this many seconds (see lobby.luau).
+local START_COUNTDOWN_SECONDS = 3
 
 -- A metal extractor locks onto the closest metal spot to the cursor, however far away it is; this
 -- is how close that spot has to be, which is no limit at all.
@@ -72,11 +84,14 @@ local CONVERTER_THRESHOLD = 0.5
 local METAL_CAPACITY = 500
 local ENERGY_CAPACITY = 500
 
--- Wind is a 2D vector, (x, z), whose length stays between MIN_WIND and MAX_WIND: it lives in an annulus. Every
+-- Wind is a 2D vector, (x, z), whose length stays between the least and most wind: it lives in an annulus. Every
 -- WIND_INTERVAL seconds it moves by a random vector up to WIND_MAX_DELTA long, and if that carries it out
--- of the annulus its length is pulled back in, or pushed out, to the nearest edge.
+-- of the annulus its length is pulled back in, or pushed out, to the nearest edge. MIN_WIND and MAX_WIND, and
+-- TIDAL_STRENGTH, the energy a tidal generator makes, are only the defaults, for a map that does not set its own
+-- (see environment.luau).
 local MIN_WIND = 1
 local MAX_WIND = 15
+local TIDAL_STRENGTH = 15
 local WIND_INTERVAL = 5
 local WIND_MAX_DELTA = 4
 
@@ -96,9 +111,15 @@ local BLUEPRINT_DECAY_DELAY = 5
 local BUILD_STUCK_SECONDS = 10
 local BLUEPRINT_DECAY_RATE = 30
 
--- Movement. Units steer directly at their waypoint and push each other apart rather than
--- pathfinding, which is enough for open terrain and keeps formations from collapsing into a point.
+-- Movement. Units steer directly at their waypoint and push each other apart, which keeps formations from
+-- collapsing into a point. A move order finds its own way first (`pathfinder.route`), so the waypoints it is
+-- given go round what it cannot cross.
 local ARRIVAL_RADIUS = 1.5
+-- Waypoints on the way somewhere, a route's or a chain of moves', are closed in on as near as WAYPOINT_EPSILON,
+-- slowing to do it. From WAYPOINT_SKIP_RANGE out a unit checks whether it can already walk straight to the next one,
+-- and goes on to it as soon as it can, so it never cuts a corner it cannot see round.
+local WAYPOINT_EPSILON = 0.25
+local WAYPOINT_SKIP_RANGE = 2
 local SEPARATION_STRENGTH = 6
 local SEPARATION_RADIUS_PADDING = 0.5
 -- A unit whose velocity is below this never bothers with terrain/passability checks or moving at
@@ -108,8 +129,7 @@ local SEPARATION_RADIUS_PADDING = 0.5
 -- visibly moving.
 local MOVEMENT_SETTLE_SPEED = 0.05
 
--- How far in front of a factory its finished unit is placed, measured from the edge of the
--- factory's footprint along its facing.
+-- How far past the edge of a factory's footprint its finished unit drives on its way out.
 local PRODUCTION_SPOT_GAP = 3
 -- How long one of a factory's own units may stand in the way of its next unit before it is told to
 -- move aside.
@@ -122,15 +142,14 @@ local GUARD_FOLLOW_GAP = 4
 
 -- Aircraft. What is left of a weapon's damage when it hits one and the weapon is not dedicated anti air.
 local NON_AA_AIR_DAMAGE_FRACTION = 0.15
--- How long an aircraft with nothing to do hovers before it settles onto the ground.
+-- How long an aircraft with nothing to do hovers before it settles onto the ground. One on wings cannot hover, and
+-- comes down at once.
 local AIR_LAND_DELAY = 2
 -- A missile is gone after this many seconds in the air, which is longer than the flight of any rocket, since
 -- one that climbs and crosses the map takes a while.
 local MISSILE_MAX_AGE = 120
 -- How fast a missile turns onto a new heading, as the fraction of the turn it makes in a second's flight.
 local MISSILE_TURN_RATE = 6
--- How far past what it is bombing a bomber flies on before it turns back for another pass.
-local BOMBER_RUN_OUT = 40
 -- Transports. A unit takes a slot for every this many studs of its radius, and a transport sets down what it
 -- carries this far apart beyond their colliders.
 local TRANSPORT_SLOT_RADIUS = 1.5
@@ -141,6 +160,9 @@ local TRANSPORT_UNLOAD_GAP = 1
 -- TRANSPORT_LOAD_SPEED studs a second relative to it, or than TRANSPORT_ENEMY_LOAD_SPEED if it belongs to the
 -- enemy, which is what makes a moving enemy hard to catch and a tower that cannot move easy.
 local TRANSPORT_LOAD_RANGE = 3
+-- A transport going to pick something up flies at its usual height until it is this close to it along the ground,
+-- and only then comes down to it.
+local TRANSPORT_DESCEND_RANGE = 6
 local TRANSPORT_LOAD_HEIGHT = 1.5
 local TRANSPORT_HOOK_GAP = 0.5
 local TRANSPORT_LOAD_SPEED = 3
@@ -165,7 +187,7 @@ local SCAVENGER_TEAM = 100
 -- How far along the game is runs from 0 to 1 over this many seconds, an hour, and it is all that decides when
 -- things happen: the first beacon comes once it reaches this much, and after that at a random gap between one
 -- beacon and the next.
-local SCAVENGER_GAME_LENGTH = 3600
+local SCAVENGER_GAME_LENGTH = 4800
 local SCAVENGER_FIRST_BEACON_PROGRESS = 0.06
 -- What the scavengers may field, in difficulty (a thing's metal plus its energy, over 60), grows exponentially
 -- with progress from this much at the start. How fast is worked out from the next two numbers: by the progress
@@ -219,6 +241,8 @@ local CAMERA_PAN_SPEED = 120
 local CAMERA_MIN_HEIGHT = 22
 local CAMERA_MAX_HEIGHT = 420
 local CAMERA_ZOOM_STEP = 14
+-- Radians the view turns per pixel of cursor movement while rotating with alt and the middle button.
+local CAMERA_ROTATE_SPEED = 0.008
 
 return table.freeze({
 	TICK_RATE = TICK_RATE,
@@ -227,6 +251,7 @@ return table.freeze({
 	CELL_STUDS = CELL_STUDS,
 	MAP_CELLS_X = MAP_CELLS_X,
 	MAP_CELLS_Z = MAP_CELLS_Z,
+	ELMOS_PER_STUD = ELMOS_PER_STUD,
 	TERRAIN_BASE_HEIGHT = TERRAIN_BASE_HEIGHT,
 	TERRAIN_AMPLITUDE = TERRAIN_AMPLITUDE,
 	TERRAIN_FREQUENCY = TERRAIN_FREQUENCY,
@@ -237,6 +262,8 @@ return table.freeze({
 	DROWN_SECONDS = DROWN_SECONDS,
 	DROWN_DEPTH_MARGIN = DROWN_DEPTH_MARGIN,
 	RELOAD_BAR_MIN_SECONDS = RELOAD_BAR_MIN_SECONDS,
+	TURRET_TOLERANCE = TURRET_TOLERANCE,
+	TURRET_REST_DELAY = TURRET_REST_DELAY,
 	DEFORM_MAX_DEPTH = DEFORM_MAX_DEPTH,
 	DEFORM_DAMAGE_SCALE = DEFORM_DAMAGE_SCALE,
 	DEFORM_MIN_DEPTH = DEFORM_MIN_DEPTH,
@@ -247,6 +274,7 @@ return table.freeze({
 
 	START_RING_RADIUS = START_RING_RADIUS,
 	START_SLOTS = START_SLOTS,
+	START_COUNTDOWN_SECONDS = START_COUNTDOWN_SECONDS,
 	METAL_SPOT_SNAP = METAL_SPOT_SNAP,
 
 	STARTING_METAL = STARTING_METAL,
@@ -259,6 +287,7 @@ return table.freeze({
 
 	MIN_WIND = MIN_WIND,
 	MAX_WIND = MAX_WIND,
+	TIDAL_STRENGTH = TIDAL_STRENGTH,
 	WIND_INTERVAL = WIND_INTERVAL,
 	WIND_MAX_DELTA = WIND_MAX_DELTA,
 	WRECK_METAL_FRACTION = WRECK_METAL_FRACTION,
@@ -269,6 +298,8 @@ return table.freeze({
 	BLUEPRINT_DECAY_RATE = BLUEPRINT_DECAY_RATE,
 
 	ARRIVAL_RADIUS = ARRIVAL_RADIUS,
+	WAYPOINT_EPSILON = WAYPOINT_EPSILON,
+	WAYPOINT_SKIP_RANGE = WAYPOINT_SKIP_RANGE,
 	SEPARATION_STRENGTH = SEPARATION_STRENGTH,
 	SEPARATION_RADIUS_PADDING = SEPARATION_RADIUS_PADDING,
 	MOVEMENT_SETTLE_SPEED = MOVEMENT_SETTLE_SPEED,
@@ -283,9 +314,9 @@ return table.freeze({
 	AIR_LAND_DELAY = AIR_LAND_DELAY,
 	MISSILE_MAX_AGE = MISSILE_MAX_AGE,
 	MISSILE_TURN_RATE = MISSILE_TURN_RATE,
-	BOMBER_RUN_OUT = BOMBER_RUN_OUT,
 	TRANSPORT_SLOT_RADIUS = TRANSPORT_SLOT_RADIUS,
 	TRANSPORT_LOAD_RANGE = TRANSPORT_LOAD_RANGE,
+	TRANSPORT_DESCEND_RANGE = TRANSPORT_DESCEND_RANGE,
 	TRANSPORT_LOAD_HEIGHT = TRANSPORT_LOAD_HEIGHT,
 	TRANSPORT_HOOK_GAP = TRANSPORT_HOOK_GAP,
 	TRANSPORT_LOAD_SPEED = TRANSPORT_LOAD_SPEED,
@@ -334,4 +365,5 @@ return table.freeze({
 	CAMERA_MIN_HEIGHT = CAMERA_MIN_HEIGHT,
 	CAMERA_MAX_HEIGHT = CAMERA_MAX_HEIGHT,
 	CAMERA_ZOOM_STEP = CAMERA_ZOOM_STEP,
+	CAMERA_ROTATE_SPEED = CAMERA_ROTATE_SPEED,
 })

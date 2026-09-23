@@ -12,3 +12,22 @@ globalTypes.d.luau
 
 # outlass preview intermediate (only lingers if a build is killed mid-run)
 src/client/ui/stylesheets/preview/.compiled.css
+
+# procedural model pipeline build output
+tools/model_pipeline/build/
+# Open Cloud key for tools/model_pipeline/roblox/upload_art.py
+tools/model_pipeline/roblox/.api_key
+/rbxopencloudkey.txt
+
+# tools/bar_maps/import_bar_maps.py writes this picture of what the materials came out as
+tools/bar_maps/preview.png
+
+# Claude Code's machine-local settings and agent worktrees
+.claude/settings.local.json
+.claude/worktrees/
+
+# Python bytecode from the tools
+__pycache__/
+
+# saved /benchmark reports
+/benchmark*.txt

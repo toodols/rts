@@ -7,13 +7,22 @@
 --
 -- A missile flies differently: it climbs straight up, crosses to its target at the height it climbed to, and
 -- dives onto it, at one speed the whole way, turning onto each new heading over a moment.
+--
+-- So does a torpedo: it runs level under the water, at its target's depth but never nearer the surface than
+-- TORPEDO_DEPTH or the sea floor than TORPEDO_CLEARANCE, and one let go above the water drops into it first.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
+local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
 type ProjectileParams = types.ProjectileParams
+
+local TORPEDO_DEPTH = 0.6
+local TORPEDO_CLEARANCE = 0.3
+-- How fast a torpedo drops into the water or changes the depth it runs at, in studs a second.
+local TORPEDO_DIVE_SPEED = 8
 
 export type Flight = {
 	position: Vector3,
@@ -27,10 +36,19 @@ export type Flight = {
 	ceiling: number?,
 	-- for homing projectiles: the current target position to home in on
 	homing_target: Vector3?,
+	-- a torpedo's speed through the water, kept apart from its velocity, which also has its rise and fall in it
+	speed: number?,
 }
 
--- A rocket is launched along `direction`; a missile ignores it and is launched straight up, toward `aim`.
-local function launch(from: Vector3, direction: Vector3, params: ProjectileParams, aim: Vector3?): Flight
+-- A rocket is launched along `direction`; a missile ignores it and is launched straight up, toward `aim`. A rocket
+-- also keeps `inherited`, the velocity of what let it go, which is how a bomb goes on with its bomber's speed.
+local function launch(
+	from: Vector3,
+	direction: Vector3,
+	params: ProjectileParams,
+	aim: Vector3?,
+	inherited: Vector3?
+): Flight
 	local missile = params.missile
 	if missile ~= nil and aim ~= nil then
 		return {
@@ -42,11 +60,34 @@ local function launch(from: Vector3, direction: Vector3, params: ProjectileParam
 			ceiling = math.max(from.Y, aim.Y) + missile.climb,
 		}
 	end
+	if params.torpedo == true then
+		local level = Vector3.new(direction.X, 0, direction.Z)
+		return {
+			position = from,
+			velocity = (if level.Magnitude > 1e-3 then level.Unit else Vector3.zAxis) * params.speed,
+			age = 0,
+			target = aim,
+			speed = params.speed,
+		}
+	end
 	return {
 		position = from,
-		velocity = direction.Unit * params.speed,
+		velocity = direction.Unit * params.speed + (inherited or Vector3.zero),
 		age = 0,
 	}
+end
+
+-- How many seconds something let go at `from`, moving at `velocity`, takes to fall to `height` under `gravity`, with
+-- nothing slowing it. Something already below that height is taken to be there at once.
+local function fall_time(from: Vector3, velocity: Vector3, gravity: number, height: number): number
+	if gravity <= 0 then
+		return math.huge
+	end
+	local under = velocity.Y * velocity.Y + 2 * gravity * (from.Y - height)
+	if under <= 0 then
+		return 0
+	end
+	return math.max(0, (velocity.Y + math.sqrt(under)) / gravity)
 end
 
 -- The direction to launch at, how long the flight takes, and the speed to launch at, for a shell with no thrust to land
@@ -142,12 +183,51 @@ local function step_missile(
 	flight.position += flight.velocity * delta
 end
 
+-- The depths a torpedo may run at at (x, z), shallowest and deepest. Where the water is too shallow to hold it the
+-- two are the same, and the sea floor is above them.
+local function torpedo_band(x: number, z: number): (number, number)
+	local top = config.WATER_LEVEL - TORPEDO_DEPTH
+	return top, math.min(top, heightmap.height_at(x, z) + TORPEDO_CLEARANCE)
+end
+
+-- Whether the water at (x, z) is deep enough for a torpedo to run through.
+local function torpedo_runs_at(x: number, z: number): boolean
+	return heightmap.height_at(x, z) + TORPEDO_CLEARANCE <= config.WATER_LEVEL - TORPEDO_DEPTH
+end
+
+-- Advances a torpedo by `delta` seconds, in place. It goes where its velocity points along the level, whatever
+-- turned it there (it homes by having its velocity turned, as a rocket does), at its own speed, and makes for the
+-- depth of what it was aimed at, as far as the water lets it.
+local function step_torpedo(flight: Flight, params: ProjectileParams, delta: number)
+	flight.age += delta
+	local speed = flight.speed or params.speed
+	if flight.age <= params.thrust_time then
+		speed += params.acceleration * delta
+	end
+	flight.speed = speed
+	local level = Vector3.new(flight.velocity.X, 0, flight.velocity.Z)
+	local heading = if level.Magnitude > 1e-3 then level.Unit else Vector3.zAxis
+	local moved = flight.position + heading * speed * delta
+
+	local top, bottom = torpedo_band(moved.X, moved.Z)
+	local aimed = if flight.target ~= nil then flight.target.Y else moved.Y
+	local wanted = math.clamp(aimed, bottom, top)
+	local most = TORPEDO_DIVE_SPEED * delta
+	local rise = math.clamp(wanted - moved.Y, -most, most)
+	flight.position = moved + Vector3.yAxis * rise
+	flight.velocity = heading * speed + Vector3.yAxis * (rise / delta)
+end
+
 -- Advances a flight by `delta` seconds, in place.
 local function step(flight: Flight, params: ProjectileParams, delta: number)
 	local missile = params.missile
 	local target = flight.target
 	if missile ~= nil and target ~= nil then
 		step_missile(flight, params, missile, target, delta)
+		return
+	end
+	if params.torpedo == true then
+		step_torpedo(flight, params, delta)
 		return
 	end
 
@@ -216,9 +296,11 @@ end
 
 return table.freeze({
 	launch = launch,
+	fall_time = fall_time,
 	trajectory = trajectory,
 	range_to = range_to,
 	aim = aim,
 	time_to_reach = time_to_reach,
 	step = step,
+	torpedo_runs_at = torpedo_runs_at,
 })

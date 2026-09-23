@@ -29,15 +29,11 @@ local place_blueprint: RemoteEvent = ReplicatedStorage.Shared.PlaceBlueprint
 local MAX_SELECTION = 250
 local MAX_QUEUE_COUNT = 50
 
--- A pathfinding order searches for a route for every unit in it, and a search is not free, so each is given a
--- share of the tick: at most this many cells settled, and only the first few units of a big selection get a
--- search of their own. The rest are sent straight to the spot, as a move would.
-local PATH_MAX_EXPANSIONS = 8000
-local PATH_MAX_SEARCHES = 12
+-- The client finds each unit's way and sends it with the order (`pathfinder.waypoints_to`); the server searches for
+-- nothing and only checks it. A route longer than this is not taken.
+local MAX_ROUTE_WAYPOINTS = 128
 
--- `path` is not an order itself: it is a request for the move orders that make up a route to a spot.
 local VALID_ORDER_KINDS: { [string]: boolean } = {
-	path = true,
 	dgun = true,
 	move = true,
 	fight = true,
@@ -51,6 +47,18 @@ local VALID_ORDER_KINDS: { [string]: boolean } = {
 	load = true,
 	unload = true,
 	stop = true,
+	area_reclaim = true,
+	area_repair = true,
+	area_resurrect = true,
+	area_attack = true,
+}
+
+-- An area command is not aimed at anything: it is a circle, given as a center point and a radius.
+local AREA_KINDS: { [string]: boolean } = {
+	area_reclaim = true,
+	area_repair = true,
+	area_resurrect = true,
+	area_attack = true,
 }
 
 -- Returns the entity only if this player's team owns it and it is active.
@@ -74,22 +82,45 @@ local function owned_entity(player: Player, id: unknown): Entity?
 	return entity
 end
 
--- The move orders that take `entity` to `to`. A route that is being queued starts where the unit's last
--- order leaves it, and one that is not starts where it stands. With no search left to spend it is one move
--- straight there.
-local function route_to(entity: Entity, to: Vector3, after_queue: boolean, search_left: boolean): { Order }
+-- `order` with the way to it that the client sent, `raw`, laid ahead of it as waypoints: moves, or for a fight, fight
+-- waypoints, so it fights its way along all of it. The way is only taken if nothing blocks any leg of it
+-- (`pathfinder.has_open_line`),
+-- and the last leg too for a move or a fight, which walk right up to where they go; otherwise the order is given
+-- without it. The leg from where the unit stands is not checked, since it has moved on since the client saw it.
+local function with_route(entity: Entity, order: Order, raw: unknown): { Order }
 	local def = unit_defs.get(entity.def_name)
-	if search_left == false then
-		return { { kind = "move", position = unit_defs.surface_position(def, to.X, to.Z) } }
+	if typeof(raw) ~= "table" or def.max_speed == nil or def.air ~= nil then
+		return { order }
 	end
-	local from = entity.position
-	if after_queue then
-		local last = entity.orders[#entity.orders]
-		if last ~= nil and last.position ~= nil then
-			from = last.position
+	local points = raw :: { unknown }
+	if #points == 0 or #points > MAX_ROUTE_WAYPOINTS then
+		return { order }
+	end
+	local kind: OrderKind = if order.kind == "fight" then "fight" else "move"
+	local steps: { Order } = {}
+	local previous: Vector3? = nil
+	for _, point in points do
+		if typeof(point) ~= "Vector3" or heightmap.in_bounds(point.X, point.Z) == false then
+			return { order }
 		end
+		local at = unit_defs.surface_position(def, point.X, point.Z)
+		if previous ~= nil and pathfinder.has_open_line(def, previous, at) == false then
+			return { order }
+		end
+		table.insert(steps, { kind = kind, position = at, target_id = nil })
+		previous = at
 	end
-	return pathfinder.find_path(def, from, to, PATH_MAX_EXPANSIONS).orders
+	local walks_up_to = order.kind == "move" or order.kind == "fight"
+	if
+		walks_up_to
+		and previous ~= nil
+		and order.position ~= nil
+		and pathfinder.has_open_line(def, previous, order.position) == false
+	then
+		return { order }
+	end
+	table.insert(steps, order)
+	return steps
 end
 
 local function on_issue_order(player: Player, payload: unknown)
@@ -115,12 +146,12 @@ local function on_issue_order(player: Player, payload: unknown)
 	-- an attack, reclaim or assist order is meaningless without something to point at; moving and attacking
 	-- the ground, fighting, and unloading, point at a place instead
 	local needs_target = kind ~= "move"
-		and kind ~= "path"
 		and kind ~= "dgun"
 		and kind ~= "fight"
 		and kind ~= "attack_ground"
 		and kind ~= "unload"
 		and kind ~= "stop"
+		and AREA_KINDS[kind] == nil
 	if needs_target and target_id == nil then
 		return
 	end
@@ -128,15 +159,23 @@ local function on_issue_order(player: Player, payload: unknown)
 		return
 	end
 
+	local radius: number? = nil
+	if AREA_KINDS[kind] then
+		if typeof(data.radius) ~= "number" or data.radius <= 0 then
+			return
+		end
+		radius = data.radius
+	end
+
 	-- one spot for everyone, unlike a move, which gives each unit its own
 	local ground: Vector3? = nil
-	-- a fight, ground attack, path, or unload dragged out along a line gives every unit a point of its own instead
-	local per_unit = positions ~= nil and (kind == "fight" or kind == "attack_ground" or kind == "path" or kind == "unload")
+	-- a fight, ground attack, or unload dragged out along a line gives every unit a point of its own instead
+	local per_unit = positions ~= nil and (kind == "fight" or kind == "attack_ground" or kind == "unload")
 	local at_a_point = kind == "fight"
 		or kind == "attack_ground"
 		or kind == "unload"
-		or kind == "path"
 		or kind == "dgun"
+		or AREA_KINDS[kind] == true
 	if at_a_point and per_unit == false then
 		local raw = data.position
 		if typeof(raw) ~= "Vector3" or heightmap.in_bounds(raw.X, raw.Z) == false then
@@ -150,24 +189,21 @@ local function on_issue_order(player: Player, payload: unknown)
 		return
 	end
 
-	local searches = 0
+	-- each unit's way, parallel to ids
+	local routes = if typeof(data.routes) == "table" then data.routes else nil
 	local count = math.min(#ids, MAX_SELECTION)
 	for index = 1, count do
 		local entity = owned_entity(player, ids[index])
 		if entity == nil then
 			continue
 		end
-		-- a lab cannot carry out orders, but what it is told is remembered and handed to each unit it makes, and
-		-- stopping forgets it
 		-- a drone answers to its carrier alone
 		if unit_defs.get(entity.def_name).drone == true then
 			continue
 		end
+		-- a lab cannot carry out orders, but it keeps them in its queue like anything else, and each unit it makes
+		-- takes a copy (see production's rally_order)
 		local factory = unit_defs.is_factory(unit_defs.get(entity.def_name))
-		if factory and kind == "stop" then
-			production.clear_rally(entity)
-			continue
-		end
 		-- an unfinished unit takes orders too: they wait in its queue until it is built
 		if factory == false and unit_defs.takes_orders(unit_defs.get(entity.def_name)) == false then
 			continue
@@ -176,43 +212,6 @@ local function on_issue_order(player: Player, payload: unknown)
 		-- stopping drops everything the unit was told to do, and leaves it standing where it is
 		if kind == "stop" then
 			entity.orders = {}
-			continue
-		end
-
-		-- a route is a chain of moves, so it is issued as the orders it is made of and not as an order of its own
-		if kind == "path" and factory then
-			-- a lab has no route to work out: what it makes is sent to the spot
-			local path_target: Vector3? = ground
-			if per_unit then
-				local raw = if positions ~= nil then positions[index] else nil
-				if typeof(raw) ~= "Vector3" or heightmap.in_bounds(raw.X, raw.Z) == false then
-					continue
-				end
-				path_target = heightmap.ground_position(raw.X, raw.Z)
-			end
-			if path_target ~= nil then
-				production.set_rally(entity, { kind = "move", position = path_target, target_id = nil }, should_queue)
-			end
-			continue
-		end
-		if kind == "path" then
-			local path_target: Vector3? = ground
-			if per_unit then
-				local raw = if positions ~= nil then positions[index] else nil
-				if typeof(raw) ~= "Vector3" or heightmap.in_bounds(raw.X, raw.Z) == false then
-					continue
-				end
-				path_target = heightmap.ground_position(raw.X, raw.Z)
-			end
-			if unit_defs.get(entity.def_name).max_speed == nil or path_target == nil then
-				continue
-			end
-			local front = data.front == true
-			local route = route_to(entity, path_target, should_queue and front == false, searches < PATH_MAX_SEARCHES)
-			searches += 1
-			if #route > 0 then
-				orders.issue(entity, route, should_queue, front)
-			end
 			continue
 		end
 
@@ -226,7 +225,7 @@ local function on_issue_order(player: Player, payload: unknown)
 			continue
 		end
 
-		local order: Order = { kind = kind :: OrderKind, position = ground, target_id = target_id }
+		local order: Order = { kind = kind :: OrderKind, position = ground, target_id = target_id, radius = radius }
 
 		if per_unit then
 			local raw = if positions ~= nil then positions[index] else nil
@@ -258,11 +257,19 @@ local function on_issue_order(player: Player, payload: unknown)
 			order.position = unit_defs.surface_position(unit_defs.get(entity.def_name), raw.X, raw.Z)
 		end
 
+		-- a lab's orders are handed to each unit it makes, which finds its own way from where it is (see production's
+		-- rally_order)
+		local front = data.front == true
 		if factory then
-			production.set_rally(entity, order, should_queue)
+			orders.issue(entity, { order }, should_queue, front)
 			continue
 		end
-		orders.issue(entity, { order }, should_queue, data.front == true)
+		orders.issue(
+			entity,
+			with_route(entity, order, if routes ~= nil then routes[index] else nil),
+			should_queue,
+			front
+		)
 	end
 end
 
@@ -335,6 +342,9 @@ local function on_place_blueprint(player: Player, payload: unknown)
 
 	-- Only a builder that lists this def may order it, and only builders can pay it off.
 	local builders: { Entity } = {}
+	-- each builder's way to the site, as the client sent it alongside its id
+	local routes = if typeof(data.routes) == "table" then data.routes else nil
+	local builder_routes: { [Entity]: unknown } = {}
 	for index = 1, math.min(#ids, MAX_SELECTION) do
 		local entity = owned_entity(player, ids[index])
 		if entity == nil then
@@ -348,6 +358,7 @@ local function on_place_blueprint(player: Player, payload: unknown)
 			continue
 		end
 		table.insert(builders, entity)
+		builder_routes[entity] = if routes ~= nil then routes[index] else nil
 	end
 	if #builders == 0 then
 		return
@@ -367,6 +378,7 @@ local function on_place_blueprint(player: Player, payload: unknown)
 	-- Nothing is placed yet. Each builder is sent to the spot, and the blueprint appears when the
 	-- first of them gets there.
 	local should_queue = data.queue == true
+	local front = data.front == true
 	for _, builder in builders do
 		local order: Order = {
 			kind = "build",
@@ -375,7 +387,7 @@ local function on_place_blueprint(player: Player, payload: unknown)
 			def_name = data.def_name,
 			facing = facing,
 		}
-		orders.issue(builder, { order }, should_queue, data.front == true)
+		orders.issue(builder, with_route(builder, order, builder_routes[builder]), should_queue, front)
 	end
 end
 
@@ -388,4 +400,5 @@ end
 
 return table.freeze({
 	init = init,
+	with_route = with_route,
 })

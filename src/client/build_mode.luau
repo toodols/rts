@@ -1,4 +1,4 @@
--- Placement mode: after picking a building from a constructor's menu the cursor carries a ghost
+-- Placement mode: after picking a building from a construction_bot's menu the cursor carries a ghost
 -- of that building until it is placed or cancelled.
 --
 -- The validity check here is a client-side preview only. The server re-runs the real check in
@@ -11,7 +11,7 @@ local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
-local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
+local spots = require(ReplicatedStorage.Shared.spots)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local world = require(ReplicatedStorage.Client.world)
@@ -55,10 +55,14 @@ end
 -- buildings themselves, and the build orders every unit publishes in its `path`.
 local TAKEN_RADIUS = 1.5
 
--- Whether `model` is the finished T1 mex that `placing_def_name` (a T2 mex) is upgrading in place:
--- it does not count as taking its spot, mirroring the server's placement.is_upgrade_target.
+-- Whether `model` is what `placing_def_name` is built over in place (`EntityDef.upgrades`), a T1 mex under a T2 one
+-- or a geothermal plant under an advanced one: it does not count as taking its spot, mirroring the server's
+-- placement.is_upgrade_target.
 local function is_upgrade_target(placing_def_name: string, model: Model): boolean
-	return placing_def_name == "advanced_metal_extractor" and model:GetAttribute "def_name" == "metal_extractor"
+	local other_def_name = model:GetAttribute "def_name"
+	return model:GetAttribute "kind" == "building"
+		and typeof(other_def_name) == "string"
+		and spots.upgrades(unit_defs.get(placing_def_name), other_def_name)
 end
 
 local function taken_positions(placing_def_name: string, builder_id: EntityId?): { Vector2 }
@@ -67,7 +71,7 @@ local function taken_positions(placing_def_name: string, builder_id: EntityId?):
 		if model:GetAttribute "kind" == "building" and is_upgrade_target(placing_def_name, model) == false then
 			local def_name = model:GetAttribute "def_name"
 			local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
-			if def ~= nil and def.requires_metal_spot == true then
+			if def ~= nil and spots.for_def(def) ~= nil then
 				local position = world.position_of(model)
 				table.insert(taken, Vector2.new(position.X, position.Z))
 			end
@@ -86,7 +90,7 @@ local function taken_positions(placing_def_name: string, builder_id: EntityId?):
 				local queued = if fields[1] == "build" and fields[4] ~= nil then unit_defs.defs[fields[4]] else nil
 				local x = tonumber(fields[2])
 				local z = tonumber(fields[3])
-				if queued ~= nil and queued.requires_metal_spot == true and x ~= nil and z ~= nil then
+				if queued ~= nil and spots.for_def(queued) ~= nil and x ~= nil and z ~= nil then
 					table.insert(taken, Vector2.new(x, z))
 				end
 			end
@@ -114,7 +118,8 @@ local function can_place(def_name: string, position: Vector3, yaw: number): bool
 		end
 	end
 
-	if def.requires_metal_spot == true and metal_spots.nearest(position.X, position.Z, 0.5) == nil then
+	local bound_to = spots.for_def(def)
+	if bound_to ~= nil and bound_to.nearest(position.X, position.Z, 0.5) == nil then
 		return false
 	end
 
@@ -141,10 +146,11 @@ local function can_place(def_name: string, position: Vector3, yaw: number): bool
 		if other_def == nil then
 			continue
 		end
-		-- wrecks, and your own units that can move, are cleared off by the builder when it gets there
+		-- wrecks and reclaimables, and your own units that can move, are cleared off by the builder when it gets there
 		local other_kind = model:GetAttribute "kind"
 		if
 			other_kind == "wreck"
+			or other_kind == "reclaimable"
 			or (other_kind == "unit" and model:GetAttribute "state" == "active" and other_def.max_speed ~= nil and world.is_mine(
 				model
 			))
@@ -244,11 +250,11 @@ end
 
 -- Where a drag from `from` to `to` puts buildings, edge to edge on the building grid: a line along
 -- whichever axis the drag runs further, or with `as_grid` a rectangle with the two as opposite
--- corners. Both are axis aligned, and the first place is always `from`. Something bound to a metal spot
--- is never laid out: it only takes the one place.
+-- corners. Both are axis aligned, and the first place is always `from`. Something bound to a metal spot or a
+-- geothermal vent is never laid out: it only takes the one place.
 local function layout(def_name: string, from: Vector3, to: Vector3, as_grid: boolean): { Vector3 }
 	local def = unit_defs.get(def_name)
-	if def.requires_metal_spot == true then
+	if spots.for_def(def) ~= nil then
 		return { from }
 	end
 
@@ -329,13 +335,14 @@ local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolea
 	end
 
 	local def = unit_defs.get(def_name)
-	-- a spot-bound building snaps onto the nearest metal spot, as it will on the server
+	-- a spot-bound building snaps onto the nearest spot of its kind, as it will on the server
 	local x = point.X
 	local z = point.Z
 	local locked: Vector3? = nil
-	if def.requires_metal_spot == true then
+	local bound_to = spots.for_def(def)
+	if bound_to ~= nil then
 		local taken = taken_positions(def_name, builder_id)
-		locked = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, function(spot: Vector3): boolean
+		locked = bound_to.nearest(x, z, config.METAL_SPOT_SNAP, function(spot: Vector3): boolean
 			for _, at in taken do
 				if (at - Vector2.new(spot.X, spot.Z)).Magnitude < TAKEN_RADIUS then
 					return true

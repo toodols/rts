@@ -40,8 +40,9 @@ local TEAM_B: TeamId = 90002
 -- them, so resolve_arena() below can move the corner itself without anything else needing to change.
 local ARENA_MARGIN = 60
 local ARENA_SPAN = 420
-local ARENA_X = config.MAP_CELLS_X * config.CELL_STUDS / 2 - ARENA_MARGIN
-local ARENA_Z = config.MAP_CELLS_Z * config.CELL_STUDS / 2 - ARENA_MARGIN
+-- set by resolve_arena() at the start of every run, from the map as it is then
+local ARENA_X = 0
+local ARENA_Z = 0
 local ARENA_MIN_X = ARENA_X - ARENA_SPAN
 local ARENA_MIN_Z = ARENA_Z - ARENA_SPAN
 
@@ -49,7 +50,6 @@ local ARENA_MIN_Z = ARENA_Z - ARENA_SPAN
 -- giving up on finding dry land at all.
 local ARENA_RETRY_STEP = 60
 local ARENA_RETRY_LIMIT = 10
-local arena_resolved = false
 
 -- Whether the arena's whole footprint, corner at (x, z), is dry enough to spawn land units on: a
 -- coarse sample of the corner, the far inward corner of the footprint, and its centre. A map preset
@@ -74,17 +74,14 @@ local function arena_is_dry(x: number, z: number): boolean
 end
 
 -- Moves the arena's corner inward along its own diagonal, up to ARENA_RETRY_LIMIT tries, until its
--- footprint tests dry. Called once, at the start of a run. Returns a warning line for the report
--- (rather than logging it directly) if nothing dry was found at all, so the whole benchmark still
--- comes out as the one message run() promises, not an extra print ahead of it.
+-- footprint tests dry. Called at the start of every run, since the map may have been replaced since the last.
+-- Returns a warning line for the report (rather than logging it directly) if nothing dry was found at all, so the
+-- whole benchmark still comes out as the one message run() promises, not an extra print ahead of it.
 local function resolve_arena(): string?
-	if arena_resolved then
-		return nil
-	end
-	arena_resolved = true
+	local half_x, half_z = heightmap.half_extents()
 	for attempt = 0, ARENA_RETRY_LIMIT do
-		local x = ARENA_X - attempt * ARENA_RETRY_STEP
-		local z = ARENA_Z - attempt * ARENA_RETRY_STEP
+		local x = half_x - ARENA_MARGIN - attempt * ARENA_RETRY_STEP
+		local z = half_z - ARENA_MARGIN - attempt * ARENA_RETRY_STEP
 		if arena_is_dry(x, z) then
 			ARENA_X = x
 			ARENA_Z = z
@@ -93,6 +90,10 @@ local function resolve_arena(): string?
 			return nil
 		end
 	end
+	ARENA_X = half_x - ARENA_MARGIN
+	ARENA_Z = half_z - ARENA_MARGIN
+	ARENA_MIN_X = ARENA_X - ARENA_SPAN
+	ARENA_MIN_Z = ARENA_Z - ARENA_SPAN
 	return "No dry spot found for the benchmark arena along its usual corner; results may include drowning"
 end
 
@@ -375,12 +376,22 @@ local SCENARIOS: { Scenario } = {
 	},
 	{
 		name = "construction",
-		description = "180 blueprints, each assisted by its own constructor from the moment it appears",
+		description = "180 blueprints, each assisted by its own construction_bot from the moment it appears",
 		ticks = 200,
 		setup = function()
 			ensure_team(TEAM_A)
 			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 320, ARENA_Z - 320, 180, 12, 13)
-			grid_spawn_targeting("constructor", TEAM_A, ARENA_X - 320, ARENA_Z - 300, 180, 12, 13, "assist", blueprints)
+			grid_spawn_targeting(
+				"construction_bot",
+				TEAM_A,
+				ARENA_X - 320,
+				ARENA_Z - 300,
+				180,
+				12,
+				13,
+				"assist",
+				blueprints
+			)
 		end,
 	},
 	{
@@ -508,7 +519,17 @@ local SCENARIOS: { Scenario } = {
 			end
 
 			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 400, ARENA_Z - 320, 40, 12, 10)
-			grid_spawn_targeting("constructor", TEAM_A, ARENA_X - 400, ARENA_Z - 300, 40, 12, 10, "assist", blueprints)
+			grid_spawn_targeting(
+				"construction_bot",
+				TEAM_A,
+				ARENA_X - 400,
+				ARENA_Z - 300,
+				40,
+				12,
+				10,
+				"assist",
+				blueprints
+			)
 
 			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 400, ARENA_Z - 280, 60, 6, 15)
 			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 400, ARENA_Z - 260, 20, 12, 10, "reclaim", wrecks)

@@ -9,6 +9,7 @@ local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 
 local state = require(script.Parent.state)
 local movement = require(script.Parent.movement)
@@ -67,9 +68,18 @@ local function work_range(entity: Entity, usual: number): number
 	return usual
 end
 
+-- How close `entity` has to come to a point it is making for to count as there: `usual`, or for an aircraft on
+-- wings, which cannot stop on a point and circles it instead, no closer than the circle it turns in.
+local function arrival_radius(entity: Entity, usual: number): number
+	return math.max(usual, unit_defs.turn_radius(unit_defs.get(entity.def_name)))
+end
+
 -- Walks toward `position`, stopping `stop_radius` short. Returns whether it is already there. Something
 -- that cannot move stays where it is, so for it this only ever answers whether the target is in reach.
+-- It goes straight: a way round a cliff or a lake is laid as move waypoints ahead of the order when it is given
+-- (`commands`), where the player can see it, and never worked out here.
 local function approach(entity: Entity, position: Vector3, stop_radius: number): boolean
+	stop_radius = arrival_radius(entity, stop_radius)
 	if geometry.distance_2d(entity.position, position) <= stop_radius then
 		return true
 	end
@@ -79,18 +89,28 @@ local function approach(entity: Entity, position: Vector3, stop_radius: number):
 	return false
 end
 
--- How many seconds of travel ahead of a waypoint a unit begins turning onto the next one, when it has
--- one to go to.
-local WAYPOINT_LOOKAHEAD = 0.5
-
--- Walks a chain of move orders. A unit with another waypoint after this one flows through it: it turns
--- onto the next as it gets close, at full speed, instead of stopping on every point along the way.
+-- Walks a chain of move orders, a route's or the waypoints a player laid. A waypoint with another after it is closed
+-- in on as near as `config.WAYPOINT_EPSILON`, slowing to get there, and from `config.WAYPOINT_SKIP_RANGE` out the unit
+-- checks whether it can already go straight to the next; as soon as it can it does, so it never cuts a corner it
+-- cannot see round. One that is right on its waypoint goes on to the next whether it can see it or not. An aircraft counts as on its waypoint within the circle it turns in.
 -- Moving on to the next order within the same tick matters as much as not braking: goals are cleared
 -- every tick, so popping an order and leaving the next for the following tick would drop the unit's
 -- goal for a tick at each waypoint, and it would coast.
-local function run_move(entity: Entity, first: Order)
+-- Whether `entity`, making for the waypoint at `position` with another at `following` after it, is done with it: it is
+-- right on it, or near enough to check and can already go straight on to the next. Until it is, it closes in.
+local function passes_waypoint(entity: Entity, position: Vector3, following: Vector3): boolean
 	local def = unit_defs.get(entity.def_name)
-	local speed = if def.max_speed ~= nil then def.max_speed else 0
+	local distance = geometry.distance_2d(entity.position, position)
+	if distance <= arrival_radius(entity, config.WAYPOINT_EPSILON) then
+		return true
+	end
+	if distance > arrival_radius(entity, config.WAYPOINT_SKIP_RANGE) then
+		return false
+	end
+	return def.air ~= nil or pathfinder.has_straight_path(def, entity.position, following)
+end
+
+local function run_move(entity: Entity, first: Order)
 	local order = first
 
 	for _ = 1, #entity.orders do
@@ -100,9 +120,8 @@ local function run_move(entity: Entity, first: Order)
 		else
 			local following = entity.orders[2]
 			if following ~= nil and following.kind == "move" and following.position ~= nil then
-				local turn_radius = math.max(config.ARRIVAL_RADIUS, speed * WAYPOINT_LOOKAHEAD)
-				if geometry.distance_2d(entity.position, position) > turn_radius then
-					movement.set_goal(entity, position, config.ARRIVAL_RADIUS, true)
+				if passes_waypoint(entity, position, following.position) == false then
+					movement.set_goal(entity, position, arrival_radius(entity, config.WAYPOINT_EPSILON), false)
 					return
 				end
 				pop(entity)
@@ -130,36 +149,109 @@ local function is_bomber(def: types.EntityDef): boolean
 end
 
 -- A bombing run: it flies at `point` at full speed, over it and on past, and drops bombs on whatever it
--- crosses as it goes (`combat` does that, whenever something is beneath it). Once it has flown over the
--- point it holds its heading, and only turns back for another pass when it is clear of it, which is what
--- makes it a pass and not a tight circle round the point.
+-- would come down on as it goes (`combat` does that, letting them go short of what they are for, since they
+-- carry on at its speed as they fall). Once it has flown over the point it holds its heading until it is its
+-- run-out clear of it, and only then turns back for another pass (`movement` does that for anything on wings).
 local function run_bombing(entity: Entity, point: Vector3)
-	local to_point = geometry.flatten(point - entity.position)
-	local heading = geometry.flatten(entity.velocity)
+	movement.set_goal(entity, point, config.ARRIVAL_RADIUS, true)
+end
 
-	local goal: Vector3
-	if heading.Magnitude > 1 and to_point:Dot(heading) < 0 and to_point.Magnitude < config.BOMBER_RUN_OUT then
-		goal = entity.position + heading.Unit * config.BOMBER_RUN_OUT
-	else
-		local ahead = if to_point.Magnitude > 1e-3
-			then to_point.Unit
-			else Vector3.new(math.sin(entity.facing), 0, math.cos(entity.facing))
-		goal = point + ahead * config.BOMBER_RUN_OUT
+-- Puts `entity`'s buildpower into the nearest thing within `reach` it can work on, and returns whether it found one:
+-- the nearest blueprint of its own team or an ally's if it can assist, failing that the nearest damaged unit or
+-- building of its own team or an ally's if it can repair, and failing that the nearest wreck or reclaimable if it can
+-- reclaim.
+-- It is what a construction turret does all the time and what a builder on a fight order stops along the way to do.
+local function work_nearby(entity: Entity, reach: number): boolean
+	local def = unit_defs.get(entity.def_name)
+	if def.buildpower == nil then
+		return false
 	end
-	movement.set_goal(entity, goal, config.ARRIVAL_RADIUS, true)
+
+	if def.assisting then
+		local best: Entity? = nil
+		local best_distance = reach
+		for _, other in state.all() do
+			if
+				other.alive == false
+				or other.state ~= "blueprint"
+				or alliances.are_allied(entity.team, other.team) == false
+				or other.id == entity.id
+			then
+				continue
+			end
+			local distance = geometry.distance_2d(entity.position, other.position)
+			if distance <= best_distance then
+				best = other
+				best_distance = distance
+			end
+		end
+		if best ~= nil then
+			construction.request(entity, best)
+			return true
+		end
+	end
+
+	if def.repairing then
+		local hurt: Entity? = nil
+		local hurt_distance = reach
+		for _, other in state.all() do
+			if
+				other.alive == false
+				or other.id == entity.id
+				or other.kind == "wreck"
+				or other.state ~= "active"
+				or alliances.are_allied(entity.team, other.team) == false
+				or other.health >= other.max_health
+				-- there is no point mending what someone is taking apart
+				or reclaim.is_reclaimed_by_ally(other)
+			then
+				continue
+			end
+			local distance = geometry.distance_2d(entity.position, other.position)
+			if distance <= hurt_distance then
+				hurt = other
+				hurt_distance = distance
+			end
+		end
+		if hurt ~= nil then
+			construction.repair(entity, hurt, config.TICK_DELTA)
+			return true
+		end
+	end
+
+	if def.reclaiming then
+		local remains: Entity? = nil
+		local remains_distance = reach
+		for _, other in state.all() do
+			if other.alive == false or (other.kind ~= "wreck" and other.kind ~= "reclaimable") then
+				continue
+			end
+			local distance = geometry.distance_2d(entity.position, other.position)
+			if distance <= remains_distance and reclaim.can_reclaim(entity, other) then
+				remains = other
+				remains_distance = distance
+			end
+		end
+		if remains ~= nil then
+			reclaim.request(entity, remains)
+			return true
+		end
+	end
+	return false
 end
 
 -- Fighting: walk to the point the way a move does, but whenever there is something to shoot at, stand still
 -- and shoot it (`combat` picks what and does the shooting, as it does for anything with no target
--- ordered), and set off again once there is nothing left. The order ends on arrival. A unit that cannot
--- shoot has nothing to stop for, and neither has a bomber, which cannot stop, so for them it is a move.
-local function run_fight(entity: Entity, order: Order)
-	local position = order.position
-	if position == nil or is_immobile(entity) then
-		pop(entity)
-		return
-	end
-	if geometry.distance_2d(entity.position, position) <= config.ARRIVAL_RADIUS then
+-- ordered), and set off again once there is nothing left. A builder stops the same way for work within its
+-- reach: a blueprint to help build, something of its side's to repair, or a wreck or reclaimable to reclaim, whichever of
+-- them it can do. The order ends on arrival. A unit that can do neither has nothing to stop for, and neither
+-- has a bomber, which cannot stop, so for them it is a move.
+--
+-- A fight is given as a chain of fight waypoints along the route to the point, as a move is given its route (see
+-- `commands`), and walked the way a move's are (`passes_waypoint`), so it fights its way along all of them; the
+-- stopping comes first, wherever along the chain it is.
+local function run_fight(entity: Entity, first: Order)
+	if first.position == nil or is_immobile(entity) then
 		pop(entity)
 		return
 	end
@@ -168,7 +260,65 @@ local function run_fight(entity: Entity, order: Order)
 	if unit_defs.attack_range(def) ~= nil and is_bomber(def) == false and combat.has_target(entity) then
 		return
 	end
-	approach(entity, position, config.ARRIVAL_RADIUS)
+	if work_nearby(entity, work_range(entity, config.BUILD_RANGE) * RANGE_MARGIN) then
+		return
+	end
+
+	local order = first
+	for _ = 1, #entity.orders do
+		local position = order.position
+		if position == nil then
+			pop(entity)
+		else
+			local following = entity.orders[2]
+			if following ~= nil and following.kind == "fight" and following.position ~= nil then
+				if passes_waypoint(entity, position, following.position) == false then
+					movement.set_goal(entity, position, arrival_radius(entity, config.WAYPOINT_EPSILON), false)
+					return
+				end
+				pop(entity)
+			else
+				-- the last waypoint: arriving on it ends the fight
+				if approach(entity, position, config.ARRIVAL_RADIUS) then
+					pop(entity)
+				end
+				return
+			end
+		end
+
+		local next_order = entity.orders[1]
+		if next_order == nil or next_order.kind ~= "fight" then
+			return
+		end
+		order = next_order
+	end
+end
+
+-- Whether some weapon of `def` could be turned on `target` at all: true for an unarmed def too, since
+-- nothing about its (nonexistent) weapons rules the order out on its own.
+local function any_weapon_can_target(def: types.EntityDef, target: Entity): boolean
+	if def.weapons == nil then
+		return true
+	end
+	for _, weapon in def.weapons do
+		if combat.can_target(weapon, target) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Whether every weapon of `def` only shoots at aircraft, so it never has a shot at the ground.
+local function all_weapons_air_only(def: types.EntityDef): boolean
+	if def.weapons == nil then
+		return false
+	end
+	for _, weapon in def.weapons do
+		if weapon.target_layer ~= "air" then
+			return false
+		end
+	end
+	return true
 end
 
 local function run_attack(entity: Entity, order: Order)
@@ -180,9 +330,9 @@ local function run_attack(entity: Entity, order: Order)
 		pop(entity)
 		return
 	end
-	-- an order to shoot at something its weapon cannot be turned on, like a fighter told to attack a
-	-- tank, is no order at all
-	if def.weapon ~= nil and combat.can_target(def.weapon, target) == false then
+	-- an order to shoot at something none of its weapons can be turned on, like a fighter told to
+	-- attack a tank, is no order at all
+	if any_weapon_can_target(def, target) == false then
 		combat.set_forced_target(entity, nil)
 		pop(entity)
 		return
@@ -204,7 +354,12 @@ local function run_attack(entity: Entity, order: Order)
 		run_bombing(entity, target.position)
 		return
 	end
-	approach(entity, target.position, reach * RANGE_MARGIN)
+	-- in range is not enough: something behind a hill cannot be shot, so it walks on until it can see it, as far as
+	-- touching it, and no further, so that it never presses into a building it cannot see over
+	if approach(entity, target.position, reach * RANGE_MARGIN) and combat.can_shoot(entity, target) == false then
+		local touching = unit_defs.collider_radius(def) + unit_defs.collider_radius(unit_defs.get(target.def_name))
+		approach(entity, target.position, touching)
+	end
 end
 
 -- Attacking the ground: close in until the point is in range, then keep shooting at it. Nothing ends the
@@ -214,7 +369,7 @@ local function run_attack_ground(entity: Entity, order: Order)
 	local position = order.position
 	local def = unit_defs.get(entity.def_name)
 	local reach = unit_defs.attack_range(def)
-	if position == nil or reach == nil or (def.weapon ~= nil and def.weapon.target_layer == "air") then
+	if position == nil or reach == nil or all_weapons_air_only(def) then
 		combat.set_forced_target(entity, nil)
 		pop(entity)
 		return
@@ -225,13 +380,16 @@ local function run_attack_ground(entity: Entity, order: Order)
 		run_bombing(entity, position)
 		return
 	end
-	approach(entity, position, reach * RANGE_MARGIN)
+	-- as an attack does, it walks on past being in range until it has a clear shot
+	if approach(entity, position, reach * RANGE_MARGIN) and combat.can_shoot_point(entity, position) == false then
+		approach(entity, position, config.ARRIVAL_RADIUS)
+	end
 end
 
 -- The commander's disintegrator at a point: close in until the point is within the weapon's range, then fire
 -- as soon as it is ready and that is the order done. A weapon that is still reloading, or a team that is short
--- of the energy for it, is waited for, but a shot that a commander is in the way of is dropped, since nothing
--- is going to change that. A unit with no manual weapon drops it.
+-- of the energy for it, is waited for, but a shot that an enemy commander is in the way of is dropped, since
+-- nothing is going to change that. A unit with no manual weapon drops it.
 local function run_dgun(entity: Entity, order: Order)
 	local position = order.position
 	local weapon = unit_defs.get(entity.def_name).manual_weapon
@@ -324,6 +482,97 @@ local function run_repair(entity: Entity, order: Order)
 	elseif is_immobile(entity) then
 		pop(entity)
 	end
+end
+
+-- An area command: reclaim, repair, resurrect or attack everything of the right kind within a circle,
+-- one thing at a time. Each tick it looks for the nearest valid thing left in the circle and pushes a
+-- single-target order in front of itself to go and do it; when that finishes, this order is back at the
+-- front and looks again. It is done, and pops itself, once nothing is left in the circle to do.
+local function run_area(entity: Entity, order: Order, kind: types.OrderKind, find: (Entity, Vector3, number) -> Entity?)
+	local center = order.position
+	local radius = order.radius
+	if center == nil or radius == nil then
+		pop(entity)
+		return
+	end
+	local target = find(entity, center, radius)
+	if target == nil then
+		pop(entity)
+		return
+	end
+	table.insert(entity.orders, 1, { kind = kind, position = nil, target_id = target.id })
+end
+
+local function nearest_in_radius(entity: Entity, center: Vector3, radius: number, matches: (Entity) -> boolean): Entity?
+	local best: Entity? = nil
+	local best_distance = math.huge
+	for _, other in state.all() do
+		if geometry.distance_2d(other.position, center) > radius or matches(other) == false then
+			continue
+		end
+		local distance = geometry.distance_2d(entity.position, other.position)
+		if distance < best_distance then
+			best = other
+			best_distance = distance
+		end
+	end
+	return best
+end
+
+local function run_area_reclaim(entity: Entity, order: Order)
+	local def = unit_defs.get(entity.def_name)
+	if def.reclaiming == false or def.buildpower == nil then
+		pop(entity)
+		return
+	end
+	run_area(entity, order, "reclaim", function(who, center, radius)
+		return nearest_in_radius(who, center, radius, function(other)
+			return other.alive
+				and (other.kind == "wreck" or other.kind == "reclaimable")
+				and reclaim.can_reclaim(who, other)
+		end)
+	end)
+end
+
+local function run_area_repair(entity: Entity, order: Order)
+	local def = unit_defs.get(entity.def_name)
+	if def.repairing == false or def.buildpower == nil then
+		pop(entity)
+		return
+	end
+	run_area(entity, order, "repair", function(who, center, radius)
+		return nearest_in_radius(who, center, radius, function(other)
+			return other.alive
+				and other.id ~= who.id
+				and other.kind ~= "wreck"
+				and other.state == "active"
+				and alliances.are_allied(who.team, other.team)
+				and other.health < other.max_health
+				and reclaim.is_reclaimed_by_ally(other) == false
+		end)
+	end)
+end
+
+local function run_area_resurrect(entity: Entity, order: Order)
+	local def = unit_defs.get(entity.def_name)
+	if def.resurrecting == false or def.buildpower == nil then
+		pop(entity)
+		return
+	end
+	run_area(entity, order, "resurrect", function(who, center, radius)
+		return nearest_in_radius(who, center, radius, function(other)
+			return other.alive and other.kind == "wreck" and resurrection.can_resurrect(who, other)
+		end)
+	end)
+end
+
+local function run_area_attack(entity: Entity, order: Order)
+	local def = unit_defs.get(entity.def_name)
+	run_area(entity, order, "attack", function(who, center, radius)
+		return nearest_in_radius(who, center, radius, function(other)
+			return combat.is_enemy(who, other) and any_weapon_can_target(def, other)
+		end)
+	end)
 end
 
 -- Guarding: stay with a friendly entity. A builder that can assist instead works on whatever the
@@ -463,14 +712,14 @@ local function vacate_point(unit: Entity, center: Vector3, half: Vector2): Vecto
 	return unit_defs.surface_position(unit_def, point.X, point.Z)
 end
 
--- The builder is at its site but something stands on it. A wreck is reclaimed first, and idle units of its own
+-- The builder is at its site but something stands on it. A wreck or reclaimable is reclaimed first, and idle units of its own
 -- team are told to move off; anything else, or units that are busy, stay in the way. Ten seconds without
 -- fewer things in the way and the order is dropped.
 local function clear_site(entity: Entity, order: Order, def_name: string, position: Vector3, facing: number)
 	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(unit_defs.get(def_name)), facing)
 	local blockers = placement.overlapping(def_name, position, facing, entity.id)
 	for _, other in blockers do
-		if other.kind == "wreck" then
+		if other.kind == "wreck" or other.kind == "reclaimable" then
 			if reclaim.can_reclaim(entity, other) then
 				-- reclaim it first; the build order is still there under it when that is done
 				table.insert(entity.orders, 1, { kind = "reclaim", position = nil, target_id = other.id })
@@ -545,99 +794,26 @@ local function run_load(entity: Entity, order: Order)
 	end
 end
 
--- Unloading: fly to the point and set everything it carries down around it.
+-- Unloading: fly to the point, come down until what it carries is just off the ground, and set it all down
+-- around it.
 local function run_unload(entity: Entity, order: Order)
 	local position = order.position
 	if position == nil or unit_defs.get(entity.def_name).transport == nil then
 		pop(entity)
 		return
 	end
-	if approach(entity, position, config.ARRIVAL_RADIUS) then
+	if approach(entity, position, config.ARRIVAL_RADIUS) and transport.lower(entity) then
 		transport.unload(entity, position)
 		pop(entity)
 	end
 end
 
 -- A building that builds, like a construction turret, cannot be ordered anywhere. It works on its
--- own, putting its buildpower into the nearest friendly blueprint within its reach, and failing that into the
--- nearest damaged unit or building of its own team or an ally.
+-- own, on whatever is nearest within its reach (`work_nearby`).
 local function run_static_builder(entity: Entity)
-	local def = unit_defs.get(entity.def_name)
-	local reach = def.build_range
-	if def.assisting == false or def.buildpower == nil or reach == nil then
-		return
-	end
-
-	local best: Entity? = nil
-	local best_distance = reach
-	for _, other in state.all() do
-		if
-			other.alive == false
-			or other.state ~= "blueprint"
-			or alliances.are_allied(entity.team, other.team) == false
-			or other.id == entity.id
-		then
-			continue
-		end
-		local distance = geometry.distance_2d(entity.position, other.position)
-		if distance <= best_distance then
-			best = other
-			best_distance = distance
-		end
-	end
-	if best ~= nil then
-		construction.request(entity, best)
-		return
-	end
-
-	-- with nothing to build it repairs the nearest damaged unit or building in reach that is its own team's or an ally's
-	if def.repairing == false then
-		return
-	end
-	local hurt: Entity? = nil
-	local hurt_distance = reach
-	for _, other in state.all() do
-		if
-			other.alive == false
-			or other.kind == "wreck"
-			or other.state ~= "active"
-			or alliances.are_allied(entity.team, other.team) == false
-			or other.health >= other.max_health
-			-- there is no point mending what someone is taking apart
-			or reclaim.is_reclaimed_by_ally(other)
-		then
-			continue
-		end
-		local distance = geometry.distance_2d(entity.position, other.position)
-		if distance <= hurt_distance then
-			hurt = other
-			hurt_distance = distance
-		end
-	end
-	if hurt ~= nil then
-		construction.repair(entity, hurt, config.TICK_DELTA)
-		return
-	end
-
-	-- with nothing else to do it reclaims the nearest wreck in reach if it can
-	if def.reclaiming ~= false then
-		local wreck: Entity? = nil
-		local wreck_distance = reach
-		for _, other in state.all() do
-			if other.alive == false or other.kind ~= "wreck" then
-				continue
-			end
-			if reclaim.can_reclaim(entity, other) then
-				local distance = geometry.distance_2d(entity.position, other.position)
-				if distance <= wreck_distance then
-					wreck = other
-					wreck_distance = distance
-				end
-			end
-		end
-		if wreck ~= nil then
-			reclaim.request(entity, wreck)
-		end
+	local reach = unit_defs.get(entity.def_name).build_range
+	if reach ~= nil then
+		work_nearby(entity, reach)
 	end
 end
 
@@ -645,11 +821,25 @@ local function tick(delta: number)
 	tick_delta = delta
 	table.clear(started_this_tick)
 	for _, entity in state.all() do
-		-- a wreck keeps the def of what it was, but it takes no orders and does no work
-		if entity.alive == false or entity.state ~= "active" or entity.kind == "wreck" then
+		-- a wreck keeps the def of what it was, but it takes no orders and does no work, and nor does a reclaimable
+		if
+			entity.alive == false
+			or entity.state ~= "active"
+			or entity.kind == "wreck"
+			or entity.kind == "reclaimable"
+		then
 			continue
 		end
 		if unit_defs.takes_orders(unit_defs.get(entity.def_name)) == false then
+			continue
+		end
+		-- a lab's orders are for the units it makes, which each take a copy (see production's rally_order)
+		if unit_defs.is_factory(unit_defs.get(entity.def_name)) then
+			continue
+		end
+		-- one on its way out of the lab that made it does nothing else until it is out: production drives it,
+		-- and its orders wait
+		if movement.exiting_from(entity.id) ~= nil then
 			continue
 		end
 
@@ -705,6 +895,17 @@ local function tick(delta: number)
 		elseif order.kind == "unload" then
 			combat.set_forced_target(entity, nil)
 			run_unload(entity, order)
+		elseif order.kind == "area_reclaim" then
+			combat.set_forced_target(entity, nil)
+			run_area_reclaim(entity, order)
+		elseif order.kind == "area_repair" then
+			combat.set_forced_target(entity, nil)
+			run_area_repair(entity, order)
+		elseif order.kind == "area_resurrect" then
+			combat.set_forced_target(entity, nil)
+			run_area_resurrect(entity, order)
+		elseif order.kind == "area_attack" then
+			run_area_attack(entity, order)
 		else
 			pop(entity)
 		end

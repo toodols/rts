@@ -11,16 +11,19 @@
 --   click on ground                move there
 --   click on an entity            attack, reclaim or assist depending on what it is
 --
--- In attack, fight, path, and unload mode the left button can also be dragged, and the units are spread
--- along the line the way a right-drag spreads a move.
+-- In fight and unload mode the left button can also be dragged, and the units are spread
+-- along the shape they trace the way a right-drag spreads a move.
+-- In attack, reclaim, repair, and resurrect mode the left button can instead be dragged out into a
+-- circle: every unit that can do the job is sent an area order for whatever of the right kind turns up
+-- inside it, one thing at a time, going back to the area order once each is done, until the circle has
+-- nothing left in it.
 -- Attack mode (A) sends the next left click as an attack: on an enemy it attacks that enemy, and anywhere
 -- else it attacks that spot on the ground and keeps shooting at it. Fight mode (F) sends it as a fight
--- waypoint: the units walk there, stopping to shoot whatever they can on the way. Pathfind mode (P) sends it
--- as a request for a route: the server finds a way there for each unit that stays on ground it can stand
--- on, and gives it the waypoints of the way. Unload mode (U) sends it as an unload order: the units go
--- there and drop what they carry.
+-- waypoint: the units walk there, stopping to shoot whatever they can on the way. Unload mode (U) sends it as an
+-- unload order: the units go there and drop what they carry. A move needs no mode of its own to find its way: the
+-- server works out a route for each unit round whatever it cannot cross, and gives it the waypoints of the way.
 -- G stops: every selected unit drops all its orders.
---   drag a line                   spread the selection evenly along that line
+--   drag a line                   spread the selection evenly along the shape the drag traces
 --   shift                         queues the order instead of replacing the queue
 --   click while placing a building cancels placement
 --
@@ -43,6 +46,7 @@ local camera_mod = require(ReplicatedStorage.Client.camera)
 local selection = require(ReplicatedStorage.Client.selection)
 local build_mode = require(ReplicatedStorage.Client.build_mode)
 local markers = require(ReplicatedStorage.Client.markers)
+local routes = require(ReplicatedStorage.Client.routes)
 
 type EntityId = types.EntityId
 
@@ -59,7 +63,7 @@ local ORDER_MARKER_SECONDS = 1
 
 -- Set while a manual weapon is aimed: the next left click fires it instead of selecting.
 local manual_aiming = false
--- Set to "attack", "fight", "path", "reclaim", "repair", "guard", "resurrect", "load" or "unload" while that mode is on: the next left click on an entity sends
+-- Set to "attack", "fight", "reclaim", "repair", "guard", "resurrect", "load" or "unload" while that mode is on: the next left click on an entity sends
 -- the selected units that can do it at that entity, in attack mode a click on the ground attacks that spot, and
 -- in fight mode a click sends them to fight their way to it.
 local target_mode: string? = nil
@@ -74,6 +78,9 @@ local mode_drag_from: Vector3? = nil
 -- The same, but for the right button: a plain right click still cancels the mode, but dragging lays
 -- the same line of orders down instead of cancelling.
 local right_mode_drag_from: Vector3? = nil
+-- Where the left button went down in an area mode (reclaim, repair, resurrect, attack): letting go on
+-- the same spot is the click, and dragging out from it draws a circle instead, centred there.
+local area_drag_from: Vector3? = nil
 local drag_rect: DragRect? = nil
 local rect_listeners: { (rect: DragRect?) -> () } = {}
 local mode_listeners: { (mode: string?) -> () } = {}
@@ -91,7 +98,7 @@ local function subscribe_rect(listener: (rect: DragRect?) -> ()): () -> ()
 	end
 end
 
--- Tells `listener` whenever the mode the cursor is in changes: "attack", "fight", "path", "reclaim", "repair", "guard", "resurrect", "load", "unload" or "disintegrator"
+-- Tells `listener` whenever the mode the cursor is in changes: "attack", "fight", "reclaim", "repair", "guard", "resurrect", "load", "unload" or "disintegrator"
 -- while one is on, and nil otherwise.
 local function subscribe_mode(listener: (mode: string?) -> ()): () -> ()
 	table.insert(mode_listeners, listener)
@@ -182,11 +189,57 @@ local function waypoint_ground(x: number, z: number): Vector3
 	return heightmap.ground_position(x, z)
 end
 
--- Where a right-drag from `from` to `to` would put `count` units: spread evenly along the line
--- and dropped onto the ground. The preview drawn during the drag and the order sent when it ends
--- both come from here, so what is shown is what is ordered.
-local function formation_points(from: Vector3, to: Vector3, count: number): { Vector3 }
-	local points = geometry.points_along_line(from, to, count)
+-- The ground the cursor has passed over in the drag going on now, from where it began: the shape a line of orders is
+-- spread along, however it winds. A point is added once the cursor is TRACE_STEP studs on from the last one.
+local TRACE_STEP = 1
+local drag_trace: { Vector3 } = {}
+
+local function begin_trace(point: Vector3?)
+	drag_trace = if point ~= nil then { point } else {}
+end
+
+local function extend_trace()
+	local last = drag_trace[#drag_trace]
+	local point = ground_point()
+	if last ~= nil and point ~= nil and geometry.distance_2d(last, point) >= TRACE_STEP then
+		table.insert(drag_trace, point)
+	end
+end
+
+-- How far along the ground `path` runs, however it winds. For a drag it is what decides whether it is a line or
+-- only a click, so a drag that comes back round to where it began is still a line.
+local function path_length(path: { Vector3 }): number
+	local length = 0
+	for index = 2, #path do
+		length += geometry.distance_2d(path[index - 1], path[index])
+	end
+	return length
+end
+
+-- Whether `path` has gone far enough to be a line of orders rather than a click.
+local function is_line(path: { Vector3 }): boolean
+	return #path >= 2 and path_length(path) >= config.FORMATION_DRAG_THRESHOLD
+end
+
+-- The trace as it stands when the button comes up, taken on to wherever the cursor let go, and cleared for the
+-- next drag.
+local function finish_trace(): { Vector3 }
+	local path = drag_trace
+	drag_trace = {}
+	markers.hide_trace()
+	local last = path[#path]
+	local point = ground_point()
+	if last ~= nil and point ~= nil and geometry.distance_2d(last, point) > 1e-3 then
+		table.insert(path, point)
+	end
+	return path
+end
+
+-- Where a drag along `path` would put `count` units: spread evenly along it and dropped onto the ground. The
+-- preview drawn during the drag and the order sent when it ends both come from here, so what is shown is what
+-- is ordered.
+local function formation_points(path: { Vector3 }, count: number): { Vector3 }
+	local points = geometry.points_along_path(path, count)
 	local grounded = table.create(count)
 	for index, point in points do
 		grounded[index] = waypoint_ground(point.X, point.Z)
@@ -194,9 +247,19 @@ local function formation_points(from: Vector3, to: Vector3, count: number): { Ve
 	return grounded
 end
 
+-- Puts `entries` in the order they lie along the way from the start of `path` to its end, so that giving the
+-- first one the first point, the next the next, and so on, does not send their paths across each other.
+local function sort_along(entries: { { id: EntityId, model: Model, def: types.EntityDef } }, path: { Vector3 })
+	local direction = geometry.flatten(path[#path] - path[1])
+	direction = if direction.Magnitude < 1e-3 then Vector3.new(1, 0, 0) else direction.Unit
+	table.sort(entries, function(a, b)
+		return world.position_of(a.model):Dot(direction) < world.position_of(b.model):Dot(direction)
+	end)
+end
+
 -- Only your own things can be box-selected; wrecks and enemies are skipped. A box that catches a
 -- mix takes only the highest kind of thing in it - armed units, then unarmed units, then buildings -
--- so sweeping over an army does not sweep up its constructors or the base behind them. A blueprint
+-- so sweeping over an army does not sweep up its construction_bots or the base behind them. A blueprint
 -- ranks as whatever it will become. Holding shift (`take_all`) takes everything.
 local function box_select(rect: DragRect, take_all: boolean): { EntityId }
 	local camera = Workspace.CurrentCamera
@@ -233,7 +296,7 @@ local function box_select(rect: DragRect, take_all: boolean): { EntityId }
 			table.insert(ids, id)
 			local def_name = model:GetAttribute "def_name"
 			local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
-			local rank = if kind == "building" then 1 elseif def ~= nil and def.weapon ~= nil then 3 else 2
+			local rank = if kind == "building" then 1 elseif def ~= nil and def.weapons ~= nil then 3 else 2
 			table.insert(by_rank[rank], id)
 		end
 	end
@@ -249,8 +312,8 @@ local function box_select(rect: DragRect, take_all: boolean): { EntityId }
 end
 
 -- Q: selects everything of yours on the screen that is the same kind of thing as anything selected. A
--- selection of one grunt becomes every grunt in view, and a mix of grunts and constructors becomes
--- every grunt and constructor in view. Blueprints count as what they will become.
+-- selection of one grunt becomes every grunt in view, and a mix of grunts and construction_bots becomes
+-- every grunt and construction_bot in view. Blueprints count as what they will become.
 local function select_same_type()
 	local camera = Workspace.CurrentCamera
 	if camera == nil then
@@ -323,12 +386,16 @@ local function send_move(ids: { EntityId }, positions: { Vector3 }, queue: boole
 	if #ids == 0 then
 		return
 	end
+	local front = space_held()
 	issue_order:FireServer({
 		kind = "move",
 		ids = ids,
 		positions = positions,
+		routes = routes.for_units(ids, "move", function(index: number): Vector3?
+			return positions[index]
+		end, nil, queue, front),
 		queue = queue,
-		front = space_held(),
+		front = front,
 	})
 end
 
@@ -336,12 +403,18 @@ local function send_targeted(kind: string, ids: { EntityId }, target_id: EntityI
 	if #ids == 0 then
 		return
 	end
+	local front = space_held()
+	local target = world.get(target_id)
+	local at = if target ~= nil then world.position_of(target) else nil
 	issue_order:FireServer({
 		kind = kind,
 		ids = ids,
 		target_id = target_id,
+		routes = routes.for_units(ids, kind, function(_: number): Vector3?
+			return at
+		end, nil, queue, front),
 		queue = queue,
-		front = space_held(),
+		front = front,
 	})
 end
 
@@ -349,27 +422,62 @@ local function send_ground_attack(ids: { EntityId }, point: Vector3, queue: bool
 	if #ids == 0 then
 		return
 	end
+	local front = space_held()
 	issue_order:FireServer({
 		kind = "attack_ground",
 		ids = ids,
 		position = point,
+		routes = routes.for_units(ids, "attack_ground", function(_: number): Vector3?
+			return point
+		end, nil, queue, front),
 		queue = queue,
-		front = space_held(),
+		front = front,
 	})
 end
 
--- An order that is to a single point on the ground: "fight", "dgun", or "path", which the server answers with a
--- chain of moves that gets around what a straight line would run into.
+-- An order that is to a single point on the ground: "fight" or "dgun".
 local function send_point_order(kind: string, ids: { EntityId }, point: Vector3, queue: boolean)
 	if #ids == 0 then
 		return
 	end
+	local front = space_held()
 	issue_order:FireServer({
 		kind = kind,
 		ids = ids,
 		position = point,
+		routes = routes.for_units(ids, kind, function(_: number): Vector3?
+			return point
+		end, nil, queue, front),
 		queue = queue,
-		front = space_held(),
+		front = front,
+	})
+end
+
+-- The area order each mode that supports one sends, and the target kind whose colour and worker
+-- filter it borrows (an area order works exactly like that single order, just spread over a circle
+-- instead of aimed at one thing).
+local AREA_KINDS: { [string]: string } = {
+	reclaim = "area_reclaim",
+	repair = "area_repair",
+	resurrect = "area_resurrect",
+	attack = "area_attack",
+}
+
+local function send_area(mode: string, ids: { EntityId }, center: Vector3, radius: number, queue: boolean)
+	if #ids == 0 then
+		return
+	end
+	local front = space_held()
+	issue_order:FireServer({
+		kind = AREA_KINDS[mode],
+		ids = ids,
+		position = center,
+		radius = radius,
+		routes = routes.for_units(ids, AREA_KINDS[mode], function(_: number): Vector3?
+			return center
+		end, radius, queue, front),
+		queue = queue,
+		front = front,
 	})
 end
 
@@ -444,7 +552,8 @@ local function order_on_entity(target: Model, queue: boolean)
 		return
 	end
 
-	if target_kind == "wreck" then
+	-- a wreck, or a rock or tree lying about, is reclaimed by whoever can
+	if target_kind == "wreck" or target_kind == "reclaimable" then
 		for _, entry in entries do
 			if entry.def.reclaiming then
 				table.insert(capable, entry.id)
@@ -538,32 +647,22 @@ local function send_stop()
 	})
 end
 
--- Spreads the selection along the dragged line, assigning units to points in the order they
+-- Spreads the selection along the dragged path, assigning units to points in the order they
 -- already lie along it so their paths do not cross.
-local function order_along_line(from: Vector3, to: Vector3, queue: boolean)
+local function order_along_trace(path: { Vector3 }, queue: boolean)
 	local entries = move_entries()
 	if #entries == 0 then
 		return
 	end
+	sort_along(entries, path)
 
-	local direction = geometry.flatten(to - from)
-	if direction.Magnitude < 1e-3 then
-		direction = Vector3.new(1, 0, 0)
-	else
-		direction = direction.Unit
-	end
-
-	table.sort(entries, function(a, b)
-		return world.position_of(a.model):Dot(direction) < world.position_of(b.model):Dot(direction)
-	end)
-
-	local positions = formation_points(from, to, #entries)
+	local positions = formation_points(path, #entries)
 	local ids = table.create(#entries)
 	for index, entry in entries do
 		ids[index] = entry.id
 	end
 
-	markers.flash_points(positions, ORDER_MARKER_SECONDS)
+	markers.flash_points(positions, ORDER_MARKER_SECONDS, "move")
 	send_move(ids, positions, queue)
 end
 
@@ -579,7 +678,7 @@ local function order_at_point(point: Vector3, queue: boolean)
 		ids[index] = entry.id
 		positions[index] = grounded
 	end
-	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS)
+	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS, "move")
 	send_move(ids, positions, queue)
 end
 
@@ -611,16 +710,37 @@ local function send_placements(def_name: string, centers: { Vector3 })
 	local front = space_held()
 	local queue = shift_held()
 	local facing = build_mode.get_facing()
+	local placeable = {}
+	for index, center in centers do
+		placeable[index] = build_mode.can_place(def_name, center, facing)
+	end
+	-- each builder's way to each site, worked out in the order they will be built, each from the one before
+	local ways: { { { Vector3 } } } = {}
+	local starts: { [EntityId]: Vector3? } = {}
+	for _, id in ids do
+		starts[id] = routes.start_of(id, queue and front == false)
+	end
+	for index, center in centers do
+		if placeable[index] then
+			local each = table.create(#ids)
+			for position, id in ids do
+				local from = starts[id]
+				each[position] = if from ~= nil then routes.waypoints(id, from, "build", center, nil) else {}
+				starts[id] = center
+			end
+			ways[index] = each
+		end
+	end
 	local first = if front then #centers else 1
 	local last = if front then 1 else #centers
 	for index = first, last, if front then -1 else 1 do
-		local center = centers[index]
-		if build_mode.can_place(def_name, center, facing) then
+		if placeable[index] then
 			place_blueprint:FireServer({
 				def_name = def_name,
-				position = center,
+				position = centers[index],
 				facing = facing,
 				ids = ids,
+				routes = ways[index],
 				queue = queue,
 				front = front,
 			})
@@ -702,7 +822,7 @@ local function can_do(mode: string, def: types.EntityDef): boolean
 	if mode == "attack" then
 		return unit_defs.attack_range(def) ~= nil or unit_defs.is_factory(def)
 	end
-	if mode == "fight" or mode == "path" then
+	if mode == "fight" then
 		return can_go(def)
 	end
 	if mode == "guard" then
@@ -728,6 +848,23 @@ local function workers(mode: string): { EntityId }
 		end
 	end
 	return ids
+end
+
+-- An area command dragged out in `mode` (reclaim, repair, resurrect or attack): every selected unit
+-- that can do the job is sent an area order for the circle at `center`, `radius` studs across. The
+-- mode then ends, unless shift is held, which also queues the order and keeps it on.
+local function order_area_mode(mode: string, center: Vector3, radius: number)
+	local ids = workers(mode)
+	if #ids == 0 then
+		target_mode = nil
+		return
+	end
+	local queue = shift_held()
+	markers.flash_points({ center }, ORDER_MARKER_SECONDS, mode)
+	send_area(mode, ids, center, radius, queue)
+	if queue == false then
+		target_mode = nil
+	end
 end
 
 local function start_target_mode(mode: string)
@@ -775,7 +912,7 @@ local function click_attack_mode()
 			return
 		end
 		local grounded = waypoint_ground(point.X, point.Z)
-		markers.flash_points({ grounded }, ORDER_MARKER_SECONDS)
+		markers.flash_points({ grounded }, ORDER_MARKER_SECONDS, "attack_ground")
 		send_ground_attack(ids, grounded, queue)
 	end
 
@@ -784,66 +921,59 @@ local function click_attack_mode()
 	end
 end
 
--- The selected units a line of orders in `mode` (attack, fight, path, or unload) spreads over.
+-- The selected units a line of orders in `mode` (attack, fight, or unload) spreads over.
 local function line_entries(mode: string): { { id: EntityId, model: Model, def: types.EntityDef } }
-	if mode == "fight" or mode == "path" then
+	if mode == "fight" then
 		return mobile_entries()
-	end
-	if mode == "unload" then
-		return workers "unload"
 	end
 	local result = {}
 	for _, entry in selected_with_def(false) do
-		if can_do("attack", entry.def) then
+		if can_do(if mode == "unload" then "unload" else "attack", entry.def) then
 			table.insert(result, entry)
 		end
 	end
 	return result
 end
 
--- Location-based mode dragged: the units are spread along the line the way a move is, each going to, or
+-- The order a line dragged in `mode` gives each unit: attacking the ground at its point, fighting, or unloading.
+local function line_kind(mode: string): string
+	if mode == "attack" then
+		return "attack_ground"
+	end
+	return mode
+end
+
+-- Location-based mode dragged: the units are spread along the path the way a move is, each going to, or
 -- fighting/attacking/unloading at, its own point. The mode ends, unless shift is held, which also queues
 -- the orders and keeps it on.
-local function order_mode_line(mode: string, from: Vector3, to: Vector3)
+local function order_mode_line(mode: string, path: { Vector3 })
 	local entries = line_entries(mode)
 	if #entries == 0 then
 		target_mode = nil
 		return
 	end
+	sort_along(entries, path)
 
-	local direction = geometry.flatten(to - from)
-	if direction.Magnitude < 1e-3 then
-		direction = Vector3.new(1, 0, 0)
-	else
-		direction = direction.Unit
-	end
-	table.sort(entries, function(a, b)
-		return world.position_of(a.model):Dot(direction) < world.position_of(b.model):Dot(direction)
-	end)
-
-	local positions = formation_points(from, to, #entries)
+	local positions = formation_points(path, #entries)
 	local ids = table.create(#entries)
 	for index, entry in entries do
 		ids[index] = entry.id
 	end
 
 	local queue = shift_held()
-	markers.flash_points(positions, ORDER_MARKER_SECONDS)
+	markers.flash_points(positions, ORDER_MARKER_SECONDS, line_kind(mode))
 
-	-- Determine the order kind based on the mode
-	local kind = if mode == "attack"
-		then "attack_ground"
-		elseif mode == "fight" then "fight"
-		elseif mode == "path" then "path"
-		elseif mode == "unload" then "unload"
-		else "attack_ground" -- fallback
-
+	local kind = line_kind(mode)
+	local front = space_held()
 	issue_order:FireServer({
 		kind = kind,
 		ids = ids,
 		positions = positions,
+		routes = routes.for_units(ids, kind, function(index: number): Vector3?
+			return positions[index]
+		end, nil, queue, front),
 		queue = queue,
-		front = space_held(),
+		front = front,
 	})
 
 	if queue == false then
@@ -855,9 +985,6 @@ end
 -- as a fight waypoint, whatever is under the cursor, so a group that includes units that cannot shoot
 -- stays together. The mode then ends, unless shift is held, which also queues the waypoint after what they
 -- are doing and keeps the mode on, so a route of them can be laid.
---
--- Pathfind mode's click is the same click with a different order: the server works out a route to the spot
--- for each unit and gives it the waypoints, which show as its path like any others.
 local function click_walk_mode(kind: string)
 	local entries = mobile_entries()
 	local point = ground_point()
@@ -873,7 +1000,7 @@ local function click_walk_mode(kind: string)
 
 	local queue = shift_held()
 	local grounded = waypoint_ground(point.X, point.Z)
-	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS)
+	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS, line_kind(kind))
 	send_point_order(kind, ids, grounded, queue)
 
 	if queue == false then
@@ -894,7 +1021,7 @@ local function click_unload_mode()
 
 	local queue = shift_held()
 	local grounded = waypoint_ground(point.X, point.Z)
-	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS)
+	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS, "unload")
 	send_unload(ids, grounded, queue)
 
 	if queue == false then
@@ -913,7 +1040,7 @@ local function click_target_mode()
 		click_attack_mode()
 		return
 	end
-	if mode == "fight" or mode == "path" then
+	if mode == "fight" then
 		click_walk_mode(mode)
 		return
 	end
@@ -959,7 +1086,7 @@ local function fire_manual()
 	end
 	local queue = shift_held()
 	local grounded = waypoint_ground(point.X, point.Z)
-	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS)
+	markers.flash_points({ grounded }, ORDER_MARKER_SECONDS, "dgun")
 	send_point_order("dgun", ids, grounded, queue)
 	-- one shot per press of D, unless shift is held to keep firing
 	if queue == false then
@@ -967,7 +1094,9 @@ local function fire_manual()
 	end
 end
 
--- Shows the rectangle the first shooter's shot would sweep, from it toward the cursor out to its range.
+-- Shows the rectangle the first shooter's shot would sweep, from it toward the cursor out to its range. With
+-- shift held the shot is queued behind everything it has to do first, so the rectangle starts where it is
+-- expected to be once that is done, and not where it stands now.
 local function preview_manual()
 	local point = ground_point()
 	local shooters = manual_shooters()
@@ -980,7 +1109,7 @@ local function preview_manual()
 	if weapon == nil then
 		return
 	end
-	local at = world.position_of(first.model)
+	local at = if shift_held() then markers.expected_end(first.model) else world.position_of(first.model)
 	local direction = geometry.flatten(point - at)
 	if direction.Magnitude < 1e-3 then
 		markers.hide_blast()
@@ -991,10 +1120,19 @@ local function preview_manual()
 end
 
 local function on_left_down()
-	if target_mode == "attack" or target_mode == "fight" or target_mode == "path" or target_mode == "unload" then
+	if target_mode == "fight" or target_mode == "unload" then
 		-- what it does waits for the button to come up, to tell a click from a line
 		mode_drag_from = ground_point()
+		begin_trace(mode_drag_from)
 		if mode_drag_from == nil then
+			click_target_mode()
+		end
+		return
+	end
+	if target_mode ~= nil and AREA_KINDS[target_mode] ~= nil then
+		-- what it does waits for the button to come up, to tell a click from a drag
+		area_drag_from = ground_point()
+		if area_drag_from == nil then
 			click_target_mode()
 		end
 		return
@@ -1025,14 +1163,28 @@ local function on_left_up()
 	mode_drag_from = nil
 	if mode_from ~= nil then
 		markers.clear_points()
+		local path = finish_trace()
 		local mode = target_mode
-		if mode == "attack" or mode == "fight" or mode == "path" or mode == "unload" then
-			local finished = ground_point()
-			if finished ~= nil and geometry.distance_2d(mode_from, finished) >= config.FORMATION_DRAG_THRESHOLD then
-				order_mode_line(mode, mode_from, finished)
+		if mode == "fight" or mode == "unload" then
+			if is_line(path) then
+				order_mode_line(mode, path)
 			else
 				click_target_mode()
 			end
+		end
+		return
+	end
+	local area_from = area_drag_from
+	area_drag_from = nil
+	if area_from ~= nil then
+		markers.hide_area()
+		local mode = target_mode
+		local point = ground_point()
+		local radius = if point ~= nil then geometry.distance_2d(area_from, point) else 0
+		if mode ~= nil and AREA_KINDS[mode] ~= nil and radius >= config.FORMATION_DRAG_THRESHOLD then
+			order_area_mode(mode, area_from, radius)
+		else
+			click_target_mode()
 		end
 		return
 	end
@@ -1084,10 +1236,11 @@ local function on_left_up()
 end
 
 local function on_right_down()
-	if target_mode == "attack" or target_mode == "fight" or target_mode == "path" or target_mode == "unload" then
+	if target_mode == "attack" or target_mode == "fight" or target_mode == "unload" then
 		-- what it does waits for the button to come up, so a plain right click can still cancel the
 		-- mode while a right-drag lays down a line of orders instead
 		right_mode_drag_from = ground_point()
+		begin_trace(right_mode_drag_from)
 		if right_mode_drag_from == nil then
 			target_mode = nil
 		end
@@ -1096,6 +1249,10 @@ local function on_right_down()
 	if target_mode ~= nil then
 		target_mode = nil
 		right_down_world = nil
+		if area_drag_from ~= nil then
+			area_drag_from = nil
+			markers.hide_area()
+		end
 		return
 	end
 	if manual_aiming then
@@ -1110,6 +1267,7 @@ local function on_right_down()
 		return
 	end
 	right_down_world = ground_point()
+	begin_trace(right_down_world)
 end
 
 local function on_right_up()
@@ -1117,14 +1275,10 @@ local function on_right_up()
 	right_mode_drag_from = nil
 	if mode_from ~= nil then
 		markers.clear_points()
+		local path = finish_trace()
 		local mode = target_mode
-		local finished = ground_point()
-		if
-			mode ~= nil
-			and finished ~= nil
-			and geometry.distance_2d(mode_from, finished) >= config.FORMATION_DRAG_THRESHOLD
-		then
-			order_mode_line(mode, mode_from, finished)
+		if mode ~= nil and is_line(path) then
+			order_mode_line(mode, path)
 		else
 			-- a right click with no drag cancels the mode, unlike a left click, which places a single order
 			target_mode = nil
@@ -1136,6 +1290,7 @@ local function on_right_up()
 	right_down_world = nil
 	-- the preview belongs to the held button; whatever happens next puts its own dots up
 	markers.clear_points()
+	local path = finish_trace()
 	if started == nil then
 		return
 	end
@@ -1146,9 +1301,9 @@ local function on_right_up()
 	local queue = shift_held()
 	local finished = ground_point()
 
-	-- a long enough right-drag is a formation line; anything shorter is a plain right-click
-	if finished ~= nil and geometry.distance_2d(started, finished) >= config.FORMATION_DRAG_THRESHOLD then
-		order_along_line(started, finished, queue)
+	-- a long enough right-drag is a formation along the shape it traced; anything shorter is a plain right-click
+	if is_line(path) then
+		order_along_trace(path, queue)
 		return
 	end
 
@@ -1172,13 +1327,13 @@ type BuildCategory = {
 }
 
 -- Buildings are grouped into categories, each with a key of its own: Z economy, X offense, C utility, V
--- production. Its key places the category's main building, which is the advanced one for a constructor that
+-- production. Its key places the category's main building, which is the advanced one for a construction_bot that
 -- can build it, and Z does the same once something in the category is being placed. Once something from a category is being
 -- placed, a few more keys pick other buildings in it, and they mean that instead of whatever they are
 -- otherwise, so X is the guard on its own but the solar collector among the economy buildings, the
 -- twin guard among the offense ones and the vehicle lab among the production ones, where A is the
 -- construction turret, S the advanced lab (the bot one or the vehicle one, whichever the selection can
--- build), V the shipyard and C the air lab. Among the offense ones W is the agitator, C the warden, A the thistle, V the catalyst and E the apocalypse. Utility has nothing
+-- build), V the shipyard and C the air lab. Among the offense ones W is the agitator, C the warden, A the thistle, S the screamer, V the catalyst and E the apocalypse. Utility has nothing
 -- in it yet.
 local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 	[Enum.KeyCode.Z] = {
@@ -1186,14 +1341,17 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 		primary = { "advanced_metal_extractor", "metal_extractor" },
 		options = {
 			[Enum.KeyCode.X] = { "fusion_reactor", "solar_collector" },
-			[Enum.KeyCode.Q] = { "energy_storage" },
-			[Enum.KeyCode.W] = { "metal_storage" },
+			[Enum.KeyCode.Q] = { "hardened_energy_storage", "energy_storage" },
+			[Enum.KeyCode.W] = { "hardened_metal_storage", "metal_storage" },
 			[Enum.KeyCode.A] = { "advanced_energy_converter", "energy_converter" },
 			[Enum.KeyCode.C] = { "advanced_fusion_reactor", "wind_turbine" },
 			[Enum.KeyCode.E] = { "epic_fusion_reactor" },
 			[Enum.KeyCode.T] = { "epic_energy_converter" },
 			[Enum.KeyCode.V] = { "advanced_solar_collector" },
 			[Enum.KeyCode.S] = { "tidal_generator" },
+			-- the geothermal plants, on a vent: the advanced one for whoever can build it, and its sidegrade
+			[Enum.KeyCode.D] = { "advanced_geothermal_powerplant", "geothermal_powerplant" },
+			[Enum.KeyCode.F] = { "rampart" },
 		},
 	},
 	[Enum.KeyCode.X] = {
@@ -1203,7 +1361,9 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 			[Enum.KeyCode.X] = { "pulsar", "twin_guard" },
 			[Enum.KeyCode.C] = { "warden", "persecutor" },
 			[Enum.KeyCode.W] = { "agitator", "calamity" },
+			[Enum.KeyCode.D] = { "prevailer" },
 			[Enum.KeyCode.A] = { "thistle" },
+			[Enum.KeyCode.S] = { "screamer" },
 			[Enum.KeyCode.V] = { "catalyst" },
 			[Enum.KeyCode.E] = { "apocalypse" },
 		},
@@ -1347,8 +1507,6 @@ local function on_input_began(input: InputObject, processed: boolean)
 		start_target_mode "attack"
 	elseif input.KeyCode == Enum.KeyCode.F then
 		start_target_mode "fight"
-	elseif input.KeyCode == Enum.KeyCode.P then
-		start_target_mode "path"
 	elseif input.KeyCode == Enum.KeyCode.E then
 		start_target_mode "reclaim"
 	elseif input.KeyCode == Enum.KeyCode.R then
@@ -1427,22 +1585,22 @@ local function on_input_ended(input: InputObject)
 	end
 end
 
--- While the right button is held, show where the order would land: one dot per selected unit
--- along the drag, or a single dot under the cursor until the drag is long enough to be a line.
-local function preview_order(from: Vector3)
-	local count = #move_entries()
-	if count == 0 then
+-- While a button is held to drag out a line of `count` orders of `kind`, shows the shape traced so far, in that
+-- order's colour, and one dot per unit along it where each would land. Until the drag is long enough to be a line,
+-- a move shows a single dot under the cursor (`single`), and anything else nothing.
+local function preview_trace(count: number, kind: string, single: boolean)
+	extend_trace()
+	if count > 0 and is_line(drag_trace) then
+		markers.show_trace(drag_trace, kind)
+		markers.show_points(formation_points(drag_trace, count), kind)
 		return
 	end
+	markers.hide_trace()
 	local to = ground_point()
-	if to == nil then
-		markers.clear_points()
-		return
-	end
-	if geometry.distance_2d(from, to) >= config.FORMATION_DRAG_THRESHOLD then
-		markers.show_points(formation_points(from, to, count))
+	if count > 0 and single and to ~= nil then
+		markers.show_points({ waypoint_ground(to.X, to.Z) }, kind)
 	else
-		markers.show_points({ waypoint_ground(to.X, to.Z) })
+		markers.clear_points()
 	end
 end
 
@@ -1461,8 +1619,9 @@ local function update_hover()
 		or left_down_at ~= nil
 		or mode_drag_from ~= nil
 		or right_mode_drag_from ~= nil
-	-- a fight or pathfind click lands on the ground whatever is under it, so nothing is lit for it
-	local model = if dragging or target_mode == "fight" or target_mode == "path" then nil else entity_under_mouse()
+		or area_drag_from ~= nil
+	-- a fight click lands on the ground whatever is under it, so nothing is lit for it
+	local model = if dragging or target_mode == "fight" then nil else entity_under_mouse()
 	local color = HOVER_COLOR
 	if target_mode == "repair" then
 		color = HOVER_REPAIR_COLOR
@@ -1482,7 +1641,8 @@ local function update_hover()
 
 	local def_name = if model ~= nil then model:GetAttribute "def_name" else nil
 	local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
-	if model == nil or def == nil or model:GetAttribute "kind" == "wreck" then
+	local kind = if model ~= nil then model:GetAttribute "kind" else nil
+	if model == nil or def == nil or kind == "wreck" or kind == "reclaimable" then
 		markers.hide_ranges()
 		return
 	end
@@ -1498,8 +1658,10 @@ local function update_hover()
 		return
 	end
 
+	-- shots leave from a quarter of its height above its middle, as the server has them (`sight.muzzle_of`)
 	local at = world.position_of(model)
-	markers.show_ranges(heightmap.ground_position(at.X, at.Z), build_range, attack_range)
+	local muzzle = at + Vector3.new(0, unit_defs.collider_height(def) * 0.25, 0)
+	markers.show_ranges(heightmap.ground_position(at.X, at.Z), build_range, attack_range, def, muzzle)
 end
 
 -- Reports a change of what the cursor is over. It says nothing while a box is being dragged or an order is
@@ -1556,20 +1718,22 @@ local function on_render()
 		preview_manual()
 	end
 
-	local aiming = right_down_world
-	if aiming ~= nil then
-		preview_order(aiming)
+	if right_down_world ~= nil then
+		preview_trace(#move_entries(), "move", true)
 	end
 
-	local mode_from = if mode_drag_from ~= nil then mode_drag_from else right_mode_drag_from
 	local mode = target_mode
-	if mode_from ~= nil and mode ~= nil then
-		local to = ground_point()
-		local count = #line_entries(mode)
-		if to ~= nil and count > 0 and geometry.distance_2d(mode_from, to) >= config.FORMATION_DRAG_THRESHOLD then
-			markers.show_points(formation_points(mode_from, to, count))
+	if (mode_drag_from ~= nil or right_mode_drag_from ~= nil) and mode ~= nil then
+		preview_trace(#line_entries(mode), line_kind(mode), false)
+	end
+
+	if area_drag_from ~= nil and mode ~= nil then
+		local point = ground_point()
+		local radius = if point ~= nil then geometry.distance_2d(area_drag_from, point) else 0
+		if radius >= config.FORMATION_DRAG_THRESHOLD then
+			markers.show_area(area_drag_from, radius, mode)
 		else
-			markers.clear_points()
+			markers.hide_area()
 		end
 	end
 
@@ -1620,7 +1784,6 @@ export type Command = {
 local COMMANDS: { Command } = table.freeze({
 	{ mode = "attack", label = "Attack", key = "A" },
 	{ mode = "fight", label = "Fight", key = "F" },
-	{ mode = "path", label = "Pathfind", key = "P" },
 	{ mode = "reclaim", label = "Reclaim", key = "E" },
 	{ mode = "repair", label = "Repair", key = "R" },
 	{ mode = "resurrect", label = "Resurrect", key = "W" },

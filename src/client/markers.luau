@@ -19,9 +19,11 @@ local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local model_fit = require(ReplicatedStorage.Shared.model_fit)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local projectile = require(ReplicatedStorage.Shared.projectile)
 
 local world = require(ReplicatedStorage.Client.world)
 local selection = require(ReplicatedStorage.Client.selection)
+local art = require(ReplicatedStorage.Client.art)
 
 type Pool = {
 	parts: { Part },
@@ -188,12 +190,20 @@ local function place_dot(dot: Part, point: Vector3, color: Color3)
 	dot.Color = color
 end
 
--- Draws one preview dot per point, on the ground, replacing whatever was shown before.
-local function show_points(points: { Vector3 })
+-- The colour an order of `kind` is drawn in, on paths and while it is being laid out.
+local function color_of(kind: string?): Color3
+	local color = if kind ~= nil then KIND_COLORS[kind] else nil
+	return if color ~= nil then color else PREVIEW_COLOR
+end
+
+-- Draws one preview dot per point, on the ground, in the colour of the order of `kind` they are for, replacing
+-- whatever was shown before.
+local function show_points(points: { Vector3 }, kind: string?)
 	preview_generation += 1
 	preview_pool.used = 0
+	local color = color_of(kind)
 	for _, point in points do
-		place_dot(acquire(preview_pool, make_dot), point, PREVIEW_COLOR)
+		place_dot(acquire(preview_pool, make_dot), point, color)
 	end
 	release_rest(preview_pool)
 end
@@ -258,8 +268,8 @@ end
 
 -- Shows the points and takes them away again, unless a newer drag or order has claimed the dots in
 -- the meantime.
-local function flash_points(points: { Vector3 }, seconds: number)
-	show_points(points)
+local function flash_points(points: { Vector3 }, seconds: number, kind: string?)
+	show_points(points, kind)
 	local generation = preview_generation
 	task.delay(seconds, function()
 		if preview_generation == generation then
@@ -340,6 +350,23 @@ local function draw_leg(pool: Pool, from: Vector3, to: Vector3, color: Color3, t
 	end
 end
 
+-- The shape a drag has traced so far, laid on the ground in the colour of the order of `kind` it will give.
+local trace_pool: Pool = { parts = {}, used = 0 }
+
+local function show_trace(path: { Vector3 }, kind: string?)
+	trace_pool.used = 0
+	local color = color_of(kind)
+	for index = 2, #path do
+		draw_leg(trace_pool, path[index - 1], path[index], color)
+	end
+	release_rest(trace_pool)
+end
+
+local function hide_trace()
+	trace_pool.used = 0
+	release_rest(trace_pool)
+end
+
 -- A glow on the ground under an entity, sized to its collider.
 local function draw_halo(model: Model, point: Vector3, color: Color3)
 	local radius = 2
@@ -360,28 +387,96 @@ local BUILD_RING_COLOR = Color3.fromRGB(96, 210, 242)
 local ATTACK_RING_COLOR = Color3.fromRGB(238, 88, 74)
 local ring_pool: Pool = { parts = {}, used = 0 }
 
--- A ring of `radius` around `center`, laid on the ground so that it climbs hills.
-local function draw_ring(center: Vector3, radius: number, color: Color3)
+-- How many times the reach of an arcing weapon is worked out again in each direction, for the ground where the
+-- last guess put it. The ground changes slowly enough that it settles in a few.
+local REACH_ITERATIONS = 4
+
+-- A ring round `center`, laid on the ground so that it climbs hills, `radius(direction)` out in each direction,
+-- into `pool`.
+local function draw_ring(pool: Pool, center: Vector3, radius: (Vector3) -> number, color: Color3)
 	local previous: Vector3? = nil
 	for step = 0, RING_SEGMENTS do
 		local angle = step / RING_SEGMENTS * math.pi * 2
-		local point =
-			heightmap.ground_position(center.X + math.cos(angle) * radius, center.Z + math.sin(angle) * radius)
+		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local out = radius(direction)
+		local point = heightmap.ground_position(center.X + direction.X * out, center.Z + direction.Z * out)
 		if previous ~= nil then
-			draw_dash(ring_pool, previous, point, color)
+			draw_dash(pool, previous, point, color)
 		end
 		previous = point
 	end
 end
 
--- Shows a build range ring and an attack range ring, whichever of them apply, around `center`.
-local function show_ranges(center: Vector3, build_range: number?, attack_range: number?)
+-- The circle an area command (reclaim, repair, resurrect or attack) is being dragged out to: concentric
+-- rings, in the colour of the mode it is for, filling the circle in and, like the range rings, laid on
+-- the ground so they climb hills instead of a flat disc that would sink into them or float over dips.
+local AREA_RING_COUNT = 8
+local area_pool: Pool = { parts = {}, used = 0 }
+
+local function show_area(center: Vector3, radius: number, kind: string?)
+	area_pool.used = 0
+	local color = color_of(kind)
+	for step = 1, AREA_RING_COUNT do
+		local out = radius * step / AREA_RING_COUNT
+		draw_ring(area_pool, center, function(_: Vector3): number
+			return out
+		end, color)
+	end
+	release_rest(area_pool)
+end
+
+local function hide_area()
+	area_pool.used = 0
+	release_rest(area_pool)
+end
+
+-- The weapon something of `def` reaches furthest with, which is the one its range ring is drawn for.
+local function longest_weapon(def: types.EntityDef): types.Weapon?
+	local longest: types.Weapon? = nil
+	if def.weapons ~= nil then
+		for _, weapon in def.weapons do
+			if longest == nil or weapon.range > longest.range then
+				longest = weapon
+			end
+		end
+	end
+	return longest
+end
+
+-- Shows a build range ring and an attack range ring, whichever of them apply, around `center`. The attack ring of
+-- something whose longest weapon arcs under gravity is drawn as far as it really reaches, which is further over
+-- ground lower than `muzzle`, where its shells come from, and less far over ground higher up, the way the server
+-- judges it (`projectile.range_to`). Any other is a circle.
+local function show_ranges(
+	center: Vector3,
+	build_range: number?,
+	attack_range: number?,
+	def: types.EntityDef?,
+	muzzle: Vector3?
+)
 	ring_pool.used = 0
 	if build_range ~= nil then
-		draw_ring(center, build_range, BUILD_RING_COLOR)
+		draw_ring(ring_pool, center, function(_: Vector3): number
+			return build_range
+		end, BUILD_RING_COLOR)
 	end
 	if attack_range ~= nil then
-		draw_ring(center, attack_range, ATTACK_RING_COLOR)
+		local weapon = if def ~= nil then longest_weapon(def) else nil
+		local params = if weapon ~= nil then weapon.projectile else nil
+		if weapon ~= nil and params ~= nil and muzzle ~= nil and weapon.range == attack_range then
+			draw_ring(ring_pool, center, function(direction: Vector3): number
+				local out = weapon.range
+				for _ = 1, REACH_ITERATIONS do
+					local ground = heightmap.ground_position(center.X + direction.X * out, center.Z + direction.Z * out)
+					out = projectile.range_to(weapon.range, muzzle, ground, params)
+				end
+				return out
+			end, ATTACK_RING_COLOR)
+		else
+			draw_ring(ring_pool, center, function(_: Vector3): number
+				return attack_range
+			end, ATTACK_RING_COLOR)
+		end
 	end
 	release_rest(ring_pool)
 end
@@ -420,11 +515,17 @@ local without_art: { [string]: boolean } = {}
 local function make_ghost_model(def_name: string, color: Color3, collider_height: number): Model?
 	local folder = ReplicatedStorage:FindFirstChild "Models"
 	local template = if folder ~= nil then folder:FindFirstChild(def_name) else nil
-	if template == nil or template:IsA "Model" == false then
-		return nil
+	local model: Model
+	if template ~= nil and template:IsA "Model" then
+		model = (template :: Model):Clone()
+	else
+		-- procedural art, if the def has some and it has been built
+		local ghost = art.ghost(def_name)
+		if ghost == nil then
+			return nil
+		end
+		model = ghost
 	end
-
-	local model = (template :: Model):Clone()
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA "BasePart" then
 			descendant.Anchored = true
@@ -466,7 +567,10 @@ local function draw_ghost(def_name: string, point: Vector3, facing: number?, col
 			model = make_ghost_model(def_name, color, height)
 			if model == nil then
 				set.used -= 1
-				without_art[def_name] = true
+				-- art still being built is asked for again next frame, and drawn as a box until then
+				if art.pending(def_name) == false then
+					without_art[def_name] = true
+				end
 			else
 				table.insert(set.models, model)
 			end
@@ -512,6 +616,37 @@ local function travelled(def: types.EntityDef?, point: Vector3): Vector3
 		return unit_defs.surface_position(def, point.X, point.Z)
 	end
 	return point
+end
+
+-- Where `model` is expected to be once it has carried out every order in its queue: it walks each leg from
+-- where the one before left it, stopping as far short of each waypoint as that order lets it. Where it stands
+-- now if it has nothing queued.
+local function expected_end(model: Model): Vector3
+	local position = world.position_of(model)
+	local cursor = heightmap.ground_position(position.X, position.Z)
+	local def_name = model:GetAttribute "def_name"
+	local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
+	local text = model:GetAttribute "path"
+	if def == nil or def.max_speed == nil or typeof(text) ~= "string" or text == "" then
+		return cursor
+	end
+	for _, waypoint in parse_path(text) do
+		local point = waypoint.point
+		if waypoint.kind == "guard" and waypoint.target_id ~= nil then
+			local guarded = world.get(waypoint.target_id)
+			if guarded ~= nil then
+				local at = world.position_of(guarded)
+				point = heightmap.ground_position(at.X, at.Z)
+			end
+		end
+		local offset = Vector3.new(point.X - cursor.X, 0, point.Z - cursor.Z)
+		local short = unit_defs.order_reach(def, waypoint.kind)
+		if offset.Magnitude > short then
+			local stop = cursor + offset.Unit * (offset.Magnitude - short)
+			cursor = heightmap.ground_position(stop.X, stop.Z)
+		end
+	end
+	return cursor
 end
 
 local function update_paths()
@@ -643,4 +778,9 @@ return table.freeze({
 	hide_ranges = hide_ranges,
 	show_blast = show_blast,
 	hide_blast = hide_blast,
+	show_area = show_area,
+	hide_area = hide_area,
+	expected_end = expected_end,
+	show_trace = show_trace,
+	hide_trace = hide_trace,
 })

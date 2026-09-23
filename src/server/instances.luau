@@ -4,8 +4,11 @@
 -- client has something to raycast against when picking units. Every part is anchored and
 -- non-collidable - nothing here ever feeds back into the simulation.
 --
--- Real models do not exist yet, so a building is a box the size of its collider and a unit is a
--- procedural stand-in that fits inside its collider (see unit_placeholder.luau).
+-- A def with a hand-made model in ReplicatedStorage.Models is drawn with it. A def with procedural art
+-- (ReplicatedStorage.Shared.art) gets only an invisible hitbox the size of its collider, which the client dresses
+-- in meshes it builds itself, since those cannot replicate. Anything else is a box the size of its collider if it
+-- is a building, and a procedural stand-in that fits inside its collider if it is a unit (see unit_placeholder.luau).
+-- A reclaimable is a rock or a tree made of a few parts, never painted for anything.
 --
 -- Art and placeholder alike are moved with :PivotTo and measured with :GetPivot, so nothing here
 -- depends on a model having a PrimaryPart. A model with one pivots about it; a model without one
@@ -18,6 +21,8 @@ local types = require(ReplicatedStorage.Shared.types)
 local model_fit = require(ReplicatedStorage.Shared.model_fit)
 local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local appearance = require(ReplicatedStorage.Shared.appearance)
+local art = require(ReplicatedStorage.Shared.art)
 
 local state = require(script.Parent.state)
 local construction = require(script.Parent.construction)
@@ -28,20 +33,15 @@ local combat = require(script.Parent.combat)
 local flows = require(script.Parent.flows)
 local shields = require(script.Parent.shields)
 local transport = require(script.Parent.transport)
+local production = require(script.Parent.production)
 local unit_placeholder = require(script.Parent.unit_placeholder)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
 
-local BLUEPRINT_TRANSPARENCY = 0.6
-local WRECK_COLOR = Color3.fromRGB(96, 88, 80)
-
-local TEAM_COLORS: { [number]: Color3 } = {
-	[0] = Color3.fromRGB(140, 140, 140),
-	[1] = Color3.fromRGB(86, 148, 224),
-	[2] = Color3.fromRGB(214, 92, 84),
-	[config.SCAVENGER_TEAM] = Color3.fromRGB(160, 84, 214),
-}
+-- The invisible part a def with procedural art is given in place of a placeholder: it is what the client picks
+-- by raycast and hangs the art on, and it is never painted.
+local HITBOX_NAME = "Hitbox"
 
 type Original = {
 	color: Color3,
@@ -79,13 +79,7 @@ local function get_container(): Folder
 	return folder
 end
 
-local function team_color(team: types.TeamId): Color3
-	local color = TEAM_COLORS[team]
-	if color == nil then
-		return TEAM_COLORS[0]
-	end
-	return color
-end
+local team_color = appearance.team_color
 
 local function make_part(name: string, parent: Instance): Part
 	local part = Instance.new "Part"
@@ -176,10 +170,16 @@ local function build_placeholder(entity: Entity): Model
 	local model = Instance.new "Model"
 	model.Name = `{entity.def_name}_{entity.id}`
 
-	if def.kind == "unit" then
+	local has_art = art.has(entity.def_name)
+	if def.kind == "unit" and has_art == false then
 		unit_placeholder.build(model, def)
 	else
-		local body = make_part("Team", model)
+		-- with art, the box is only something to pick and to hang the client's meshes on, and is never seen
+		local body = make_part(if has_art then HITBOX_NAME else "Team", model)
+		if has_art then
+			body.Transparency = 1
+			body.CastShadow = false
+		end
 		local collider = def.collider
 		body.Shape = Enum.PartType.Block
 		if collider.shape == "box" then
@@ -198,7 +198,58 @@ local function build_placeholder(entity: Entity): Model
 	return model
 end
 
+-- A reclaimable: a rock, a couple of stones filling its collider, or a tree, a fir of three tiers on a trunk. Nothing
+-- in it is named "Team", so nobody's colour ever goes on it. It is laid out around the origin, like a placeholder.
+local TRUNK_COLOR = Color3.fromRGB(92, 66, 44)
+
+local function build_reclaimable(entity: Entity): Model
+	local def = unit_defs.get(entity.def_name)
+	local model = Instance.new "Model"
+	model.Name = `{entity.def_name}_{entity.id}`
+	local radius = unit_defs.collider_radius(def)
+	local height = unit_defs.collider_height(def)
+	local bottom = -height / 2
+
+	if entity.def_name == "tree" then
+		local trunk_height = height * 0.3
+		local trunk = make_part("Trunk", model)
+		trunk.Material = Enum.Material.Wood
+		trunk.Color = TRUNK_COLOR
+		trunk.Size = Vector3.new(radius * 0.35, trunk_height, radius * 0.35)
+		trunk.CFrame = CFrame.new(0, bottom + trunk_height / 2, 0)
+		local tier_height = (height - trunk_height) / 2
+		for tier = 0, 2 do
+			local width = radius * 2 * (1 - tier * 0.28)
+			local part = make_part("Leaves", model)
+			part.Material = Enum.Material.LeafyGrass
+			part.Color = def.color
+			part.Size = Vector3.new(width, tier_height, width)
+			part.CFrame = CFrame.new(0, bottom + trunk_height + tier_height * (tier * 0.75 + 0.5), 0)
+				* CFrame.Angles(0, tier * math.pi / 4, 0)
+		end
+	else
+		local stone = make_part("Stone", model)
+		stone.Material = Enum.Material.Slate
+		stone.Color = def.color
+		stone.Size = Vector3.new(radius * 1.7, height, radius * 1.4)
+		stone.CFrame = CFrame.new(0, 0, 0) * CFrame.Angles(0.12, 0.3, -0.1)
+		local chip = make_part("Stone", model)
+		chip.Material = Enum.Material.Slate
+		chip.Color = def.color:Lerp(Color3.new(0, 0, 0), 0.15)
+		chip.Size = Vector3.new(radius * 0.9, height * 0.7, radius * 0.8)
+		chip.CFrame = CFrame.new(radius * 0.55, bottom + height * 0.35, radius * 0.4) * CFrame.Angles(-0.2, 1.1, 0.15)
+	end
+
+	model.WorldPivot = CFrame.identity
+	remember_appearance(model)
+	model.Parent = get_container()
+	return model
+end
+
 local function build_model(entity: Entity): Model
+	if entity.kind == "reclaimable" then
+		return build_reclaimable(entity)
+	end
 	local template = find_template(entity.def_name)
 	if template ~= nil then
 		return build_from_template(entity, template)
@@ -229,11 +280,12 @@ local function tinted_parts(model: Model): { BasePart }
 	return parts
 end
 
--- Blueprints and wrecks read as such across the whole model, not just its team-coloured parts.
+-- Blueprints and wrecks read as such across the whole model, not just its team-coloured parts. A hitbox is
+-- left out: it stays invisible, and the client paints the art hung on it.
 local function all_parts(model: Model): { BasePart }
 	local parts = {}
 	for _, descendant in model:GetDescendants() do
-		if descendant:IsA "BasePart" then
+		if descendant:IsA "BasePart" and descendant.Name ~= HITBOX_NAME then
 			table.insert(parts, descendant)
 		end
 	end
@@ -251,16 +303,16 @@ local function apply_appearance(entity: Entity, model: Model)
 
 	if entity.kind == "wreck" then
 		for _, part in all_parts(model) do
-			part.Color = WRECK_COLOR
-			part.Transparency = 0.25
-			part.Material = Enum.Material.CorrodedMetal
+			part.Color = appearance.WRECK_COLOR
+			part.Transparency = appearance.WRECK_TRANSPARENCY
+			part.Material = appearance.WRECK_MATERIAL
 		end
 	elseif entity.state == "blueprint" then
-		local tint = team_color(entity.team):Lerp(def.color, 0.35)
+		local tint = appearance.blueprint_tint(def.color, team_color(entity.team))
 		for _, part in all_parts(model) do
 			part.Color = tint
-			part.Transparency = BLUEPRINT_TRANSPARENCY
-			part.Material = Enum.Material.ForceField
+			part.Transparency = appearance.BLUEPRINT_TRANSPARENCY
+			part.Material = appearance.BLUEPRINT_MATERIAL
 		end
 	else
 		for _, part in all_parts(model) do
@@ -272,7 +324,7 @@ local function apply_appearance(entity: Entity, model: Model)
 			end
 		end
 		for _, part in tinted_parts(model) do
-			part.Color = def.color:Lerp(team_color(entity.team), 0.45)
+			part.Color = appearance.team_tint(def.color, team_color(entity.team))
 		end
 	end
 end
@@ -358,27 +410,60 @@ end
 
 -- How far along a slow weapon is to its next shot, from 0 to 1, rounded to a hundredth so that it is not
 -- rewritten every step; nil for something with no weapon that takes longer than `config.RELOAD_BAR_MIN_SECONDS`
--- to reload. A unit with several turrets shows its first slow one.
+-- to reload. A unit with several weapons shows its first slow one.
 local function reload_progress(entity: Entity, def: types.EntityDef): number?
-	local remaining = entity.reload_remaining
-	local weapon = def.weapon
-	if weapon == nil or weapon.reload <= config.RELOAD_BAR_MIN_SECONDS then
-		weapon = nil
-		local turrets = def.turrets
-		if turrets ~= nil then
-			for index, turret in turrets do
-				if turret.weapon.reload > config.RELOAD_BAR_MIN_SECONDS then
-					weapon = turret.weapon
-					remaining = entity.turret_reloads[index] or 0
-					break
-				end
+	local weapons = def.weapons
+	if weapons == nil then
+		return nil
+	end
+	for index, weapon in weapons do
+		if weapon.reload > config.RELOAD_BAR_MIN_SECONDS then
+			local remaining = entity.weapon_reloads[index] or 0
+			return math.floor(math.clamp(1 - remaining / weapon.reload, 0, 1) * 100) / 100
+		end
+	end
+	return nil
+end
+
+-- The attribute weapon `index`'s aim is written to, "aim_1" and so on, made once rather than every sync.
+local aim_attributes: { string } = {}
+local function aim_attribute(index: number): string
+	local name = aim_attributes[index]
+	if name == nil then
+		name = `aim_{index}`
+		aim_attributes[index] = name
+	end
+	return name
+end
+
+-- The weapons of a def whose art plays something when they fire (a "hatch" piece naming them), worked out once.
+local fired_by_def: { [string]: { number } } = {}
+local function fired_weapons(def_name: string): { number }
+	local found = fired_by_def[def_name]
+	if found ~= nil then
+		return found
+	end
+	found = {}
+	local data = if art.has(def_name) then art.get(def_name) else nil
+	if data ~= nil then
+		for _, group in data.groups do
+			if group.kind == "hatch" and group.weapon ~= nil and table.find(found, group.weapon) == nil then
+				table.insert(found, group.weapon)
 			end
 		end
 	end
-	if weapon == nil then
-		return nil
+	fired_by_def[def_name] = found
+	return found
+end
+
+local fired_attributes: { string } = {}
+local function fired_attribute(index: number): string
+	local name = fired_attributes[index]
+	if name == nil then
+		name = `fired_{index}`
+		fired_attributes[index] = name
 	end
-	return math.floor(math.clamp(1 - remaining / weapon.reload, 0, 1) * 100) / 100
+	return name
 end
 
 -- Everything the client needs to know about an entity that is not its transform.
@@ -414,6 +499,8 @@ local function apply_attributes(entity: Entity, model: Model)
 	set_attribute(model, "order_count", #entity.orders)
 	-- a weapon with an energy cost and no energy to fire it with
 	set_attribute(model, "need_energy", combat.short_of_energy(entity.id))
+	-- a lab whose next unit cannot be started for something standing where it goes
+	set_attribute(model, "exit_blocked", production.is_blocked(entity.id))
 	-- what it is making or spending this second, in metal and energy, and what is holding it back if it is
 	local flow = flows.get(entity.id)
 	set_attribute(model, "metal_rate", if flow ~= nil then math.round(flow.metal * 10) / 10 else nil)
@@ -429,21 +516,59 @@ local function apply_attributes(entity: Entity, model: Model)
 	if def.manual_weapon ~= nil then
 		set_attribute(model, "manual_ready", entity.manual_reload_remaining <= 0)
 	end
-	-- how many missiles a launcher holds ready, the most it can hold, and how far along its next one is
-	if def.weapon ~= nil and def.weapon.stockpile ~= nil then
-		local stockpile = def.weapon.stockpile
-		set_attribute(model, "stockpile", entity.stockpile)
+	-- how many missiles a launcher holds ready, the most it can hold, and how far along its next one is;
+	-- a unit with several stockpiling weapons shows its first. A carrier shows its drones in reserve the same way.
+	local carrier = def.carrier
+	if carrier ~= nil then
+		local stockpile = carrier.stockpile
+		set_attribute(model, "stockpile", entity.drone_stockpile)
 		set_attribute(model, "stockpile_limit", stockpile.limit)
 		set_attribute(
 			model,
 			"stockpile_progress",
-			if entity.stockpile >= stockpile.limit
+			if entity.drone_stockpile >= stockpile.limit
 				then 1
-				else math.floor(entity.stockpile_progress / stockpile.build_time * 100) / 100
+				else math.floor(entity.drone_stockpile_progress / stockpile.build_time * 100) / 100
 		)
+	elseif def.weapons ~= nil then
+		for index, weapon in def.weapons do
+			local stockpile = weapon.stockpile
+			if stockpile == nil then
+				continue
+			end
+			local held = entity.weapon_stockpiles[index] or 0
+			set_attribute(model, "stockpile", held)
+			set_attribute(model, "stockpile_limit", stockpile.limit)
+			set_attribute(
+				model,
+				"stockpile_progress",
+				if held >= stockpile.limit
+					then 1
+					else math.floor((entity.weapon_stockpile_progress[index] or 0) / stockpile.build_time * 100) / 100
+			)
+			break
+		end
 	end
 	-- how far along a slow weapon is to its next shot, which is shown as a bar
 	set_attribute(model, "reload_progress", reload_progress(entity, def))
+	-- where each turret points, in radians from the way the entity faces, which the client turns its art to; to a
+	-- hundredth, so that a turret holding still is not rewritten every step
+	if def.weapons ~= nil then
+		for index, weapon in def.weapons do
+			if weapon.turret ~= nil then
+				set_attribute(model, aim_attribute(index), math.round((entity.weapon_aims[index] or 0) * 100) / 100)
+			end
+		end
+	end
+	-- how many shots each weapon whose art plays something when it fires (a silo's hatch) has taken, for the client
+	-- to play it on each one; to the nearest thousand, which is plenty to see a new one by
+	for _, index in fired_weapons(entity.def_name) do
+		set_attribute(model, fired_attribute(index), combat.shots_of(entity.id, index) % 1000)
+	end
+	-- where a pop-up is in unfolding (see types.Animation); nothing else ever leaves "open"
+	if def.popup ~= nil then
+		set_attribute(model, "animation", entity.animation.state)
+	end
 	-- how full a transport is, in slots
 	if def.transport ~= nil then
 		set_attribute(model, "cargo_used", transport.slots_used(entity.id))
@@ -508,11 +633,35 @@ local function destroy(id: EntityId)
 	transforms[id] = nil
 end
 
+-- What the client needs to know about a reclaimable, which is much less than about anything else: what it is, and
+-- what is left in it. It never moves, is never anyone's, and never does anything.
+local function apply_reclaimable_attributes(entity: Entity, model: Model)
+	set_attribute(model, "entity_id", entity.id)
+	set_attribute(model, "team", entity.team)
+	set_attribute(model, "ally_group", alliances.root_of(entity.team))
+	set_attribute(model, "def_name", entity.def_name)
+	set_attribute(model, "kind", entity.kind)
+	set_attribute(model, "state", entity.state)
+	local yield = entity.yield
+	if yield ~= nil then
+		local def = unit_defs.get(entity.def_name)
+		set_attribute(model, "metal_left", math.round(yield.metal_left))
+		set_attribute(model, "energy_left", math.round(yield.energy_left))
+		set_attribute(model, "reclaim_left", math.round(yield.buildpower_left))
+		set_attribute(model, "reclaim_total", math.round(def.buildpower_cost))
+	end
+end
+
 local function sync_entity(entity: Entity, carried: boolean)
 	local model = models[entity.id]
 	if model == nil then
 		model = build_model(entity)
 		models[entity.id] = model
+	end
+	if entity.kind == "reclaimable" then
+		apply_transform(entity, model)
+		apply_reclaimable_attributes(entity, model)
+		return
 	end
 	apply_transform(entity, model)
 	apply_appearance(entity, model)

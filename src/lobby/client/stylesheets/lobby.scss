@@ -1,0 +1,714 @@
+// The lobby's screens, in the game HUD's own language: the same palette, plates, rails and cells, from the same
+// partials, so going from the lobby into a game looks like one piece. Only what the lobby adds is written here.
+@use "sass:color";
+@use "../../../client/ui/stylesheets/default/theme" as *;
+@use "../../../client/ui/stylesheets/default/mixins" as *;
+@use "../../../client/ui/stylesheets/default/main" as *;
+
+// Base -------------------------------------------------------------------------------------------------
+
+ScrollingFrame {
+	border: none;
+	background-color: transparent;
+	scrollbar-width: thin;
+	scrollbar-color: $edge transparent;
+	overflow-y: auto;
+}
+
+ImageLabel {
+	border: none;
+	background-color: transparent;
+}
+
+// The small lit block at the start of a title, as the HUD's panels have.
+.accent-bar {
+	width: 4px;
+	height: 14px;
+	background-color: var(--Accent);
+
+	&.tall {
+		height: 34px;
+	}
+}
+
+.title-row {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.badge {
+	width: auto;
+	height: 18px;
+	padding: 0 space(2);
+	outline: 1px solid $edge;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+// A word stamped on a row: who is host, who is you, who may join.
+.tag {
+	width: auto;
+	height: 16px;
+	padding: 0 space(1);
+	outline: 1px solid $edge;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 10px;
+	font-weight: bold;
+	letter-spacing: 0.08em;
+
+	&.friends,
+	&.you {
+		color: var(--Accent);
+		outline: 1px solid var(--Accent);
+	}
+
+	&.host {
+		color: var(--Energy);
+		outline: 1px solid var(--Energy);
+	}
+}
+
+.seam {
+	@include seam;
+}
+
+// A command button. The primary one is filled with the accent, the way the lit rail is. Its words are in a label
+// inside it (see ui/controls.luau for why).
+.button {
+	width: auto;
+	height: 36px;
+	padding: 0 space(5);
+	@include cell;
+	@include stack(row, 0);
+	justify-content: center;
+	align-items: center;
+
+	&.primary {
+		background-color: color.adjust($accent, $lightness: -22%);
+		background-image: linear-gradient(180deg, veil(white, 0.18), veil(black, 0.25));
+		outline: 1px solid var(--Accent);
+
+		&:hover {
+			background-color: color.adjust($accent, $lightness: -12%);
+		}
+	}
+
+	&.locked,
+	&:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	// the join button on each row of the browser, as wide as its column
+	&.join {
+		width: 96px;
+	}
+}
+
+.button-label {
+	font-family: Michroma;
+	font-size: 12px;
+	font-weight: bold;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+// One choice among several. The one in effect is lit; a locked one (anyone but the host) does not light on hover.
+.chip {
+	width: auto;
+	height: 30px;
+	padding: 0 space(3);
+	@include cell;
+	@include stack(row, 0);
+	justify-content: center;
+	align-items: center;
+
+	// Lit with the accent, so the choice in effect reads at a glance and not only on a closer look at its edge. The
+	// gradient is written out again because outlass bakes the cell's translucent gradient together with the
+	// background-color of the rule it is declared in; changing only background-color here would not show.
+	&.active {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
+		outline: 1px solid var(--Accent);
+	}
+
+	&.locked:hover {
+		background-color: $steel-raised;
+		outline: 1px solid $edge;
+	}
+
+	&.locked.active:hover {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.chip-label {
+	color: var(--TextDim);
+	font-size: 13px;
+	font-weight: bold;
+}
+
+.chip.active > .chip-label {
+	color: var(--Text);
+}
+
+// Screen -------------------------------------------------------------------------------------------------
+
+// Behind everything: the void, lifting toward the middle, with a lit rail along the top edge.
+.backdrop {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	background-color: $void;
+	background-image: radial-gradient(ellipse at center, $steel 0%, $void 70%);
+}
+
+.backdrop-rail {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: $rail;
+	background-image: linear-gradient(90deg, transparent 0%, $accent 30%, $accent 70%, transparent 100%);
+}
+
+// Everything the player uses, at the size it was drawn for, scaled as a whole to the screen (see use_viewport).
+.shell {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 1240px;
+	height: 720px;
+	@include stack(column, space(3));
+}
+
+.header {
+	width: 100%;
+	height: 64px;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: space(3) space(4);
+}
+
+.header-titles {
+	height: auto;
+	@include stack(column, 0);
+}
+
+.header-title {
+	width: 100%;
+	height: 22px;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 18px;
+	letter-spacing: 0.2em;
+	text-align: left;
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+.header-subtitle {
+	@include caption;
+	width: 100%;
+	height: 16px;
+	font-size: 12px;
+}
+
+.header-player {
+	width: auto;
+	height: auto;
+	color: var(--Accent);
+	font-size: 14px;
+	text-align: right;
+}
+
+// Takes the rest of the column. `height: 0` is only there for outlass: the idiomatic `flex: 1; min-height: 0` (or a
+// bare `flex-grow: 1`) leaves the height unset, which outlass turns into AutomaticSize.Y - sized to the content, so a
+// list never scrolls - where a browser lets the flex layout decide it. Same meaning in CSS, so it stays harmless there.
+.body {
+	width: 100%;
+	height: 0;
+	flex: 1;
+}
+
+// Something the player should know, like a request the server turned down: along the bottom, in the danger red.
+.notice {
+	position: absolute;
+	bottom: space(8);
+	left: 50%;
+	transform: translateX(-50%);
+	width: auto;
+	height: auto;
+	padding: space(2) space(5);
+	background-color: veil($void, 0.92);
+	outline: 1px solid var(--Danger);
+	color: var(--Text);
+	font-family: RobotoMono;
+	font-size: 13px;
+	z-index: 10;
+}
+
+// Browser -------------------------------------------------------------------------------------------------
+
+.browser {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(3));
+}
+
+.lobby-columns {
+	width: 100%;
+	height: 18px;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(2);
+}
+
+.column-name {
+	@include caption;
+	font-family: RobotoMono;
+	font-size: 10px;
+	letter-spacing: 0.1em;
+}
+
+// The header's stand-in for the join buttons, so the columns above line up with the rows below.
+.join-space {
+	width: 96px;
+	height: 1px;
+}
+
+.lobby-list {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+}
+
+.lobby-row {
+	width: 100%;
+	height: 60px;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(2);
+	background-color: $steel-raised;
+	background-image: linear-gradient(180deg, veil(white, 0.04), veil(black, 0.2));
+	outline: 1px solid $edge;
+	transition: outline-color $fast $ease-out;
+
+	&:hover {
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.lobby-thumb {
+	width: 76px;
+	height: 48px;
+	background-color: $void;
+	outline: 1px solid color.adjust($edge, $lightness: -20%);
+
+	&.blank {
+		height: 1px;
+		background-color: transparent;
+		outline: none;
+	}
+}
+
+.lobby-cell {
+	height: auto;
+	text-align: left;
+
+	&.host {
+		flex-grow: 1;
+		@include stack(column, space(1));
+	}
+	&.mode {
+		width: 110px;
+		color: var(--Accent);
+	}
+	&.map {
+		width: 190px;
+		@include stack(column, 0);
+	}
+	&.players {
+		width: 80px;
+		text-align: right;
+	}
+	&.players.full {
+		color: var(--Danger);
+	}
+
+	// the column headings, over the tone the cells below them take
+	&.column-name {
+		color: var(--TextDim);
+	}
+}
+
+.lobby-host {
+	width: 100%;
+	height: 20px;
+	font-size: 15px;
+	font-weight: bold;
+	text-align: left;
+}
+
+.lobby-map-name,
+.lobby-map-size {
+	width: 100%;
+	height: 18px;
+	text-align: left;
+}
+
+.lobby-map-size {
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+.empty {
+	width: 100%;
+	height: 120px;
+	color: var(--TextFaint);
+	font-size: 15px;
+	font-style: italic;
+}
+
+// Room -----------------------------------------------------------------------------------------------------
+
+.room {
+	width: 100%;
+	height: 100%;
+	@include stack(row, space(3));
+}
+
+.room-side {
+	width: 524px;
+	height: 100%;
+	@include stack(column, space(3));
+}
+
+// Map --------------------------------------------------------------------------------------------------------
+
+.map-panel {
+	width: 704px;
+	height: 100%;
+	@include stack(column, space(2));
+}
+
+// The large picture. A dark stage the picture is fitted into, so maps of every shape sit in the same frame.
+.map-stage {
+	width: 100%;
+	height: 300px;
+	background-color: $void;
+	background-image: linear-gradient(180deg, veil($steel, 0.6), $void);
+	outline: 1px solid color.adjust($edge, $lightness: -20%);
+}
+
+// Fitted to the map's shape by the aspect constraint the picture sets on it, and centred in its box.
+.map-fit {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 100%;
+	height: 100%;
+	outline: 1px solid $edge;
+}
+
+.map-picture {
+	position: absolute;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	object-fit: fill;
+	image-rendering: auto;
+}
+
+.map-drawing {
+	position: absolute;
+	z-index: 2;
+	width: 100%;
+	height: 100%;
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+.map-grid {
+	position: absolute;
+	z-index: 3;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+
+.grid-line {
+	position: absolute;
+	background-color: white;
+	opacity: 0.22;
+
+	&.column {
+		width: 1px;
+		height: 100%;
+	}
+
+	&.row {
+		width: 100%;
+		height: 1px;
+	}
+}
+
+.facts {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(5));
+	align-items: center;
+}
+
+// Wrapped text cannot size its own width, so a fact is given one.
+.fact {
+	width: 84px;
+	height: auto;
+	@include stack(column, 0);
+}
+
+.fact-label {
+	@include caption;
+	width: 100%;
+	height: 14px;
+	font-family: RobotoMono;
+	font-size: 10px;
+	letter-spacing: 0.1em;
+}
+
+.fact-value {
+	width: 100%;
+	height: 22px;
+	font-size: 17px;
+	text-align: left;
+}
+
+.map-description {
+	height: auto;
+	@include caption;
+	font-size: 12px;
+}
+
+.map-grid-note {
+	width: 100%;
+	height: 14px;
+	font-size: 11px;
+	font-style: italic;
+	text-align: left;
+}
+
+// Every map to pick from, as cards four across.
+.map-list {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	display: grid;
+	// four cards and three gaps inside the panel's 672px, with a little room for the scrollbar
+	grid-template-columns: repeat(4, 158px);
+	grid-auto-rows: 118px;
+	gap: space(2);
+	padding: 1px;
+}
+
+.map-card {
+	width: 158px;
+	height: 118px;
+	@include cell;
+	@include stack(column, space(1));
+	align-items: center;
+	padding: space(1) + 2px;
+
+	&.active {
+		background-color: $steel-lit;
+		outline: 2px solid var(--Accent);
+	}
+
+	&.locked:hover {
+		background-color: $steel-raised;
+		outline: 1px solid $edge;
+	}
+
+	&.locked.active:hover {
+		background-color: $steel-lit;
+		outline: 2px solid var(--Accent);
+	}
+}
+
+.map-card-thumb {
+	width: 100%;
+	height: 70px;
+	background-color: $void;
+}
+
+.map-card-name {
+	width: 100%;
+	height: 16px;
+	font-size: 13px;
+	font-weight: bold;
+	text-overflow: ellipsis;
+}
+
+.map-card-size {
+	width: 100%;
+	height: 13px;
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 10px;
+
+	// more players than the map has starts
+	&.crowded {
+		color: var(--Danger);
+	}
+}
+
+// Settings ----------------------------------------------------------------------------------------------------
+
+.settings-panel {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(3));
+}
+
+.group {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+}
+
+.group-label {
+	@include caption;
+	width: 100%;
+	height: 14px;
+	font-family: RobotoMono;
+	font-size: 10px;
+	letter-spacing: 0.1em;
+}
+
+.chips {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	flex-wrap: wrap;
+}
+
+// Seats -------------------------------------------------------------------------------------------------------
+
+.seats-panel {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+}
+
+.sides {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+
+	// clear of the scrollbar, which is drawn over the content
+	padding-right: space(3);
+
+	&.split {
+		flex-direction: row;
+		gap: space(3);
+	}
+}
+
+.side {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+}
+
+// Side by side, the teams share the width evenly. `width: 0` stands in for `flex-basis: 0`, which outlass has no
+// equivalent for.
+.sides.split > .side {
+	width: 0;
+	flex: 1 1 0;
+}
+
+.side-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.side-count {
+	width: auto;
+	height: 14px;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+.seat {
+	width: 100%;
+	height: 30px;
+	@include stack(row, space(2));
+	align-items: center;
+	padding: 0 space(2);
+	background-color: $steel-raised;
+	outline: 1px solid color.adjust($edge, $lightness: -15%);
+
+	&.you {
+		outline: 1px solid var(--Accent);
+	}
+
+	// An empty place: a dashed outline and faint text, so it reads as room rather than as someone.
+	&.open {
+		background-color: veil($void, 0.5);
+		outline: 1px dashed color.adjust($edge, $lightness: -10%);
+		color: var(--TextFaint);
+		font-size: 12px;
+		font-style: italic;
+	}
+
+	&.movable:hover {
+		background-color: $steel-lit;
+		outline: 1px solid var(--Accent);
+		color: var(--Text);
+	}
+}
+
+.seat-name {
+	height: auto;
+	font-size: 14px;
+	text-align: left;
+	text-overflow: ellipsis;
+}
+
+// Actions -----------------------------------------------------------------------------------------------------
+
+.room-actions {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: space(3);
+}
+
+.status {
+	height: auto;
+	color: var(--TextDim);
+	font-size: 13px;
+
+	&.warning {
+		color: $caution;
+	}
+}

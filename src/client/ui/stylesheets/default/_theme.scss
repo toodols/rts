@@ -29,7 +29,6 @@ $caution: rgb(236, 184, 68);
 $accent: rgb(96, 210, 242);
 $resurrect: rgb(176, 96, 240);
 $fight: rgb(255, 138, 64);
-$pathfind: rgb(64, 208, 190);
 
 // Spacing scale. `space(3)` is 12px; `_main.scss` turns the same scale into .gap-N utilities.
 $unit: 4px;
@@ -89,5 +88,4 @@ $medium: 0.2s;
 	--Accent: #{$accent};
 	--Resurrect: #{$resurrect};
 	--Fight: #{$fight};
-	--Pathfind: #{$pathfind};
 }

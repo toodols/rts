@@ -1,4 +1,4 @@
--- Answers "can this footprint go here": the check a constructor runs before dropping a blueprint,
+-- Answers "can this footprint go here": the check a construction_bot runs before dropping a blueprint,
 -- and the same check a factory runs on the spot in front of itself before starting the next unit.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -7,7 +7,7 @@ local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
-local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
+local spots = require(ReplicatedStorage.Shared.spots)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local state = require(script.Parent.state)
@@ -18,11 +18,11 @@ type EntityId = types.EntityId
 
 -- Footprints are allowed to touch; only real overlap is rejected.
 local OVERLAP_PADDING = 0
--- How close to the centre of a metal spot a spot-bound building has to be to count as on it.
+-- How close to a spot a spot-bound building has to be to count as on it.
 local SPOT_MATCH_RADIUS = 0.5
 -- How far off its grid position a building may be, only there to forgive float error.
 local GRID_TOLERANCE = 0.01
--- How close something has to be to a metal spot to be sitting on it or headed for it.
+-- How close something has to be to a spot to be sitting on it or headed for it.
 local TAKEN_RADIUS = 1
 
 local function half_extents_for(entity: Entity): Vector2
@@ -30,10 +30,10 @@ local function half_extents_for(entity: Entity): Vector2
 	return geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), entity.facing)
 end
 
--- Whether something in the way of a footprint can be moved off it for `team`: a wreck, which is
+-- Whether something in the way of a footprint can be moved off it for `team`: a wreck or a reclaimable, which is
 -- reclaimed, or one of its own units that can move, which is sent away.
 local function clearable(other: Entity, team: types.TeamId): boolean
-	if other.kind == "wreck" then
+	if other.kind == "wreck" or other.kind == "reclaimable" then
 		return true
 	end
 	return other.kind == "unit"
@@ -42,10 +42,10 @@ local function clearable(other: Entity, team: types.TeamId): boolean
 		and unit_defs.get(other.def_name).max_speed ~= nil
 end
 
--- Whether `other` is the finished T1 mex that a T2 mex (`def_name`) is upgrading in place: it does
--- not block the T2's footprint, the way a wreck or a movable unit does not.
+-- Whether `other` is what `def_name` is built over in place (`EntityDef.upgrades`), a T1 mex under a T2 one or a
+-- geothermal plant under an advanced one: it does not block the footprint, the way a wreck or a movable unit does not.
 local function is_upgrade_target(def_name: string, other: Entity): boolean
-	return def_name == "advanced_metal_extractor" and other.kind == "building" and other.def_name == "metal_extractor"
+	return other.kind == "building" and spots.upgrades(unit_defs.get(def_name), other.def_name)
 end
 
 -- Everything standing in the way of a footprint at `position`.
@@ -91,10 +91,11 @@ local function can_place(
 		end
 	end
 
-	if def.requires_metal_spot == true then
+	local bound_to = spots.for_def(def)
+	if bound_to ~= nil then
 		-- placement snaps onto a spot before it gets here, so anything not exactly on one is off it
-		if metal_spots.nearest(position.X, position.Z, SPOT_MATCH_RADIUS) == nil then
-			return false, "needs a metal spot"
+		if bound_to.nearest(position.X, position.Z, SPOT_MATCH_RADIUS) == nil then
+			return false, if def.requires_geo_spot == true then "needs a geothermal vent" else "needs a metal spot"
 		end
 	end
 
@@ -142,14 +143,15 @@ end
 
 -- Whether something spot-bound already stands on `spot`, or is waiting in some builder's queue to.
 -- If `builder_id` is provided, mexes queued by that same builder are ignored (not considered taken).
--- If `def_name` equals "advanced_metal_extractor", spots with T1 mexes are not considered taken.
+-- Spots with what `def_name` is built over in place (`EntityDef.upgrades`) on them are not considered taken.
 local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string?): boolean
 	for _, other in state.all() do
 		if other.alive == false then
 			continue
 		end
-		if other.kind == "building" and unit_defs.get(other.def_name).requires_metal_spot == true then
-			-- Allow T2 mex to use a spot already occupied by T1 mex (fix #4)
+		if other.kind == "building" and spots.for_def(unit_defs.get(other.def_name)) ~= nil then
+			-- a T2 mex may go on a spot a T1 mex already stands on (fix #4), and an advanced geothermal on a vent a
+			-- plain one does
 			if def_name ~= nil and is_upgrade_target(def_name, other) then
 				continue
 			end
@@ -161,7 +163,7 @@ local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string
 			local queued_def = if order.kind == "build" and order.def_name ~= nil
 				then unit_defs.get(order.def_name)
 				else nil
-			if queued_def ~= nil and queued_def.requires_metal_spot == true and order.position ~= nil then
+			if queued_def ~= nil and spots.for_def(queued_def) ~= nil and order.position ~= nil then
 				-- Only ignore this queued mex if it's queued by the same builder (fix #10)
 				if builder_id ~= nil and other.id == builder_id then
 					continue
@@ -176,13 +178,15 @@ local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string
 end
 
 -- Where a building asked for at (x, z) would actually go, turned to `facing`. Buildings sit on the
--- building grid, and a spot-bound one goes on the nearest metal spot instead, or nowhere if there is
--- none close enough. If `builder_id` is provided and this is a metal spot building, spots queued by
--- that builder are not considered taken. T2 mexes can use spots already occupied by T1 mexes.
+-- building grid, and a spot-bound one goes on the nearest spot of its kind instead, a metal spot or a geothermal vent,
+-- or nowhere if there is none close enough. If `builder_id` is provided and this is a spot-bound building, spots
+-- queued by that builder are not considered taken. Something built over another in place can use spots that other
+-- already stands on.
 local function resolve_center(def_name: string, x: number, z: number, facing: number, builder_id: EntityId?): Vector3?
 	local def = unit_defs.get(def_name)
-	if def.requires_metal_spot == true then
-		local spot = metal_spots.nearest(x, z, config.METAL_SPOT_SNAP, function(s)
+	local bound_to = spots.for_def(def)
+	if bound_to ~= nil then
+		local spot = bound_to.nearest(x, z, config.METAL_SPOT_SNAP, function(s)
 			return spot_taken(s, builder_id, def_name)
 		end)
 		if spot == nil then

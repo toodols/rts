@@ -41,12 +41,6 @@
 	outline: 1px solid var(--Fight);
 }
 
-// Pathfinding is teal: a move that finds its own way.
-.mode-hint.path {
-	color: var(--Pathfind);
-	outline: 1px solid var(--Pathfind);
-}
-
 // Repairing is yellow, the same yellow as energy.
 .mode-hint.repair {
 	color: var(--Energy);

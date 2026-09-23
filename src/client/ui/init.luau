@@ -11,6 +11,7 @@ local build_menu = require(ReplicatedStorage.Client.ui.build_menu)
 local command_panel = require(ReplicatedStorage.Client.ui.command_panel)
 local selection_box = require(ReplicatedStorage.Client.ui.selection_box)
 local world_bars = require(ReplicatedStorage.Client.ui.world_bars)
+local lobby_panel = require(ReplicatedStorage.Client.ui.lobby_panel)
 
 local ResourceBar = resource_bar.ResourceBar
 local SelectionPanel = selection_panel.SelectionPanel
@@ -43,6 +44,7 @@ local function Main()
 		SelectionBox = React.createElement(SelectionBox),
 		PlacementHint = React.createElement(PlacementHint),
 		ModeHint = React.createElement(ModeHint),
+		LobbyPanel = React.createElement(lobby_panel.LobbyPanel),
 	})
 end
 

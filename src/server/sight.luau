@@ -3,7 +3,8 @@
 -- A shot is blocked by the ground, or by something solid between the two: a finished unit or building.
 -- Blocked by ground, the shooter never fires. Blocked by something on its own side, it holds fire too,
 -- which is the caller's business, and blocked by an enemy it fires as normal and the enemy takes the
--- shot. Wrecks and blueprints are not in the way of anything.
+-- shot. Wrecks and blueprints are not in the way of anything, and neither are aircraft, which as in BAR have no
+-- collider: a shot passes through any aircraft but the one it is aimed at.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -14,6 +15,7 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local state = require(script.Parent.state)
 local alliances = require(script.Parent.alliances)
 local flat_grid = require(script.Parent.flat_grid)
+local air = require(script.Parent.air)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -92,7 +94,8 @@ local function rebuild()
 	flat_grid.clear(large_blockers.grid)
 	flat_grid.clear(wrecks.grid)
 	for _, entity in state.all() do
-		if entity.alive == false then
+		-- a reclaimable is in the way of no line of fire, and no shot can strike it
+		if entity.alive == false or entity.kind == "reclaimable" then
 			continue
 		end
 		local def = unit_defs.get(entity.def_name)
@@ -100,7 +103,13 @@ local function rebuild()
 		local half_height = unit_defs.collider_height(def) / 2
 		if entity.kind == "wreck" then
 			layer_add(wrecks, entity, radius, half_height)
-		elseif entity.state == "active" then
+		-- what is wholly under the water is under every line of fire as well: nothing can hit it that way, and it is
+		-- not in the way of anything
+		elseif
+			entity.state == "active"
+			and air.is_aircraft(entity) == false
+			and unit_defs.submerged(def, entity.position) == false
+		then
 			layer_add(if radius <= SMALL_RADIUS then small_blockers else large_blockers, entity, radius, half_height)
 		end
 	end
@@ -226,7 +235,13 @@ end
 
 -- Like `verdict`, for a shell that arcs: the ground can only block the arc it really flies, `path`, and not the
 -- straight line to the target, which it goes over. What stands in its way is still judged on that line.
-local function verdict_along(shooter: Entity, target_position: Vector3, origin: Vector3, path: { Vector3 }, ignored: EntityId): Verdict
+local function verdict_along(
+	shooter: Entity,
+	target_position: Vector3,
+	origin: Vector3,
+	path: { Vector3 },
+	ignored: EntityId
+): Verdict
 	if path_blocked(path) then
 		return "terrain"
 	end

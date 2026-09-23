@@ -70,8 +70,9 @@ local function start_center(slot: number): Vector2
 end
 
 local function acceptable(x: number, z: number, spacing: number, underwater: boolean): boolean
-	local half_x = config.MAP_CELLS_X * config.CELL_STUDS / 2 - EDGE_MARGIN
-	local half_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2 - EDGE_MARGIN
+	local map_half_x, map_half_z = heightmap.half_extents()
+	local half_x = map_half_x - EDGE_MARGIN
+	local half_z = map_half_z - EDGE_MARGIN
 	if math.abs(x) > half_x or math.abs(z) > half_z then
 		return false
 	end
@@ -125,8 +126,7 @@ end
 -- A map that is laid out in layers puts each layer's own number of spots on ground at that layer's height, and
 -- nowhere else, which keeps them off the ramps between layers.
 local function add_layers(random: Random, layers: { MetalLayer })
-	local half_x = config.MAP_CELLS_X * config.CELL_STUDS / 2
-	local half_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2
+	local half_x, half_z = heightmap.half_extents()
 	for _, layer in layers do
 		local placed = 0
 		for _ = 1, MAX_ATTEMPTS do
@@ -156,6 +156,16 @@ end
 local function initialize(seed: number)
 	table.clear(spots)
 	starts.initialize()
+
+	-- a map that says where its metal is has exactly that, and nothing laid out from the seed
+	local fixed = map_presets.get(heightmap.get_preset()).metal_spots
+	if fixed ~= nil then
+		for _, spot in fixed do
+			add(spot.position.X, spot.position.Y, spot.multiplier)
+		end
+		return
+	end
+
 	local random = Random.new(seed + SEED_OFFSET)
 
 	for slot = 1, config.START_SLOTS do
@@ -187,8 +197,7 @@ local function initialize(seed: number)
 		if placed >= MIDDLE_SPOT_COUNT then
 			break
 		end
-		local half_x = config.MAP_CELLS_X * config.CELL_STUDS / 2
-		local half_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2
+		local half_x, half_z = heightmap.half_extents()
 		local x = random:NextNumber(-half_x, half_x)
 		local z = random:NextNumber(-half_z, half_z)
 
@@ -217,8 +226,7 @@ local function initialize(seed: number)
 		if sunk >= UNDERWATER_SPOT_COUNT then
 			break
 		end
-		local half_x = config.MAP_CELLS_X * config.CELL_STUDS / 2
-		local half_z = config.MAP_CELLS_Z * config.CELL_STUDS / 2
+		local half_x, half_z = heightmap.half_extents()
 		local x = random:NextNumber(-half_x, half_x)
 		local z = random:NextNumber(-half_z, half_z)
 		if acceptable(x, z, MIDDLE_SPACING, true) then

@@ -34,6 +34,12 @@ type Placed = {
 
 -- How many rings of spots round the drop point are tried for each thing before it is left aboard.
 local UNLOAD_RINGS = 6
+-- A transport comes down to pick something up over it or over one of this many spots this far from it, in studs,
+-- whichever it can come lowest over; somewhere other than straight over it has to be at least HOOK_SPOT_PREFERENCE
+-- studs lower to be worth it.
+local HOOK_SPOTS = 8
+local HOOK_SPOT_REACH = 2
+local HOOK_SPOT_PREFERENCE = 0.25
 
 -- How many slots the transport can hold in all; none if it is not a transport.
 local function capacity_of(transport: Entity): number
@@ -58,7 +64,7 @@ local function can_load(transport: Entity, cargo: Entity): boolean
 	if transport.alive == false or transport.state ~= "active" or cargo.alive == false or cargo.state ~= "active" then
 		return false
 	end
-	if transport.id == cargo.id or cargo.kind == "wreck" then
+	if transport.id == cargo.id or cargo.kind == "wreck" or cargo.kind == "reclaimable" then
 		return false
 	end
 	local cargo_def = unit_defs.get(cargo.def_name)
@@ -75,22 +81,58 @@ local function hook_height(transport: Entity, cargo: Entity): number
 	return cargo.position.Y + cargo_half + transport_half + config.TRANSPORT_HOOK_GAP
 end
 
--- Flies `transport` to `cargo`, keeping pace with it, and down over the top of it, ready to be picked up.
+-- Where over `cargo` the transport comes down to pick it up: of the spots within its reach of it, the one it can
+-- come lowest over, so that ground rising beside the thing, like the foot of a slope, does not hold it up out of
+-- reach. Straight over it unless somewhere else is clearly lower.
+local function hook_spot(transport: Entity, cargo: Entity): Vector3
+	local def = unit_defs.get(transport.def_name)
+	local at = cargo.position
+	local best = at
+	local lowest = air.resting_height(def, at.X, at.Z) - HOOK_SPOT_PREFERENCE
+	for index = 0, HOOK_SPOTS - 1 do
+		local angle = index * (2 * math.pi / HOOK_SPOTS)
+		local x = at.X + math.cos(angle) * HOOK_SPOT_REACH
+		local z = at.Z + math.sin(angle) * HOOK_SPOT_REACH
+		local height = air.resting_height(def, x, z)
+		if height < lowest then
+			best = Vector3.new(x, at.Y, z)
+			lowest = height
+		end
+	end
+	return best
+end
+
+-- Flies `transport` to `cargo`, keeping pace with it, and down over the top of it, ready to be picked up. It
+-- flies there at its usual height, and only comes down once it is over the thing: coming down on the way would
+-- drag it along any ground between them that is higher than where the thing stands.
 local function reach_for(transport: Entity, cargo: Entity)
-	movement.set_tracking_goal(transport, cargo.position, config.TRANSPORT_LOAD_RANGE / 2, cargo.velocity)
-	movement.set_hover(transport, hook_height(transport, cargo))
+	local spot = hook_spot(transport, cargo)
+	-- it stops close enough to the spot to be well within its reach of the thing
+	local stop_radius = (config.TRANSPORT_LOAD_RANGE - HOOK_SPOT_REACH) / 2
+	movement.set_tracking_goal(transport, spot, stop_radius, cargo.velocity)
+	if geometry.distance_2d(transport.position, cargo.position) <= config.TRANSPORT_DESCEND_RANGE then
+		movement.set_hover(transport, hook_height(transport, cargo))
+	end
 end
 
 -- Whether `transport` is close and still enough beside `cargo` to take it aboard this instant: effectively
--- touching it, and moving so little relative to it that the hook can catch. It is stricter for the enemy's
+-- touching it, or as near as the ground lets it come and within a rope's length, and moving so little relative
+-- to it that the hook can catch. It is stricter for the enemy's
 -- things, which makes any of them that are moving hard to get hold of, and easy for a tower, which never moves.
 local function in_grasp(transport: Entity, cargo: Entity): boolean
 	if geometry.distance_2d(transport.position, cargo.position) > config.TRANSPORT_LOAD_RANGE then
 		return false
 	end
-	local underside = transport.position.Y - unit_defs.collider_height(unit_defs.get(transport.def_name)) / 2
+	local transport_def = unit_defs.get(transport.def_name)
+	local position = transport.position
+	local underside = position.Y - unit_defs.collider_height(transport_def) / 2
 	local top = cargo.position.Y + unit_defs.collider_height(unit_defs.get(cargo.def_name)) / 2
-	if underside - top > config.TRANSPORT_LOAD_HEIGHT then
+	-- one that can come no lower, held up by ground rising beside the thing, lets its hook down on the rope
+	local reach = config.TRANSPORT_LOAD_HEIGHT
+	if position.Y <= air.resting_height(transport_def, position.X, position.Z) + config.TRANSPORT_LOAD_HEIGHT then
+		reach += config.TRANSPORT_ROPE
+	end
+	if underside - top > reach then
 		return false
 	end
 	local limit = if cargo.team == transport.team
@@ -99,9 +141,9 @@ local function in_grasp(transport: Entity, cargo: Entity): boolean
 	return geometry.flatten(transport.velocity - cargo.velocity).Magnitude <= limit
 end
 
--- Takes `cargo` aboard. Whatever it was doing is forgotten.
+-- Takes `cargo` aboard. Its orders are kept, not forgotten: nothing runs them while it is in the hold, and it
+-- takes them up again once it is set down.
 local function load(transport: Entity, cargo: Entity)
-	cargo.orders = {}
 	cargo.velocity = Vector3.zero
 	combat.set_forced_target(cargo, nil)
 	state.stow(transport.id, cargo)
@@ -128,6 +170,30 @@ local function dangle_position(transport: Entity, cargo: Entity, index: number, 
 	-- it can be lowered no further than the ground
 	local y = math.max(transport.position.Y - drop, air.resting_height(cargo_def, x, z))
 	return Vector3.new(x, y, z)
+end
+
+-- The height the middle of `transport` is at when what it carries hangs just clear of the ground under it: low
+-- enough to set it down, and no lower, so that nothing it carries is dragged along the ground on the way.
+local function set_down_height(transport: Entity): number
+	local transport_def = unit_defs.get(transport.def_name)
+	local x = transport.position.X
+	local z = transport.position.Z
+	local height = air.resting_height(transport_def, x, z)
+	for _, cargo in state.cargo_of(transport.id) do
+		local cargo_def = unit_defs.get(cargo.def_name)
+		local drop = unit_defs.collider_height(transport_def) / 2
+			+ config.TRANSPORT_ROPE
+			+ unit_defs.collider_height(cargo_def) / 2
+		height = math.max(height, air.resting_height(cargo_def, x, z) + drop + config.TRANSPORT_HOOK_GAP)
+	end
+	return height
+end
+
+-- Brings `transport` down to set what it carries down, and returns whether it is low enough to let go of it.
+local function lower(transport: Entity): boolean
+	local height = set_down_height(transport)
+	movement.set_hover(transport, height)
+	return transport.position.Y <= height + config.TRANSPORT_LOAD_HEIGHT
 end
 
 -- Hangs everything a transport carries from it. Run once a step, after everything has moved.
@@ -210,6 +276,7 @@ return table.freeze({
 	reach_for = reach_for,
 	in_grasp = in_grasp,
 	load = load,
+	lower = lower,
 	tick = tick,
 	unload = unload,
 })

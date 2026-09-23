@@ -13,5 +13,6 @@ pow.init({
 		},
 	},
 	disable_data_store = true,
+	extras_shared = { ServerScriptService.Server.pow_shared_ext },
 	extras_server = { ServerScriptService.Server.pow_server_ext },
 })

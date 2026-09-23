@@ -3,7 +3,9 @@
 --
 -- A wreck has its own pools (50% of the dead unit's metal over 20% of its buildpower_cost), so
 -- reclaiming a wreck is much faster than rebuilding the unit was. Reclaiming something still
--- standing unwinds its build progress and refunds metal at its own build rate.
+-- standing unwinds its build progress and refunds metal at its own build rate. A reclaimable, a rock or a
+-- tree, is taken apart exactly as a wreck is, out of the pools its def gives it, and pays out energy as
+-- well as metal.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -46,7 +48,11 @@ local function can_reclaim(reclaimer: Entity, target: Entity): boolean
 		return false
 	end
 	-- something that has to be destroyed cannot be taken apart while it stands, but what it leaves can be
-	if target.kind ~= "wreck" and unit_defs.get(target.def_name).reclaimable == false then
+	if
+		target.kind ~= "wreck"
+		and target.kind ~= "reclaimable"
+		and unit_defs.get(target.def_name).reclaimable == false
+	then
 		return false
 	end
 	return true
@@ -139,6 +145,36 @@ local function reclaim_wreck(target: Entity, applied: number, team: types.TeamId
 	end
 end
 
+-- A reclaimable pays out its metal and energy in step with the buildpower put into it, at the rates its def's
+-- metal_cost and energy_cost over its buildpower_cost set, and is gone once all of that has been put in.
+local function reclaim_yield(target: Entity, applied: number, team: types.TeamId)
+	local yield = target.yield
+	if yield == nil then
+		return
+	end
+	local def = unit_defs.get(target.def_name)
+	if def.buildpower_cost <= 0 then
+		economy.add_metal(team, yield.metal_left)
+		economy.add_energy(team, yield.energy_left)
+		state.mark_dead(target)
+		return
+	end
+
+	local consumed = math.min(applied, yield.buildpower_left)
+	local metal = math.min(yield.metal_left, consumed * def.metal_cost / def.buildpower_cost)
+	local energy = math.min(yield.energy_left, consumed * def.energy_cost / def.buildpower_cost)
+
+	yield.buildpower_left -= consumed
+	yield.metal_left -= metal
+	yield.energy_left -= energy
+	economy.add_metal(team, metal)
+	economy.add_energy(team, energy)
+
+	if yield.buildpower_left <= 0 then
+		state.mark_dead(target)
+	end
+end
+
 -- Reclaiming something still standing takes its health away at the rate its buildpower cost sets:
 -- each point of buildpower applied removes that fraction of its max health, so a reclaimer of
 -- buildpower B strips a target of cost C in C / B seconds however hurt it was. When its health runs
@@ -170,6 +206,8 @@ local function resolve(delta: number)
 		local applied = entry.buildpower * delta
 		if target.kind == "wreck" then
 			reclaim_wreck(target, applied, entry.team)
+		elseif target.kind == "reclaimable" then
+			reclaim_yield(target, applied, entry.team)
 		else
 			reclaim_standing(target, applied, entry.team)
 		end

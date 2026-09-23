@@ -36,8 +36,9 @@ local function max_health_for_progress(full_health: number, progress: number, co
 	return math.max(MINIMUM_BLUEPRINT_HEALTH, full_health * (progress / cost))
 end
 
-local function create_team(id: TeamId): Team
-	local team: Team = {
+-- A team as it starts: a stockpile, the capacity to hold it and an income.
+local function fresh_team(id: TeamId): Team
+	return {
 		id = id,
 		-- replaced by the player's name when a player takes the team
 		name = `Team {id}`,
@@ -52,8 +53,31 @@ local function create_team(id: TeamId): Team
 		energy_revenue = 0,
 		energy_expense = 0,
 	}
+end
+
+local function create_team(id: TeamId): Team
+	local team = fresh_team(id)
 	teams[id] = team
 	return team
+end
+
+-- Puts a team back to how it started, in place, keeping its name.
+local function reset_team(id: TeamId)
+	local team = teams[id]
+	if team == nil then
+		return
+	end
+	local fresh = fresh_team(id)
+	team.metal = fresh.metal
+	team.energy = fresh.energy
+	team.metal_income = fresh.metal_income
+	team.energy_income = fresh.energy_income
+	team.metal_capacity = fresh.metal_capacity
+	team.energy_capacity = fresh.energy_capacity
+	team.metal_revenue = fresh.metal_revenue
+	team.metal_expense = fresh.metal_expense
+	team.energy_revenue = fresh.energy_revenue
+	team.energy_expense = fresh.energy_expense
 end
 
 local function get_team(id: TeamId): Team?
@@ -93,15 +117,19 @@ local function create_entity(
 		energy_paid = if state == "active" then def.energy_cost else 0,
 		orders = {},
 		queue = {},
-		reload_remaining = 0,
 		manual_reload_remaining = 0,
-		turret_reloads = {},
-		burst_remaining = 0,
-		turret_burst_remaining = {},
-		stockpile = 0,
-		stockpile_progress = 0,
+		weapon_reloads = {},
+		weapon_burst_remaining = {},
+		weapon_stockpiles = {},
+		weapon_stockpile_progress = {},
+		drone_stockpile = 0,
+		drone_stockpile_progress = 0,
+		weapon_aims = {},
+		-- a pop-up starts folded away; everything else is always ready to fire
+		animation = { state = if def.popup ~= nil then "closed" else "open", ticks = 0 },
 		unfed_time = 0,
 		wreck = nil,
+		yield = nil,
 		alive = true,
 	}
 
@@ -138,13 +166,15 @@ local function create_wreck(source: Entity): Entity
 		energy_paid = 0,
 		orders = {},
 		queue = {},
-		reload_remaining = 0,
 		manual_reload_remaining = 0,
-		turret_reloads = {},
-		burst_remaining = 0,
-		turret_burst_remaining = {},
-		stockpile = 0,
-		stockpile_progress = 0,
+		weapon_reloads = {},
+		weapon_burst_remaining = {},
+		weapon_stockpiles = {},
+		weapon_stockpile_progress = {},
+		drone_stockpile = 0,
+		drone_stockpile_progress = 0,
+		weapon_aims = {},
+		animation = { state = "closed", ticks = 0 },
 		unfed_time = 0,
 		wreck = {
 			source_def_name = source.def_name,
@@ -153,6 +183,54 @@ local function create_wreck(source: Entity): Entity
 			buildpower_total = buildpower_total,
 			buildpower_left = buildpower_total,
 			resurrect_progress = 0,
+		},
+		yield = nil,
+		alive = true,
+	}
+
+	spawning[id] = entity
+	return entity
+end
+
+-- A reclaimable, a rock or a tree, lying at `position`: full of what its def says it holds. It belongs to nobody, so
+-- it is on team 0 like a wreck. Its health is never touched, since nothing can harm it.
+local function create_reclaimable(def_name: string, position: Vector3, facing: number): Entity
+	local def = unit_defs.get(def_name)
+	assert(def.kind == "reclaimable", `"{def_name}" is not a reclaimable`)
+	local id = next_entity_id
+	next_entity_id += 1
+
+	local entity: Entity = {
+		id = id,
+		team = 0,
+		def_name = def_name,
+		kind = "reclaimable",
+		state = "active",
+		position = position,
+		facing = facing,
+		velocity = Vector3.zero,
+		health = def.health,
+		max_health = def.health,
+		build_progress = 0,
+		metal_paid = 0,
+		energy_paid = 0,
+		orders = {},
+		queue = {},
+		manual_reload_remaining = 0,
+		weapon_reloads = {},
+		weapon_burst_remaining = {},
+		weapon_stockpiles = {},
+		weapon_stockpile_progress = {},
+		weapon_aims = {},
+		animation = { state = "closed", ticks = 0 },
+		unfed_time = 0,
+		drone_stockpile = 0,
+		drone_stockpile_progress = 0,
+		wreck = nil,
+		yield = {
+			metal_left = def.metal_cost,
+			energy_left = def.energy_cost,
+			buildpower_left = def.buildpower_cost,
 		},
 		alive = true,
 	}
@@ -271,10 +349,12 @@ end
 
 return table.freeze({
 	create_team = create_team,
+	reset_team = reset_team,
 	get_team = get_team,
 	all_teams = all_teams,
 	create_entity = create_entity,
 	create_wreck = create_wreck,
+	create_reclaimable = create_reclaimable,
 	get = get,
 	all = all,
 	flush = flush,

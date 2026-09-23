@@ -12,16 +12,15 @@ local config = require(ReplicatedStorage.Shared.config)
 local map_presets = require(ReplicatedStorage.Shared.map_presets)
 
 local CELL_STUDS = config.CELL_STUDS
-local MAP_CELLS_X = config.MAP_CELLS_X
-local MAP_CELLS_Z = config.MAP_CELLS_Z
 
--- Grid samples run 0..MAP_CELLS inclusive, so there is one more sample than cell on each axis.
-local SAMPLES_X = MAP_CELLS_X + 1
-local SAMPLES_Z = MAP_CELLS_Z + 1
-
--- World origin is placed so that the map is centred on (0, 0).
-local ORIGIN_X = -MAP_CELLS_X * CELL_STUDS / 2
-local ORIGIN_Z = -MAP_CELLS_Z * CELL_STUDS / 2
+-- How big the map is, which is up to its preset (`Preset.size`), so these are set by `initialize` and not constants.
+-- Grid samples run 0..cells inclusive, so there is one more sample than cell on each axis. The map is centred on
+-- (0, 0), so the origin, its low corner, is half of it back from there.
+local map_cells_x = config.MAP_CELLS_X
+local map_cells_z = config.MAP_CELLS_Z
+local samples_x = map_cells_x + 1
+local origin_x = -map_cells_x * CELL_STUDS / 2
+local origin_z = -map_cells_z * CELL_STUDS / 2
 
 local heights: { number } = {}
 -- The height each edited sample was generated with, by sample index. Only samples that have been edited
@@ -34,7 +33,7 @@ local highest_height = 0
 local is_initialized = false
 
 local function sample_index(cx: number, cz: number): number
-	return cz * SAMPLES_X + cx + 1
+	return cz * samples_x + cx + 1
 end
 
 -- Fills the grid from a map preset, which decides what the ground looks like. Every sample is the
@@ -45,19 +44,44 @@ local function initialize(seed: number, preset_name: string?)
 	current_preset = preset.name
 	local height_of = preset.build(seed)
 
+	-- to the nearest even number of cells: the map is centred on (0, 0), and only an even number puts its edges, and
+	-- so every cell, on the terrain's voxel grid, which is what lets a cell be drawn as exactly one column of voxels
+	local size = preset.size
+	map_cells_x = if size ~= nil then 2 * math.round(size.X / CELL_STUDS / 2) else config.MAP_CELLS_X
+	map_cells_z = if size ~= nil then 2 * math.round(size.Y / CELL_STUDS / 2) else config.MAP_CELLS_Z
+	assert(map_cells_x % 2 == 0 and map_cells_z % 2 == 0, "a map must be an even number of cells across")
+	samples_x = map_cells_x + 1
+	origin_x = -map_cells_x * CELL_STUDS / 2
+	origin_z = -map_cells_z * CELL_STUDS / 2
+
 	table.clear(heights)
 	table.clear(originals)
 	lowest_height = math.huge
 	highest_height = -math.huge
-	for cz = 0, MAP_CELLS_Z do
-		for cx = 0, MAP_CELLS_X do
-			local height = height_of(ORIGIN_X + cx * CELL_STUDS, ORIGIN_Z + cz * CELL_STUDS)
+	for cz = 0, map_cells_z do
+		for cx = 0, map_cells_x do
+			local height = height_of(origin_x + cx * CELL_STUDS, origin_z + cz * CELL_STUDS)
 			heights[sample_index(cx, cz)] = height
 			lowest_height = math.min(lowest_height, height)
 			highest_height = math.max(highest_height, height)
 		end
 	end
 	is_initialized = true
+end
+
+-- How many cells the map is across, along x and then z.
+local function cells(): (number, number)
+	return map_cells_x, map_cells_z
+end
+
+-- How many grid samples are in a row along x, which is what a sample index counts in.
+local function samples_across(): number
+	return samples_x
+end
+
+-- How far the map reaches from its middle, (0, 0), along x and then z, in studs.
+local function half_extents(): (number, number)
+	return map_cells_x * CELL_STUDS / 2, map_cells_z * CELL_STUDS / 2
 end
 
 local function get_preset(): string
@@ -79,8 +103,8 @@ end
 
 -- Height of grid sample (cx, cz), clamped to the edge outside the map.
 local function sample(cx: number, cz: number): number
-	local clamped_x = math.clamp(cx, 0, MAP_CELLS_X)
-	local clamped_z = math.clamp(cz, 0, MAP_CELLS_Z)
+	local clamped_x = math.clamp(cx, 0, map_cells_x)
+	local clamped_z = math.clamp(cz, 0, map_cells_z)
 	local height = heights[sample_index(clamped_x, clamped_z)]
 	if height == nil then
 		return config.TERRAIN_BASE_HEIGHT
@@ -89,11 +113,11 @@ local function sample(cx: number, cz: number): number
 end
 
 local function world_to_grid(x: number, z: number): (number, number)
-	return (x - ORIGIN_X) / CELL_STUDS, (z - ORIGIN_Z) / CELL_STUDS
+	return (x - origin_x) / CELL_STUDS, (z - origin_z) / CELL_STUDS
 end
 
 local function grid_to_world(cx: number, cz: number): (number, number)
-	return ORIGIN_X + cx * CELL_STUDS, ORIGIN_Z + cz * CELL_STUDS
+	return origin_x + cx * CELL_STUDS, origin_z + cz * CELL_STUDS
 end
 
 local function height_at(x: number, z: number): number
@@ -152,7 +176,7 @@ end
 
 local function in_bounds(x: number, z: number): boolean
 	local gx, gz = world_to_grid(x, z)
-	return gx >= 0 and gx <= MAP_CELLS_X and gz >= 0 and gz <= MAP_CELLS_Z
+	return gx >= 0 and gx <= map_cells_x and gz >= 0 and gz <= map_cells_z
 end
 
 -- Sets the height of one grid sample. The first time a sample is edited, the height it was generated with
@@ -203,8 +227,8 @@ local function deform(
 	local gx1, gz1 = world_to_grid(center_x + reach, center_z + reach)
 
 	local changes = {}
-	for cz = math.max(0, math.ceil(gz0)), math.min(MAP_CELLS_Z, math.floor(gz1)) do
-		for cx = math.max(0, math.ceil(gx0)), math.min(MAP_CELLS_X, math.floor(gx1)) do
+	for cz = math.max(0, math.ceil(gz0)), math.min(map_cells_z, math.floor(gz1)) do
+		for cx = math.max(0, math.ceil(gx0)), math.min(map_cells_x, math.floor(gx1)) do
 			local wx, wz = grid_to_world(cx, cz)
 			local dx = wx - center_x
 			local dz = wz - center_z
@@ -298,8 +322,7 @@ return table.freeze({
 	apply_heights = apply_heights,
 	edited_heights = edited_heights,
 	sample_index = sample_index,
-	SAMPLES_X = SAMPLES_X,
-	SAMPLES_Z = SAMPLES_Z,
-	ORIGIN_X = ORIGIN_X,
-	ORIGIN_Z = ORIGIN_Z,
+	cells = cells,
+	samples_across = samples_across,
+	half_extents = half_extents,
 })

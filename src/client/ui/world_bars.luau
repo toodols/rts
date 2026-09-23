@@ -23,6 +23,7 @@ local React = require(ReplicatedStorage.Packages.react)
 local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local art = require(ReplicatedStorage.Shared.art)
 
 local world = require(ReplicatedStorage.Client.world)
 
@@ -118,6 +119,7 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 	local is_blueprint = model:GetAttribute "state" == "blueprint"
 
 	local is_wreck = model:GetAttribute "kind" == "wreck"
+	local is_reclaimable = model:GetAttribute "kind" == "reclaimable"
 
 	local fraction: number
 	local fill_tags: string
@@ -129,7 +131,13 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 	-- a third bar, under the wreck's health, for how far along raising it is
 	local resurrect_track: any = nil
 
-	if is_wreck then
+	if is_reclaimable then
+		-- a rock or a tree has no health, only what is left of it to reclaim, shown once someone has started
+		local total = math.max(1, number_of(model, "reclaim_total", 1))
+		fraction = math.clamp(number_of(model, "reclaim_left", total) / total, 0, 1)
+		fill_tags = "bar-fill reclaim"
+		show_track = fraction < 1
+	elseif is_wreck then
 		local total = math.max(1, number_of(model, "reclaim_total", 1))
 		fraction = math.clamp(number_of(model, "reclaim_left", total) / total, 0, 1)
 		fill_tags = "bar-fill reclaim"
@@ -215,27 +223,43 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 			else "bar-fill health"
 	end
 
-	-- a shooter that has a target and cannot pay for the shot says so, flashing above its bar
+	-- what is stopping it says so, flashing above its bar: a shooter that has a target and cannot pay for the
+	-- shot, or a lab that cannot start its next unit for something standing where it goes
+	local complaint: string? = nil
+	if model:GetAttribute "exit_blocked" == true then
+		complaint = "Exit blocked"
+	elseif model:GetAttribute "need_energy" == true then
+		complaint = "Need energy"
+	end
 	local warning: any = nil
-	if model:GetAttribute "need_energy" == true then
+	if complaint ~= nil then
 		warning = React.createElement("TextLabel", {
 			[React.Tag] = if props.lit then "bar-warning lit" else "bar-warning",
 			LayoutOrder = -1,
-			Text = "Need energy",
+			Text = complaint,
 		})
 	end
 
-	-- only a commander has a nametag, and the name on it is its team's
+	-- A commander has a nametag, its team's name, and everything else a dot, both in the team's own colour, which
+	-- the stylesheet cannot know. A wreck belongs to nobody and has neither.
+	local def_name = model:GetAttribute "def_name"
+	local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
 	local team_name = model:GetAttribute "team_name"
 	local team_color = model:GetAttribute "team_color"
+	local color = if typeof(team_color) == "Color3" then team_color else nil
 	local nametag: any = nil
-	if typeof(team_name) == "string" then
+	if is_wreck == false and def ~= nil and def.nametag == true and typeof(team_name) == "string" then
 		nametag = React.createElement("TextLabel", {
 			[React.Tag] = "bar-name",
 			LayoutOrder = 0,
 			Text = team_name,
-			-- the team's own colour, which the stylesheet cannot know
-			TextColor3 = if typeof(team_color) == "Color3" then team_color else nil,
+			TextColor3 = color,
+		})
+	elseif is_wreck == false and color ~= nil then
+		nametag = React.createElement("Frame", {
+			[React.Tag] = "bar-dot",
+			LayoutOrder = 0,
+			BackgroundColor3 = color,
 		})
 	end
 
@@ -294,7 +318,7 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 		})
 	end
 
-	-- nothing to show: an unhurt unit with no nametag and nothing to say
+	-- nothing to show: an unhurt thing with no nametag, no dot and nothing to say
 	if
 		show_track == false
 		and health_track == nil
@@ -363,8 +387,12 @@ local function place_frames()
 		local def_name = model:GetAttribute "def_name"
 		local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
 		local half_height = if def ~= nil then unit_defs.collider_height(def) / 2 else 1
+		-- over the top of its art where that stands taller than its collider, like the commander's; the model's
+		-- position is its collider's middle, and its art stands on the collider's bottom
+		local art_height = if typeof(def_name) == "string" then art.height(def_name) else nil
+		local above = if art_height ~= nil then math.max(half_height, art_height - half_height) else half_height
 
-		local anchor = world.position_of(model) + Vector3.new(0, half_height + BAR_GAP, 0)
+		local anchor = world.position_of(model) + Vector3.new(0, above + BAR_GAP, 0)
 		local point, on_screen = camera:WorldToViewportPoint(anchor)
 		local near = (anchor - camera.CFrame.Position).Magnitude <= BAR_MAX_DISTANCE
 		frame.Visible = on_screen and near
@@ -408,6 +436,13 @@ local function WorldBars()
 	for _, model in models do
 		local id = world.id_of(model)
 		if id == nil or model.Parent == nil then
+			continue
+		end
+		-- the rocks and trees nobody has touched, which is nearly all of them, have nothing to show
+		if
+			model:GetAttribute "kind" == "reclaimable"
+			and number_of(model, "reclaim_left", 0) >= number_of(model, "reclaim_total", 0)
+		then
 			continue
 		end
 		children[tostring(id)] = React.createElement(Bar, { id = id, model = model, lit = lit })

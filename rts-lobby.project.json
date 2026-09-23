@@ -1,0 +1,37 @@
+{
+	"name": "rts-lobby",
+	"servePlaceIds": [94551068553227],
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/shared"
+			},
+			"Packages": {
+				"$path": "Packages"
+			},
+			"Client": {
+				"$path": "src/client"
+			},
+			"Lobby": {
+				"$path": "src/lobby/shared"
+			},
+			"LobbyClient": {
+				"$path": "src/lobby/client"
+			}
+		},
+		"ServerScriptService": {
+			"LobbyServer": {
+				"$path": "src/lobby/server"
+			}
+		},
+		"Workspace": {
+			"$ignoreUnknownInstances": true
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"lobby_init": { "$path": "src/lobby_init.client.luau" }
+			}
+		}
+	}
+}

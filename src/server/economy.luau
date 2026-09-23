@@ -7,10 +7,12 @@ local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
+local environment = require(ReplicatedStorage.Shared.environment)
 
 local state = require(script.Parent.state)
 local wind = require(script.Parent.wind)
 local flows = require(script.Parent.flows)
+local nocost = require(script.Parent.nocost)
 
 type Team = types.Team
 type TeamId = types.TeamId
@@ -71,7 +73,12 @@ local function refresh_income()
 	local converting: { [TeamId]: types.EnergyConversion } = {}
 	table.clear(converters)
 	for _, entity in state.all() do
-		if entity.alive == false or entity.state ~= "active" or entity.kind == "wreck" then
+		if
+			entity.alive == false
+			or entity.state ~= "active"
+			or entity.kind == "wreck"
+			or entity.kind == "reclaimable"
+		then
 			continue
 		end
 		local def = unit_defs.get(entity.def_name)
@@ -88,6 +95,11 @@ local function refresh_income()
 		if def.wind_multiplier ~= nil then
 			energy_made[entity.team] = (energy_made[entity.team] or 0) + wind.speed() * def.wind_multiplier
 			flows.add(entity.id, 0, wind.speed() * def.wind_multiplier)
+		end
+		if def.tidal_multiplier ~= nil then
+			local made = environment.tidal_strength() * def.tidal_multiplier
+			energy_made[entity.team] = (energy_made[entity.team] or 0) + made
+			flows.add(entity.id, 0, made)
 		end
 		if def.energy_conversion ~= nil then
 			local total = converting[entity.team]
@@ -199,8 +211,12 @@ local function add_energy(team_id: TeamId, amount: number): number
 	return team.energy - before
 end
 
--- Spends if the team can afford it in full, otherwise spends nothing.
+-- Spends if the team can afford it in full, otherwise spends nothing. With nocost on, everything is affordable and
+-- nothing is spent.
 local function try_spend(team_id: TeamId, metal: number, energy: number): boolean
+	if nocost.is_enabled() then
+		return true
+	end
 	local team = state.get_team(team_id)
 	if team == nil then
 		return false

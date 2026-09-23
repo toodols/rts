@@ -8,7 +8,7 @@ with metal / energy / buildpower economics.
 ```bash
 aftman install          # rojo, wally, selene, stylua, luau-lsp
 wally install           # react, react-roblox, promise, janitor
-rojo build -o rts.rbxlx # then open in Studio and `rojo serve`
+rojo build rts-game.project.json -o rts.rbxlx # then open in Studio and `rojo serve rts-game.project.json`
 ```
 
 Stylesheets are SCSS compiled by [outlass](https://github.com/toodols/outlass) into a Roblox
@@ -29,7 +29,7 @@ diff the Roblox render against — see `src/client/ui/stylesheets/preview/README
 ```bash
 selene src
 stylua src
-rojo sourcemap --output sourcemap.json
+rojo sourcemap rts-game.project.json --output sourcemap.json
 luau-lsp analyze --defs=globalTypes.d.luau --sourcemap=sourcemap.json --ignore="**/Packages/**" --ignore="**/pow/**" src
 ```
 
@@ -47,6 +47,37 @@ and administration. Press `;` to open it, `help` lists commands. It is started b
 | `godmode` / `godmode true` / `godmode false` | toggle, enable or disable commanding every team; you can select and order any team's units and build with any team's builders |
 | `scavengers` / `scavengers true` / `scavengers false` | toggle, enable or disable the scavengers gamemode: whether beacons appear and make anything. What is already out there carries on |
 | `beacon` | put a scavenger beacon down now, wherever the rules would put one |
+
+## Lobby
+
+The lobby is a place of its own, built from `rts-lobby.project.json` (the game is `rts-game.project.json`):
+
+```bash
+rojo build rts-lobby.project.json -o lobby.rbxlx   # or `rojo serve rts-lobby.project.json` into the lobby place
+```
+
+It shares `src/shared` and the game's SCSS partials with the game, and adds `src/lobby`: `server/` (the lobbies and
+their rules, the cross-server list, and launching), `shared/` (the remotes and the protocol) and `client/` (the React
+screens). `build_stylesheets.bat` compiles its sheet, `src/lobby/client/stylesheets/lobby.scss`, alongside the game's.
+
+A player makes a lobby, or joins one from the list, which shows every open lobby on every lobby server: each server
+lists its own in a MemoryStore sorted map and reads everyone else's every 5 seconds. Joining a lobby on another server
+teleports the player to that server, where they are seated as they arrive. A lobby is public or friends only; a
+friends-only lobby is listed only to the host's friends and only they can join it.
+
+The host picks the map and the mode (`shared/game_modes.luau`): Scav Easy / Normal / Hard / Brutal (everyone against
+the scavengers, whose strength grows faster the harder it is), 1v1 up to 5v5, or FFA. In a team game players pick
+their team by clicking one of its open places. Each map has a picture drawn on the client from its own heightmap and
+theme, the same way the terrain is painted (`shared/ground_paint.luau`), at the map's true aspect ratio and with a grid
+of BAR map units (512 elmos, about 47 studs) over it, so maps can be compared by size.
+
+Starting reserves a server of the game place, leaves the match (mode, map, seed, who sits on which side) in a
+MemoryStore hash map under that server's PrivateServerId, and teleports everyone there. The game server reads it back
+as it starts (`server/match.luau`): each seated player gets a team, teams on a side are allied, and the scavengers are
+turned off or paced to the difficulty. Any other game server, and Studio, plays the usual game.
+
+The place ids are in `shared/places.luau`. Teleports do not work in Studio, so starting a game or joining a lobby on
+another server can only be tried in a live server.
 
 ## How it fits together
 
@@ -108,7 +139,7 @@ set it off.
 Deaths already compute an overkill ratio (`combat.DEBRIS_OVERKILL_RATIO`); debris fields are the
 next thing to build on it. Today every death leaves a wreck.
 
-A construction turret takes assist, reclaim, repair and guard orders like a constructor, for whatever is
+A construction turret takes assist, reclaim, repair and guard orders like a construction_bot, for whatever is
 within its reach, but cannot move and cannot make anything; a move order is dropped and an order for
 something out of reach ends. With nothing to do it puts its buildpower into the nearest friendly
 blueprint within reach, including a factory's unit in progress, and failing that repairs the nearest damaged unit or
@@ -122,7 +153,7 @@ waiting in some builder's queue. The Guard (light laser tower) fires on enemies 
 
 The vehicle lab makes the Incisor, a light laser tank, the way the bot lab makes bots. The Twin Guard
 carries two turrets, each with its own range, reload and target, and prefers a target its other turret
-is not already shooting. The commander builds everything but the construction turret; constructors build
+is not already shooting. The commander builds everything but the construction turret; construction_bots build
 all of it.
 
 Every def has a display name (BAR's) and a subtitle, its name in plain words: a Lasher is a missile
@@ -211,11 +242,13 @@ when it can no longer be. Hunters do not all make for the target itself, which
 would stop them in a clump at the front with the rest unable to get into range. Each walks to a spot of its own
 at shooting range, on the ring round the target, spread across the half of it that it is coming from and fixed
 by its id, and attacks from there. A unit that is trying to go somewhere and getting nowhere gives up on it, and
-one that is within range of a target it cannot see over the ground walks on until it can.
+one that is within range of a target it cannot see over the ground goes to the target itself instead, up onto
+the cliff if there is a way up, and gives it up if there is not. It never just walks straight at a target.
 
-Where a unit goes, it goes by a straight run across ground it can stand on whenever it has one, because that is
-nearly free. Only when it has none does it ask `pathfinder` for a route round the water or the cliff, which is
-issued as a chain of move orders ending in the attack. A route that gets no closer than a place within weapon
+Where a unit goes, it goes by a straight run across ground it can stand on the whole way
+(`pathfinder.has_straight_path`) whenever it has one, because that is nearly free. Only when it has none does it
+ask `pathfinder` for a route round the water or the cliff, which is issued as a chain of move orders ending in
+the attack. Aircraft go straight at their target. A route that gets no closer than a place within weapon
 range still counts, since the unit can shoot across. Routes cost from about a millisecond to a good deal more, so
 one step gives out one, none may search more than `PATH_MAX_EXPANSIONS` cells (`find_path`'s `max_expansions`),
 a route is trusted for 30 seconds, and a unit that was refused or found no way waits, and gives up on that
@@ -255,7 +288,7 @@ A def may also say how deep it has to be (`min_water_depth`), which is what make
 floats on the surface instead of standing on the bed, and that goes for buildings too: a shipyard sits on
 the water's surface, while a building without a `min_water_depth` that is built underwater stands on the sea
 floor (`unit_defs.surface_height` is the one place that decides). Units treat water they cannot stand in as a wall and
-slide along it; there is no pathfinding, so a unit ordered across a lake stops at the shore. Buildings are
+slide along it, but every order that walks somewhere finds its way round a lake (see Pathfinding below). Buildings are
 refused where the water is wrong for them, so a shipyard goes in deep water. The one metal extractor stands
 on dry land or on the sea floor: most metal spots are on dry land, and a few more (`UNDERWATER_SPOT_COUNT`,
 laid out after the rest so they move nothing) are underwater. An underwater one is built by something that
@@ -284,16 +317,42 @@ footprint sizes are not modelled.
 
 ### Pathfinding
 
-`shared/pathfinder.luau` is for AI: `pathfinder.find_path(def, from, to)` returns `{ orders, complete }`, where
-`orders` is a chain of `move` orders that carries a unit of that def from `from` to `to` over ground it can
-stand on, ready for `orders.issue`. It is A* over the heightmap's cells, eight ways with no corner cutting, on
-the slope maps above and the water rules for the def (a cell is open only if the water is right at all four of
-its corners, which is exactly what `movement` tests at any point in it), and the route is then pulled tight, so
-the orders are only the turns it needs, ending on `to` itself. A destination it cannot reach gets the route to
-the nearest reachable cell and `complete = false`. A unit standing where it should not is still given a way out.
-Pressing P puts the cursor in pathfind mode, and a click asks the server (`commands.luau`) for a route for each selected unit. Other units, buildings and the width of the unit are not part of it, and nothing re-plans as the ground
-changes, so a route is made when it is wanted and made again if it fails. `passability.initialize` has to
-have run.
+`shared/pathfinder.luau` finds the way for everything that walks. `pathfinder.find_path(def, from, to)` returns
+`{ orders, complete }`, where `orders` is a chain of `move` orders that carries a unit of that def from `from` to
+`to` over ground it can stand on, ready for `orders.issue`. It is A* over the heightmap's cells, eight ways with no
+corner cutting, on the slope maps above and the water rules for the def (a cell is open only if the water is right
+at all four of its corners, which is exactly what `movement` tests at any point in it). A destination it cannot
+reach gets the route to the nearest reachable cell and `complete = false`. A unit standing where it should not is
+still given a way out.
+
+Routes keep clear of walls where they can and squeeze past them where they cannot. For each kind of ground (slope
+class and water limits) the pathfinder keeps which cells are open and how far each is from the nearest that is not,
+with the map's edge counting as a wall, worked out for the whole map the first time a kind of unit asks and patched
+where craters land (`pathfinder.refresh`, from `deformation`). A cell is tight for a unit when its radius and
+`WALL_MARGIN` (1.5 studs) do not fit there; stepping into one costs `TIGHT_PENALTY` (4) times as much, so a route
+takes the gap only when going round is a good deal further. The route is then pulled tight across ground that is not
+tight, so its orders are only the turns it needs, and inside a squeeze it follows the gap point to point.
+
+`pathfinder.has_straight_path(def, from, to)` says whether a unit can walk the whole straight line, by the same
+tests, reading one byte a cell on the line, so it is nearly free: the line has to keep clear of walls, unless one
+of its ends is in a squeeze itself. `pathfinder.route(def, from, to)` puts the two together: one move straight
+there when the line is good, and otherwise the route `find_path` finds.
+
+A player's move and fight go through it (`commands.luau`): a move is issued as the chain of moves of its route, and
+a fight as a chain of fight waypoints along it, so the unit fights its way along all of them. So does each move or
+fight a factory hands the units it makes (its rally, worked out from where each unit appears). One order searches
+for at most 12 of its units, and the rest of those whose line is not good are sent straight there; units with a
+good line never need one. Every other order that walks to something, an attack, a build, a reclaim, a repair, a
+guard or an unload, finds its way through `server/navigation.luau` the same way, out of sight of the order: straight
+when it can, a route when it cannot (at most 4 searches a tick in all), worked out again when its goal moves more
+than 4 studs or it has made no headway for a second. An attack does not stop at being in range: it walks on until it
+has a clear shot (`combat.can_shoot`), since something behind a hill cannot be shot from in front of it.
+
+Waypoints, a route's or a player's shift-queued ones, are closed in on as near as `WAYPOINT_EPSILON` (0.25 studs),
+slowing to get there, and from `WAYPOINT_SKIP_RANGE` (2 studs) out the unit checks every tick whether it can go
+straight to the next already, and goes on as soon as it can, so it never cuts a corner it cannot see round. Aircraft
+go straight everywhere, and count as on a waypoint within the circle they turn in. Other units and buildings are not
+part of any of it. `passability.initialize` has to have run.
 
 ### Terrain deformation
 
@@ -346,7 +405,7 @@ weapon that takes longer than `config.RELOAD_BAR_MIN_SECONDS` (5) to reload, lik
 its owner for how far along it is to its next shot. Both come from attributes on the model (`stockpile_progress`,
 `reload_progress`) and are drawn by `world_bars.luau`.
 
-The numbers for both are chosen, not BAR's, like the aircraft's. Both are built by the advanced constructors, X
+The numbers for both are chosen, not BAR's, like the aircraft's. Both are built by the advanced construction_bots, X
 then A and X then E, and neither can be carried.
 
 ### Line of sight
@@ -396,6 +455,20 @@ has nothing to do, then settles onto the ground. Aircraft fly over water and ove
 they crowd only each other, and an airborne one neither blocks a placement nor is caught in a ground blast
 or the disintegrator. Shot down, one leaves its wreck on the ground below.
 
+The Valiant and the Whirlwind fly on `wings`. They still take off and land straight up and down, but they cannot
+hover: in the air they hold their height only by moving forward. While one has something to do it flies flat
+out, as BAR's planes do, and turns no faster than its `turn_rate`, so where it has nowhere in particular to be,
+like a Valiant in range of what it is shooting, it circles. When where it is going is behind it and nearer than
+its `run_out`, it holds its heading until it is not and only then turns back, which is BAR's rule and what makes
+a bomber's attack a pass. It counts as having reached a point once it is within the circle it turns in, since it
+cannot stop on it. With nothing left to do it does not wait in the air for `AIR_LAND_DELAY`: it comes straight
+down, slowing to a stop as it lands.
+
+Their cruise altitudes and `run_out` come from BAR's `corveng` and `corshad` (`cruisealtitude`, and `turnradius`
+64, which the engine takes as that many frames of flight at full speed). BAR has no turn rate: turning comes out
+of its flight model. `turn_rate` is that model's steady turn with full bank, elevator and rudder, from each unit's
+`maxbank`, `maxelevator`, `maxrudder` and `speedtofront`, which is a circle of about 23 studs for both.
+
 Every weapon that is not dedicated anti air (`anti_air = true`) does `config.NON_AA_AIR_DAMAGE_FRACTION`
 (20%) of its damage to an aircraft, rockets and their blasts included. A weapon can also name the layer it
 shoots at with `target_layer`: the Valiant hits aircraft only, and the Whirlwind's bombs hit the ground
@@ -411,8 +484,22 @@ twelve passes; with it a Thistle averaged one hit a pass and a Trasher two. The 
 BAR's `ABOT3`, an amphibious bot, so it climbs what the other bots do and wades as the commander does.
 
 The Whirlwind attacks by flying over its target at full speed and on past it (`bombing_runs`), dropping
-bombs on whatever it crosses, then coming round for another pass. A bomb has `dropped = true`: it leaves
-straight down with no launch speed, so it lands where it was let go.
+bombs as it goes, then coming round for another pass once it is its `run_out` clear. A bomb has
+`dropped = true`: it has no launch speed of its own, but it carries on at the bomber's velocity as it falls,
+so it comes down well ahead of where it was let go. Its weapon is BAR's `corbomb`: five bombs 0.26667 seconds
+apart, a 6 second reload, and map gravity. The burst is one shot, as in BAR: the bomber starts it once the target
+is within half the length of the line of bombs it lays of where the first would come down, allowing for how far a
+moving target will have gone by then, so the target is in the middle of the line. The rest follow the first at
+what it was let go at, whatever they will come down on, short of the target and then past it. Each bomb is also
+pushed sideways onto the aim, by as much as brings it onto the aim's line when it lands but no more than BAR's
+one elmo a frame, which makes up for a bomber that is not quite lined up. It needs no line of sight, and it only
+bombs from the air.
+
+A weapon's reload is not rounded to the tick. Whatever is left of a tick after a reload runs out is carried: the
+shot is taken as though that long ago, already that far into its flight and from where its owner was then, and
+the next reload starts that much sooner. So a burst 0.26667 seconds apart is laid 0.26667 seconds apart, not
+alternately 0.25 and 0.3. A weapon with nothing to shoot waits ready, and does not save up the shots it could
+have taken.
 
 The Hercules (light transport) and the Hephaestus (heavy transport) carry things. Every unit and static
 defence has a `weight_class`, `"light"` or `"heavy"`, or none, which cannot be carried at all; a
@@ -421,15 +508,21 @@ transport's `carries` says how much it can lift, and a `"heavy"` one takes light
 T1 ground unit is light. A load is measured in slots (one for every `config.TRANSPORT_SLOT_RADIUS` studs of
 radius) against the transport's `capacity`.
 
-A transport can pick up the enemy's things as well as its own. It has to fly down over the thing until they
-are effectively touching (`TRANSPORT_LOAD_RANGE`, `TRANSPORT_LOAD_HEIGHT`), keeping pace with it, and be moving
+A transport can pick up the enemy's things as well as its own. It flies to the thing at its usual height and
+only comes down once it is within `TRANSPORT_DESCEND_RANGE` of it, so it never drags itself along ground that is
+higher than where the thing stands. It comes down over the thing, or a little to one side of it if that lets it
+come lower, as at the foot of a slope. An aircraft rests on the highest ground under any part of it, not only
+under its middle, so it does not sink into a slope it is over. It has to come down until it and the thing are
+effectively touching (`TRANSPORT_LOAD_RANGE`, `TRANSPORT_LOAD_HEIGHT`), keeping pace with it, and be moving
 no faster than `TRANSPORT_LOAD_SPEED` relative to it, or `TRANSPORT_ENEMY_LOAD_SPEED` if it is the enemy's. A
 tower never moves, so it is easy; an enemy unit that is on the move is hard. What is aboard is inactive:
 nothing sees, shoots, orders or moves it. It is still drawn, hanging from the transport on a rope and
 swinging as the transport moves, and a transport with something aboard does not land. A building is put down
 square to the grid, at the nearest spot that is free. A transport that dies takes its cargo with it.
 
-The numbers for the aircraft are chosen, not copied from BAR unit files like the rest.
+The Valiant's and the Whirlwind's numbers are BAR's `corveng` and `corshad`, apart from their climb speeds and
+their turn rates (see above). The other aircraft's numbers are chosen, not copied from BAR unit files like the
+rest.
 
 ### Carriers and drones
 
@@ -469,10 +562,9 @@ The server rejects a placement that is not on it.
 | U with transports selected | unload mode: the next left click on the ground sends them there to set everything aboard down (shift queues and stays in the mode), right click / Esc cancels |
 | Q | select everything of yours on the screen of the same type as what is selected (while placing an economy building, Q picks the energy storage instead) |
 | Tab | select your commander and pan the camera to it; with several, each press moves to the next and wraps round |
-| D with a commander selected | aim its disintegrator (a red rectangle from the commander toward the cursor, as long as its range, that destroys everything in it): the next left click gives it a `dgun` order at that spot, an order like any other: the commander closes in until the spot is in range, fires once its weapon is ready and has the energy, and moves on to the next order. Shift queues it behind what the commander is doing and keeps aiming, space puts it at the front, and a shot that another commander is in the way of is dropped. Right click / Esc cancels |
+| D with a commander selected | aim its disintegrator (a red rectangle from the commander toward the cursor, as long as its range, that destroys everything in it): the next left click gives it a `dgun` order at that spot, an order like any other: the commander closes in until the spot is in range, fires once its weapon is ready and has the energy, and moves on to the next order. Shift queues it behind what the commander is doing and keeps aiming, space puts it at the front. Allies and your own units in the rectangle go with everything else, but a shot that an enemy commander is in the way of is dropped. Right click / Esc cancels |
 | A with armed units selected | attack mode: the next left click attacks an enemy under the cursor, or the spot of ground if there is none (shift queues and stays in the mode), right click / Esc cancels |
 | F with units selected | fight mode: the next left click on the ground sends them there, stopping to shoot whatever is in reach on the way (shift queues it and stays in the mode), right click / Esc cancels |
-| P with units selected | pathfind mode: the next left click on the ground has each selected unit that can move find its own route there over ground it can stand on, and it is given the waypoints of the route (shift queues it after what they are doing, from where that leaves them, and keeps the mode on; a big selection only gets a search for its first 12 units, and the rest are sent straight there), right click / Esc cancels |
 | E with reclaimers selected | reclaim mode: the next left click on an entity sends the selected reclaimers at it (shift queues and stays in the mode), right click / Esc cancels |
 | R with repairers selected | repair mode, the same as reclaim mode: the next left click on a damaged friendly sends them to repair it |
 | `[` / `]` while placing | rotate a quarter turn counterclockwise / clockwise · right click cancels |
@@ -481,10 +573,16 @@ A factory's build orders **always** queue, with or without shift; shift adds fiv
 
 ## Not built yet
 
-- Models. Buildings are boxes the size of their collider. Units are procedural stand-ins that fit inside
+- Models, mostly. Fifteen buildings have procedural art from `tools/model_pipeline`: the three laser towers, both
+  construction turrets, the fusion reactors, the energy converters and the four storages. It is kept as data in
+  `src/shared/art/` and built by each client with EditableMesh (`client/art.luau`), which the experience has to
+  allow (Game Settings > Security > Allow Mesh / Image APIs); the server's model for them is an invisible hitbox.
+  Tower heads turn with their turrets' aim, construction turrets turn toward their work, and reactor rings spin.
+  Every other building is a box the size of its collider. Units are procedural stand-ins that fit inside
   theirs (`server/unit_placeholder.luau`): vehicles are tracked boxes with a cab and a barrel, ships the same
   without tracks, bots are stacked cylinders whose proportions come from a hash of their name, and aircraft
   are flat isosceles triangles. Anything that builds, repairs, reclaims or assists has a yellow part. A
   vehicle is a def with `vehicle = true`.
-- Pathfinding. Units steer straight at their goal and push each other apart.
+- Pathfinding round other units and buildings. Only the ground is routed round; units are pushed apart from each
+  other and off buildings as they go.
 - Debris fields, resource buildings, and any win condition.

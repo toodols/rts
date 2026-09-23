@@ -45,14 +45,13 @@ local function SelectionBox()
 end
 
 local MODE_HINTS: { [string]: string } = {
-	attack = "In attacking (A) mode · click an enemy to attack it, or the ground to attack that spot · shift keeps the mode · right click cancels",
-	reclaim = "In reclaiming (E) mode · click something to reclaim it · shift keeps the mode · right click cancels",
-	repair = "In repairing (R) mode · click a damaged friendly to repair it · shift keeps the mode · right click cancels",
-	resurrect = "In resurrecting (W) mode · click a wreck to raise it, after refilling its metal · shift keeps the mode · right click cancels",
-	fight = "In fighting (F) mode · click the ground to walk there, stopping to shoot whatever is in reach on the way · shift keeps the mode and adds another waypoint · right click cancels",
-	path = "In pathfinding (P) mode · click the ground to have each unit find its own way there, over ground it can stand on · shift keeps the mode and queues the route · right click cancels",
+	attack = "In attacking (A) mode · click an enemy to attack it, or the ground to attack that spot, or drag out a circle to attack everything of the enemy's inside it · shift keeps the mode · right click cancels",
+	reclaim = "In reclaiming (E) mode · click something to reclaim it, or drag out a circle to reclaim everything inside it · shift keeps the mode · right click cancels",
+	repair = "In repairing (R) mode · click a damaged friendly to repair it, or drag out a circle to repair everything damaged inside it · shift keeps the mode · right click cancels",
+	resurrect = "In resurrecting (W) mode · click a wreck to raise it, after refilling its metal, or drag out a circle to resurrect every wreck inside it · shift keeps the mode · right click cancels",
+	fight = "In fighting (F) mode · click the ground to walk there, stopping to shoot whatever is in reach on the way, and builders to help build, repair or reclaim what is in reach, or drag to spread them along what you trace · shift keeps the mode and adds another waypoint · right click cancels",
 	load = "In loading (J) mode · click a friendly unit to have the selected transports pick it up · shift keeps the mode · right click cancels",
-	unload = "In unloading (U) mode · click the ground to set everything aboard down there · shift keeps the mode · right click cancels",
+	unload = "In unloading (U) mode · click the ground to set everything aboard down there, or drag to spread the transports along what you trace · shift keeps the mode · right click cancels",
 	guard = "In guarding (O) mode · click a friendly unit or building to follow and defend it, assisting what it builds or reclaims · shift keeps the mode · right click cancels",
 	disintegrator = "In disintegrator (D) mode · click to have the commander close in and fire at that spot · shift queues the shot and keeps aiming · right click cancels",
 }

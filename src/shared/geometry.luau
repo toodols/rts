@@ -37,8 +37,6 @@ local function flatten(vector: Vector3): Vector3
 	return Vector3.new(vector.X, 0, vector.Z)
 end
 
--- Evenly spaced points along a line, the layout used when a right-drag asks a group to spread out.
--- A single unit is placed at the midpoint rather than at one end.
 -- Pulls `target` in toward `origin` until it is no further than `range` away on the ground
 -- plane. Height is whatever the inputs carried, so callers put the result back on the ground.
 local function clamp_to_range(origin: Vector3, target: Vector3, range: number): Vector3
@@ -63,6 +61,7 @@ local function snap_center(x: number, z: number, half_extents: Vector2, cell: nu
 	return snap_axis(x, half_extents.X), snap_axis(z, half_extents.Y)
 end
 
+-- Evenly spaced points along a line. A single unit is placed at the midpoint rather than at one end.
 local function points_along_line(from: Vector3, to: Vector3, count: number): { Vector3 }
 	local points = table.create(count)
 	if count <= 1 then
@@ -75,6 +74,38 @@ local function points_along_line(from: Vector3, to: Vector3, count: number): { V
 	return points
 end
 
+-- Evenly spaced points along a path of joined straight pieces, measured along the ground: the layout used
+-- when a drag asks a group to spread out along the shape the cursor traced. The first and last points are the
+-- path's ends, and a single unit is placed halfway along it rather than at one end.
+local function points_along_path(path: { Vector3 }, count: number): { Vector3 }
+	if #path == 0 then
+		return {}
+	end
+	local lengths = table.create(#path)
+	lengths[1] = 0
+	for index = 2, #path do
+		lengths[index] = lengths[index - 1] + distance_2d(path[index - 1], path[index])
+	end
+	local total = lengths[#path]
+	if total < 1e-6 then
+		return table.create(count, path[1])
+	end
+
+	local points = table.create(count)
+	local piece = 2
+	for index = 1, count do
+		local wanted = if count <= 1 then total / 2 else total * (index - 1) / (count - 1)
+		while piece < #path and lengths[piece] < wanted do
+			piece += 1
+		end
+		local start = lengths[piece - 1]
+		local span = lengths[piece] - start
+		local t = if span > 1e-6 then math.clamp((wanted - start) / span, 0, 1) else 0
+		points[index] = path[piece - 1]:Lerp(path[piece], t)
+	end
+	return points
+end
+
 return table.freeze({
 	snap_facing = snap_facing,
 	rotated_half_extents = rotated_half_extents,
@@ -82,6 +113,7 @@ return table.freeze({
 	distance_2d = distance_2d,
 	flatten = flatten,
 	points_along_line = points_along_line,
+	points_along_path = points_along_path,
 	snap_center = snap_center,
 	clamp_to_range = clamp_to_range,
 })

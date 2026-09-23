@@ -1,5 +1,6 @@
 {
-	"name": "rts",
+	"name": "rts-game",
+	"servePlaceIds": [114890272627009],
 	"tree": {
 		"$className": "DataModel",
 		"ReplicatedStorage": {

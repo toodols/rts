@@ -3,7 +3,7 @@
 -- A factory (Bot Lab) lists the units it produces; clicking one appends it to the factory's
 -- production queue. Factory build orders always queue, so shift only changes how many are added.
 --
--- A constructor lists the buildings it can put down; clicking one enters placement mode and the
+-- A construction_bot lists the buildings it can put down; clicking one enters placement mode and the
 -- blueprint is created where the next left click lands.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -90,7 +90,7 @@ type Tab = {
 	keys: { [string]: string },
 }
 
--- Splits a constructor's buildings into the categories the build hotkeys use, keeping the order it lists
+-- Splits a construction_bot's buildings into the categories the build hotkeys use, keeping the order it lists
 -- them in and leaving out the empty ones. Anything no category holds goes in a last tab of its own.
 local function tabs_for(builds: { string }): { Tab }
 	local tabs: { Tab } = {}
@@ -106,7 +106,13 @@ local function tabs_for(builds: { string }): { Tab }
 		if #defs > 0 then
 			table.insert(
 				tabs,
-				{ name = category.name, key = category.key, defs = defs, primary = category.primary, keys = category.keys }
+				{
+					name = category.name,
+					key = category.key,
+					defs = defs,
+					primary = category.primary,
+					keys = category.keys,
+				}
 			)
 		end
 	end
@@ -224,7 +230,7 @@ local function BuildMenu()
 		})
 	end
 
-	-- a constructor's buildings are shown a category at a time, or they would fill the screen; what a factory
+	-- a construction_bot's buildings are shown a category at a time, or they would fill the screen; what a factory
 	-- makes is one short list
 	local buildings_only = true
 	for _, def_name in builds do

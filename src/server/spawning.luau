@@ -1,4 +1,5 @@
--- Putting a team's starting force on the map: its commander beside the team's start position.
+-- Putting a team's starting force on the map: its commander beside the team's start position, the one its player
+-- chose (see lobby.luau), or the start numbered the same as the team for a team nobody chose one for.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -11,8 +12,15 @@ local placement = require(script.Parent.placement)
 
 type TeamId = types.TeamId
 
+-- The start each team's player chose, by slot.
+local slot_by_team: { [TeamId]: number } = {}
+
+local function set_start(team_id: TeamId, slot: number)
+	slot_by_team[team_id] = slot
+end
+
 local function start_position(team_id: TeamId): Vector3
-	local center = starts.center(team_id)
+	local center = starts.center(slot_by_team[team_id] or team_id)
 	return heightmap.ground_position(center.X, center.Y)
 end
 
@@ -45,6 +53,7 @@ local function give_starting_force(team_id: TeamId): boolean
 end
 
 return table.freeze({
+	set_start = set_start,
 	give_starting_force = give_starting_force,
 	spawn_near = spawn_near,
 })

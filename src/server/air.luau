@@ -16,11 +16,20 @@ type EntityDef = types.EntityDef
 
 -- How far above where it rests an aircraft has to be before it counts as flying.
 local AIRBORNE_MARGIN = 1
+-- How many points round the edge of something the ground is read at, for how high it rests.
+local FOOTPRINT_SAMPLES = 8
 
--- The height the middle of `def` is at when it rests on the ground at (x, z). It never goes under the
--- sea: an aircraft that lands over the water hovers on its surface.
+-- The height the middle of `def` is at when it rests on the ground at (x, z): on the highest of the ground under
+-- it, round the edge of its collider as well as under its middle, so that one over a slope or a cliff edge does
+-- not sink into the side that rises. It never goes under the sea: an aircraft that lands over the water hovers on
+-- its surface.
 local function resting_height(def: EntityDef, x: number, z: number): number
 	local ground = math.max(heightmap.height_at(x, z), config.WATER_LEVEL)
+	local radius = unit_defs.collider_radius(def)
+	for index = 0, FOOTPRINT_SAMPLES - 1 do
+		local angle = index * (2 * math.pi / FOOTPRINT_SAMPLES)
+		ground = math.max(ground, heightmap.height_at(x + math.cos(angle) * radius, z + math.sin(angle) * radius))
+	end
 	return ground + unit_defs.collider_height(def) / 2
 end
 

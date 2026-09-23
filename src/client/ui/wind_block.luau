@@ -13,7 +13,7 @@ local Workspace = game:GetService "Workspace"
 
 local React = require(ReplicatedStorage.Packages.react)
 
-local config = require(ReplicatedStorage.Shared.config)
+local environment = require(ReplicatedStorage.Shared.environment)
 
 local STREAK_COUNT = 14
 local STREAK_COLOR = Color3.fromRGB(96, 210, 242)
@@ -117,9 +117,10 @@ local function WindBlock(props: { LayoutOrder: number })
 		end
 	end, {})
 
-	-- how far the speed is between the lowest and the highest it can be
-	local fraction =
-		math.clamp((wind.Magnitude - config.MIN_WIND) / math.max(config.MAX_WIND - config.MIN_WIND, 1e-6), 0, 1)
+	-- how far the speed is between the lowest and the highest it can be on this map
+	local least = environment.min_wind()
+	local most = environment.max_wind()
+	local fraction = math.clamp((wind.Magnitude - least) / math.max(most - least, 1e-6), 0, 1)
 
 	return React.createElement("Frame", {
 		[React.Tag] = "wind-block",
@@ -166,12 +167,12 @@ local function WindBlock(props: { LayoutOrder: number })
 				Min = React.createElement("TextLabel", {
 					[React.Tag] = "wind-limit grow",
 					LayoutOrder = 1,
-					Text = `MIN {config.MIN_WIND}`,
+					Text = `MIN {least}`,
 				}),
 				Max = React.createElement("TextLabel", {
 					[React.Tag] = "wind-limit right",
 					LayoutOrder = 2,
-					Text = `MAX {config.MAX_WIND}`,
+					Text = `MAX {most}`,
 				}),
 			}),
 		}),

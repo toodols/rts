@@ -1,4 +1,5 @@
--- Player to team mapping. One team per player for now; a future lobby would assign these instead.
+-- Player to team mapping. One team per player: the team a lobby seated them on (see match.luau), or the next one
+-- free.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -11,13 +12,18 @@ type TeamId = types.TeamId
 local team_by_player: { [Player]: TeamId } = {}
 local next_team_id = 1
 
-local function assign(player: Player): TeamId
+-- Gives `player` team `wanted`, or the next team free when it is nil.
+local function assign(player: Player, wanted: TeamId?): TeamId
 	local existing = team_by_player[player]
 	if existing ~= nil then
 		return existing
 	end
 	local team_id = next_team_id
-	next_team_id += 1
+	if wanted ~= nil then
+		team_id = wanted
+	else
+		next_team_id += 1
+	end
 	team_by_player[player] = team_id
 	local team = state.get_team(team_id)
 	if team == nil then
@@ -36,6 +42,11 @@ local function create_team(name: string): TeamId
 	local team = state.create_team(team_id)
 	team.name = name
 	return team_id
+end
+
+-- Keeps the first `count` teams for players a lobby seated, so that nobody else is given one of them.
+local function reserve(count: number)
+	next_team_id = math.max(next_team_id, count + 1)
 end
 
 local function team_of(player: Player): TeamId?
@@ -59,6 +70,7 @@ end
 return table.freeze({
 	assign = assign,
 	create_team = create_team,
+	reserve = reserve,
 	team_of = team_of,
 	forget = forget,
 	players_on_team = players_on_team,

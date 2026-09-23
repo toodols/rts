@@ -14,17 +14,15 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
-local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
 local FOCUS_NAME = "ReplicationFocus"
 
 local focus_part: BasePart? = nil
 
+-- Every map is centred on (0, 0).
 local function map_center(): Vector3
-	local x = heightmap.ORIGIN_X + config.MAP_CELLS_X * config.CELL_STUDS / 2
-	local z = heightmap.ORIGIN_Z + config.MAP_CELLS_Z * config.CELL_STUDS / 2
-	return heightmap.ground_position(x, z)
+	return heightmap.ground_position(0, 0)
 end
 
 local function get_focus(): BasePart

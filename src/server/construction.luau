@@ -56,13 +56,16 @@ local function complete(entity: Entity)
 	entity.max_health = def.health
 	entity.health = math.clamp(entity.health, 1, def.health)
 
-	-- If this is a T2 mex built on top of a T1 mex, refund the T1
-	if entity.def_name == "advanced_metal_extractor" then
+	-- Something built over another in place, a T2 mex on a T1 or an advanced geothermal on a plain one, takes it
+	-- down now and refunds its metal to whoever it belonged to, as BAR's upgrade reclaimer gadgets do
+	if def.upgrades ~= nil then
 		for _, other in state.all() do
-			if other.alive and other.def_name == "metal_extractor"
+			if
+				other.alive
 				and other.state == "active"
-				and geometry.distance_2d(entity.position, other.position) < 1 then
-				-- Refund the T1 mex
+				and table.find(def.upgrades, other.def_name) ~= nil
+				and geometry.distance_2d(entity.position, other.position) < 1
+			then
 				local other_def = unit_defs.get(other.def_name)
 				economy.add_metal(other.team, other_def.metal_cost)
 				state.mark_dead(other)

@@ -6,7 +6,7 @@ automatically by `src/server/instances.luau`.
 ## Adding a model
 
 Name the file after the def name in `src/shared/unit_defs.luau`, so the Bot Lab is `bot_lab.rbxm`,
-and the two bots are `constructor.rbxm` and `grunt.rbxm`. Save from Studio with right click →
+and the two bots are `construction_bot.rbxm` and `grunt.rbxm`. Save from Studio with right click →
 *Save to File*, or use a `.model.json` for something simple.
 
 Requirements:

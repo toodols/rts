@@ -1,0 +1,88 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// The panel shown while the game waits for everyone to be ready: a plate over the top middle of the screen, the
+// title, a line on what to do, and every player in a list.
+.lobby-panel {
+	@include plate;
+	position: absolute;
+	top: space(20);
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: space(2);
+	width: 360px;
+	padding: space(4);
+	border-top: 2px solid var(--Accent);
+	box-shadow: 0 8px 24px veil($void, 0.6);
+}
+
+// Counting down: the plate's edge goes hot, as the moment approaches.
+.lobby-panel.counting {
+	border-top: 2px solid var(--Energy);
+}
+
+.lobby-title {
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 20px;
+	letter-spacing: 0.08em;
+	color: var(--Text);
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+.lobby-panel.counting .lobby-title {
+	color: var(--Energy);
+}
+
+.lobby-hint {
+	font-size: 13px;
+	color: var(--TextDim);
+}
+
+.lobby-list {
+	display: flex;
+	flex-direction: column;
+	gap: space(1);
+	margin-top: space(2);
+}
+
+// One player. Their status is faint until they are ready, when it lights green.
+.lobby-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: space(3);
+	padding: space(1) space(2);
+	background-color: veil($steel-raised, 0.8);
+	outline: 1px solid $edge;
+}
+
+.lobby-name {
+	font-family: RobotoMono;
+	font-size: 14px;
+	text-align: left;
+	color: var(--TextDim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.lobby-name.you {
+	color: var(--Accent);
+	font-weight: bold;
+}
+
+.lobby-status {
+	font-family: RobotoMono;
+	font-size: 12px;
+	text-align: right;
+	color: var(--TextFaint);
+}
+
+.lobby-row.ready .lobby-status {
+	color: var(--Gain);
+	font-weight: bold;
+}

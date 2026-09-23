@@ -7,10 +7,17 @@
 -- islands: islands in an ocean, one under every start, more scattered between, and at least one volcano,
 --   a cone far steeper than anything can be built on.
 -- koth: a mountain in the sea, in three terraces. The teams start on the lowest and the top is to be held.
+-- supreme_isthmus, hooked, center_command, rifted, comet_catcher, altair_crossing, ancient_bastion, folsom_dam:
+--   Beyond All Reason's maps of those names, from their heightmaps, textures and metal maps (see bar_maps).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local config = require(ReplicatedStorage.Shared.config)
+local bar_maps = require(ReplicatedStorage.Shared.bar_maps)
+local environment = require(ReplicatedStorage.Shared.environment)
+
+type BarMap = bar_maps.BarMap
+type Fitted = bar_maps.Fitted
 
 -- One band of ground that has metal spots of its own, so that each layer of a map is worth a set number of them.
 export type MetalLayer = {
@@ -29,16 +36,103 @@ export type MetalLayer = {
 	clear_of_starts: boolean,
 }
 
+-- What the ground of a map is made of. Terrain paints every column from this (see server/terrain.luau): the
+-- map's own features decide first, then the steepness, so the routes read off the ground, then the height, then
+-- patches of noise.
+export type Theme = {
+	-- open ground, which everything can drive over, and the second material it is mottled with
+	ground: Enum.Material,
+	ground_patches: Enum.Material,
+	-- too steep for tanks, not for bots
+	slope: Enum.Material,
+	-- too steep for anything that walks
+	cliff: Enum.Material,
+	-- ground within a stud or two of the waterline, and the sea floor below that
+	shore: Enum.Material,
+	seabed: Enum.Material,
+	-- open ground from about this height up is `high_ground` instead, like snow on the peaks; nil for none
+	high_ground: Enum.Material?,
+	high_from: number?,
+	-- the colours the map gives its materials; any it leaves out keep Roblox's own
+	colors: { [Enum.Material]: Color3 },
+	water_color: Color3,
+	-- the map's own features, given the seed: a material for a place, told whether the ground there is too steep for
+	-- bots, or nil to leave it to the rules above
+	paint: ((seed: number) -> (x: number, z: number, height: number, too_steep: boolean) -> Enum.Material?)?,
+}
+
+-- A metal spot a map puts in a place of its own choosing, in world (x, z).
+export type FixedMetalSpot = {
+	position: Vector2,
+	-- nil for the ordinary amount
+	multiplier: number?,
+}
+
 export type Preset = {
 	name: string,
 	description: string,
+	-- How big the map is, in studs along x and z, rounded to an even number of cells; nil for config's MAP_CELLS_X by
+	-- MAP_CELLS_Z.
+	size: Vector2?,
 	-- Gives the ground height at a world position.
 	build: (seed: number) -> (x: number, z: number) -> number,
 	-- Where a team's start ideally is, as (x, z); nil puts them on a ring around the middle.
 	start_position: ((slot: number) -> Vector2)?,
+	-- How many different starts the map has, which players choose among; nil for config's START_SLOTS.
+	start_count: number?,
 	-- The layers the middle spots are laid out in, each with its own count, in place of the usual scatter
 	-- over the whole map and the spots on the sea floor.
 	metal_layers: { MetalLayer }?,
+	-- Every metal spot on the map, where the map says, in place of any laid out from the seed; nil to lay them out.
+	metal_spots: { FixedMetalSpot }?,
+	theme: Theme,
+	-- The least and most the wind blows, and how strong the tide is (see environment.luau); any left nil is config's
+	-- default.
+	conditions: environment.Conditions?,
+}
+
+-- Themes ----------------------------------------------------------------------------------------------
+
+local DEFAULT_WATER = Color3.fromRGB(38, 76, 108)
+
+-- Green hills with rocky faces, as the highlands always were, but with grass on them now.
+local TEMPERATE: Theme = {
+	ground = Enum.Material.Grass,
+	ground_patches = Enum.Material.LeafyGrass,
+	slope = Enum.Material.Ground,
+	cliff = Enum.Material.Rock,
+	shore = Enum.Material.Sand,
+	seabed = Enum.Material.Sand,
+	high_ground = nil,
+	high_from = nil,
+	colors = {
+		[Enum.Material.Grass] = Color3.fromRGB(96, 124, 64),
+		[Enum.Material.LeafyGrass] = Color3.fromRGB(82, 110, 58),
+		[Enum.Material.Ground] = Color3.fromRGB(110, 94, 70),
+		[Enum.Material.Rock] = Color3.fromRGB(104, 100, 94),
+	},
+	water_color = DEFAULT_WATER,
+	paint = nil,
+}
+
+-- Beaches and palms: pale sand, bright grass, basalt where it is steep.
+local TROPICAL: Theme = {
+	ground = Enum.Material.Grass,
+	ground_patches = Enum.Material.LeafyGrass,
+	slope = Enum.Material.Ground,
+	cliff = Enum.Material.Basalt,
+	shore = Enum.Material.Sand,
+	seabed = Enum.Material.Sand,
+	high_ground = nil,
+	high_from = nil,
+	colors = {
+		[Enum.Material.Grass] = Color3.fromRGB(104, 142, 62),
+		[Enum.Material.LeafyGrass] = Color3.fromRGB(78, 122, 52),
+		[Enum.Material.Sand] = Color3.fromRGB(214, 196, 150),
+		[Enum.Material.Basalt] = Color3.fromRGB(62, 58, 58),
+	},
+	water_color = Color3.fromRGB(34, 96, 118),
+	paint = nil,
 }
 
 local HALF_X = config.MAP_CELLS_X * config.CELL_STUDS / 2
@@ -198,6 +292,28 @@ local function island_height(island: Island, distance: number): number
 	-- a flat top that falls away to the sea bed in an S, so the shore slopes gently
 	local rise = smoothstep((radius - distance) / (radius * (1 - PLATEAU_FRACTION)))
 	return SEA_FLOOR + (island.top - SEA_FLOOR) * rise
+end
+
+-- The islands are tropical, and every volcano's crater is still hot.
+local function islands_paint(seed: number): (number, number, number, boolean) -> Enum.Material?
+	local volcanoes = {}
+	for _, island in lay_out_islands(seed) do
+		if island.volcano then
+			table.insert(volcanoes, island)
+		end
+	end
+	return function(x: number, z: number, height: number, _too_steep: boolean): Enum.Material?
+		for _, volcano in volcanoes do
+			local distance = math.sqrt((x - volcano.x) ^ 2 + (z - volcano.z) ^ 2)
+			if distance < volcano.radius * CRATER_FRACTION then
+				return Enum.Material.CrackedLava
+			end
+			if distance < volcano.radius * 0.6 and height > START_ISLAND_TOP + 4 then
+				return Enum.Material.Basalt
+			end
+		end
+		return nil
+	end
 end
 
 local function islands_build(seed: number): (number, number) -> number
@@ -386,41 +502,147 @@ local KOTH_METAL_LAYERS: { MetalLayer } = {
 	},
 }
 
+local ISLANDS_THEME: Theme = table.clone(TROPICAL)
+ISLANDS_THEME.paint = islands_paint
+
+-- The summit to be held is paved, so it reads as the prize from anywhere on the map.
+local KOTH_THEME: Theme = table.clone(TEMPERATE)
+KOTH_THEME.high_ground = Enum.Material.Pavement
+KOTH_THEME.high_from = KOTH_LAYER_3 - 4
+
+-- Beyond All Reason ------------------------------------------------------------------------------------
+
+-- What a rich spot on a BAR map is worth, as metal_spots' own rich spots are.
+local BAR_RICH_MULTIPLIER = 4.0
+
+-- Each map is fitted once, the first time anything asks for it, and kept.
+local fitted_maps: { [string]: Fitted } = {}
+
+local function fitted(map: BarMap): Fitted
+	local existing = fitted_maps[map.name]
+	if existing ~= nil then
+		return existing
+	end
+	local made = bar_maps.fit(map)
+	fitted_maps[map.name] = made
+	return made
+end
+
+-- Ground that turns to the map's cliff where it is too steep for bots, whatever the texture says, so the routes read
+-- the same as on every other map. Built ground, like a fortress wall or a dam, stays what it is.
+local SOFT_GROUND: { [Enum.Material]: boolean } = {
+	[Enum.Material.Grass] = true,
+	[Enum.Material.LeafyGrass] = true,
+	[Enum.Material.Ground] = true,
+	[Enum.Material.Mud] = true,
+	[Enum.Material.Sand] = true,
+}
+
+-- The ground as the map's texture has it, and cliffs beyond its edges.
+local function bar_theme(map: BarMap): Theme
+	local fallback = map.materials[1]
+	return {
+		ground = fallback,
+		ground_patches = fallback,
+		slope = fallback,
+		cliff = map.cliff,
+		shore = fallback,
+		seabed = fallback,
+		high_ground = nil,
+		high_from = nil,
+		colors = map.colors,
+		water_color = map.water_color,
+		paint = function(_seed: number): (number, number, number, boolean) -> Enum.Material?
+			local fit = fitted(map)
+			return function(x: number, z: number, _height: number, too_steep: boolean): Enum.Material?
+				local material = fit.material_at(x, z)
+				if material == nil or (too_steep and SOFT_GROUND[material] == true) then
+					return map.cliff
+				end
+				return material
+			end
+		end,
+	}
+end
+
+local function bar_preset(map: BarMap): Preset
+	local fit = fitted(map)
+	local metal: { FixedMetalSpot } = {}
+	for _, spot in map.metal do
+		table.insert(metal, {
+			position = fit.to_world(spot.at),
+			multiplier = if spot.rich then BAR_RICH_MULTIPLIER else nil,
+		})
+	end
+	return {
+		name = map.name,
+		description = `{map.display_name}, from Beyond All Reason, as big as it is there`,
+		size = fit.size,
+		build = function(_seed: number): (number, number) -> number
+			return fit.height_at
+		end,
+		start_position = function(slot: number): Vector2
+			return fit.to_world(map.starts[(slot - 1) % #map.starts + 1])
+		end,
+		start_count = #map.starts,
+		metal_layers = nil,
+		metal_spots = metal,
+		theme = bar_theme(map),
+		conditions = { min_wind = map.min_wind, max_wind = map.max_wind, tidal_strength = map.tidal_strength },
+	}
+end
+
 local presets: { [string]: Preset } = {
 	highlands = {
 		name = "highlands",
 		description = "Rolling hills, with basins that dip below the sea in places",
 		build = highlands_build,
+		size = nil,
 		start_position = nil,
 		metal_layers = nil,
+		metal_spots = nil,
+		theme = TEMPERATE,
 	},
 	islands = {
 		name = "islands",
 		description = "Islands in an ocean, one under every start and at least one steep volcano",
 		build = islands_build,
+		size = nil,
 		start_position = nil,
 		metal_layers = nil,
+		metal_spots = nil,
+		theme = ISLANDS_THEME,
 	},
 	continents = {
 		name = "continents",
 		description = "Two continents joined by two narrow land bridges, one team on each side, in a surrounding sea",
 		build = continents_build,
+		size = nil,
 		start_position = function(slot: number): Vector2
 			return CONTINENT_STARTS[(slot - 1) % #CONTINENT_STARTS + 1]
 		end,
 		metal_layers = nil,
+		metal_spots = nil,
+		theme = TEMPERATE,
 	},
 	koth = {
 		name = "koth",
 		description = "A mountain in the sea, in three terraces joined by narrow ramps, with metal on every layer",
 		build = koth_build,
+		size = nil,
 		start_position = function(slot: number): Vector2
 			local angle = (slot - 1) * (math.pi * 2 / config.START_SLOTS)
 			return Vector2.new(math.cos(angle), math.sin(angle)) * KOTH_START_RADIUS
 		end,
 		metal_layers = KOTH_METAL_LAYERS,
+		metal_spots = nil,
+		theme = KOTH_THEME,
 	},
 }
+
+for _, map in bar_maps.MAPS do
+	presets[map.name] = bar_preset(map)
+end
 
 local DEFAULT = "highlands"
 
