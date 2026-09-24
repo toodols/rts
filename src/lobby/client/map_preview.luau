@@ -96,11 +96,15 @@ local function info(preset_name: string): MapInfo
 	return made
 end
 
--- Every map, the ones made from a seed first and then BAR's from smallest to largest.
-local function all(): { MapInfo }
+-- Every map a lobby can pick (not a campaign mission's), the ones made from a seed first and then BAR's from smallest to largest.
+-- BAR's are only there `with_bar`, for a developer.
+local function all(with_bar: boolean): { MapInfo }
 	local result: { MapInfo } = {}
-	for name in map_presets.presets do
-		table.insert(result, info(name))
+	for name, preset in map_presets.presets do
+		-- a campaign mission's map is only played in the campaign
+		if preset.campaign_only ~= true and (with_bar or bar_by_name[name] == nil) then
+			table.insert(result, info(name))
+		end
 	end
 	table.sort(result, function(a: MapInfo, b: MapInfo): boolean
 		if a.from_bar ~= b.from_bar then

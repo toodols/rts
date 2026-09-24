@@ -14,6 +14,8 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
 local PAN_ACTION = "rts_camera_pan"
 local RENDER_STEP = "rts_camera"
+-- How long a glide (`glide_to`) takes, in seconds.
+local GLIDE_SECONDS = 0.8
 
 local focus = Vector3.zero
 local height = config.CAMERA_HEIGHT
@@ -30,10 +32,36 @@ local KEY_DIRECTIONS: { [Enum.KeyCode]: Vector2 } = {
 
 local held: { [Enum.KeyCode]: boolean } = {}
 
+-- A move of the view that eases there rather than jumping (`glide_to`): from where and to where, in (x, z), when it
+-- began and how long it takes. The player panning or zooming, or a jump (`look_at`), ends it where it is.
+type Glide = { from: Vector2, to: Vector2, began: number, seconds: number }
+local glide: Glide? = nil
+
 -- Where the cursor was last frame while the middle mouse button has been held, if it has: the drag
 -- pans or turns by how far it has moved since. The button is polled every frame rather than followed
 -- through input events, which the interface can swallow.
 local last_drag_location: Vector2? = nil
+
+-- How the view was panned, for whoever wants to know (the tutorial): with the arrow keys, or by dragging with the
+-- middle mouse button. Told every frame the focus moves, and only then; turning and zooming are not panning.
+export type PanMethod = "keys" | "drag"
+local pan_listeners: { (method: PanMethod) -> () } = {}
+
+local function report_pan(method: PanMethod)
+	for _, listener in table.clone(pan_listeners) do
+		listener(method)
+	end
+end
+
+local function subscribe_pan(listener: (method: PanMethod) -> ()): () -> ()
+	table.insert(pan_listeners, listener)
+	return function()
+		local index = table.find(pan_listeners, listener)
+		if index ~= nil then
+			table.remove(pan_listeners, index)
+		end
+	end
+end
 
 local function alt_held(): boolean
 	return UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt)
@@ -91,8 +119,10 @@ local function apply(delta: number)
 			if alt_held() then
 				-- the ground turns the way the cursor drags it
 				yaw -= moved.X * config.CAMERA_ROTATE_SPEED
-			else
+			elseif moved.Magnitude > 0 then
+				glide = nil
 				pan_by_pixels(moved)
+				report_pan "drag"
 			end
 		end
 		last_drag_location = location
@@ -105,7 +135,21 @@ local function apply(delta: number)
 		-- pan speed scales with altitude so a zoomed-out camera crosses the map at the same
 		-- apparent rate as a zoomed-in one
 		local speed = config.CAMERA_PAN_SPEED * (height / config.CAMERA_HEIGHT)
+		glide = nil
 		focus += screen_to_ground(direction.Unit) * speed * delta
+		report_pan "keys"
+	end
+
+	local gliding = glide
+	if gliding ~= nil then
+		local t = math.clamp((os.clock() - gliding.began) / gliding.seconds, 0, 1)
+		-- quick to start and gentle to arrive
+		local eased = 1 - (1 - t) ^ 3
+		local at = gliding.from:Lerp(gliding.to, eased)
+		focus = Vector3.new(at.X, focus.Y, at.Y)
+		if t >= 1 then
+			glide = nil
+		end
 	end
 
 	focus = Vector3.new(focus.X, heightmap.height_at(focus.X, focus.Z), focus.Z)
@@ -141,6 +185,7 @@ local function on_zoom(_, input_state: Enum.UserInputState, input: InputObject):
 	end
 	-- Zoom toward the cursor: whatever is under it stays under it. The focus moves by however far the
 	-- point under the cursor would otherwise have slid across the ground.
+	glide = nil
 	local cursor = UserInputService:GetMouseLocation()
 	local before = ground_under_cursor(cursor, focus, height)
 	height = math.clamp(
@@ -156,7 +201,18 @@ local function on_zoom(_, input_state: Enum.UserInputState, input: InputObject):
 end
 
 local function look_at(position: Vector3)
+	glide = nil
 	focus = Vector3.new(position.X, 0, position.Z)
+end
+
+-- Moves the view to look at `position`, easing there over GLIDE_SECONDS rather than jumping.
+local function glide_to(position: Vector3)
+	glide = {
+		from = Vector2.new(focus.X, focus.Z),
+		to = Vector2.new(position.X, position.Z),
+		began = os.clock(),
+		seconds = GLIDE_SECONDS,
+	}
 end
 
 local function get_focus(): Vector3
@@ -193,5 +249,7 @@ end
 return table.freeze({
 	init = init,
 	look_at = look_at,
+	glide_to = glide_to,
 	get_focus = get_focus,
+	subscribe_pan = subscribe_pan,
 })

@@ -1,0 +1,41 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// The game paused: the whole screen dimmed, a little less than for the end of a game, and a plate across the middle
+// with hazard stripes along its top and bottom so it reads as a halt rather than a result. It sits under the victory
+// screen, which is the one to see if both are up.
+.pause-overlay {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: veil($void, 0.45);
+	z-index: 90;
+}
+
+.pause-plate {
+	@include plate;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(2);
+	min-width: 380px;
+	padding: space(6) space(12);
+}
+
+.pause-title {
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 56px;
+	color: var(--Caution);
+	-webkit-text-stroke: 3px veil($void, 0.85);
+}
+
+.pause-hint {
+	font-size: 15px;
+	color: var(--TextDim);
+	text-align: center;
+}

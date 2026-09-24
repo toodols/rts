@@ -13,6 +13,7 @@ local state = require(script.Parent.state)
 local wind = require(script.Parent.wind)
 local flows = require(script.Parent.flows)
 local nocost = require(script.Parent.nocost)
+local match_stats = require(script.Parent.match_stats)
 
 type Team = types.Team
 type TeamId = types.TeamId
@@ -29,6 +30,10 @@ local converters: { [TeamId]: { types.Entity } } = {}
 -- What each team has gained and spent since the last step settled it, before it is smoothed into rates.
 type Ledger = { metal_in: number, metal_out: number, energy_in: number, energy_out: number }
 local ledgers: { [TeamId]: Ledger } = {}
+-- Each team's resource bonus, as what its extractors and generators make is multiplied by: 2 for +100%, 0 for -100%.
+-- It scales only what they make themselves, so not what converters, reclaim, a commander or a team's flat base income
+-- bring in. A team with none set makes what its defs say.
+local bonus_scales: { [TeamId]: number } = {}
 -- How many seconds the rates take to follow what is happening, so a lump of reclaimed metal reads as a burst
 -- that fades and not as a single spike.
 local RATE_SMOOTHING_SECONDS = 1.5
@@ -65,6 +70,16 @@ local function record_spent(team_id: TeamId, metal: number, energy: number)
 	ledger.energy_out += energy
 end
 
+-- Gives `team_id` a resource bonus of `percent` (see game_modes.BONUS_MIN), from the next tick on.
+local function set_bonus(team_id: TeamId, percent: number)
+	bonus_scales[team_id] = 1 + percent / 100
+end
+
+-- `team_id`'s resource bonus in percent.
+local function bonus_of(team_id: TeamId): number
+	return ((bonus_scales[team_id] or 1) - 1) * 100
+end
+
 local function refresh_income()
 	local metal_made: { [TeamId]: number } = {}
 	local energy_made: { [TeamId]: number } = {}
@@ -81,25 +96,32 @@ local function refresh_income()
 		then
 			continue
 		end
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
+		local bonus = bonus_scales[entity.team] or 1
+		-- the bonus is for extractors and generators, and not for a unit that makes something as well, like a commander
+		local metal_bonus = if def.requires_metal_spot == true then bonus else 1
+		local energy_bonus = if def.kind == "building" then bonus else 1
 		if def.metal_income ~= nil then
 			-- an extractor makes what its spot lets it
 			local multiplier = if def.requires_metal_spot == true then metal_spots.multiplier_at(entity.position) else 1
-			metal_made[entity.team] = (metal_made[entity.team] or 0) + def.metal_income * multiplier
-			flows.add(entity.id, def.metal_income * multiplier, 0)
+			local made = def.metal_income * multiplier * metal_bonus
+			metal_made[entity.team] = (metal_made[entity.team] or 0) + made
+			flows.add(entity.id, if def.requires_metal_spot == true then "Extracting" else "Generating", made, 0)
 		end
 		if def.energy_income ~= nil then
-			energy_made[entity.team] = (energy_made[entity.team] or 0) + def.energy_income
-			flows.add(entity.id, 0, def.energy_income)
+			local made = def.energy_income * energy_bonus
+			energy_made[entity.team] = (energy_made[entity.team] or 0) + made
+			flows.add(entity.id, "Generating", 0, made)
 		end
 		if def.wind_multiplier ~= nil then
-			energy_made[entity.team] = (energy_made[entity.team] or 0) + wind.speed() * def.wind_multiplier
-			flows.add(entity.id, 0, wind.speed() * def.wind_multiplier)
+			local made = wind.speed() * def.wind_multiplier * energy_bonus
+			energy_made[entity.team] = (energy_made[entity.team] or 0) + made
+			flows.add(entity.id, "Wind", 0, made)
 		end
 		if def.tidal_multiplier ~= nil then
-			local made = environment.tidal_strength() * def.tidal_multiplier
+			local made = environment.tidal_strength() * def.tidal_multiplier * energy_bonus
 			energy_made[entity.team] = (energy_made[entity.team] or 0) + made
-			flows.add(entity.id, 0, made)
+			flows.add(entity.id, "Tidal", 0, made)
 		end
 		if def.energy_conversion ~= nil then
 			local total = converting[entity.team]
@@ -147,12 +169,13 @@ local function convert(delta: number)
 
 		-- each converter runs at that fraction of its rate, and is held back if that is less than all of it
 		for _, converter in converters[team_id] or {} do
-			local conversion_def = unit_defs.get(converter.def_name).energy_conversion
+			local conversion_def = unit_defs.of(converter).energy_conversion
 			if conversion_def == nil then
 				continue
 			end
 			flows.add(
 				converter.id,
+				"Converting",
 				conversion_def.metal_per_second * fraction,
 				-conversion_def.energy_per_second * fraction
 			)
@@ -169,6 +192,7 @@ local function convert(delta: number)
 		local ledger = ledger_of(team_id)
 		ledger.energy_out += wanted * fraction
 		ledger.metal_in += total.metal_per_second * delta * fraction
+		match_stats.made_metal(team_id, total.metal_per_second * delta * fraction)
 	end
 end
 
@@ -176,19 +200,19 @@ local function accrue(delta: number)
 	settle(delta)
 	refresh_income()
 	for team_id, team in state.all_teams() do
-		local metal_before = team.metal
-		local energy_before = team.energy
+		match_stats.made_metal(team_id, team.metal_income * delta)
 		team.metal = math.min(team.metal_capacity, team.metal + team.metal_income * delta)
 		team.energy = math.min(team.energy_capacity, team.energy + team.energy_income * delta)
-		-- only what was actually banked counts, so income wasted on a full store is not revenue
+		-- all of it counts as revenue, even what overflows a full store, so the HUD shows what the team makes
 		local ledger = ledger_of(team_id)
-		ledger.metal_in += team.metal - metal_before
-		ledger.energy_in += team.energy - energy_before
+		ledger.metal_in += team.metal_income * delta
+		ledger.energy_in += team.energy_income * delta
 	end
 	convert(delta)
 end
 
--- Metal recovered from reclaim, capped at storage. Returns how much was actually banked.
+-- Metal recovered from reclaim, capped at storage. All of it counts as revenue, even what overflows a full store.
+-- Returns how much was actually banked.
 local function add_metal(team_id: TeamId, amount: number): number
 	local team = state.get_team(team_id)
 	if team == nil then
@@ -196,7 +220,7 @@ local function add_metal(team_id: TeamId, amount: number): number
 	end
 	local before = team.metal
 	team.metal = math.min(team.metal_capacity, team.metal + amount)
-	ledger_of(team_id).metal_in += team.metal - before
+	ledger_of(team_id).metal_in += amount
 	return team.metal - before
 end
 
@@ -207,7 +231,7 @@ local function add_energy(team_id: TeamId, amount: number): number
 	end
 	local before = team.energy
 	team.energy = math.min(team.energy_capacity, team.energy + amount)
-	ledger_of(team_id).energy_in += team.energy - before
+	ledger_of(team_id).energy_in += amount
 	return team.energy - before
 end
 
@@ -232,6 +256,8 @@ end
 
 return table.freeze({
 	accrue = accrue,
+	set_bonus = set_bonus,
+	bonus_of = bonus_of,
 	add_metal = add_metal,
 	add_energy = add_energy,
 	try_spend = try_spend,

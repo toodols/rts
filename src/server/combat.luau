@@ -32,11 +32,16 @@ local deformation = require(script.Parent.deformation)
 local movement = require(script.Parent.movement)
 local profiler = require(script.Parent.profiler)
 local turrets = require(script.Parent.turrets)
+local match_stats = require(script.Parent.match_stats)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
+type TeamId = types.TeamId
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
+-- Tells the clients that something finished went without leaving a wreck, so that they fling its pieces apart
+-- (client/debris.luau). It is only drawn.
+local unit_shattered: RemoteEvent = ReplicatedStorage.Shared.UnitShattered
 
 -- Runs a line-of-sight check (any of sight.verdict/verdict_along/verdict_to_point/first_hit/
 -- first_hit_at) under its own profiler label, `combat_los`, split out of the general `combat` one -
@@ -60,9 +65,18 @@ end
 local WRECK_MAX_SEVERITY = 25
 local RECENT_DAMAGE_DECAY = 0.9
 local FRAMES_PER_SECOND = 30
+-- How violent being disintegrated counts as, for how hard the pieces of what it destroys fly (`shatter`).
+local DISINTEGRATION_SEVERITY = 100
 
 -- Damage taken lately, by entity, decayed a little every tick.
 local recent_damage: { [EntityId]: number } = {}
+
+-- What nothing but a manual weapon (a commander's disintegrator) can hurt, by def name: the tutorial's boulder
+-- (unit_defs/campaign.luau). Weapons, blasts and death explosions do nothing to it; a disintegrator takes it away in one
+-- shot, as it does anything, and it leaves nothing behind and does not explode.
+local DGUN_ONLY: { [string]: boolean } = {
+	tutorial_boulder = true,
+}
 
 -- How many candidate targets are checked for line of sight, nearest first, before giving up.
 local MAX_SIGHT_CHECKS = 6
@@ -486,7 +500,7 @@ end
 -- is the only thing that is aimed at what is wholly under it. A weapon that names a layer shoots only at that one,
 -- and a lobbed shell comes down where its target was, so it is never thrown at something in the air.
 local function can_target(weapon: types.Weapon, target: Entity): boolean
-	local def = unit_defs.get(target.def_name)
+	local def = unit_defs.of(target)
 	if is_torpedo(weapon) then
 		return unit_defs.in_water(def, target.position)
 	end
@@ -501,6 +515,12 @@ local function can_target(weapon: types.Weapon, target: Entity): boolean
 		return in_air == false
 	end
 	return in_air == false or is_lobbed(weapon) == false
+end
+
+-- Whether a weapon picking for itself makes out `other`, `distance` studs off: anything, save that something stealthy
+-- is only made out from close by (`EntityDef.stealth`). An order to attack it is not a pick, and needs no spotting.
+local function spots(other: Entity, distance: number): boolean
+	return distance <= config.STEALTH_DETECTION_RANGE or unit_defs.of(other).stealth ~= true
 end
 
 -- What `attacker` shoots at when it fires from `origin`: the highest reward enemy in range it has a clear
@@ -523,6 +543,7 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 		if
 			is_enemy(attacker, other)
 			and can_target(weapon, other)
+			and spots(other, distance)
 			and table.find(claimed, other.id) == nil
 			and reaches(attacker, weapon, origin, other.position, other.velocity, distance)
 		then
@@ -530,15 +551,16 @@ local function pick_target(attacker: Entity, origin: Vector3, weapon: types.Weap
 		end
 		return nil
 	end)
-	-- The reward for shooting something is its power (metal cost + 60x energy cost) over its current health, so
+	-- The reward for shooting something is its power (`unit_defs.power`) over its current health, so
 	-- what is closest to dying comes first, times the share of the weapon's damage it would actually take: an
 	-- aircraft that takes 15% from a weapon that is not anti air is worth 15% of what it would be to one that is.
 	local rewards: { [Entity]: number } = {}
 	local anti_air = weapon.anti_air == true
 	for _, other in candidates do
-		local def = unit_defs.get(other.def_name)
-		local power = def.metal_cost + 60 * def.energy_cost
-		rewards[other] = power * unit_defs.damage_against(anti_air, def, 1) / math.max(other.health, 1e-3)
+		local def = unit_defs.of(other)
+		rewards[other] = unit_defs.power(def)
+			* unit_defs.damage_against(anti_air, def, 1)
+			/ math.max(other.health, 1e-3)
 	end
 	table.sort(candidates, function(a: Entity, b: Entity): boolean
 		local reward_a = rewards[a]
@@ -623,6 +645,7 @@ local function any_target(attacker: Entity, origin: Vector3, weapon: types.Weapo
 			distance > search_radius
 			or is_enemy(attacker, other) == false
 			or can_target(weapon, other) == false
+			or spots(other, distance) == false
 			or reaches(attacker, weapon, origin, other.position, other.velocity, distance) == false
 		then
 			return nil
@@ -650,7 +673,24 @@ end
 -- Defined below, after the damage it deals, which can kill something that explodes in turn.
 local explode: (source: Entity) -> ()
 
+-- `entity`, finished, has gone and left no wreck: its pieces fly apart, harder the more violent its death (`severity`,
+-- as `kill` has it). A blueprint just disappears, and so does a wreck.
+local function shatter(entity: Entity, severity: number)
+	if entity.kind == "wreck" or entity.state ~= "active" then
+		return
+	end
+	unit_shattered:FireAllClients({
+		id = entity.id,
+		severity = severity,
+		velocity = entity.velocity,
+	})
+end
+
 local function kill(entity: Entity, severity: number)
+	-- a finished thing is a loss to its team, but not a drone, which is only a part of its carrier
+	if entity.kind ~= "wreck" and entity.state == "active" and unit_defs.of(entity).drone ~= true then
+		match_stats.lost(entity.team)
+	end
 	-- Only finished things leave anything behind: a blueprint that dies just disappears, and so does what a
 	-- death was too violent to leave a wreck of.
 	-- a drone is only a part of its carrier and leaves nothing
@@ -658,19 +698,67 @@ local function kill(entity: Entity, severity: number)
 		entity.kind ~= "wreck"
 		and entity.state == "active"
 		and not air.is_aircraft(entity)
-		and unit_defs.get(entity.def_name).drone ~= true
+		and unit_defs.of(entity).drone ~= true
 		and severity <= WRECK_MAX_SEVERITY
 	then
 		local wreck = state.create_wreck(entity)
+	else
+		shatter(entity, severity)
 	end
 	state.mark_dead(entity)
 	explode(entity)
 end
 
-local function apply_damage(target: Entity, amount: number)
-	-- a reclaimable has no health to speak of: nothing but reclaiming it takes it away
-	if target.kind == "reclaimable" then
+-- `attacker` has dealt `dealt` damage to `target`, an enemy, and `killed` says whether that finished it. It is credited
+-- as BAR (the Spring engine, CUnit::DoDamage) credits it: the damage earns a tenth of the share of the target's health
+-- it took, and a kill a tenth more, both scaled by the target's power over the attacker's. So killing something worth
+-- as much as the killer earns 0.2, and killing something worth a quarter of it 0.05. Only damage an enemy takes counts,
+-- and only up to its last hit point; a blueprint's damage counts but its death is no kill.
+local EXPERIENCE_SCALE = 0.1
+local function credit(attacker: Entity, target: Entity, dealt: number, killed: boolean)
+	local def = unit_defs.of(target)
+	local power = unit_defs.power(def)
+	local ratio = power / math.max(unit_defs.power(unit_defs.of(attacker)), 1)
+	-- a blueprint's health grows as it is built, so what is taken off it is weighed against what it will have
+	local share = dealt / math.max(target.max_health, def.health, 1)
+	attacker.damage_dealt += dealt
+	attacker.score_dealt += power * share
+	attacker.experience += EXPERIENCE_SCALE * ratio * share
+	local kill = killed and target.state == "active"
+	if kill then
+		attacker.kills += 1
+		attacker.experience += EXPERIENCE_SCALE * ratio
+	end
+	match_stats.dealt(attacker.team, dealt, power * share, kill)
+end
+
+-- Whether damage `attacker` deals to `target` is credited to it: an enemy's that is still standing, and not a wreck or
+-- neutral scenery.
+local function earns_credit(attacker: Entity, target: Entity): boolean
+	return attacker.alive
+		and attacker.id ~= target.id
+		and target.health > 0
+		and target.kind ~= "wreck"
+		and target.team ~= 0
+		and alliances.are_allied(attacker.team, target.team) == false
+end
+
+-- `target` takes `amount` of damage, dealt by the entity `attacker_id` if anyone (a death explosion or drowning is
+-- nobody's doing), which is credited for it. `attacker_team` is whose weapon it was, when the attacker may be gone by
+-- now, as a shell's may; otherwise it is the attacker's own. Without ally griefing, an ally's weapon does nothing.
+local function apply_damage(target: Entity, amount: number, attacker_id: EntityId?, attacker_team: TeamId?)
+	-- a reclaimable has no health to speak of: nothing but reclaiming it takes it away; and what only a disintegrator
+	-- can hurt takes nothing from anything else
+	if target.kind == "reclaimable" or DGUN_ONLY[target.def_name] ~= nil then
 		return
+	end
+	local attacker = if attacker_id ~= nil then state.get(attacker_id) else nil
+	local team = attacker_team or (if attacker ~= nil then attacker.team else nil)
+	if team ~= nil and alliances.may_harm(team, target.team) == false then
+		return
+	end
+	if attacker ~= nil and amount > 0 and earns_credit(attacker, target) then
+		credit(attacker, target, math.min(amount, target.health), amount >= target.health)
 	end
 	target.health -= amount
 	recent_damage[target.id] = (recent_damage[target.id] or 0) + amount
@@ -691,7 +779,7 @@ explode = function(source: Entity)
 	if source.kind == "wreck" then
 		return
 	end
-	local blast = unit_defs.get(source.def_name).death_explosion
+	local blast = unit_defs.of(source).death_explosion
 	if blast == nil or source.state ~= "active" then
 		return
 	end
@@ -709,7 +797,7 @@ explode = function(source: Entity)
 		if other.alive == false or air.is_airborne(other) then
 			continue
 		end
-		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
+		local reach = unit_defs.collider_radius(unit_defs.of(other))
 		local distance = geometry.distance_2d(source.position, other.position)
 		if distance <= blast.radius + reach then
 			local falloff = 1 - 0.75 * math.clamp(distance / blast.radius, 0, 1)
@@ -718,11 +806,11 @@ explode = function(source: Entity)
 	end
 end
 
--- `weapon` hits `struck` for `amount` of damage, or a fraction of it if it is an aircraft and the weapon is not
--- dedicated anti air. The unit also loses acceleration for a short time due to the impact.
-local function hit(struck: Entity, weapon: types.Weapon, amount: number)
-	local def = unit_defs.get(struck.def_name)
-	apply_damage(struck, unit_defs.damage_against(weapon.anti_air == true, def, amount))
+-- `weapon`, fired by `attacker_id`, hits `struck` for `amount` of damage, or a fraction of it if it is an aircraft and
+-- the weapon is not dedicated anti air. The unit also loses acceleration for a short time due to the impact.
+local function hit(struck: Entity, weapon: types.Weapon, amount: number, attacker_id: EntityId)
+	local def = unit_defs.of(struck)
+	apply_damage(struck, unit_defs.damage_against(weapon.anti_air == true, def, amount), attacker_id)
 	-- it answers slower for half a second (`movement.set_impulse`)
 	if def.max_speed ~= nil and def.acceleration ~= nil then
 		movement.set_impulse(struck, 0.5)
@@ -741,7 +829,7 @@ local function burn(attacker: Entity, weapon: types.Weapon, struck: Entity?, tar
 	local slices = beam_slices(weapon)
 	local slice = weapon.damage / slices
 	if struck ~= nil then
-		hit(struck, weapon, slice)
+		hit(struck, weapon, slice, attacker.id)
 	end
 	if slices > 1 then
 		table.insert(beams, {
@@ -1024,7 +1112,7 @@ local function muzzle_for(entity: Entity, weapon: types.Weapon): Muzzle?
 		return if cached == false then nil else cached
 	end
 	local found: Muzzle | false = false
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	local data = if art.has(entity.def_name) then art.get(entity.def_name) else nil
 	if data ~= nil and def.weapons ~= nil then
 		for index, candidate in def.weapons do
@@ -1086,7 +1174,7 @@ end
 -- weapons that it has a clear line to, whether or not the weapon is reloading. It is what makes a unit on a
 -- fight order stop walking.
 local function has_target(entity: Entity): boolean
-	local weapons = unit_defs.get(entity.def_name).weapons
+	local weapons = unit_defs.of(entity).weapons
 	if weapons == nil then
 		return false
 	end
@@ -1103,7 +1191,7 @@ end
 -- and has a clear shot at it, whether or not it is reloading. It is what an attack order walks on until it has, since
 -- being in range of something behind a hill is not being able to shoot it.
 local function can_shoot(entity: Entity, target: Entity): boolean
-	local weapons = unit_defs.get(entity.def_name).weapons
+	local weapons = unit_defs.of(entity).weapons
 	if weapons == nil then
 		return false
 	end
@@ -1126,7 +1214,7 @@ end
 
 -- The same for a bare `point` on the ground.
 local function can_shoot_point(entity: Entity, point: Vector3): boolean
-	local weapons = unit_defs.get(entity.def_name).weapons
+	local weapons = unit_defs.of(entity).weapons
 	if weapons == nil then
 		return false
 	end
@@ -1154,15 +1242,15 @@ export type ManualFireResult = "fired" | "waiting" | "blocked" | "unable"
 
 -- Fires an entity's manual weapon toward `aim`. A rectangle sweeps out from the shooter along that
 -- line for the weapon's whole range, and everything inside it except the shooter is destroyed
--- outright, with no wreck: it is disintegrated, whoever it belonged to, allies and your own included, as in
--- BAR. Only an enemy commander stops it: one in the way blocks the shot, which is BAR's answer to one commander
--- disintegrating another. Anything that even touches the rectangle counts, so each thing counts as a circle
--- its collider wide.
+-- outright, with no wreck: it is disintegrated, whoever it belonged to, your own included, as in BAR, and an
+-- ally's too with ally griefing on; without it an ally's things are passed through untouched. Only an enemy
+-- commander stops it: one in the way blocks the shot, which is BAR's answer to one commander disintegrating
+-- another. Anything that even touches the rectangle counts, so each thing counts as a circle its collider wide.
 local function manual_fire(shooter: Entity, aim: Vector3): ManualFireResult
 	if shooter.alive == false or shooter.state ~= "active" then
 		return "unable"
 	end
-	local weapon = unit_defs.get(shooter.def_name).manual_weapon
+	local weapon = unit_defs.of(shooter).manual_weapon
 	if weapon == nil then
 		return "unable"
 	end
@@ -1184,10 +1272,16 @@ local function manual_fire(shooter: Entity, aim: Vector3): ManualFireResult
 	for _, other in state.all() do
 		-- it sweeps the ground, so an aircraft that is up in the air is over it; a reclaimable is not harmed by it,
 		-- as it is by nothing
-		if other.alive == false or other.id == shooter.id or other.kind == "reclaimable" or air.is_airborne(other) then
+		if
+			other.alive == false
+			or other.id == shooter.id
+			or other.kind == "reclaimable"
+			or air.is_airborne(other)
+			or alliances.may_harm(shooter.team, other.team) == false
+		then
 			continue
 		end
-		local reach = unit_defs.collider_radius(unit_defs.get(other.def_name))
+		local reach = unit_defs.collider_radius(unit_defs.of(other))
 		local offset = geometry.flatten(other.position - shooter.position)
 		local along = offset:Dot(direction)
 		local across = math.abs(offset:Dot(sideways))
@@ -1214,6 +1308,12 @@ local function manual_fire(shooter: Entity, aim: Vector3): ManualFireResult
 	})
 
 	for _, other in inside do
+		-- gone, with nothing left of it and no blast
+		if DGUN_ONLY[other.def_name] == true then
+			state.mark_dead(other)
+			continue
+		end
+		shatter(other, DISINTEGRATION_SEVERITY)
 		state.mark_dead(other)
 		-- disintegrated, but not defused
 		explode(other)
@@ -1389,7 +1489,7 @@ local function tick_beams()
 			end
 		end
 		if struck ~= nil then
-			hit(struck, beam.weapon, beam.slice)
+			hit(struck, beam.weapon, beam.slice, beam.shooter_id)
 		end
 		beam.slices_left -= 1
 		if burning == false or beam.slices_left <= 0 then
@@ -1446,7 +1546,7 @@ local function tick(delta: number)
 			entity.manual_reload_remaining = math.max(0, entity.manual_reload_remaining - delta)
 		end
 
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
 		local weapons = def.weapons
 		if weapons ~= nil then
 			tick_weapons(entity, weapons, def.popup, delta)
@@ -1496,6 +1596,7 @@ return table.freeze({
 	is_enemy = is_enemy,
 	is_valid_forced_target = is_valid_forced_target,
 	can_target = can_target,
+	spots = spots,
 	has_target = has_target,
 	can_shoot = can_shoot,
 	can_shoot_point = can_shoot_point,

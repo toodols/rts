@@ -57,46 +57,7 @@
       </rbx-frame>
 
       <!-- selection_panel.luau: SelectionPanel -> Single -->
-      <rbx-frame class="selection-panel panel">
-        <rbx-frame class="rail"></rbx-frame>
-        <rbx-frame class="selection-title">
-          <rbx-frame class="accent-bar"></rbx-frame>
-          <rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel>
-          <rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
-        </rbx-frame>
-        <rbx-frame class="progress-track">
-          <rbx-frame class="progress-fill" style="width: 100%; height: 100%"></rbx-frame>
-        </rbx-frame>
-        <rbx-frame class="stat-list">
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">HEALTH</rbx-textlabel>
-            <rbx-textlabel class="stat-value">3000 / 3000</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">METAL</rbx-textlabel>
-            <rbx-textlabel class="stat-value">500</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">ENERGY</rbx-textlabel>
-            <rbx-textlabel class="stat-value">10000</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">BUILDPOWER</rbx-textlabel>
-            <rbx-textlabel class="stat-value">100</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">ORDERS</rbx-textlabel>
-            <rbx-textlabel class="stat-value">0</rbx-textlabel>
-          </rbx-frame>
-        </rbx-frame>
-        <rbx-frame class="queue-strip">
-          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
-          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
-          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
-          <rbx-textbutton class="queue-chip">Co</rbx-textbutton>
-          <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
-        </rbx-frame>
-      </rbx-frame>
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Builds T1 bots</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-good" style="width: 100%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">3000 / 3000</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile metal-tile"><rbx-frame class="tile-rail metal-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip metal-chip"></rbx-frame><rbx-textlabel class="tile-name metal">METAL</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-4.5</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-45.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="loadout"><rbx-frame class="loadout-row loadout-build"><rbx-textlabel class="loadout-slot slot-build">BLD</rbx-textlabel><rbx-textlabel class="loadout-name">BUILDPOWER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-build">100</rbx-textlabel><rbx-textlabel class="loadout-unit">PER SEC</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="queue-strip"><rbx-textbutton class="queue-chip">Gr</rbx-textbutton><rbx-textbutton class="queue-chip">Gr</rbx-textbutton><rbx-textbutton class="queue-chip">Gr</rbx-textbutton><rbx-textbutton class="queue-chip">Co</rbx-textbutton><rbx-textbutton class="queue-chip">Gr</rbx-textbutton></rbx-frame></rbx-frame>
 
       <!-- build_menu.luau: BuildMenu, a Bot Lab selected -->
       <rbx-frame class="build-menu panel">
@@ -135,41 +96,15 @@
 <div class="h-grid">
 
   <figure class="h-cell">
-    <figcaption><b>.badge-blueprint · .blueprint-fill</b> <span>selection_panel.luau &rarr; Single, state == "blueprint"</span></figcaption>
+    <figcaption><b>.badge-blueprint · .vitals-fill-blueprint</b> <span>selection_panel.luau &rarr; Single, state == "blueprint"</span></figcaption>
     <div class="h-box h-tall h-anchor">
-      <rbx-frame class="selection-panel panel">
-        <rbx-frame class="rail"></rbx-frame>
-        <rbx-frame class="selection-title">
-          <rbx-frame class="accent-bar"></rbx-frame>
-          <rbx-textlabel class="selection-name">Construction Bot</rbx-textlabel>
-          <rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel>
-        </rbx-frame>
-        <rbx-frame class="progress-track">
-          <rbx-frame class="progress-fill blueprint-fill" style="width: 45%; height: 100%"></rbx-frame>
-        </rbx-frame>
-        <rbx-frame class="stat-list">
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">HEALTH</rbx-textlabel>
-            <rbx-textlabel class="stat-value">180 / 180</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">METAL</rbx-textlabel>
-            <rbx-textlabel class="stat-value">200</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">BUILDPOWER</rbx-textlabel>
-            <rbx-textlabel class="stat-value">70</rbx-textlabel>
-          </rbx-frame>
-        </rbx-frame>
-      </rbx-frame>
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Construction Bot</rbx-textlabel><rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Builds T1 structures</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-blueprint" style="width: 45%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">BUILDING  45%</rbx-textlabel></rbx-frame><rbx-frame class="loadout"><rbx-frame class="loadout-row loadout-build"><rbx-textlabel class="loadout-slot slot-build">BLD</rbx-textlabel><rbx-textlabel class="loadout-name">BUILDPOWER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-build">70</rbx-textlabel><rbx-textlabel class="loadout-unit">PER SEC</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame></rbx-frame>
     </div>
-    <p class="h-note">The fill is the energy tone rather than buildpower green, and the badge outline
-      is <code>var(--Energy)</code>. Note <code>.badge-blueprint</code> is a sibling class, not
-      <code>.badge.badge-blueprint</code>, so it beats <code>.badge</code> on source order alone.</p>
+    <p class="h-note">A blueprint makes and spends nothing, so it has no resource tiles, only its progress stamped on the bar. Only a state worth pointing out gets a badge.</p>
   </figure>
 
   <figure class="h-cell">
-    <figcaption><b>.badge-count</b> <span>selection_panel.luau &rarr; Many</span></figcaption>
+    <figcaption><b>.badge-count · .group-grid</b> <span>selection_panel.luau &rarr; Many</span></figcaption>
     <div class="h-box h-tall h-anchor">
       <rbx-frame class="selection-panel panel">
         <rbx-frame class="rail"></rbx-frame>
@@ -178,20 +113,96 @@
           <rbx-textlabel class="selection-name">SELECTION</rbx-textlabel>
           <rbx-textlabel class="badge badge-count">7</rbx-textlabel>
         </rbx-frame>
-        <rbx-frame class="stat-list">
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">GRUNT</rbx-textlabel>
-            <rbx-textlabel class="stat-value">x5</rbx-textlabel>
-          </rbx-frame>
-          <rbx-frame class="stat">
-            <rbx-textlabel class="stat-label">CONSTRUCTOR</rbx-textlabel>
-            <rbx-textlabel class="stat-value">x2</rbx-textlabel>
-          </rbx-frame>
+        <rbx-frame class="group-grid">
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×5</rbx-textlabel><rbx-textlabel class="group-name">GRUNT</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×2</rbx-textlabel><rbx-textlabel class="group-name">CONSTRUCTION BOT</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×3</rbx-textlabel><rbx-textlabel class="group-name">ROCKETEER</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×1</rbx-textlabel><rbx-textlabel class="group-name">COMMANDER</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×4</rbx-textlabel><rbx-textlabel class="group-name">SCOUT</rbx-textlabel></rbx-frame>
         </rbx-frame>
       </rbx-frame>
     </div>
-    <p class="h-note">No progress track and no queue: <code>Many</code> renders the title and the
-      rows only, so the panel is whatever <code>height: auto</code> resolves to.</p>
+    <p class="h-note">A tile per kind, four to a row, the count large in the accent colour and the name
+      under it, cut off with an ellipsis when it is too long.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tile-rate-gain · .vitals-fill-worn</b> <span>selection_panel.luau &rarr; Single, energy_rate &gt; 0</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Wind Turbine</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(232, 64, 64)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(232, 64, 64)">CRIMSON</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Makes energy from the wind</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-worn" style="width: 52%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">104 / 200</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-gain">+18.4</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-gain">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">Only the resource it is making gets a tile.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tile-stalled · .vitals-fill-critical · .gauge-list</b> <span>selection_panel.luau &rarr; Single, stalled == "energy"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Deflector</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Plasma shield</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-critical" style="width: 22%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">440 / 2000</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile energy-tile tile-stalled"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel><rbx-textlabel class="tile-stall">SHORT</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-60.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="gauge-list"><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">SHIELD</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill shield-fill" style="width: 42%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">1350/3250</rbx-textlabel></rbx-frame><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">MISSILES</rbx-textlabel><rbx-frame class="pip-row"><rbx-frame class="pip pip-full missile-pip"></rbx-frame><rbx-frame class="pip pip-full missile-pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">2/5</rbx-textlabel></rbx-frame><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">CARGO</rbx-textlabel><rbx-frame class="pip-row"><rbx-frame class="pip pip-full cargo-pip"></rbx-frame><rbx-frame class="pip pip-full cargo-pip"></rbx-frame><rbx-frame class="pip pip-full cargo-pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">3/8</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">The resource holding it back outlines its tile in red with a flag. Not every gauge row appears on one entity in game.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.loadout · .loadout-row</b> <span>selection_panel.luau &rarr; Loadout</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Commander</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Builds, fights, and ends the game</rbx-textlabel><rbx-textlabel class="veterancy">3 KILLS · XP 0.40</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-good" style="width: 88%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">2900 / 3300</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile metal-tile"><rbx-frame class="tile-rail metal-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip metal-chip"></rbx-frame><rbx-textlabel class="tile-name metal">METAL</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-8.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-75.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="loadout"><rbx-frame class="loadout-row loadout-build"><rbx-textlabel class="loadout-slot slot-build">BLD</rbx-textlabel><rbx-textlabel class="loadout-name">BUILDPOWER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-build">300</rbx-textlabel><rbx-textlabel class="loadout-unit">PER SEC</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="loadout-heading"><rbx-textlabel class="loadout-heading-text heading-weapon">WEAPONS</rbx-textlabel><rbx-frame class="loadout-rule rule-weapon"></rbx-frame></rbx-frame><rbx-frame class="loadout-row loadout-weapon"><rbx-textlabel class="loadout-slot slot-weapon">LSR</rbx-textlabel><rbx-textlabel class="loadout-name">LASER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-weapon">188</rbx-textlabel><rbx-textlabel class="loadout-unit">DPS</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="loadout-row loadout-manual"><rbx-textlabel class="loadout-slot slot-manual">DGN</rbx-textlabel><rbx-textlabel class="loadout-name">DISINTEGRATOR</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-manual">500</rbx-textlabel><rbx-textlabel class="loadout-unit">E/SHOT</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">The team sits at the end of the title, and kills and experience at the end of the subtitle once there are any. A row for buildpower and one for each weapon: the rest is in their tooltips.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tooltip · .tooltip-weapon</b> <span>tooltip.luau &rarr; WithTooltip, a weapon row hovered</span></figcaption>
+    <div class="h-box h-tall">
+      <rbx-frame class="tooltip" style="position: relative"><rbx-frame class="tooltip-rail tooltip-weapon"></rbx-frame><rbx-textlabel class="tooltip-kicker">WEAPON</rbx-textlabel><rbx-textlabel class="tooltip-title tooltip-weapon">LASER</rbx-textlabel><rbx-textlabel class="tooltip-text">Hits the instant it fires; the beam is only what is drawn.</rbx-textlabel><rbx-frame class="tooltip-rows"><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Damage a second</rbx-textlabel><rbx-textlabel class="tooltip-value weapon">188</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Damage a shot</rbx-textlabel><rbx-textlabel class="tooltip-value">75</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Reload</rbx-textlabel><rbx-textlabel class="tooltip-value">0.40s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Range</rbx-textlabel><rbx-textlabel class="tooltip-value">300 studs</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Targets</rbx-textlabel><rbx-textlabel class="tooltip-value">Ground and air</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="tooltip-notes"><rbx-textlabel class="tooltip-note">· Only 15% of its damage lands on aircraft.</rbx-textlabel></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">Portalled into the HUD's ScreenGui, beside the panel and level with the bottom of the row.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tooltip · .gain · .loss</b> <span>tooltip.luau &rarr; a resource tile hovered</span></figcaption>
+    <div class="h-box h-tall">
+      <rbx-frame class="tooltip" style="position: relative"><rbx-frame class="tooltip-rail tooltip-metal"></rbx-frame><rbx-textlabel class="tooltip-kicker">ECONOMY</rbx-textlabel><rbx-textlabel class="tooltip-title tooltip-metal">METAL</rbx-textlabel><rbx-frame class="tooltip-rows"><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Generating</rbx-textlabel><rbx-textlabel class="tooltip-value gain">+2.0/s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Building Solar Collector</rbx-textlabel><rbx-textlabel class="tooltip-value loss">-10.0/s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-divider"></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Net</rbx-textlabel><rbx-textlabel class="tooltip-value loss">-8.0/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">Where the rate comes from, a row a source as the server names it, and the net when there is more than one.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tooltip · .tooltip-plain</b> <span>tooltip.luau &rarr; the title hovered</span></figcaption>
+    <div class="h-box h-tall">
+      <rbx-frame class="tooltip" style="position: relative"><rbx-frame class="tooltip-rail tooltip-plain"></rbx-frame><rbx-textlabel class="tooltip-kicker">UNIT</rbx-textlabel><rbx-textlabel class="tooltip-title tooltip-plain">COMMANDER</rbx-textlabel><rbx-textlabel class="tooltip-text">Builds, fights, and ends the game</rbx-textlabel><rbx-frame class="tooltip-rows"><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Health</rbx-textlabel><rbx-textlabel class="tooltip-value">3300</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Metal cost</rbx-textlabel><rbx-textlabel class="tooltip-value metal">1400</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Energy cost</rbx-textlabel><rbx-textlabel class="tooltip-value energy">26000</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Buildpower cost</rbx-textlabel><rbx-textlabel class="tooltip-value buildpower">75000</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Speed</rbx-textlabel><rbx-textlabel class="tooltip-value">37.5 studs/s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Orders queued</rbx-textlabel><rbx-textlabel class="tooltip-value">2</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">What it costs, how tough and quick it is, and its queued orders.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.badge-remnant · .vitals-fill-wreck</b> <span>selection_panel.luau &rarr; Remnant, kind == "wreck"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Grunt Wreck</rbx-textlabel><rbx-textlabel class="badge badge-remnant">WRECK</rbx-textlabel></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Reclaim for metal, or resurrect it</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-wreck" style="width: 70%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">105 / 150</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile metal-tile"><rbx-frame class="tile-rail metal-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip metal-chip"></rbx-frame><rbx-textlabel class="tile-name metal">METAL</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-metal">19</rbx-textlabel></rbx-frame><rbx-textlabel class="tile-cost">TO RECLAIM</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="gauge-list"><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">RECLAIMED</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill reclaim-fill" style="width: 24%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">24/100</rbx-textlabel></rbx-frame><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">RAISED</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill resurrect-fill" style="width: 40%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">40/100</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">No team, no rates. What is left to reclaim, how far that and raising it have got, and what
+      the unit it was cost.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tile-rate-energy</b> <span>selection_panel.luau &rarr; Remnant, kind == "reclaimable"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Tree</rbx-textlabel><rbx-textlabel class="badge badge-remnant">FEATURE</rbx-textlabel></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Reclaim for energy</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-energy">250</rbx-textlabel></rbx-frame><rbx-textlabel class="tile-cost">TO RECLAIM</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="gauge-list"><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">RECLAIMED</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill reclaim-fill" style="width: 0%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">0/100</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">A rock or tree takes no harm, so it has no health bar, and shows only the resource it holds.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.pause-overlay</b> <span>pause_overlay.luau &rarr; Workspace.paused</span></figcaption>
+    <div class="h-box h-tall h-anchor" style="position: relative">
+      <rbx-frame class="pause-overlay">
+        <rbx-frame class="pause-plate">
+          <rbx-textlabel class="pause-title">PAUSED</rbx-textlabel>
+          <rbx-textlabel class="pause-hint">The game is stopped until it is unpaused</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Dims the whole screen and says so across the middle, in the caution colour. Clicks go
+      through to the world.</p>
   </figure>
 
   <figure class="h-cell">
@@ -374,24 +385,31 @@
   </figure>
 
   <figure class="h-cell">
-    <figcaption><b>.progress-track · .progress-fill</b> <span>_selection_panel.scss</span></figcaption>
+    <figcaption><b>.vitals-track · .vitals-fill · .vitals-label</b> <span>_selection_panel.scss</span></figcaption>
     <div class="h-box">
-      <rbx-frame class="progress-track">
-        <rbx-frame class="progress-fill" style="width: 72%; height: 100%"></rbx-frame>
+      <rbx-frame class="vitals-track">
+        <rbx-frame class="vitals-fill vitals-fill-good" style="width: 88%; height: 100%"></rbx-frame>
+        <rbx-textlabel class="vitals-label">2640 / 3000</rbx-textlabel>
       </rbx-frame>
       <rbx-frame style="height: 10px"></rbx-frame>
-      <rbx-frame class="progress-track">
-        <rbx-frame class="progress-fill blueprint-fill" style="width: 45%; height: 100%"></rbx-frame>
+      <rbx-frame class="vitals-track">
+        <rbx-frame class="vitals-fill vitals-fill-worn" style="width: 48%; height: 100%"></rbx-frame>
+        <rbx-textlabel class="vitals-label">1440 / 3000</rbx-textlabel>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-frame class="vitals-track">
+        <rbx-frame class="vitals-fill vitals-fill-critical" style="width: 18%; height: 100%"></rbx-frame>
+        <rbx-textlabel class="vitals-label">540 / 3000</rbx-textlabel>
       </rbx-frame>
     </div>
-    <p class="h-note">Same mixins as the resource meters at 8px: buildpower green for health,
-      energy blue for build progress.</p>
+    <p class="h-note">18px channel with the numbers stamped on it. Green over 60%, amber over 30%, red and
+      pulsing below.</p>
   </figure>
 
   <figure class="h-cell">
     <figcaption><b>.badge</b> <span>_selection_panel.scss</span></figcaption>
     <div class="h-box" style="display: flex; gap: 10px; align-items: center">
-      <rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
+      
       <rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel>
       <rbx-textlabel class="badge badge-count">12</rbx-textlabel>
     </div>
@@ -400,20 +418,38 @@
   </figure>
 
   <figure class="h-cell">
-    <figcaption><b>.stat-list · .stat · .stat-label · .stat-value</b> <span>_selection_panel.scss</span></figcaption>
+    <figcaption><b>.resource-tile · .tile-rate-*</b> <span>_selection_panel.scss</span></figcaption>
     <div class="h-box">
-      <rbx-frame class="stat-list">
-        <rbx-frame class="stat">
-          <rbx-textlabel class="stat-label">HEALTH</rbx-textlabel>
-          <rbx-textlabel class="stat-value">3000 / 3000</rbx-textlabel>
+      <rbx-frame class="economy-row">
+        <rbx-frame class="resource-tile metal-tile">
+          <rbx-frame class="tile-rail metal-rail"></rbx-frame>
+          <rbx-frame class="tile-head">
+            <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+            <rbx-textlabel class="tile-name metal">METAL</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="tile-rate">
+            <rbx-textlabel class="tile-rate-value tile-rate-gain">+2.5</rbx-textlabel>
+            <rbx-textlabel class="tile-rate-unit tile-rate-gain">/s</rbx-textlabel>
+          </rbx-frame>
+          <rbx-textlabel class="tile-cost">COST <b>150</b></rbx-textlabel>
         </rbx-frame>
-        <rbx-frame class="stat">
-          <rbx-textlabel class="stat-label">BUILDPOWER</rbx-textlabel>
-          <rbx-textlabel class="stat-value">100</rbx-textlabel>
+        <rbx-frame class="resource-tile energy-tile tile-stalled">
+          <rbx-frame class="tile-rail energy-rail"></rbx-frame>
+          <rbx-frame class="tile-head">
+            <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+            <rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="tile-stall">SHORT</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="tile-rate">
+            <rbx-textlabel class="tile-rate-value tile-rate-loss">-12.0</rbx-textlabel>
+            <rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel>
+          </rbx-frame>
+          <rbx-textlabel class="tile-cost">COST <b>1400</b></rbx-textlabel>
         </rbx-frame>
       </rbx-frame>
     </div>
-    <p class="h-note">17px rows, 4px gaps. The label grows, the value is right-aligned RobotoMono 13.</p>
+    <p class="h-note">A tile per resource, tinted and lipped in its colour. The rate is big and signed: green
+      for income, red for upkeep, faint when idle. The cost sits underneath.</p>
   </figure>
 
   <figure class="h-cell">
@@ -494,7 +530,7 @@
       <rbx-frame class="selection-title" style="width: 298px">
         <rbx-frame class="accent-bar"></rbx-frame>
         <rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel>
-        <rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
+        
       </rbx-frame>
     </div>
     <p class="h-note">Three components render an <code>accent-bar</code> Frame

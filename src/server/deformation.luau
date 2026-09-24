@@ -22,6 +22,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local state = require(script.Parent.state)
 local terrain = require(script.Parent.terrain)
 local placement = require(script.Parent.placement)
+local obstacles = require(script.Parent.obstacles)
 
 local terrain_deformed: RemoteEvent = ReplicatedStorage.Shared.TerrainDeformed
 
@@ -71,7 +72,7 @@ local function reseat(min_x: number, min_z: number, max_x: number, max_z: number
 		if entity.alive == false or entity.kind == "building" then
 			continue
 		end
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
 		if def.air ~= nil then
 			continue
 		end
@@ -112,6 +113,8 @@ local function flush()
 	-- a sample moves the surface over the four cells around it
 	terrain.rewrite(first_x - 1, first_z - 1, last_x, last_z)
 	passability.refresh(first_x - 1, first_z - 1, last_x, last_z)
+	-- what stands as a wall is still one, whatever the ground under it did
+	obstacles.restamp()
 	pathfinder.refresh(first_x - 1, first_z - 1, last_x, last_z)
 	terrain_deformed:FireAllClients(map_state.generation(), changes)
 

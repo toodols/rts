@@ -14,21 +14,14 @@
 	align-items: stretch;
 	gap: space(2);
 	width: 360px;
+	height: auto;
 	padding: space(4);
-	border-top: 2px solid var(--Accent);
-	box-shadow: 0 8px 24px veil($void, 0.6);
-}
-
-// Counting down: the plate's edge goes hot, as the moment approaches.
-.lobby-panel.counting {
-	border-top: 2px solid var(--Energy);
 }
 
 .lobby-title {
 	font-family: Michroma;
 	font-weight: bold;
 	font-size: 20px;
-	letter-spacing: 0.08em;
 	color: var(--Text);
 	-webkit-text-stroke: 2px veil($void, 0.85);
 }
@@ -46,7 +39,6 @@
 	display: flex;
 	flex-direction: column;
 	gap: space(1);
-	margin-top: space(2);
 }
 
 // One player. Their status is faint until they are ready, when it lights green.

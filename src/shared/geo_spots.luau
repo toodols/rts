@@ -1,14 +1,11 @@
--- Geothermal vents: the few places on the map where a geothermal powerplant can be built, as metal spots are where an
--- extractor can.
+-- Geothermal vents: the few places on a map where a geothermal powerplant can be built, as metal spots are where an
+-- extractor can. They are as particular to a map as its metal is, so a map has only the vents it says it has
+-- (`Preset.geo_spots`): a BAR map has the ones in its own archive, where BAR has them. A map that has none of its own can
+-- ask for one beside every start instead (`Preset.geo_at_starts`), which is laid out from the ground, on the nearest
+-- flat, dry place that is off the start itself and off the metal spots. Anything else has no vents at all.
 --
--- BAR's maps put their vents where their authors chose, but the pages the maps here were brought over from do not say
--- where that is, so every map has its vents laid out from the seed, like the metal spots of a generated map. They come
--- in pairs, each vent's twin on the opposite side of the middle of the map, so that neither side of a two-team map is
--- favoured: the maps are all laid out that way round, or near enough. They keep off the starts, away from each other
--- and off the metal spots, on dry ground flat enough to build a powerplant on.
---
--- Like the metal spots they are a pure function of the seed and the map, so the client lays out exactly the vents the
--- server has instead of having them replicated. Must be initialised after the metal spots.
+-- Like the metal spots they are a pure function of the map, so the client lays out exactly the vents the server has
+-- instead of having them replicated. Must be initialised after the metal spots.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -17,23 +14,21 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 local starts = require(ReplicatedStorage.Shared.starts)
 local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
+local map_presets = require(ReplicatedStorage.Shared.map_presets)
 
--- How many twinned pairs of vents a map has.
-local PAIR_COUNT = 2
 -- Every geothermal building stands on BAR's 5 x 5 footprint, two cells across here, so a vent is where the centre of a
 -- building two cells across goes: on a corner of the building grid.
 local FOOTPRINT_HALF_EXTENTS = Vector2.new(config.CELL_STUDS, config.CELL_STUDS)
--- Kept this far from the map edge, from every start, from each other, from every metal spot, and from its own twin.
-local EDGE_MARGIN = 24
-local START_CLEARANCE = 60
-local SPACING = 80
+-- A vent beside a start is looked for this far out from the start's centre, nearest first, and keeps this far from the
+-- metal spots and from the other vents.
+local NEAR_START_MIN = 24
+local NEAR_START_MAX = 64
+local NEAR_START_STEP = 4
+local NEAR_START_ANGLES = 24
 local METAL_CLEARANCE = 10
+local SPACING = 20
 -- Dry by at least this much under the whole footprint.
 local MIN_HEIGHT_ABOVE_WATER = 0.5
-
-local MAX_ATTEMPTS = 2000
--- Decorrelates the vents from the terrain noise and the metal spots, which are seeded with the same number.
-local SEED_OFFSET = 104729
 -- How far from a vent a building may be and still count as standing on it.
 local MATCH_RADIUS = 0.5
 
@@ -50,18 +45,25 @@ local function snapped(x: number, z: number): (number, number)
 	return geometry.snap_center(x, z, FOOTPRINT_HALF_EXTENTS, config.CELL_STUDS)
 end
 
-local function acceptable(x: number, z: number): boolean
-	local half_x, half_z = heightmap.half_extents()
-	if math.abs(x) > half_x - EDGE_MARGIN or math.abs(z) > half_z - EDGE_MARGIN then
+local function add(x: number, z: number)
+	local position = heightmap.ground_position(x, z)
+	table.insert(spots, { center = position, positions = { position } })
+end
+
+-- Whether a geothermal building could stand at (x, z), on the grid already: in bounds, on flat dry ground, and clear of
+-- the metal spots and the other vents.
+local function fits(x: number, z: number): boolean
+	local half = FOOTPRINT_HALF_EXTENTS
+	if heightmap.in_bounds(x - half.X, z - half.Y) == false or heightmap.in_bounds(x + half.X, z + half.Y) == false then
 		return false
 	end
-	local lowest, highest = heightmap.height_range(x, z, FOOTPRINT_HALF_EXTENTS.X, FOOTPRINT_HALF_EXTENTS.Y)
+	local lowest, highest = heightmap.height_range(x, z, half.X, half.Y)
 	if highest - lowest > config.MAX_BUILD_SLOPE_STUDS or lowest < config.WATER_LEVEL + MIN_HEIGHT_ABOVE_WATER then
 		return false
 	end
 	local here = Vector2.new(x, z)
-	for slot = 1, config.START_SLOTS do
-		if (here - starts.center(slot)).Magnitude < START_CLEARANCE then
+	for _, spot in metal_spots.all() do
+		if (here - Vector2.new(spot.center.X, spot.center.Z)).Magnitude < METAL_CLEARANCE then
 			return false
 		end
 	end
@@ -70,43 +72,45 @@ local function acceptable(x: number, z: number): boolean
 			return false
 		end
 	end
-	for _, spot in metal_spots.all() do
-		if (here - Vector2.new(spot.center.X, spot.center.Z)).Magnitude < METAL_CLEARANCE then
-			return false
-		end
-	end
 	return true
 end
 
-local function add(x: number, z: number)
-	local position = heightmap.ground_position(x, z)
-	table.insert(spots, { center = position, positions = { position } })
+-- The nearest place a vent fits beside `start`, looking round it first toward the middle of the map.
+local function beside(start: Vector2): Vector2?
+	local inward = math.atan2(-start.Y, -start.X)
+	for radius = NEAR_START_MIN, NEAR_START_MAX, NEAR_START_STEP do
+		for step = 0, NEAR_START_ANGLES - 1 do
+			-- alternately either side of inward, widening
+			local offset = math.ceil(step / 2) * (if step % 2 == 0 then 1 else -1)
+			local angle = inward + offset * (math.pi * 2 / NEAR_START_ANGLES)
+			local x, z = snapped(start.X + math.cos(angle) * radius, start.Y + math.sin(angle) * radius)
+			if fits(x, z) then
+				return Vector2.new(x, z)
+			end
+		end
+	end
+	return nil
 end
 
--- Must be called after `metal_spots.initialize`, with the same seed on both sides.
-local function initialize(seed: number)
+-- Must be called after `metal_spots.initialize`, on both sides.
+local function initialize(_seed: number)
 	table.clear(spots)
-	local random = Random.new(seed + SEED_OFFSET)
-	local half_x, half_z = heightmap.half_extents()
-	local pairs_placed = 0
-	for _ = 1, MAX_ATTEMPTS do
-		if pairs_placed >= PAIR_COUNT then
-			break
+	local preset = map_presets.get(heightmap.get_preset())
+	if preset.geo_spots ~= nil then
+		for _, at in preset.geo_spots do
+			add(snapped(at.X, at.Y))
 		end
-		-- the grid is laid out symmetrically about the middle, so a snapped point's twin is snapped too
-		local x, z = snapped(random:NextNumber(-half_x, half_x), random:NextNumber(-half_z, half_z))
-		if Vector2.new(x, z).Magnitude * 2 < SPACING then
-			continue
-		end
-		if acceptable(x, z) == false or acceptable(-x, -z) == false then
-			continue
-		end
-		add(x, z)
-		add(-x, -z)
-		pairs_placed += 1
+		return
 	end
-	if pairs_placed < PAIR_COUNT then
-		warn(`only found room for {pairs_placed} of {PAIR_COUNT} pairs of geothermal vents`)
+	if preset.geo_at_starts == true then
+		for slot = 1, starts.count() do
+			local at = beside(starts.center(slot))
+			if at ~= nil then
+				add(at.X, at.Y)
+			else
+				warn(`found no room for a geothermal vent beside start {slot}`)
+			end
+		end
 	end
 end
 

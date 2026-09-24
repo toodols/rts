@@ -1,6 +1,8 @@
--- The scavengers gamemode. Every few minutes a beacon appears somewhere on the map, and for as long as it
--- stands it keeps producing hostile units and defences around itself. The units scatter across the map and
--- hunt: anything of a player's that one notices, and has a way to, it attacks.
+-- The scavengers gamemode. As the game begins a beacon stands in a start nobody took, and every few minutes
+-- another goes up near one already standing, so that they spread out over the map. Once the game is far enough
+-- along, every beacon keeps producing hostile units and defences around itself, so the more beacons stand the more
+-- come. The units scatter across the map and hunt: anything of a player's that one notices, and has a way to, it
+-- attacks.
 --
 -- The scavengers are a team of their own (`config.SCAVENGER_TEAM`), so everything `combat` already knows
 -- about enemies applies to them without a special case: defences shoot whatever comes into range, and a
@@ -13,6 +15,7 @@
 -- to a good deal more, so there is a limit on how many are asked for and how far each may search, and a unit that
 -- is refused waits before it tries again.
 
+local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
@@ -23,6 +26,8 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 local passability = require(ReplicatedStorage.Shared.passability)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
+local starts = require(ReplicatedStorage.Shared.starts)
+local game_phase = require(ReplicatedStorage.Shared.game_phase)
 
 local state = require(script.Parent.state)
 local orders = require(script.Parent.orders)
@@ -45,7 +50,8 @@ type Spawn = {
 	-- made by a beacon that floats on the sea, and by no other; everything else is made by a land one,
 	-- unless it is amphibious
 	sea: boolean?,
-	-- an aircraft: it takes off from wherever it is made, so a beacon of either kind can make it
+	-- an aircraft, a hovercraft or an amphibious walker (`can_cross`): it gets away from wherever it is made, so a
+	-- beacon of either kind can make it
 	amphibious: boolean?,
 }
 
@@ -56,6 +62,11 @@ type Beacon = {
 	next_defense_at: number,
 	-- whether it floats on the sea, and makes ships, or stands on the land
 	sea: boolean,
+	-- whether it makes things before the game has got to `SCAVENGER_SPAWN_PROGRESS`, as a forced one does
+	eager: boolean,
+	-- the beacon itself, kept so that once it is gone `forget` can still tell whether it was destroyed or only
+	-- cleared away with the map
+	entity: Entity,
 }
 
 -- What a scavenger unit remembers between thoughts.
@@ -82,6 +93,12 @@ type Brain = {
 	-- a target it found no route to, and until when it is not tried for again
 	avoid_target: EntityId?,
 	avoid_until: number,
+	-- The last time it got anything done (`SCAVENGER_FUTILE_SECONDS`), when it next looks at how near it is to the
+	-- nearest thing of a player's, and the nearest it has been to that thing.
+	useful_at: number,
+	next_futile_check: number,
+	closest: number,
+	closest_target: EntityId?,
 }
 
 type Spot = {
@@ -89,7 +106,7 @@ type Spot = {
 	facing: number,
 }
 
--- What the client is told: the scavengers' budget, which is the difficulty a player is up against, in this
+-- What the client is told: the scavengers' budget, the hardest thing they may make now, in this
 -- attribute of Workspace, and nothing at all while the gamemode is off, which is how the client knows whether to
 -- show it. It is rounded to two significant figures, so it changes every twenty seconds or so at most rather
 -- than every tick.
@@ -98,8 +115,13 @@ local DIFFICULTY_ATTRIBUTE = "scavenger_difficulty"
 
 local BEACON_DEF = "scavenger_beacon"
 local SEA_BEACON_DEF = "scavenger_sea_beacon"
+local BOSS_DEF = "scavenger_boss"
+-- What the players are told when it falls.
+local BOSS_DEFEATED = "The Scavenger Overlord has fallen"
 local BEACON_ATTEMPTS = 40
 local BEACON_RETRY_DELAY = 10
+-- The first beacon is looked for in rings this far apart round its start box's start, as far as the box goes.
+local START_SEARCH_STEP = 8
 
 -- Units appear this far from the middle of a beacon, and defences a little further out, so that a defence
 -- never boxes the beacon's own units in. Rings then widen by SPAWN_RING_STEP until something fits.
@@ -115,13 +137,12 @@ local DEFENSE_SCAN_RADIUS = 60
 -- difficulty, so what is cheap is made more often than what is dear without the dear ever quite being left out.
 local ROSTER_WEIGHT = 12
 
--- Fodder: what is worth less than this share of the budget is not made while there is anything stronger that fits. So
--- the easiest things go first as the budget grows and, once it is high enough, they stop altogether and all that is
--- made is the hardest of what the roster has.
-local FODDER_SHARE = 0.04
+-- Fodder: what is worth less than this share of the hardest thing a beacon could make now is not made. So the easiest
+-- things go first as the budget grows, and by the end of the game only the hardest few are made.
+local FODDER_SHARE = 0.12
 
--- When the units or defences are at their limit, something new retires the weakest only if it is at least this
--- many times as hard, so what is out there stays a spread of easy and hard rather than all of the newest.
+-- When a beacon has all the defences it will take, something new retires the weakest only if it is at least this
+-- many times as hard, so what stands there stays a spread of easy and hard rather than all of the newest.
 local UPGRADE_FACTOR = 2
 
 -- A beacon site needs room to move: this many of the 8 directions round it have to be open for this far, or
@@ -170,6 +191,13 @@ local SEEK_STAGE_SHARE = 0.8
 local SEEK_MIN_PROGRESS = 30
 -- How many places on the map a stranded unit tries for a route to.
 local ROAM_ROUTE_TRIES = 6
+-- How often a unit looks at whether it is getting anywhere (`SCAVENGER_FUTILE_SECONDS`), and how often what the
+-- units that got nowhere were worth is spent on something that can get across (`run_reroll`).
+local FUTILE_CHECK_INTERVAL = 5
+local REROLL_INTERVAL = 1
+-- Water this deep is deeper than any sea on the maps, and still within what an amphibious walker goes through (BAR's
+-- 5000 elmos, about 454 studs): what a rerolled unit has to manage.
+local CROSSING_DEPTH = 400
 -- Close in to a little inside the nominal range, the same margin `orders` uses when it closes on a target, so
 -- that "can it get within range" is asked of the spot it would actually stop at.
 local RANGE_MARGIN = 0.85
@@ -183,13 +211,25 @@ local progress_offset = 0
 -- `set_pace`).
 local game_length = config.SCAVENGER_GAME_LENGTH
 local enabled = config.SCAVENGERS_ENABLED
-local next_beacon_at = 0
+-- Whether the game has begun, as far as the scavengers are concerned: the first step anything of a player's stands
+-- (see `open`).
+local opened = false
+-- When the next beacon goes up; nil until the beacons start making things, which is when the gaps start.
+local next_beacon_at: number? = nil
 local beacons: { [EntityId]: Beacon } = {}
 local brains: { [EntityId]: Brain } = {}
 -- How many more routes this step may ask for.
 local paths_left = 0
 -- When the scavengers' manual-fire weapons next look for something to fire at (`aim_manual_weapons`).
 local next_aim_at = 0
+-- What everything they field has in health, as a multiple of its def's; a match sets it from its difficulty.
+local health_multiplier = 1
+-- What the units that got nothing done were worth, in difficulty, still to be spent on ones that can get across,
+-- and when it is next spent.
+local reroll_credit = 0
+local next_reroll_at = 0
+-- Their boss, once it has come; it comes once a game.
+local boss: Entity? = nil
 
 local function is_scavenger(entity: Entity): boolean
 	return entity.team == config.SCAVENGER_TEAM
@@ -226,6 +266,14 @@ local function progress(): number
 	return math.clamp((clock + progress_offset) / game_length, 0, 1)
 end
 
+-- Sets how far the game has got, from 0 to 1, from now on: it carries on rising from there. The budget follows it,
+-- and it is the only thing that does, so it is what sets the difficulty. Returns the progress it was set to.
+local function set_progress(fraction: number): number
+	local wanted = math.clamp(fraction, 0, 1)
+	progress_offset = wanted * game_length - clock
+	return wanted
+end
+
 -- How hard something is to face, for now just what it cost: its metal and its energy over 60. It is only a
 -- stand-in for a better judgement, so it lives in this one function.
 local function difficulty_of(def_name: string): number
@@ -246,9 +294,15 @@ local function is_anti_air_only(def: EntityDef): boolean
 	return true
 end
 
+-- Whether something of `def` can get anywhere there is to get: it flies, or it can go on land and on water of any depth,
+-- as a hovercraft or an amphibious walker can.
+local function can_cross(def: EntityDef): boolean
+	return def.air ~= nil or unit_defs.tolerates_water(def, 0, CROSSING_DEPTH)
+end
+
 -- Everything a player can build that fights, which is everything the scavengers can field: what is listed among
 -- what some builder or factory makes, has a weapon or drones to fight with, and is not itself a drone. A beacon on
--- the sea makes what floats, and any other makes the rest. The list is sorted so that it is the same every time.
+-- the sea makes what floats, and any other makes the rest; what can cross either (`can_cross`) comes from both. The list is sorted so that it is the same every time.
 local function build_roster(): { Spawn }
 	local buildable: { [string]: boolean } = {}
 	for _, def in unit_defs.defs do
@@ -266,7 +320,7 @@ local function build_roster(): { Spawn }
 				def_name = name,
 				weight = ROSTER_WEIGHT / math.sqrt(difficulty_of(name)),
 				sea = def.min_water_depth ~= nil,
-				amphibious = def.air ~= nil,
+				amphibious = can_cross(def),
 			})
 		end
 	end
@@ -278,46 +332,31 @@ end
 
 local SPAWNS: { Spawn } = build_roster()
 
--- The hardest difficulty in the roster: the most a single thing a beacon can make is worth.
-local function hardest_difficulty(): number
-	local hardest = 0
-	for _, option in SPAWNS do
-		hardest = math.max(hardest, difficulty_of(option.def_name))
-	end
-	return hardest
-end
-
--- The budget is what the scavengers may field, in difficulty, and it grows exponentially with progress:
--- `SCAVENGER_BUDGET_START` at the start, times e to this rate for every whole game. The rate is not chosen but
--- worked out, so that the budget reaches `SCAVENGER_ROSTER_COPIES` times the hardest thing in the roster at
--- `SCAVENGER_ROSTER_PROGRESS`: by then everything the game has can be afforded and fielded, and past it the
--- budget only buys more of it. There is nothing harder to unlock until there is a third tier. It stays above
--- the start so that a roster of one cheap thing has a rate.
-local budget_rate = math.log(
-	math.max(hardest_difficulty() * config.SCAVENGER_ROSTER_COPIES, config.SCAVENGER_BUDGET_START * 1.01)
-		/ config.SCAVENGER_BUDGET_START
-) / config.SCAVENGER_ROSTER_PROGRESS
+-- The budget is the hardest single thing a beacon may make now, in difficulty. It is not a limit on how much is
+-- out: there is none, and how many come is up to how many beacons stand. It runs from `SCAVENGER_BUDGET_START` to
+-- `SCAVENGER_BUDGET_END` over the game, a little slower than exponentially (see config): the log of how far it has
+-- grown is `progress ^ SCAVENGER_BUDGET_SHAPE` of the way, which with a shape under 1 is ahead early and eases off.
+local BUDGET_GROWTH = math.log(config.SCAVENGER_BUDGET_END / config.SCAVENGER_BUDGET_START)
 
 local function budget(): number
-	return config.SCAVENGER_BUDGET_START * math.exp(budget_rate * progress())
+	return config.SCAVENGER_BUDGET_START * math.exp(BUDGET_GROWTH * progress() ^ config.SCAVENGER_BUDGET_SHAPE)
 end
 
--- What the scavengers have out now, in difficulty: everything of theirs that is finished, apart from the beacons.
-local function fielded_difficulty(): number
-	local total = 0
+-- How many units the scavengers have out, drones apart.
+local function count_units(): number
+	local count = 0
 	for _, other in state.all() do
 		if
 			other.alive
+			and other.kind == "unit"
 			and other.state == "active"
-			and other.kind ~= "wreck"
 			and is_scavenger(other)
-			and is_beacon(other) == false
-			and unit_defs.get(other.def_name).drone ~= true
+			and unit_defs.of(other).drone ~= true
 		then
-			total += difficulty_of(other.def_name)
+			count += 1
 		end
 	end
-	return total
+	return count
 end
 
 -- `value` to `digits` significant figures, which is how a number that grows by orders of magnitude is shown
@@ -388,52 +427,189 @@ local function is_beacon_site_clear(center: Vector3): boolean
 	return true
 end
 
--- Puts a beacon down at a random empty place well away from the players, on dry level ground or floating on the
--- sea: where there is water at the spot it is the kind that floats, and where there is not it is the land kind.
--- The very first beacon of the game is never a sea one, so a player never faces an opening threat they have no
--- way to reach. Returns whether one went down: on a crowded map, or one with nowhere it will stand, it can fail
--- to find room.
-local function spawn_beacon(allow_sea: boolean): boolean
+-- What something the scavengers field has in health: its def's times the difficulty's multiplier. It keeps the share of
+-- its health it had.
+local function toughen(entity: Entity)
+	local fraction = entity.health / entity.max_health
+	entity.max_health = unit_defs.of(entity).health * health_multiplier
+	entity.health = entity.max_health * fraction
+end
+
+-- A beacon's health, which grows with the game's progress (`SCAVENGER_BEACON_HEALTH_GROWTH`), keeping the share of it
+-- the beacon has.
+local function grow_beacon(beacon: Entity)
+	local wanted = unit_defs.of(beacon).health * (1 + config.SCAVENGER_BEACON_HEALTH_GROWTH * progress())
+	if math.abs(wanted - beacon.max_health) < 1 then
+		return
+	end
+	local fraction = beacon.health / beacon.max_health
+	beacon.max_health = wanted
+	beacon.health = wanted * fraction
+end
+
+-- Stands a beacon at `center`, a place already found for it, and sets it making things: `delay` seconds from now,
+-- once the game is far enough along, or at once if it is `eager`.
+local function place_beacon(center: Vector3, sea: boolean, delay: number, eager: boolean): Entity
+	local beacon =
+		state.create_entity(if sea then SEA_BEACON_DEF else BEACON_DEF, config.SCAVENGER_TEAM, center, 0, "active")
+	-- published at once, so the next beacon's site check and this one's first spawns can see it
+	state.flush()
+	beacons[beacon.id] = {
+		next_unit_at = clock + delay,
+		next_defense_at = clock + delay,
+		sea = sea,
+		eager = eager,
+		entity = beacon,
+	}
+	grow_beacon(beacon)
+	return beacon
+end
+
+-- Where a beacon would stand near (x, z), and whether it is a sea one, if it can stand there at all: on dry level
+-- ground, or floating on the sea where there is water at the spot, well away from the players and other beacons,
+-- and with room round it for what it makes to get away.
+local function beacon_site(x: number, z: number, allow_sea: boolean): (Vector3?, boolean)
 	local half_x, half_z = heightmap.half_extents()
-	local extent_x = half_x - config.SCAVENGER_BEACON_EDGE_MARGIN
-	local extent_z = half_z - config.SCAVENGER_BEACON_EDGE_MARGIN
-	for _ = 1, BEACON_ATTEMPTS do
-		local x = rng:NextNumber(-extent_x, extent_x)
-		local z = rng:NextNumber(-extent_z, extent_z)
-		local sea = allow_sea and heightmap.water_depth(x, z) > 0
-		local def_name = if sea then SEA_BEACON_DEF else BEACON_DEF
-		local center = placement.resolve_center(def_name, x, z, 0)
-		if
-			center ~= nil
-			and placement.can_place(def_name, center, 0, nil)
-			and is_beacon_site_clear(center)
-			and has_room_to_roam(center, sea)
-		then
-			local beacon = state.create_entity(def_name, config.SCAVENGER_TEAM, center, 0, "active")
-			-- published at once, so the next beacon's site check and this one's first spawns can see it
-			state.flush()
-			local unit_interval = config.SCAVENGER_SPAWN_INTERVAL
-			local defense_interval = config.SCAVENGER_DEFENSE_SPAWN_INTERVAL
-			-- Sea beacons spawn scavengers less frequently
-			if sea then
-				unit_interval *= config.SCAVENGER_SEA_SPAWN_MULTIPLIER
-				defense_interval *= config.SCAVENGER_SEA_SPAWN_MULTIPLIER
-			end
-			beacons[beacon.id] = {
-				next_unit_at = clock + config.SCAVENGER_INITIAL_SPAWN_DELAY + unit_interval,
-				next_defense_at = clock + config.SCAVENGER_INITIAL_SPAWN_DELAY + defense_interval,
-				sea = sea,
-			}
+	local margin = config.SCAVENGER_BEACON_EDGE_MARGIN
+	if math.abs(x) > half_x - margin or math.abs(z) > half_z - margin then
+		return nil, false
+	end
+	local sea = allow_sea and heightmap.water_depth(x, z) > 0
+	local def_name = if sea then SEA_BEACON_DEF else BEACON_DEF
+	local center = placement.resolve_center(def_name, x, z, 0)
+	if
+		center ~= nil
+		and placement.can_place(def_name, center, 0, nil)
+		and is_beacon_site_clear(center)
+		and has_room_to_roam(center, sea)
+	then
+		return center, sea
+	end
+	return nil, false
+end
+
+-- The beacons that stand, as entities.
+local function standing_beacons(): { Entity }
+	local found: { Entity } = {}
+	for id in beacons do
+		local beacon = state.get(id)
+		if beacon ~= nil and beacon.alive then
+			table.insert(found, beacon)
+		end
+	end
+	return found
+end
+
+-- Puts a beacon down near one already standing, between `SCAVENGER_BEACON_SPACING` and `SCAVENGER_BEACON_SPREAD`
+-- from it, so that they spread out from where they began; with none standing, or no room round any, anywhere on the
+-- map. Units and defences come `SCAVENGER_INITIAL_SPAWN_DELAY` after it goes up, and a sea one makes them less
+-- often. Returns whether one went down: on a crowded map, or one with nowhere it will stand, it can fail to find
+-- room.
+local function spawn_beacon(allow_sea: boolean): boolean
+	local from = standing_beacons()
+	local half_x, half_z = heightmap.half_extents()
+	for attempt = 1, BEACON_ATTEMPTS * 2 do
+		local x, z
+		if attempt <= BEACON_ATTEMPTS and #from > 0 then
+			local origin = from[rng:NextInteger(1, #from)].position
+			local angle = rng:NextNumber(0, math.pi * 2)
+			local distance = rng:NextNumber(config.SCAVENGER_BEACON_SPACING, config.SCAVENGER_BEACON_SPREAD)
+			x = origin.X + math.cos(angle) * distance
+			z = origin.Z + math.sin(angle) * distance
+		elseif attempt > BEACON_ATTEMPTS then
+			x = rng:NextNumber(-half_x, half_x)
+			z = rng:NextNumber(-half_z, half_z)
+		else
+			continue
+		end
+		local center, sea = beacon_site(x, z, allow_sea)
+		if center ~= nil then
+			local multiplier = if sea then config.SCAVENGER_SEA_SPAWN_MULTIPLIER else 1
+			place_beacon(
+				center,
+				sea,
+				config.SCAVENGER_INITIAL_SPAWN_DELAY + config.SCAVENGER_SPAWN_INTERVAL * multiplier,
+				false
+			)
 			return true
 		end
 	end
 	return false
 end
 
+-- The start box no player has been given that is furthest from everything of the players', by index, if there is one.
+local function free_box(): number?
+	local taken: { [number]: boolean } = {}
+	for _, player in Players:GetPlayers() do
+		local index = game_phase.box_of(player)
+		if index ~= nil then
+			taken[index] = true
+		end
+	end
+	local best: number? = nil
+	local best_distance = -1
+	for index = 1, starts.box_count() do
+		if taken[index] then
+			continue
+		end
+		local box = starts.box(index)
+		local middle = (box.min + box.max) / 2
+		local nearest = math.huge
+		for _, other in state.all() do
+			if
+				other.alive
+				and is_scavenger(other) == false
+				and other.kind ~= "wreck"
+				and other.kind ~= "reclaimable"
+			then
+				nearest = math.min(nearest, geometry.distance_2d(Vector3.new(middle.X, 0, middle.Y), other.position))
+			end
+		end
+		if nearest > best_distance then
+			best = index
+			best_distance = nearest
+		end
+	end
+	return best
+end
+
+-- The game has begun: the scavengers take a start box nobody else was given, and their first beacon stands in it,
+-- making nothing until the game has got to `SCAVENGER_SPAWN_PROGRESS`. It goes up as near the box's start as it
+-- will stand, on the land, so a player never faces an opening threat they have no way to reach. With every box
+-- taken, it goes wherever there is room instead.
+local function open()
+	local index = free_box()
+	if index ~= nil then
+		local box = starts.box(index)
+		local spot = starts.default_spot(index)
+		local reach = (box.max - box.min).Magnitude
+		for radius = 0, reach, START_SEARCH_STEP do
+			local around = math.max(1, math.ceil(math.pi * 2 * radius / START_SEARCH_STEP))
+			local first_angle = rng:NextNumber(0, math.pi * 2)
+			for step = 0, around - 1 do
+				local angle = first_angle + step * (math.pi * 2 / around)
+				local x = spot.X + math.cos(angle) * radius
+				local z = spot.Y + math.sin(angle) * radius
+				if starts.in_box(index, x, z) == false then
+					continue
+				end
+				local center = beacon_site(x, z, false)
+				if center ~= nil then
+					place_beacon(center, false, 0, false)
+					return
+				end
+			end
+		end
+	end
+	if spawn_beacon(false) == false then
+		warn "the scavengers found nowhere to put their first beacon; the schedule will try again"
+	end
+end
+
 -- Puts a beacon down at (x, z) regardless of players or roaming room, for testing: it still snaps to
 -- the nearest valid land or sea spot the way spawn_beacon does, but skips is_beacon_site_clear and
--- has_room_to_roam, and starts making things right away rather than waiting out the usual initial
--- delay. Returns whether one went down; it can still fail if there is nowhere for it to stand at all.
+-- has_room_to_roam, and starts making things right away, whatever the game's progress, rather than
+-- waiting. Returns whether one went down; it can still fail if there is nowhere for it to stand at all.
 local function force_beacon(x: number, z: number): EntityId?
 	local sea = heightmap.water_depth(x, z) > 0
 	local def_name = if sea then SEA_BEACON_DEF else BEACON_DEF
@@ -441,14 +617,7 @@ local function force_beacon(x: number, z: number): EntityId?
 	if center == nil or placement.can_place(def_name, center, 0, nil) == false then
 		return nil
 	end
-	local beacon = state.create_entity(def_name, config.SCAVENGER_TEAM, center, 0, "active")
-	state.flush()
-	beacons[beacon.id] = {
-		next_unit_at = clock,
-		next_defense_at = clock,
-		sea = sea,
-	}
-	return beacon.id
+	return place_beacon(center, sea, 0, true).id
 end
 
 local function beacon_interval(): number
@@ -470,7 +639,7 @@ local function enemy_air_exists(): boolean
 			other.alive
 			and other.kind == "unit"
 			and is_scavenger(other) == false
-			and unit_defs.is_air(unit_defs.get(other.def_name))
+			and unit_defs.is_air(unit_defs.of(other))
 		then
 			return true
 		end
@@ -478,30 +647,25 @@ local function enemy_air_exists(): boolean
 	return false
 end
 
--- What the scavengers already have out: every unit of theirs on the map, or the defences standing round
--- `beacon`.
-local function existing(beacon: Entity, defense: boolean): { Entity }
+-- The defences the scavengers have standing round `beacon`.
+local function defenses_around(beacon: Entity): { Entity }
 	local found: { Entity } = {}
 	for _, other in state.all() do
-		if other.alive == false or other.state ~= "active" or is_scavenger(other) == false then
-			continue
-		end
-		if defense then
-			if
-				other.kind == "building"
-				and is_beacon(other) == false
-				and geometry.distance_2d(other.position, beacon.position) <= DEFENSE_SCAN_RADIUS
-			then
-				table.insert(found, other)
-			end
-		elseif other.kind == "unit" and unit_defs.get(other.def_name).drone ~= true then
+		if
+			other.alive
+			and other.state == "active"
+			and is_scavenger(other)
+			and other.kind == "building"
+			and is_beacon(other) == false
+			and geometry.distance_2d(other.position, beacon.position) <= DEFENSE_SCAN_RADIUS
+		then
 			table.insert(found, other)
 		end
 	end
 	return found
 end
 
--- The easiest of `present` to do without. A unit in the middle of an attack is never the one, so nothing
+-- The easiest of `present` to do without. One in the middle of an attack is never the one, so nothing
 -- disappears in front of a player.
 local function weakest_of(present: { Entity }): Entity?
 	local weakest: Entity? = nil
@@ -520,41 +684,43 @@ local function weakest_of(present: { Entity }): Entity?
 	return weakest
 end
 
--- Picks by weight among the units, or the defences, that fit in `headroom`: what is left of the budget, and that
--- a beacon on the sea, or on the land, makes.
-local function choose_spawn(defense: boolean, headroom: number, sea: boolean, air_around: boolean): string?
-	-- what is too easy to be worth making once there is something harder that a beacon here can make at all
-	local fodder_below = budget() * FODDER_SHARE
-	local roster_has_strong = false
+-- The units, or the defences, that are no harder than `headroom`, the budget, and that a beacon on the sea, or on
+-- the land, makes, less the fodder; and what their weights come to.
+local function spawn_options(defense: boolean, headroom: number, sea: boolean, air_around: boolean): ({ Spawn }, number)
 	local options: { Spawn } = {}
+	-- the hardest of them, which is what the fodder is measured against
+	local hardest = 0
 	for _, option in SPAWNS do
-		local is_defense = unit_defs.get(option.def_name).kind == "building"
+		local is_defense = unit_defs.of(option).kind == "building"
 		if is_defense ~= defense or (option.amphibious ~= true and (option.sea == true) ~= sea) then
 			continue
 		end
 		-- what only shoots at aircraft is made only while there are aircraft to shoot at
-		if air_around == false and is_anti_air_only(unit_defs.get(option.def_name)) then
+		if air_around == false and is_anti_air_only(unit_defs.of(option)) then
 			continue
-		end
-		if difficulty_of(option.def_name) >= fodder_below then
-			roster_has_strong = true
 		end
 		if difficulty_of(option.def_name) <= headroom then
 			table.insert(options, option)
+			hardest = math.max(hardest, difficulty_of(option.def_name))
 		end
 	end
 
-	-- with the harder things on offer the fodder is left out altogether, even if that leaves nothing that fits for
-	-- now: a beacon then waits for room rather than filling it with the easy things
+	-- what is too easy beside the hardest of it is left out
+	local fodder_below = hardest * FODDER_SHARE
 	local total = 0
 	local chosen: { Spawn } = {}
 	for _, option in options do
-		if roster_has_strong == false or difficulty_of(option.def_name) >= fodder_below then
+		if difficulty_of(option.def_name) >= fodder_below then
 			table.insert(chosen, option)
 			total += option.weight
 		end
 	end
-	options = chosen
+	return chosen, total
+end
+
+-- Picks by weight among `spawn_options`.
+local function choose_spawn(defense: boolean, headroom: number, sea: boolean, air_around: boolean): string?
+	local options, total = spawn_options(defense, headroom, sea, air_around)
 	if #options == 0 then
 		return nil
 	end
@@ -569,23 +735,69 @@ local function choose_spawn(defense: boolean, headroom: number, sea: boolean, ai
 	return options[#options].def_name
 end
 
--- Makes one unit, or one defence, beside `beacon`. When there are already as many as are allowed it makes room
--- only by retiring something much easier than what it is about to make, without a wreck. Without that, a cap filled
--- early with the easiest things would leave everything unlocked later with no way in.
+-- Their boss comes, near `near`: once a game, when the last beacon falls or the game's progress runs out. It has the
+-- difficulty's health like everything else of theirs, and hunts as their units do. With it out no more beacons come.
+local function summon_boss(near: Vector3)
+	if boss ~= nil then
+		return
+	end
+	local spot = find_spot(BOSS_DEF, near, UNIT_RING_START)
+	local at = if spot ~= nil then spot.position else heightmap.ground_position(near.X, near.Z)
+	local facing = if spot ~= nil then spot.facing else 0
+	local summoned = state.create_entity(BOSS_DEF, config.SCAVENGER_TEAM, at, facing, "active")
+	toughen(summoned)
+	state.flush()
+	boss = summoned
+end
+
+-- Their boss is dead: every team but theirs has won.
+local function defeat_boss()
+	local winners = {}
+	for id in state.all_teams() do
+		if id ~= config.SCAVENGER_TEAM then
+			table.insert(winners, id)
+		end
+	end
+	table.sort(winners)
+	game_phase.set_ended(winners, BOSS_DEFEATED)
+end
+
+-- The beacon `id` is gone. If it was destroyed, and not only cleared away with the map, that moves the game on a
+-- little, which is small beside the units it will not make; and the last one standing brings their boss, at once,
+-- where it stood. Whichever of `run_beacons` and `forget` notices first, the beacon counts once.
+local function lose_beacon(id: EntityId, record: Beacon)
+	beacons[id] = nil
+	if record.entity.health > 0 or enabled == false then
+		return
+	end
+	set_progress(progress() + config.SCAVENGER_BEACON_KILL_PROGRESS)
+	if count_beacons() == 0 then
+		summon_boss(record.entity.position)
+	end
+end
+
+-- Makes one unit, or one defence, beside `beacon`. Units have no limit but the server's ceiling. When a beacon
+-- already has all the defences it will take it makes room only by retiring one much easier than what it is about to
+-- make, without a wreck. Without that, a ring filled early with the easiest things would leave everything unlocked
+-- later with no way in.
 local function spawn_at(beacon: Entity, record: Beacon, defense: boolean)
-	local def_name = choose_spawn(defense, budget() - fielded_difficulty(), record.sea, enemy_air_exists())
+	if defense == false and count_units() >= config.SCAVENGER_UNIT_CEILING then
+		return
+	end
+	local def_name = choose_spawn(defense, budget(), record.sea, enemy_air_exists())
 	if def_name == nil then
 		return
 	end
 
-	local present = existing(beacon, defense)
-	local limit = if defense then config.SCAVENGER_MAX_DEFENSES_PER_BEACON else config.SCAVENGER_MAX_UNITS
-	if #present >= limit then
-		local weakest = weakest_of(present)
-		if weakest == nil or difficulty_of(weakest.def_name) * UPGRADE_FACTOR > difficulty_of(def_name) then
-			return
+	if defense then
+		local present = defenses_around(beacon)
+		if #present >= config.SCAVENGER_MAX_DEFENSES_PER_BEACON then
+			local weakest = weakest_of(present)
+			if weakest == nil or difficulty_of(weakest.def_name) * UPGRADE_FACTOR > difficulty_of(def_name) then
+				return
+			end
+			state.mark_dead(weakest)
 		end
-		state.mark_dead(weakest)
 	end
 
 	local start = if defense then DEFENSE_RING_START else UNIT_RING_START
@@ -593,7 +805,7 @@ local function spawn_at(beacon: Entity, record: Beacon, defense: boolean)
 	if spot == nil then
 		return
 	end
-	state.create_entity(def_name, config.SCAVENGER_TEAM, spot.position, spot.facing, "active")
+	toughen(state.create_entity(def_name, config.SCAVENGER_TEAM, spot.position, spot.facing, "active"))
 	-- published at once, so the next thing this beacon makes sees this one as occupying its place
 	state.flush()
 end
@@ -603,25 +815,91 @@ local function run_beacons()
 		local beacon = state.get(id)
 		if beacon == nil then
 			-- destroyed, so it makes nothing more
-			beacons[id] = nil
+			lose_beacon(id, record)
 			continue
 		end
+		grow_beacon(beacon)
+		-- nothing is made before the game has got far enough along, and a beacon that has been waiting for it
+		-- starts the moment it does
+		if record.eager == false and progress() < config.SCAVENGER_SPAWN_PROGRESS then
+			continue
+		end
+		local multiplier = if record.sea then config.SCAVENGER_SEA_SPAWN_MULTIPLIER else 1
 		if clock >= record.next_unit_at then
-			record.next_unit_at = clock + config.SCAVENGER_SPAWN_INTERVAL
+			record.next_unit_at = clock + config.SCAVENGER_SPAWN_INTERVAL * multiplier
 			spawn_at(beacon, record, false)
 		end
 		-- a beacon that has all the defences it will take just skips this: it never costs it a unit
 		if clock >= record.next_defense_at then
-			record.next_defense_at = clock + config.SCAVENGER_DEFENSE_SPAWN_INTERVAL
+			record.next_defense_at = clock + config.SCAVENGER_DEFENSE_SPAWN_INTERVAL * multiplier
 			spawn_at(beacon, record, true)
 		end
 	end
 end
 
--- Beacons wait for the game to get far enough along, and then come at random gaps, while fewer than the
--- limit stand.
+-- Spends what the units that got nothing done were worth (`is_futile`) on units that can get across, at a beacon, as
+-- the credit allows: one a second, each the hardest the budget allows being no more than the credit left, picked by
+-- weight as the beacons pick. Credit short of anything that fits waits for more.
+local function run_reroll()
+	if reroll_credit <= 0 or clock < next_reroll_at then
+		return
+	end
+	next_reroll_at = clock + REROLL_INTERVAL
+	local at = standing_beacons()
+	if #at == 0 or count_units() >= config.SCAVENGER_UNIT_CEILING then
+		return
+	end
+	local headroom = math.min(budget(), reroll_credit)
+	local air_around = enemy_air_exists()
+	local options: { Spawn } = {}
+	local total = 0
+	for _, option in SPAWNS do
+		local def = unit_defs.of(option)
+		if
+			def.kind == "unit"
+			and can_cross(def)
+			and difficulty_of(option.def_name) <= headroom
+			and (air_around or is_anti_air_only(def) == false)
+		then
+			table.insert(options, option)
+			total += option.weight
+		end
+	end
+	if #options == 0 then
+		return
+	end
+	local chosen = options[#options].def_name
+	local roll = rng:NextNumber(0, total)
+	for _, option in options do
+		roll -= option.weight
+		if roll <= 0 then
+			chosen = option.def_name
+			break
+		end
+	end
+	local beacon = at[rng:NextInteger(1, #at)]
+	local spot = find_spot(chosen, beacon.position, UNIT_RING_START)
+	if spot == nil then
+		return
+	end
+	toughen(state.create_entity(chosen, config.SCAVENGER_TEAM, spot.position, spot.facing, "active"))
+	state.flush()
+	reroll_credit -= difficulty_of(chosen)
+end
+
+-- Once the beacons start making things, more come at random gaps, while fewer than the limit stand. The first of
+-- them, and any with none standing, is always a land one, so a player never faces a threat they have no way to reach.
 local function run_beacon_schedule()
-	if progress() < config.SCAVENGER_FIRST_BEACON_PROGRESS or clock < next_beacon_at then
+	-- with their boss out it is the end, and no more come
+	if boss ~= nil or progress() < config.SCAVENGER_SPAWN_PROGRESS then
+		return
+	end
+	local due = next_beacon_at
+	if due == nil then
+		next_beacon_at = clock + beacon_interval()
+		return
+	end
+	if clock < due then
 		return
 	end
 	if count_beacons() >= config.SCAVENGER_MAX_BEACONS then
@@ -644,7 +922,7 @@ local function find_target(unit: Entity, def: EntityDef, weapon: Weapon, avoid: 
 	for _, other in state.all() do
 		if combat.is_enemy(unit, other) and combat.can_target(weapon, other) and other.id ~= avoid then
 			local distance = geometry.distance_2d(unit.position, other.position)
-			if distance <= nearest_distance then
+			if distance <= nearest_distance and combat.spots(other, distance) then
 				nearest = other
 				nearest_distance = distance
 			end
@@ -719,6 +997,7 @@ local function hunt(unit: Entity, brain: Brain, def: EntityDef, target: Entity)
 		and clock < brain.route_until
 		and geometry.distance_2d(anchor, target.position) <= ROUTE_TARGET_DRIFT
 	then
+		brain.useful_at = clock
 		return
 	end
 	if clock < brain.next_path_at then
@@ -757,6 +1036,8 @@ local function hunt(unit: Entity, brain: Brain, def: EntityDef, target: Entity)
 		table.insert(chain, { kind = "attack", target_id = target.id })
 	end
 	orders.issue(unit, chain, false, false)
+	-- it has a way to something it can shoot, which is getting something done
+	brain.useful_at = clock
 	brain.route_target = target.id
 	brain.route_anchor = target.position
 	brain.route_until = clock + ROUTE_HOLD
@@ -794,7 +1075,7 @@ local function nearest_enemy(unit: Entity, weapon: Weapon, avoid: EntityId?): En
 	for _, other in state.all() do
 		if combat.is_enemy(unit, other) and combat.can_target(weapon, other) and other.id ~= avoid then
 			local distance = geometry.distance_2d(unit.position, other.position)
-			if distance < nearest_distance then
+			if distance < nearest_distance and combat.spots(other, distance) then
 				nearest = other
 				nearest_distance = distance
 			end
@@ -928,16 +1209,58 @@ local function brain_for(unit: Entity): Brain
 			route_until = 0,
 			avoid_target = nil,
 			avoid_until = 0,
+			useful_at = clock,
+			next_futile_check = clock + FUTILE_CHECK_INTERVAL,
+			closest = math.huge,
+			closest_target = nil,
 		}
 		brains[unit.id] = brain
 	end
 	return brain
 end
 
+-- Whether `unit` has got nothing done for `SCAVENGER_FUTILE_SECONDS`: not gone after anything it could reach (see
+-- `hunt`), and not got any nearer the nearest thing of a player's than it had been. Every so often it looks at how near
+-- that is; a new nearest thing starts the reckoning again from where it stands, and with nothing of a player's it could
+-- turn on there is nothing to get done, so it is not held against it. Aircraft go wherever they like, and the boss is
+-- never taken away.
+local function is_futile(unit: Entity, brain: Brain, def: EntityDef): boolean
+	if def.air ~= nil or unit == boss then
+		return false
+	end
+	if clock >= brain.next_futile_check then
+		brain.next_futile_check = clock + FUTILE_CHECK_INTERVAL
+		local weapon = main_weapon(def)
+		local target = if weapon ~= nil then nearest_enemy(unit, weapon, nil) else nil
+		if target == nil then
+			brain.useful_at = clock
+		else
+			local distance = geometry.distance_2d(unit.position, target.position)
+			if target.id ~= brain.closest_target then
+				brain.closest_target = target.id
+				brain.closest = distance
+			elseif distance <= brain.closest - config.SCAVENGER_FUTILE_PROGRESS then
+				brain.closest = distance
+				brain.useful_at = clock
+			end
+		end
+	end
+	return clock - brain.useful_at >= config.SCAVENGER_FUTILE_SECONDS
+end
+
 -- One unit making up its mind: hunt what it can reach, otherwise keep wandering.
 local function think(unit: Entity, brain: Brain)
-	local def = unit_defs.get(unit.def_name)
+	local def = unit_defs.of(unit)
 	brain.next_think = clock + THINK_INTERVAL
+
+	-- stranded, say on an island with no way across: it is taken away, with no wreck, and what it was worth goes to
+	-- making something that can get across (`run_reroll`)
+	if is_futile(unit, brain, def) then
+		reroll_credit += difficulty_of(unit.def_name)
+		brains[unit.id] = nil
+		state.mark_dead(unit)
+		return
+	end
 
 	-- `movement` still holds last tick's goals here, so this is whether it was trying to go somewhere
 	local moved = geometry.distance_2d(unit.position, brain.last_position)
@@ -1028,7 +1351,7 @@ local function aim_manual_weapons()
 		if #shooter.orders > 0 then
 			continue
 		end
-		local def = unit_defs.get(shooter.def_name)
+		local def = unit_defs.of(shooter)
 		if def.weapons == nil then
 			continue
 		end
@@ -1046,6 +1369,7 @@ local function aim_manual_weapons()
 					combat.is_enemy(shooter, other)
 					and combat.can_target(weapon, other)
 					and geometry.distance_2d(shooter.position, other.position) <= weapon.range
+					and combat.spots(other, geometry.distance_2d(shooter.position, other.position))
 				then
 					local worth = difficulty_of(other.def_name)
 					if worth > best_worth then
@@ -1068,7 +1392,7 @@ local function run_brains()
 			continue
 		end
 		-- a drone is its carrier's to send out, and to call back
-		if unit_defs.get(unit.def_name).drone == true then
+		if unit_defs.of(unit).drone == true then
 			continue
 		end
 		local brain = brain_for(unit)
@@ -1082,9 +1406,14 @@ end
 -- progress the purple bar over it shows and a Graverobber works on, at the rate that fills it in
 -- `SCAVENGER_REVIVE_SECONDS`, and when it is full the wreck is gone and the unit stands in its place on the
 -- scavengers' team, with the health a raised unit has. It costs them nothing. Only units come back, as with a
--- Graverobber, and never a commander. With as many scavenger units out as are allowed it waits, full, for room; and
--- whatever takes the wreck apart first, by reclaiming it, wins.
+-- Graverobber, and never a commander, and only within `SCAVENGER_REVIVE_RANGE` of a standing beacon: a wreck further
+-- out lies as it is, keeping what progress it had, until a beacon goes up near it. With the server's ceiling of
+-- scavenger units out it waits, full, for room; and whatever takes the wreck apart first, by reclaiming it, wins.
 local function run_revival(delta: number)
+	local near = standing_beacons()
+	if #near == 0 then
+		return
+	end
 	local unit_count = 0
 	local wrecks: { Entity } = {}
 	for _, other in state.all() do
@@ -1097,7 +1426,7 @@ local function run_revival(delta: number)
 			other.kind == "unit"
 			and other.state == "active"
 			and is_scavenger(other)
-			and unit_defs.get(other.def_name).drone ~= true
+			and unit_defs.of(other).drone ~= true
 		then
 			unit_count += 1
 		end
@@ -1108,14 +1437,29 @@ local function run_revival(delta: number)
 		if wreck == nil then
 			continue
 		end
+		local in_range = false
+		for _, beacon in near do
+			if geometry.distance_2d(beacon.position, wreck_entity.position) <= config.SCAVENGER_REVIVE_RANGE then
+				in_range = true
+				break
+			end
+		end
+		if in_range == false then
+			continue
+		end
 		local source = unit_defs.get(wreck.source_def_name)
-		if source.kind ~= "unit" or source.nametag == true or source.buildpower_cost <= 0 then
+		if
+			source.kind ~= "unit"
+			or source.nametag == true
+			or source.buildpower_cost <= 0
+			or wreck.source_def_name == BOSS_DEF
+		then
 			continue
 		end
 		local cost = source.buildpower_cost
 		wreck.resurrect_progress =
 			math.min(cost, wreck.resurrect_progress + cost * delta / config.SCAVENGER_REVIVE_SECONDS)
-		if wreck.resurrect_progress >= cost and unit_count < config.SCAVENGER_MAX_UNITS then
+		if wreck.resurrect_progress >= cost and unit_count < config.SCAVENGER_UNIT_CEILING then
 			local raised = state.create_entity(
 				wreck.source_def_name,
 				config.SCAVENGER_TEAM,
@@ -1123,6 +1467,7 @@ local function run_revival(delta: number)
 				wreck_entity.facing,
 				"active"
 			)
+			toughen(raised)
 			raised.health = raised.max_health * config.RESURRECT_HEALTH_FRACTION
 			state.mark_dead(wreck_entity)
 			unit_count += 1
@@ -1157,9 +1502,35 @@ local function tick(delta: number)
 		Workspace:SetAttribute(DIFFICULTY_ATTRIBUTE, shown)
 	end
 
+	-- The game begins for the scavengers on the first step anything of a player's stands, so a start one of them has
+	-- is never taken for free. With the gamemode off then, it is not opened later: turning it on part way just
+	-- starts the schedule.
+	if opened == false then
+		for _, other in state.all() do
+			if
+				other.alive
+				and other.kind ~= "wreck"
+				and other.kind ~= "reclaimable"
+				and is_scavenger(other) == false
+			then
+				opened = true
+				break
+			end
+		end
+		if opened and enabled then
+			open()
+		end
+	end
+
 	if enabled then
+		-- the game's time is up: their boss comes, by a beacon if one stands, or in the middle of the map
+		if boss == nil and progress() >= 1 then
+			local standing = standing_beacons()
+			summon_boss(if #standing > 0 then standing[rng:NextInteger(1, #standing)].position else Vector3.zero)
+		end
 		run_beacon_schedule()
 		run_beacons()
+		run_reroll()
 		run_revival(delta)
 	end
 	-- a beacon that stops making things does not stop what it already made
@@ -1167,20 +1538,14 @@ local function tick(delta: number)
 	aim_manual_weapons()
 end
 
--- Sets how far the game has got, from 0 to 1, from now on: it carries on rising from there. The budget follows it,
--- and it is the only thing that does, so it is what sets the difficulty. Returns the progress it was set to.
-local function set_progress(fraction: number): number
-	local wanted = math.clamp(fraction, 0, 1)
-	progress_offset = wanted * game_length - clock
-	return wanted
-end
-
 -- Sets the progress to what makes the budget `score` (the difficulty on the scavengers' readout) and returns the
 -- progress and the budget that came of it. A score outside what the budget goes through, from its start to where it
 -- stops growing, is taken to the nearest end.
 local function set_difficulty(score: number): (number, number)
-	local wanted = if score > 0 and budget_rate > 0
-		then math.log(score / config.SCAVENGER_BUDGET_START) / budget_rate
+	-- the budget's curve run backwards
+	local wanted = if score > config.SCAVENGER_BUDGET_START
+		then math.min(math.log(score / config.SCAVENGER_BUDGET_START) / BUDGET_GROWTH, 1)
+			^ (1 / config.SCAVENGER_BUDGET_SHAPE)
 		else 0
 	local set = set_progress(wanted)
 	return set, budget()
@@ -1209,9 +1574,54 @@ local function summon_beacon(): boolean
 	return spawn_beacon(count_beacons() > 0)
 end
 
+-- What a beacon on the sea, or on the land, would make of its units, or its defences, if it made one now, and the
+-- chance of each from 0 to 1, likeliest first. Whether there are aircraft about is taken as it stands, so what only
+-- shoots at them is in it only while there are.
+local function spawn_chances(
+	defense: boolean,
+	sea: boolean
+): { { def_name: string, chance: number, difficulty: number } }
+	local options, total = spawn_options(defense, budget(), sea, enemy_air_exists())
+	local chances = {}
+	for _, option in options do
+		table.insert(chances, {
+			def_name = option.def_name,
+			chance = option.weight / total,
+			difficulty = difficulty_of(option.def_name),
+		})
+	end
+	table.sort(chances, function(a, b): boolean
+		if a.chance ~= b.chance then
+			return a.chance > b.chance
+		end
+		return a.def_name < b.def_name
+	end)
+	return chances
+end
+
+-- Called for everything that is gone. What was destroyed, and not only cleared away with the map, counts: a beacon
+-- moves the game on (`lose_beacon`), and their boss wins it.
+-- What the units that got nothing done were worth that is still to be spent on ones that can get across.
+local function pending_reroll(): number
+	return reroll_credit
+end
+
+-- Sets what everything the scavengers field from now on has in health, as a multiple of its def's: a match sets it
+-- from its difficulty (`game_modes.Difficulty.health`).
+local function set_health_multiplier(multiple: number)
+	health_multiplier = math.max(multiple, 0.01)
+end
+
 local function forget(entity_id: EntityId)
 	brains[entity_id] = nil
-	beacons[entity_id] = nil
+	local record = beacons[entity_id]
+	if record ~= nil then
+		lose_beacon(entity_id, record)
+	end
+	local fallen = boss
+	if fallen ~= nil and fallen.id == entity_id and fallen.health <= 0 then
+		defeat_boss()
+	end
 end
 
 return table.freeze({
@@ -1220,12 +1630,14 @@ return table.freeze({
 	set_enabled = set_enabled,
 	is_enabled = is_enabled,
 	set_pace = set_pace,
+	set_health_multiplier = set_health_multiplier,
+	pending_reroll = pending_reroll,
 	summon_beacon = summon_beacon,
 	force_beacon = force_beacon,
 	progress = progress,
 	set_progress = set_progress,
 	set_difficulty = set_difficulty,
 	budget = budget,
-	fielded_difficulty = fielded_difficulty,
+	spawn_chances = spawn_chances,
 	forget = forget,
 })

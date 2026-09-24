@@ -2,6 +2,8 @@
 
 local GuiService = game:GetService "GuiService"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
+local RunService = game:GetService "RunService"
+local UserInputService = game:GetService "UserInputService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
@@ -45,15 +47,15 @@ local function SelectionBox()
 end
 
 local MODE_HINTS: { [string]: string } = {
-	attack = "In attacking (A) mode · click an enemy to attack it, or the ground to attack that spot, or drag out a circle to attack everything of the enemy's inside it · shift keeps the mode · right click cancels",
-	reclaim = "In reclaiming (E) mode · click something to reclaim it, or drag out a circle to reclaim everything inside it · shift keeps the mode · right click cancels",
-	repair = "In repairing (R) mode · click a damaged friendly to repair it, or drag out a circle to repair everything damaged inside it · shift keeps the mode · right click cancels",
-	resurrect = "In resurrecting (W) mode · click a wreck to raise it, after refilling its metal, or drag out a circle to resurrect every wreck inside it · shift keeps the mode · right click cancels",
-	fight = "In fighting (F) mode · click the ground to walk there, stopping to shoot whatever is in reach on the way, and builders to help build, repair or reclaim what is in reach, or drag to spread them along what you trace · shift keeps the mode and adds another waypoint · right click cancels",
-	load = "In loading (J) mode · click a friendly unit to have the selected transports pick it up · shift keeps the mode · right click cancels",
-	unload = "In unloading (U) mode · click the ground to set everything aboard down there, or drag to spread the transports along what you trace · shift keeps the mode · right click cancels",
-	guard = "In guarding (O) mode · click a friendly unit or building to follow and defend it, assisting what it builds or reclaims · shift keeps the mode · right click cancels",
-	disintegrator = "In disintegrator (D) mode · click to have the commander close in and fire at that spot · shift queues the shot and keeps aiming · right click cancels",
+	attack = "ATTACK (A) · drag for an area · shift keeps · right click cancels",
+	reclaim = "RECLAIM (E) · drag for an area · shift keeps · right click cancels",
+	repair = "REPAIR (R) · drag for an area · shift keeps · right click cancels",
+	resurrect = "RESURRECT (W) · drag for an area · shift keeps · right click cancels",
+	fight = "FIGHT (F) · drag to spread · shift keeps · right click cancels",
+	load = "LOAD (J) · shift keeps · right click cancels",
+	unload = "UNLOAD (U) · drag to spread · shift keeps · right click cancels",
+	guard = "GUARD (O) · shift keeps · right click cancels",
+	disintegrator = "DISINTEGRATOR (D) · shift queues · right click cancels",
 }
 
 -- Says which mode the cursor is in while a reclaim, repair or disintegrator mode is on, so that it is
@@ -98,13 +100,60 @@ local function PlacementHint()
 
 	return React.createElement("TextLabel", {
 		[React.Tag] = "placement-hint",
-		Text = "[ ] rotate · right click cancels · hold shift to keep placing",
+		Text = "[ ] rotate · shift keeps · right click cancels",
+	}, {
+		Scale = React.createElement("UIScale", { Scale = ui_scale }),
+	})
+end
+
+-- How far under the cursor's tip the placement problem sits, clear of the pointer itself.
+local PROBLEM_OFFSET = 28
+
+-- Says under the cursor why the building it carries cannot go there, while its ghost is red: rough ground,
+-- dry land for something that floats, water too shallow for it, and so on.
+local function PlacementProblem()
+	local problem, set_problem = React.useState(build_mode.get_problem())
+	local position, set_position = React.useBinding(UDim2.new())
+	local ui_scale = use_viewport.use_ui_scale()
+
+	React.useEffect(function()
+		return build_mode.subscribe_problem(function(next_problem: string?)
+			set_problem(next_problem)
+		end)
+	end, {})
+
+	-- follows the cursor every frame through a binding, so moving the mouse does not re-render
+	React.useEffect(function()
+		if problem == nil then
+			return nil
+		end
+		local function follow()
+			-- the mouse is in viewport space and this GUI is one inset below it, see SelectionBox
+			local mouse = UserInputService:GetMouseLocation() - GuiService:GetGuiInset()
+			set_position(UDim2.fromOffset(mouse.X, mouse.Y + PROBLEM_OFFSET))
+		end
+		follow()
+		local connection = RunService.RenderStepped:Connect(follow)
+		return function()
+			connection:Disconnect()
+		end
+	end, { problem })
+
+	if problem == nil then
+		return nil
+	end
+
+	return React.createElement("TextLabel", {
+		[React.Tag] = "placement-problem",
+		Position = position,
+		Text = problem,
 	}, {
 		Scale = React.createElement("UIScale", { Scale = ui_scale }),
 	})
 end
 
 return table.freeze({
+	PlacementProblem = PlacementProblem,
 	SelectionBox = SelectionBox,
 	PlacementHint = PlacementHint,
 	ModeHint = ModeHint,

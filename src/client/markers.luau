@@ -37,6 +37,8 @@ type Waypoint = {
 	-- what a build order will build, and how it will be turned
 	def_name: string?,
 	facing: number?,
+	-- the circle an area order covers
+	radius: number?,
 }
 
 local PREVIEW_COLOR = Color3.fromRGB(126, 240, 154)
@@ -57,6 +59,11 @@ local KIND_COLORS: { [string]: Color3 } = {
 	load = Color3.fromRGB(96, 210, 242),
 	unload = Color3.fromRGB(236, 184, 68),
 }
+-- An area order is drawn in the colour of the order it gives over its circle.
+KIND_COLORS.area_reclaim = KIND_COLORS.reclaim
+KIND_COLORS.area_repair = KIND_COLORS.repair
+KIND_COLORS.area_resurrect = KIND_COLORS.resurrect
+KIND_COLORS.area_attack = KIND_COLORS.attack
 local BUILD_BEAM_COLOR = Color3.fromRGB(96, 210, 242)
 local RECLAIM_BEAM_COLOR = Color3.fromRGB(236, 184, 68)
 
@@ -278,7 +285,7 @@ local function flash_points(points: { Vector3 }, seconds: number, kind: string?)
 	end)
 end
 
--- "kind,x,z,target;..." as published by the server, with each point dropped onto the ground.
+-- "kind,x,z,target,facing,radius;..." as published by the server, with each point dropped onto the ground.
 local function parse_path(text: string): { Waypoint }
 	local cached = parsed_paths[text]
 	if cached ~= nil then
@@ -298,6 +305,7 @@ local function parse_path(text: string): { Waypoint }
 				target_id = if is_build then nil else tonumber(fields[4]),
 				def_name = if is_build then fields[4] else nil,
 				facing = tonumber(fields[5]),
+				radius = tonumber(fields[6]),
 			})
 		end
 	end
@@ -327,10 +335,10 @@ local function draw_dash(pool: Pool, from: Vector3, to: Vector3, color: Color3)
 end
 
 -- A line from `from` to `to` that follows the ground between them, laid as short joined pieces so
--- it is one unbroken stroke however long the leg is. For something that floats it runs along the water's
+-- it is one unbroken stroke however long the leg is. For something that rides the water it runs along the water's
 -- surface instead, and only comes down to `to` at the very end.
 local function draw_leg(pool: Pool, from: Vector3, to: Vector3, color: Color3, traveller: types.EntityDef?)
-	local on_water = traveller ~= nil and unit_defs.floats(traveller)
+	local on_water = traveller ~= nil and unit_defs.rides_surface(traveller)
 	local run = Vector2.new(to.X - from.X, to.Z - from.Z).Magnitude
 	local steps = math.max(1, math.floor(run / PATH_STEP))
 	local previous = from
@@ -381,10 +389,12 @@ local function draw_halo(model: Model, point: Vector3, color: Color3)
 	halo.Color = color
 end
 
--- Range rings around whatever the cursor is over: how far it can build, and how far it can shoot.
+-- Range rings around whatever the cursor is over: how far it can build, how far it can shoot, and for an anti-nuke
+-- how far out it shoots nukes down.
 local RING_SEGMENTS = 48
 local BUILD_RING_COLOR = Color3.fromRGB(96, 210, 242)
 local ATTACK_RING_COLOR = Color3.fromRGB(238, 88, 74)
+local INTERCEPT_RING_COLOR = Color3.fromRGB(255, 220, 60)
 local ring_pool: Pool = { parts = {}, used = 0 }
 
 -- How many times the reach of an arcing weapon is worked out again in each direction, for the ground where the
@@ -430,12 +440,13 @@ local function hide_area()
 	release_rest(area_pool)
 end
 
--- The weapon something of `def` reaches furthest with, which is the one its range ring is drawn for.
+-- The weapon something of `def` reaches furthest with, which is the one its attack ring is drawn for. An
+-- anti-nuke's interceptor has a ring of its own.
 local function longest_weapon(def: types.EntityDef): types.Weapon?
 	local longest: types.Weapon? = nil
 	if def.weapons ~= nil then
 		for _, weapon in def.weapons do
-			if longest == nil or weapon.range > longest.range then
+			if weapon.anti_nuke ~= true and (longest == nil or weapon.range > longest.range) then
 				longest = weapon
 			end
 		end
@@ -443,7 +454,8 @@ local function longest_weapon(def: types.EntityDef): types.Weapon?
 	return longest
 end
 
--- Shows a build range ring and an attack range ring, whichever of them apply, around `center`. The attack ring of
+-- Shows a build range ring, an attack range ring and an intercept ring, whichever of them apply, around `center`.
+-- The attack ring of
 -- something whose longest weapon arcs under gravity is drawn as far as it really reaches, which is further over
 -- ground lower than `muzzle`, where its shells come from, and less far over ground higher up, the way the server
 -- judges it (`projectile.range_to`). Any other is a circle.
@@ -452,7 +464,8 @@ local function show_ranges(
 	build_range: number?,
 	attack_range: number?,
 	def: types.EntityDef?,
-	muzzle: Vector3?
+	muzzle: Vector3?,
+	intercept_range: number?
 )
 	ring_pool.used = 0
 	if build_range ~= nil then
@@ -477,6 +490,11 @@ local function show_ranges(
 				return attack_range
 			end, ATTACK_RING_COLOR)
 		end
+	end
+	if intercept_range ~= nil then
+		draw_ring(ring_pool, center, function(_: Vector3): number
+			return intercept_range
+		end, INTERCEPT_RING_COLOR)
 	end
 	release_rest(ring_pool)
 end
@@ -609,10 +627,10 @@ end
 
 -- Everything still ahead of every selected unit: a line from where it stands through each order in
 -- its queue, and a dot on each waypoint.
--- Where `point` is drawn for something of `def` that travels through it: on the water's surface if it floats,
+-- Where `point` is drawn for something of `def` that travels through it: on the water's surface if it rides it,
 -- and where the ground is otherwise.
 local function travelled(def: types.EntityDef?, point: Vector3): Vector3
-	if def ~= nil and unit_defs.floats(def) then
+	if def ~= nil and unit_defs.rides_surface(def) then
 		return unit_defs.surface_position(def, point.X, point.Z)
 	end
 	return point
@@ -648,6 +666,9 @@ local function expected_end(model: Model): Vector3
 	end
 	return cursor
 end
+
+-- The circle of every area order in a selected unit's queue.
+local queue_area_pool: Pool = { parts = {}, used = 0 }
 
 local function update_paths()
 	for _, id in selection.get() do
@@ -706,6 +727,12 @@ local function update_paths()
 			if waypoint.kind == "build" and waypoint.def_name ~= nil then
 				draw_ghost(waypoint.def_name, point, waypoint.facing, color)
 			end
+			local radius = waypoint.radius
+			if radius ~= nil and radius > 0 then
+				draw_ring(queue_area_pool, point, function(_: Vector3): number
+					return radius
+				end, color)
+			end
 			draw_leg(segment_pool, cursor, point, color, def)
 			cursor = point
 		end
@@ -714,6 +741,7 @@ local function update_paths()
 	release_rest(waypoint_pool)
 	release_rest(halo_pool)
 	release_rest(ghost_pool)
+	release_rest(queue_area_pool)
 	release_ghost_models()
 end
 

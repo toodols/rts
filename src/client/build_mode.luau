@@ -16,6 +16,7 @@ local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local world = require(ReplicatedStorage.Client.world)
 local markers = require(ReplicatedStorage.Client.markers)
+local unlocks = require(ReplicatedStorage.Client.unlocks)
 
 type EntityId = types.EntityId
 
@@ -30,6 +31,9 @@ local ghost: Part? = nil
 local ghost_model: Model? = nil
 local ghost_model_valid: boolean? = nil
 local listeners: { (def_name: string?) -> () } = {}
+-- Why the ghost cannot be built where it is, or nil while it can, for the note under the cursor.
+local problem: string? = nil
+local problem_listeners: { (problem: string?) -> () } = {}
 -- Boxes drawn at the other places a dragged line or grid would put a building.
 local preview_parts: { Part } = {}
 -- Most buildings a single drag may lay out.
@@ -49,6 +53,30 @@ local function subscribe(listener: (def_name: string?) -> ()): () -> ()
 			table.remove(listeners, index)
 		end
 	end
+end
+
+local function set_problem(next_problem: string?)
+	if next_problem == problem then
+		return
+	end
+	problem = next_problem
+	for _, listener in problem_listeners do
+		listener(problem)
+	end
+end
+
+local function subscribe_problem(listener: (problem: string?) -> ()): () -> ()
+	table.insert(problem_listeners, listener)
+	return function()
+		local index = table.find(problem_listeners, listener)
+		if index ~= nil then
+			table.remove(problem_listeners, index)
+		end
+	end
+end
+
+local function get_problem(): string?
+	return problem
 end
 
 -- Where spot-bound buildings stand or are queued to be built, from what the client can see: the
@@ -99,42 +127,44 @@ local function taken_positions(placing_def_name: string, builder_id: EntityId?):
 	return taken
 end
 
--- Mirrors placement.can_place using only what the client can see.
-local function can_place(def_name: string, position: Vector3, yaw: number): boolean
+-- Mirrors placement.can_place using only what the client can see, saying why not: nil when it fits, otherwise
+-- what is wrong with the place, as the note under the cursor puts it.
+local function placement_problem(def_name: string, position: Vector3, yaw: number): string?
 	local def = unit_defs.get(def_name)
 	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), yaw)
 
-	if heightmap.in_bounds(position.X - half.X, position.Z - half.Y) == false then
-		return false
-	end
-	if heightmap.in_bounds(position.X + half.X, position.Z + half.Y) == false then
-		return false
+	if
+		heightmap.in_bounds(position.X - half.X, position.Z - half.Y) == false
+		or heightmap.in_bounds(position.X + half.X, position.Z + half.Y) == false
+	then
+		return "Outside the map"
 	end
 
 	if def.kind == "building" then
 		local grid_x, grid_z = geometry.snap_center(position.X, position.Z, half, config.CELL_STUDS)
 		if math.abs(grid_x - position.X) > 0.01 or math.abs(grid_z - position.Z) > 0.01 then
-			return false
+			return "Off the building grid"
 		end
 	end
 
 	local bound_to = spots.for_def(def)
 	if bound_to ~= nil and bound_to.nearest(position.X, position.Z, 0.5) == nil then
-		return false
+		return if def.requires_geo_spot == true then "Requires a geothermal vent" else "Requires a metal spot"
 	end
 
 	local lowest, highest = heightmap.height_range(position.X, position.Z, half.X, half.Y)
 	if highest - lowest > config.MAX_BUILD_SLOPE_STUDS then
-		return false
+		return "Requires flat terrain"
 	end
-	if
-		unit_defs.tolerates_water(
-			def,
-			math.max(0, config.WATER_LEVEL - highest),
-			math.max(0, config.WATER_LEVEL - lowest)
-		) == false
-	then
-		return false
+	local shallowest = math.max(0, config.WATER_LEVEL - highest)
+	local deepest = math.max(0, config.WATER_LEVEL - lowest)
+	if unit_defs.tolerates_water(def, shallowest, deepest) == false then
+		local min_depth = def.min_water_depth
+		if min_depth ~= nil and shallowest < min_depth then
+			-- some of it is on dry land, or it is in water but not deep enough to float
+			return if shallowest <= 0 then "Can only be built on water" else "Requires deeper water"
+		end
+		return if def.max_water_depth <= 0 then "Cannot be built on water" else "Water is too deep"
 	end
 
 	for _, model in world.all() do
@@ -161,11 +191,15 @@ local function can_place(def_name: string, position: Vector3, yaw: number): bool
 		local other_yaw = select(2, model:GetPivot():ToOrientation())
 		local other_half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(other_def), other_yaw)
 		if geometry.aabb_overlap(position, half, world.position_of(model), other_half, 0) then
-			return false
+			return "Something is in the way"
 		end
 	end
 
-	return true
+	return nil
+end
+
+local function can_place(def_name: string, position: Vector3, yaw: number): boolean
+	return placement_problem(def_name, position, yaw) == nil
 end
 
 local function clear_preview()
@@ -188,9 +222,10 @@ local function destroy_ghost()
 	end
 end
 
+-- Nothing the player has not unlocked can be picked up, whichever way it was asked for (the menu or a key).
 local function enter(def_name: string)
 	local def = unit_defs.defs[def_name]
-	if def == nil or def.kind ~= "building" then
+	if def == nil or def.kind ~= "building" or unlocks.is_unlocked(def_name) == false then
 		return
 	end
 	destroy_ghost()
@@ -232,6 +267,7 @@ local function exit()
 	current_def = nil
 	destroy_ghost()
 	markers.hide_lock()
+	set_problem(nil)
 	notify()
 end
 
@@ -331,6 +367,7 @@ local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolea
 	local part = ghost
 	if def_name == nil or part == nil or point == nil then
 		markers.hide_lock()
+		set_problem(nil)
 		return nil, false
 	end
 
@@ -363,7 +400,9 @@ local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolea
 		x, z = geometry.snap_center(x, z, half, config.CELL_STUDS)
 	end
 	local center = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
-	local valid = can_place(def_name, center, facing)
+	local reason = placement_problem(def_name, center, facing)
+	local valid = reason == nil
+	set_problem(reason)
 
 	part.CFrame = CFrame.new(center) * CFrame.Angles(0, facing, 0)
 	part.Color = if valid then VALID_COLOR else INVALID_COLOR
@@ -397,4 +436,6 @@ return table.freeze({
 	clear_preview = clear_preview,
 	can_place = can_place,
 	subscribe = subscribe,
+	subscribe_problem = subscribe_problem,
+	get_problem = get_problem,
 })

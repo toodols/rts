@@ -32,8 +32,10 @@ type FlyingProjectile = {
 	params: types.ProjectileParams,
 	-- the entity this steers toward every frame, for a homing weapon (an AA missile, say): drawing it
 	-- on a plain ballistic path would have it visibly miss a target the server's own copy is curving
-	-- to hit, since the server steers the same way (see projectiles.steer_toward on the server).
+	-- to hit, since the server steers the same way (projectile.home, as projectiles.tick does).
 	homing_target_id: EntityId?,
+	-- where that entity was last frame: the server knows how fast it is going, and the client works it out from this
+	homing_target_last: Vector3?,
 }
 
 -- How long a beam stays up when its weapon does not say, and how see-through it has become by the end.
@@ -511,6 +513,7 @@ local function launch_projectile(
 		flight = flight,
 		params = params,
 		homing_target_id = homing_target_id,
+		homing_target_last = nil,
 	}
 	projectiles[id] = projectile
 	if params.line_thickness ~= nil then
@@ -545,19 +548,6 @@ local function remove_projectile(id: number): types.ProjectileLook?
 	return projectile.params.look
 end
 
--- Steers a homing projectile toward its target's current position, the same way the server's own copy
--- does (projectiles.steer_toward), so the drawn missile curves in step with the one that actually hits.
-local function steer_toward(flight: projectile_mod.Flight, target_position: Vector3, delta: number)
-	local to_target = target_position - flight.position
-	if to_target.Magnitude > 1e-3 then
-		local desired_direction = to_target.Unit
-		local current_direction = if flight.velocity.Magnitude > 1e-3 then flight.velocity.Unit else desired_direction
-		local turned = current_direction:Lerp(desired_direction, math.min(1, config.MISSILE_TURN_RATE * delta))
-		local direction = if turned.Magnitude > 1e-3 then turned.Unit else desired_direction
-		flight.velocity = direction * flight.velocity.Magnitude
-	end
-end
-
 -- How many seconds of the game pass in a second of real time, as the server says (`sim_rate`): 1 normally, more
 -- while it is warping ahead, and nothing while it is paused.
 local function sim_rate(): number
@@ -577,12 +567,21 @@ local function fly_projectiles(real_delta: number)
 	local delta = elapsed / steps
 	for id, projectile in projectiles do
 		local target = if projectile.homing_target_id ~= nil then world.get(projectile.homing_target_id) else nil
+		local target_position, target_velocity = Vector3.zero, Vector3.zero
 		if target == nil then
 			projectile.homing_target_id = nil
+		else
+			target_position = world.position_of(target)
+			local last = projectile.homing_target_last
+			if last ~= nil then
+				target_velocity = (target_position - last) / elapsed
+			end
+			projectile.homing_target_last = target_position
 		end
 		for _ = 1, steps do
+			-- the server steers it the same way (projectile.home), so the drawn missile curves in step with the one that hits
 			if target ~= nil then
-				steer_toward(projectile.flight, world.position_of(target), delta)
+				projectile_mod.home(projectile.flight, projectile.params, target_position, target_velocity, delta)
 			end
 			projectile_mod.step(projectile.flight, projectile.params, delta)
 		end

@@ -392,6 +392,10 @@ def write(entry):
     material_lines = "\n".join(f"\t\tEnum.Material.{material}," for material in materials)
     colour_lines = "\n".join(f"\t\t[Enum.Material.{material}] = {colour(colours[material])}," for material in materials)
     start_lines = "\n".join(f"\t\tVector2.new({u:.4f}, {v:.4f})," for u, v in starts)
+    box_lines = "\n".join(
+        f"\t\t{{ min = Vector2.new({x0 / 200:.4f}, {y0 / 200:.4f}), max = Vector2.new({x1 / 200:.4f}, {y1 / 200:.4f}) }},"
+        for x0, y0, x1, y1 in entry["boxes"]
+    )
     metal_lines = "\n".join(
         f"\t\t{{ at = Vector2.new({u:.4f}, {v:.4f}), rich = {'true' if rich else 'false'} }}," for u, v, rich in metal
     )
@@ -427,6 +431,10 @@ return table.freeze({{
 	-- as fractions of the map across and down from its north-west corner; the first team on odd slots
 	starts = {{
 {start_lines}
+	}},
+	-- each team's start box, where its players choose to start, from BAR's map list, the same way
+	start_boxes = {{
+{box_lines}
 	}},
 	metal = {{
 {metal_lines}

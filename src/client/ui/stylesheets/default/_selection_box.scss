@@ -22,6 +22,22 @@
 	font-size: 12px;
 }
 
+// Why the building on the cursor cannot go where it is, just under the pointer, in the red of its ghost. The
+// position is the cursor's and comes from the component; the transform centres the note under it.
+.placement-problem {
+	position: absolute;
+	transform: translateX(-50%);
+	padding: space(1) space(3);
+	background-color: veil($void, 0.82);
+	outline: 1px solid var(--Danger);
+	color: var(--Danger);
+	font-family: RobotoMono;
+	font-size: 12px;
+	white-space: nowrap;
+	pointer-events: none;
+	z-index: 110;
+}
+
 // The hint for a reclaim, repair or disintegrator mode: the same plate as the placement hint, but lit, so
 // it reads as something the cursor is doing rather than a tip.
 .mode-hint {

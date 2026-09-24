@@ -14,6 +14,8 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
 local economy = require(script.Parent.economy)
+local flows = require(script.Parent.flows)
+local match_stats = require(script.Parent.match_stats)
 local alliances = require(script.Parent.alliances)
 
 type Entity = types.Entity
@@ -37,7 +39,7 @@ local function begin_tick()
 end
 
 local function can_reclaim(reclaimer: Entity, target: Entity): boolean
-	local def = unit_defs.get(reclaimer.def_name)
+	local def = unit_defs.of(reclaimer)
 	if def.reclaiming == false or def.buildpower == nil then
 		return false
 	end
@@ -51,7 +53,7 @@ local function can_reclaim(reclaimer: Entity, target: Entity): boolean
 	if
 		target.kind ~= "wreck"
 		and target.kind ~= "reclaimable"
-		and unit_defs.get(target.def_name).reclaimable == false
+		and unit_defs.of(target).reclaimable == false
 	then
 		return false
 	end
@@ -59,7 +61,7 @@ local function can_reclaim(reclaimer: Entity, target: Entity): boolean
 end
 
 local function request(reclaimer: Entity, target: Entity)
-	local def = unit_defs.get(reclaimer.def_name)
+	local def = unit_defs.of(reclaimer)
 	local buildpower = def.buildpower
 	if buildpower == nil then
 		return
@@ -123,7 +125,31 @@ local function recent_target_of(reclaimer_id: types.EntityId): types.EntityId?
 	return nil
 end
 
-local function reclaim_wreck(target: Entity, applied: number, team: types.TeamId)
+-- What reclaiming `target_id` is called in the infobox's list of where a reclaimer's income comes from: "Reclaiming
+-- Rock", "Reclaiming Grunt wreck". The target may already be gone by the time its last payout lands.
+local function reclaim_label(target_id: types.EntityId): string
+	local target = state.get(target_id)
+	if target == nil then
+		return "Reclaiming"
+	end
+	local name = unit_defs.of(target).display_name
+	return if target.kind == "wreck" then `Reclaiming {name} wreck` else `Reclaiming {name}`
+end
+
+-- Banks what `entry`'s reclaimer pulled out this step and counts it as that reclaimer's income, so the infobox
+-- shows it earning like a generator. What a full store turned away is not income, and metal turned away marks it
+-- as held back (the infobox only has room to say so on the metal tile).
+local function pay(entry: Request, metal: number, energy: number, delta: number)
+	local metal_banked = if metal > 0 then economy.add_metal(entry.team, metal) else 0
+	local energy_banked = if energy > 0 then economy.add_energy(entry.team, energy) else 0
+	match_stats.made_metal(entry.team, metal_banked)
+	flows.add(entry.reclaimer_id, reclaim_label(entry.target_id), metal_banked / delta, energy_banked / delta)
+	if metal_banked < metal - 1e-6 then
+		flows.stall(entry.reclaimer_id, "storage")
+	end
+end
+
+local function reclaim_wreck(target: Entity, applied: number, entry: Request, delta: number)
 	local wreck = target.wreck
 	if wreck == nil then
 		return
@@ -138,37 +164,34 @@ local function reclaim_wreck(target: Entity, applied: number, team: types.TeamId
 
 	wreck.buildpower_left -= consumed
 	wreck.metal_left = math.max(0, wreck.metal_left - metal)
-	economy.add_metal(team, metal)
+	pay(entry, metal, 0, delta)
 
 	if wreck.buildpower_left <= 0 then
 		state.mark_dead(target)
 	end
 end
 
--- A reclaimable pays out its metal and energy in step with the buildpower put into it, at the rates its def's
--- metal_cost and energy_cost over its buildpower_cost set, and is gone once all of that has been put in.
-local function reclaim_yield(target: Entity, applied: number, team: types.TeamId)
+-- A reclaimable pays out its metal and energy in step with the buildpower put into it, at the rates its metal and
+-- energy totals over its buildpower total set, and is gone once all of that has been put in.
+local function reclaim_yield(target: Entity, applied: number, entry: Request, delta: number)
 	local yield = target.yield
 	if yield == nil then
 		return
 	end
-	local def = unit_defs.get(target.def_name)
-	if def.buildpower_cost <= 0 then
-		economy.add_metal(team, yield.metal_left)
-		economy.add_energy(team, yield.energy_left)
+	if yield.buildpower_total <= 0 then
+		pay(entry, yield.metal_left, yield.energy_left, delta)
 		state.mark_dead(target)
 		return
 	end
 
 	local consumed = math.min(applied, yield.buildpower_left)
-	local metal = math.min(yield.metal_left, consumed * def.metal_cost / def.buildpower_cost)
-	local energy = math.min(yield.energy_left, consumed * def.energy_cost / def.buildpower_cost)
+	local metal = math.min(yield.metal_left, consumed * yield.metal_total / yield.buildpower_total)
+	local energy = math.min(yield.energy_left, consumed * yield.energy_total / yield.buildpower_total)
 
 	yield.buildpower_left -= consumed
 	yield.metal_left -= metal
 	yield.energy_left -= energy
-	economy.add_metal(team, metal)
-	economy.add_energy(team, energy)
+	pay(entry, metal, energy, delta)
 
 	if yield.buildpower_left <= 0 then
 		state.mark_dead(target)
@@ -180,19 +203,27 @@ end
 -- buildpower B strips a target of cost C in C / B seconds however hurt it was. When its health runs
 -- out it is gone, leaving no wreck, and its metal goes to the reclaimer that finished it. A blueprint
 -- counts for the buildpower actually put into it, and pays back the metal actually spent on it.
-local function reclaim_standing(target: Entity, applied: number, team: types.TeamId)
-	local def = unit_defs.get(target.def_name)
+-- The metal comes in one lump at the end, but the reclaimer's income reads as the steady rate it is earning it at,
+-- so the infobox does not sit at nothing and then flash a spike for a single tick.
+local function reclaim_standing(target: Entity, applied: number, entry: Request, delta: number)
+	local def = unit_defs.of(target)
 	local is_blueprint = target.state == "blueprint"
 	local cost = if is_blueprint then target.build_progress else def.buildpower_cost
+	local metal = if is_blueprint then target.metal_paid else def.metal_cost
 
 	if cost > 0 then
+		flows.add(entry.reclaimer_id, reclaim_label(target.id), metal * math.min(1, applied / cost) / delta, 0)
 		target.health -= target.max_health * applied / cost
 		if target.health > 0 then
 			return
 		end
 	end
 
-	economy.add_metal(team, if is_blueprint then target.metal_paid else def.metal_cost)
+	local banked = economy.add_metal(entry.team, metal)
+	match_stats.made_metal(entry.team, banked)
+	if banked < metal - 1e-6 then
+		flows.stall(entry.reclaimer_id, "storage")
+	end
 	state.mark_dead(target)
 end
 
@@ -205,11 +236,11 @@ local function resolve(delta: number)
 		end
 		local applied = entry.buildpower * delta
 		if target.kind == "wreck" then
-			reclaim_wreck(target, applied, entry.team)
+			reclaim_wreck(target, applied, entry, delta)
 		elseif target.kind == "reclaimable" then
-			reclaim_yield(target, applied, entry.team)
+			reclaim_yield(target, applied, entry, delta)
 		else
-			reclaim_standing(target, applied, entry.team)
+			reclaim_standing(target, applied, entry, delta)
 		end
 	end
 end

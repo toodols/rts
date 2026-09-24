@@ -53,6 +53,13 @@ local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
 -- Collisions are tested at least this often along the flight, so a fast rocket cannot skip through
 -- something narrow.
 local HIT_STEP = 0.5
+-- A homing projectile whose weapon does not give it a guidance time is guided for this many times as long as it
+-- takes to fly its weapon's range: long enough to come round once for something that got past it, not long enough
+-- to chase it for ever.
+local GUIDANCE_MARGIN = 2.5
+-- How far clear of its target's collider a missile fired to miss (config.HOMING_MISS_CHANCE) passes.
+local MISS_CLEARANCE = 1.5
+local miss_roll = Random.new()
 -- How big the burst is where a shield swallows a shell.
 local SHIELD_BURST_RADIUS = 3
 -- The projectile's own thickness.
@@ -98,7 +105,7 @@ local air_layer = new_layer(24, 64, widest_collider)
 local MAX_BLAST_CELLS = 24
 
 local function layer_add(layer: Layer, entity: Entity)
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	local position = entity.position
 	local k = flat_grid.add(layer.grid, position.X, position.Z, unit_defs.collider_radius(def))
 	layer.ys[k] = position.Y
@@ -120,7 +127,7 @@ local function rebuild_grids()
 			layer_add(wreck_layer, entity)
 		elseif air.is_aircraft(entity) then
 			layer_add(air_layer, entity)
-		elseif unit_defs.collider_radius(unit_defs.get(entity.def_name)) <= SMALL_RADIUS then
+		elseif unit_defs.collider_radius(unit_defs.of(entity)) <= SMALL_RADIUS then
 			layer_add(small_layer, entity)
 		else
 			layer_add(large_layer, entity)
@@ -249,6 +256,23 @@ local function launch(
 	if direction.Magnitude < 1e-3 then
 		direction = Vector3.new(math.sin(owner.facing), 0, math.cos(owner.facing))
 	end
+	-- an anti-air missile is guided for so long and no longer, and now and then is fired to just miss; the client has to
+	-- know both to fly it the same
+	if params.homing == true and weapon.anti_nuke ~= true then
+		params = table.clone(params)
+		if params.guidance_time == nil then
+			params.guidance_time = projectile_mod.time_to_reach(weapon.range, params) * GUIDANCE_MARGIN
+		end
+		if target ~= nil and miss_roll:NextNumber() < config.HOMING_MISS_CHANCE then
+			local target_def = unit_defs.of(target)
+			local clear = math.max(unit_defs.collider_radius(target_def), unit_defs.collider_height(target_def) / 2)
+				+ MISS_CLEARANCE
+			local across = direction:Cross(Vector3.yAxis)
+			across = if across.Magnitude > 1e-3 then across.Unit else Vector3.xAxis
+			local around = miss_roll:NextNumber() * 2 * math.pi
+			params.aim_offset = CFrame.fromAxisAngle(direction.Unit, around):VectorToWorldSpace(across) * clear
+		end
+	end
 
 	local inherited: Vector3? = nil
 	if params.dropped == true then
@@ -302,7 +326,7 @@ end
 
 -- Whether `at` is within `other`'s collider, the rocket's own thickness included.
 local function inside(at: Vector3, other: Entity): boolean
-	local def = unit_defs.get(other.def_name)
+	local def = unit_defs.of(other)
 	local sideways = Vector2.new(at.X - other.position.X, at.Z - other.position.Z).Magnitude
 	local vertical = math.abs(at.Y - other.position.Y)
 	return sideways <= unit_defs.collider_radius(def) + PROJECTILE_RADIUS
@@ -340,7 +364,7 @@ local function struck_by(projectile: Projectile): Entity?
 				return nil
 			end
 			if torpedo then
-				local def = unit_defs.get(other.def_name)
+				local def = unit_defs.of(other)
 				if unit_defs.in_water(def, other.position) == false then
 					return nil
 				end
@@ -392,13 +416,18 @@ local function damage_to(projectile: Projectile, target: Entity, amount: number)
 	if target.kind == "wreck" then
 		return amount
 	end
-	return unit_defs.damage_against(projectile.anti_air, unit_defs.get(target.def_name), amount)
+	return unit_defs.damage_against(projectile.anti_air, unit_defs.of(target), amount)
 end
 
 -- The rocket goes off at `at`. What it struck takes the whole damage; everything else within the blast
 -- takes less the further from the centre it is, friend and foe alike - except the shooter itself,
 -- which its own blast never reaches.
-local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, apply_damage: (Entity, number) -> ())
+local function detonate(
+	projectile: Projectile,
+	at: Vector3,
+	struck: Entity?,
+	apply_damage: (Entity, number, EntityId?, types.TeamId?) -> ()
+)
 	weapon_fired:FireAllClients({
 		impact = { id = projectile.id, at = at, radius = projectile.params.aoe_radius },
 		team = projectile.team,
@@ -407,20 +436,26 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 	deformation.crater(at, projectile.params.aoe_radius, projectile.damage)
 
 	if struck ~= nil then
-		apply_damage(struck, damage_to(projectile, struck, projectile.damage))
+		apply_damage(struck, damage_to(projectile, struck, projectile.damage), projectile.owner_id, projectile.team)
 	end
 	local aoe = projectile.params.aoe_radius
 	local edge = projectile.params.edge_effectiveness or EDGE_DAMAGE
 	local function blast(other: Entity, reach: number)
 		-- the shooter itself never takes its own blast - a bomber flying away from a bomb it just
-		-- dropped, say - but nobody else is spared for being on its side: that stays real friendly fire
+		-- dropped, say - but nobody else is spared for being on its side: that stays real friendly fire, to
+		-- the team's own things always, and to its allies' with ally griefing on (`alliances.may_harm`)
 		if (struck ~= nil and other.id == struck.id) or other.id == projectile.owner_id then
 			return
 		end
 		local distance = (other.position - at).Magnitude
 		if distance <= aoe + reach then
 			local falloff = 1 - (1 - edge) * math.clamp(distance / aoe, 0, 1)
-			apply_damage(other, damage_to(projectile, other, projectile.damage * falloff))
+			apply_damage(
+				other,
+				damage_to(projectile, other, projectile.damage * falloff),
+				projectile.owner_id,
+				projectile.team
+			)
 		end
 	end
 	-- anything the blast reaches is within the blast plus its own radius of the centre, and so within that
@@ -428,7 +463,7 @@ local function detonate(projectile: Projectile, at: Vector3, struck: Entity?, ap
 	if (aoe + widest_collider) / 8 > MAX_BLAST_CELLS then
 		for _, other in state.all() do
 			if other.alive then
-				blast(other, unit_defs.collider_radius(unit_defs.get(other.def_name)))
+				blast(other, unit_defs.collider_radius(unit_defs.of(other)))
 			end
 		end
 		return
@@ -459,30 +494,9 @@ local function pick_nuke_target(shooter_position: Vector3, shooter_team: types.T
 	return nearest
 end
 
--- Updates a homing interceptor to track its target. Steers the projectile's velocity toward the target's
--- current position using a turn rate similar to missiles, allowing the interceptor to adjust course as
--- the nuke moves.
-local function steer_toward(missile: Projectile, target_position: Vector3, delta: number)
-	local to_target = target_position - missile.flight.position
-	if to_target.Magnitude > 1e-3 then
-		local desired_direction = to_target.Unit
-		local current_direction = if missile.flight.velocity.Magnitude > 1e-3
-			then missile.flight.velocity.Unit
-			else desired_direction
-		-- use missile turn rate for smooth steering
-		local turned = current_direction:Lerp(desired_direction, math.min(1, config.MISSILE_TURN_RATE * delta))
-		local direction = if turned.Magnitude > 1e-3 then turned.Unit else desired_direction
-		missile.flight.velocity = direction * missile.flight.velocity.Magnitude
-	end
-end
-
-local function update_homing(interceptor: Projectile, target: Projectile, delta: number)
-	steer_toward(interceptor, target.flight.position, delta)
-end
-
 -- Flies every rocket forward one tick. `apply_damage` is handed in rather than required, because combat
 -- launches rockets and so depends on this module.
-local function tick(delta: number, apply_damage: (Entity, number) -> ())
+local function tick(delta: number, apply_damage: (Entity, number, EntityId?, types.TeamId?) -> ())
 	if #projectiles > 0 then
 		rebuild_grids()
 	end
@@ -507,12 +521,9 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 
 		local finished = false
 		for _ = 1, steps do
-			projectile_mod.step(projectile.flight, projectile.params, sub_delta)
-			local at = projectile.flight.position
-
-			-- homing logic: steer interceptor toward tracked nuke
+			-- homing logic: an interceptor steers toward the nuke it tracks, and an AA missile (or other non anti-nuke
+			-- homing weapon) toward the entity it was fired at for as long as that entity is still alive
 			if projectile.is_anti_nuke and projectile.params.homing and projectile.homing_target_id ~= nil then
-				-- find the target nuke
 				local target: Projectile? = nil
 				for _, p in projectiles do
 					if p.id == projectile.homing_target_id then
@@ -521,23 +532,35 @@ local function tick(delta: number, apply_damage: (Entity, number) -> ())
 					end
 				end
 				if target ~= nil then
-					update_homing(projectile, target, sub_delta)
+					projectile_mod.home(
+						projectile.flight,
+						projectile.params,
+						target.flight.position,
+						target.flight.velocity,
+						sub_delta
+					)
 				else
 					-- target lost, clear it for re-acquisition next tick
 					projectile.homing_target_id = nil
 				end
 			end
-
-			-- homing logic: an AA missile (or other non anti-nuke homing weapon) steers toward the
-			-- entity it was fired at for as long as that entity is still alive
 			if projectile.homing_entity_id ~= nil then
 				local target = state.get(projectile.homing_entity_id)
 				if target ~= nil and target.alive then
-					steer_toward(projectile, target.position, sub_delta)
+					projectile_mod.home(
+						projectile.flight,
+						projectile.params,
+						target.position,
+						target.velocity,
+						sub_delta
+					)
 				else
 					projectile.homing_entity_id = nil
 				end
 			end
+
+			projectile_mod.step(projectile.flight, projectile.params, sub_delta)
+			local at = projectile.flight.position
 
 			-- a plasma shell that runs into an enemy shield goes off on it, and does no harm
 			if

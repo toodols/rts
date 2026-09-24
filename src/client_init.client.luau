@@ -7,6 +7,7 @@ local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local passability = require(ReplicatedStorage.Shared.passability)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local starts = require(ReplicatedStorage.Shared.starts)
+local campaign = require(ReplicatedStorage.Shared.campaign)
 
 local world_mod = require(ReplicatedStorage.Client.world)
 local interpolation_mod = require(ReplicatedStorage.Client.interpolation)
@@ -15,9 +16,14 @@ local camera_mod = require(ReplicatedStorage.Client.camera)
 local selection_mod = require(ReplicatedStorage.Client.selection)
 local input_mod = require(ReplicatedStorage.Client.input)
 local effects_mod = require(ReplicatedStorage.Client.effects)
+local debris_mod = require(ReplicatedStorage.Client.debris)
 local markers_mod = require(ReplicatedStorage.Client.markers)
 local spot_markers_mod = require(ReplicatedStorage.Client.spot_markers)
 local lobby_mod = require(ReplicatedStorage.Client.lobby)
+local pings_mod = require(ReplicatedStorage.Client.pings)
+local mission_mod = require(ReplicatedStorage.Client.mission)
+local tutorial_mod = require(ReplicatedStorage.Client.tutorial)
+local ui_art_mod = require(ReplicatedStorage.Client.ui_art)
 local ui_mod = require(ReplicatedStorage.Client.ui)
 
 local local_player = Players.LocalPlayer
@@ -71,6 +77,11 @@ end
 -- is still on its way.
 local PRELOAD_TIMEOUT = 60
 local preload_began = os.clock()
+-- the tutorial's pictures first, which are few and small: they are the cards it teaches with, and what is built last
+-- is what runs out of EditableMesh memory
+if mission_mod.is_tutorial() then
+	ui_art_mod.preload(PRELOAD_TIMEOUT)
+end
 local not_built = art_mod.preload(PRELOAD_TIMEOUT)
 if #not_built > 0 then
 	warn(
@@ -85,25 +96,46 @@ camera_mod.init()
 selection_mod.init()
 input_mod.init()
 effects_mod.init()
+debris_mod.init()
 markers_mod.init()
 spot_markers_mod.init()
 lobby_mod.init()
+pings_mod.init()
+tutorial_mod.init()
 ui_mod.init_ui()
 
--- Opens the view over this player's starting position: the start they chose, or until they have, the one numbered as
--- their team is, once they have a team.
+-- Opens the view over this player's starting position: where they chose to start, or until they have, their start
+-- area's usual start, once they have one. The tutorial chooses no start: it opens over the commander, which the server
+-- puts at the tutorial's start.
 local function look_at_start()
-	local slot = game_phase.start_of(local_player)
-	if slot == nil then
-		local team = local_player:GetAttribute "team"
-		while typeof(team) ~= "number" do
-			local_player:GetAttributeChangedSignal("team"):Wait()
-			team = local_player:GetAttribute "team"
+	if mission_mod.is_tutorial() then
+		for _, model in world_mod.all() do
+			if world_mod.is_mine(model) and model:GetAttribute "def_name" == "commander" then
+				camera_mod.look_at(world_mod.position_of(model))
+				return
+			end
 		end
-		slot = team
+		local start = campaign.TUTORIAL.player_start
+		camera_mod.look_at(Vector3.new(start.X, 0, start.Y))
+		return
 	end
-	local start = starts.center(slot :: number)
-	camera_mod.look_at(Vector3.new(start.X, 0, start.Y))
+	local chosen = game_phase.start_of(local_player)
+	if chosen ~= nil then
+		camera_mod.look_at(chosen)
+		return
+	end
+	local box = game_phase.box_of(local_player)
+	while box == nil do
+		local_player:GetAttributeChangedSignal(game_phase.BOX_ATTRIBUTE):Wait()
+		box = game_phase.box_of(local_player)
+		-- the game may have turned out to be the tutorial while waiting
+		if mission_mod.is_tutorial() then
+			look_at_start()
+			return
+		end
+	end
+	local spot = starts.default_spot(box)
+	camera_mod.look_at(Vector3.new(spot.X, 0, spot.Y))
 end
 
 -- A map replaced while playing: everything drawn from the old one is drawn again from the new, and the view goes to
@@ -120,8 +152,13 @@ follow_map()
 
 look_at_start()
 
--- the view follows this player to the start they choose
+-- the view follows this player to the start they choose, and to the tutorial's if the game turns out to be it
 local_player:GetAttributeChangedSignal(game_phase.START_ATTRIBUTE):Connect(look_at_start)
+mission_mod.subscribe(function(mission: string?)
+	if mission == "tutorial" then
+		look_at_start()
+	end
+end)
 
 -- everything is built and drawn: the server may count this player as loaded in
 local client_loaded: RemoteEvent = ReplicatedStorage.Shared.ClientLoaded

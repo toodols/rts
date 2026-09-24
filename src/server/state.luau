@@ -42,6 +42,7 @@ local function fresh_team(id: TeamId): Team
 		id = id,
 		-- replaced by the player's name when a player takes the team
 		name = `Team {id}`,
+		skin = config.DEFAULT_SKIN,
 		metal = config.STARTING_METAL,
 		energy = config.STARTING_ENERGY,
 		metal_income = config.METAL_INCOME,
@@ -95,7 +96,10 @@ local function create_entity(
 	facing: number,
 	state: EntityState
 ): Entity
-	local def = unit_defs.get(def_name)
+	-- it wears its team's skin, and a neutral thing, whose team is not a real one, the default
+	local owner = teams[team]
+	local skin = if owner ~= nil then owner.skin else config.DEFAULT_SKIN
+	local def = unit_defs.skinned(def_name, skin)
 	local id = next_entity_id
 	next_entity_id += 1
 
@@ -103,6 +107,7 @@ local function create_entity(
 		id = id,
 		team = team,
 		def_name = def_name,
+		skin = skin,
 		kind = def.kind,
 		state = state,
 		position = position,
@@ -130,6 +135,10 @@ local function create_entity(
 		unfed_time = 0,
 		wreck = nil,
 		yield = nil,
+		kills = 0,
+		damage_dealt = 0,
+		score_dealt = 0,
+		experience = 0,
 		alive = true,
 	}
 
@@ -140,6 +149,7 @@ end
 -- Wrecks reuse the dead thing's def for their footprint and look, but carry their own metal and
 -- buildpower pools. They belong to no team, so team 0 marks them as neutral.
 local function create_wreck(source: Entity): Entity
+	-- a wreck wears no skin, so it is the plain def's whatever the dead thing wore
 	local def = unit_defs.get(source.def_name)
 	local id = next_entity_id
 	next_entity_id += 1
@@ -185,6 +195,10 @@ local function create_wreck(source: Entity): Entity
 			resurrect_progress = 0,
 		},
 		yield = nil,
+		kills = 0,
+		damage_dealt = 0,
+		score_dealt = 0,
+		experience = 0,
 		alive = true,
 	}
 
@@ -192,10 +206,14 @@ local function create_wreck(source: Entity): Entity
 	return entity
 end
 
--- A reclaimable, a rock or a tree, lying at `position`: full of what its def says it holds. It belongs to nobody, so
--- it is on team 0 like a wreck. Its health is never touched, since nothing can harm it.
-local function create_reclaimable(def_name: string, position: Vector3, facing: number): Entity
+-- A reclaimable, a rock or a tree, lying at `position`: full of what `amounts` says, or what its def does. It belongs
+-- to nobody, so it is on team 0 like a wreck. Its health is never touched, since nothing can harm it.
+local function create_reclaimable(def_name: string, position: Vector3, facing: number, amounts: types.Holds?): Entity
 	local def = unit_defs.get(def_name)
+	local metal = if amounts ~= nil then amounts.metal else def.metal_cost
+	local energy = if amounts ~= nil then amounts.energy else def.energy_cost
+	local buildpower = (if amounts ~= nil then amounts.buildpower else def.buildpower_cost)
+		* config.RECLAIMABLE_BUILDPOWER_FRACTION
 	assert(def.kind == "reclaimable", `"{def_name}" is not a reclaimable`)
 	local id = next_entity_id
 	next_entity_id += 1
@@ -228,10 +246,17 @@ local function create_reclaimable(def_name: string, position: Vector3, facing: n
 		drone_stockpile_progress = 0,
 		wreck = nil,
 		yield = {
-			metal_left = def.metal_cost,
-			energy_left = def.energy_cost,
-			buildpower_left = def.buildpower_cost,
+			metal_total = metal,
+			energy_total = energy,
+			buildpower_total = buildpower,
+			metal_left = metal,
+			energy_left = energy,
+			buildpower_left = buildpower,
 		},
+		kills = 0,
+		damage_dealt = 0,
+		score_dealt = 0,
+		experience = 0,
 		alive = true,
 	}
 

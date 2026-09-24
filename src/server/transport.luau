@@ -43,7 +43,7 @@ local HOOK_SPOT_PREFERENCE = 0.25
 
 -- How many slots the transport can hold in all; none if it is not a transport.
 local function capacity_of(transport: Entity): number
-	local carrying = unit_defs.get(transport.def_name).transport
+	local carrying = unit_defs.of(transport).transport
 	if carrying == nil then
 		return 0
 	end
@@ -54,7 +54,7 @@ end
 local function slots_used(transport_id: EntityId): number
 	local used = 0
 	for _, cargo in state.cargo_of(transport_id) do
-		used += unit_defs.transport_slots(unit_defs.get(cargo.def_name))
+		used += unit_defs.transport_slots(unit_defs.of(cargo))
 	end
 	return used
 end
@@ -67,8 +67,8 @@ local function can_load(transport: Entity, cargo: Entity): boolean
 	if transport.id == cargo.id or cargo.kind == "wreck" or cargo.kind == "reclaimable" then
 		return false
 	end
-	local cargo_def = unit_defs.get(cargo.def_name)
-	if unit_defs.can_carry(unit_defs.get(transport.def_name), cargo_def) == false then
+	local cargo_def = unit_defs.of(cargo)
+	if unit_defs.can_carry(unit_defs.of(transport), cargo_def) == false then
 		return false
 	end
 	return slots_used(transport.id) + unit_defs.transport_slots(cargo_def) <= capacity_of(transport)
@@ -76,8 +76,8 @@ end
 
 -- The height the middle of `transport` is at when it hangs just over the top of `cargo`.
 local function hook_height(transport: Entity, cargo: Entity): number
-	local transport_half = unit_defs.collider_height(unit_defs.get(transport.def_name)) / 2
-	local cargo_half = unit_defs.collider_height(unit_defs.get(cargo.def_name)) / 2
+	local transport_half = unit_defs.collider_height(unit_defs.of(transport)) / 2
+	local cargo_half = unit_defs.collider_height(unit_defs.of(cargo)) / 2
 	return cargo.position.Y + cargo_half + transport_half + config.TRANSPORT_HOOK_GAP
 end
 
@@ -85,7 +85,7 @@ end
 -- come lowest over, so that ground rising beside the thing, like the foot of a slope, does not hold it up out of
 -- reach. Straight over it unless somewhere else is clearly lower.
 local function hook_spot(transport: Entity, cargo: Entity): Vector3
-	local def = unit_defs.get(transport.def_name)
+	local def = unit_defs.of(transport)
 	local at = cargo.position
 	local best = at
 	local lowest = air.resting_height(def, at.X, at.Z) - HOOK_SPOT_PREFERENCE
@@ -123,10 +123,10 @@ local function in_grasp(transport: Entity, cargo: Entity): boolean
 	if geometry.distance_2d(transport.position, cargo.position) > config.TRANSPORT_LOAD_RANGE then
 		return false
 	end
-	local transport_def = unit_defs.get(transport.def_name)
+	local transport_def = unit_defs.of(transport)
 	local position = transport.position
 	local underside = position.Y - unit_defs.collider_height(transport_def) / 2
-	local top = cargo.position.Y + unit_defs.collider_height(unit_defs.get(cargo.def_name)) / 2
+	local top = cargo.position.Y + unit_defs.collider_height(unit_defs.of(cargo)) / 2
 	-- one that can come no lower, held up by ground rising beside the thing, lets its hook down on the rope
 	local reach = config.TRANSPORT_LOAD_HEIGHT
 	if position.Y <= air.resting_height(transport_def, position.X, position.Z) + config.TRANSPORT_LOAD_HEIGHT then
@@ -152,8 +152,8 @@ end
 -- Where the cargo at `index` of `count` hangs from `transport`: on a rope below it, spread round its middle if
 -- there is more than one thing, and swung back against the way the transport is moving.
 local function dangle_position(transport: Entity, cargo: Entity, index: number, count: number): Vector3
-	local transport_def = unit_defs.get(transport.def_name)
-	local cargo_def = unit_defs.get(cargo.def_name)
+	local transport_def = unit_defs.of(transport)
+	local cargo_def = unit_defs.of(cargo)
 	local drop = unit_defs.collider_height(transport_def) / 2
 		+ config.TRANSPORT_ROPE
 		+ unit_defs.collider_height(cargo_def) / 2
@@ -175,12 +175,12 @@ end
 -- The height the middle of `transport` is at when what it carries hangs just clear of the ground under it: low
 -- enough to set it down, and no lower, so that nothing it carries is dragged along the ground on the way.
 local function set_down_height(transport: Entity): number
-	local transport_def = unit_defs.get(transport.def_name)
+	local transport_def = unit_defs.of(transport)
 	local x = transport.position.X
 	local z = transport.position.Z
 	local height = air.resting_height(transport_def, x, z)
 	for _, cargo in state.cargo_of(transport.id) do
-		local cargo_def = unit_defs.get(cargo.def_name)
+		local cargo_def = unit_defs.of(cargo)
 		local drop = unit_defs.collider_height(transport_def) / 2
 			+ config.TRANSPORT_ROPE
 			+ unit_defs.collider_height(cargo_def) / 2
@@ -199,7 +199,7 @@ end
 -- Hangs everything a transport carries from it. Run once a step, after everything has moved.
 local function tick()
 	for _, transport in state.all() do
-		if transport.alive == false or unit_defs.get(transport.def_name).transport == nil then
+		if transport.alive == false or unit_defs.of(transport).transport == nil then
 			continue
 		end
 		local cargo_list = state.cargo_of(transport.id)
@@ -214,7 +214,7 @@ end
 -- The first free spot for `cargo` on the rings round `at`, one that clears the ground and everything on it,
 -- and the things already set down in this same unloading, which are not in the world yet.
 local function find_spot(cargo: Entity, at: Vector3, placed: { Placed }): Vector3?
-	local def = unit_defs.get(cargo.def_name)
+	local def = unit_defs.of(cargo)
 	local half = placement.half_extents_for(cargo)
 	local step = unit_defs.collider_radius(def) * 2 + config.TRANSPORT_UNLOAD_GAP
 

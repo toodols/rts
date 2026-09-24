@@ -1,3 +1,4 @@
+@use "sass:color";
 @use "theme" as *;
 @use "mixins" as *;
 // `.selection-name` extends `.heading`, which _main.scss declares: an @extend only reaches
@@ -16,7 +17,7 @@
 }
 
 .selection-panel {
-	width: 330px;
+	width: 360px;
 	height: auto;
 	@include stack(column, space(3));
 	padding: space(4);
@@ -32,18 +33,19 @@
 .selection-name {
 	@extend .heading;
 	flex-grow: 1;
+	font-size: 16px;
 }
 
 // State badge. Square and hairline-outlined rather than a pill; `&-` suffixes keep the variants
 // beside the base rule.
 .badge {
 	width: auto;
-	height: 17px;
+	height: 19px;
 	padding: 0 space(2);
 	outline: 1px solid $edge;
 	color: var(--TextDim);
 	font-family: RobotoMono;
-	font-size: 11px;
+	font-size: 12px;
 
 	&-blueprint {
 		color: var(--Accent);
@@ -54,42 +56,316 @@
 		color: var(--Accent);
 		outline: 1px solid var(--Accent);
 	}
+
+	// a wreck or a rock: nobody's, and only there to be reclaimed
+	&-remnant {
+		color: var(--Caution);
+		outline: 1px solid var(--Caution);
+	}
 }
 
-.stat-list {
+// What it has earned in battle, at the end of the subtitle line, in the accent colour. Nothing shows until it has
+// earned some.
+.veterancy {
+	width: auto;
+	height: auto;
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 12px;
+	font-weight: bold;
+	text-align: right;
+	white-space: nowrap;
+}
+
+// White, and tinted from code by a gradient in the team's colour.
+.team-swatch {
+	width: 10px;
+	height: 10px;
+	background-color: white;
+	outline: 1px solid veil($void, 0.8);
+
+	&-neutral {
+		background-color: var(--TextFaint);
+	}
+}
+
+// Health as a fat bar with its numbers stamped on it, rather than a thin line and a stat row under it.
+.vitals-track {
+	@include track(20px);
+	position: relative;
+}
+
+.vitals-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
+
+	&-good {
+		@include meter($gain);
+	}
+	&-worn {
+		@include meter($caution);
+	}
+	&-critical {
+		@include meter($danger);
+	}
+	&-blueprint {
+		@include meter($accent);
+	}
+	&-wreck {
+		@include meter($caution);
+	}
+}
+
+.vitals-label {
+	@extend .readout;
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 2;
+	font-size: 14px;
+	text-align: center;
+	line-height: 20px;
+}
+
+// Metal and energy as two tiles side by side, each in its resource's colour.
+.economy-row {
 	width: 100%;
 	height: auto;
-	@include stack(column, space(1));
-}
-
-.stat {
 	@include stack(row, space(2));
-	align-items: center;
-	width: 100%;
-	height: 17px;
 }
 
-.stat-label {
-	@include caption;
+.resource-tile {
+	position: relative;
+	flex: 1 1 0;
+	height: auto;
+	@include stack(column, space(1));
+	padding: space(2) space(3) space(2) space(3);
+	background-color: veil($void, 0.55);
+	outline: 1px solid $edge;
+	transition: outline-color $medium $ease-out;
+
+	&.metal-tile {
+		background-image: linear-gradient(160deg, veil($metal, 0.14) 0%, transparent 60%);
+	}
+	&.energy-tile {
+		background-image: linear-gradient(160deg, veil($energy, 0.16) 0%, transparent 60%);
+	}
+
+	// What holds it back is outlined in red, over the resource's own tint.
+	&.tile-stalled {
+		outline: 1px solid var(--Danger);
+		@priority 20;
+	}
+}
+
+// A lit lip along the top of a tile, in the resource's colour.
+.tile-rail {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: $rail;
+
+	&.metal-rail {
+		@include rail($metal);
+	}
+	&.energy-rail {
+		@include rail($energy);
+	}
+}
+
+.tile-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(1));
+	align-items: center;
+}
+
+.tile-name {
+	font-family: Michroma;
+	font-size: 12px;
+	font-weight: bold;
+	text-align: left;
 	flex-grow: 1;
 }
 
-.stat-value {
+.tile-stall {
+	padding: 0 space(1);
+	background-color: var(--Danger);
+	color: var(--Void);
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+}
+
+.tile-rate {
+	width: 100%;
+	height: auto;
+	@include stack(row, 2px);
+	align-items: flex-end;
+}
+
+.tile-rate-value {
+	@extend .readout;
+	font-size: 26px;
+	text-align: left;
+}
+
+.tile-rate-unit {
+	font-family: RobotoMono;
+	font-size: 14px;
+	text-align: left;
+}
+
+.tile-rate-unit.tile-rate-gain {
+	color: color.adjust($gain, $lightness: -18%);
+}
+.tile-rate-unit.tile-rate-loss {
+	color: color.adjust($danger, $lightness: -15%);
+}
+
+.tile-rate-gain {
+	color: var(--Gain);
+}
+.tile-rate-loss {
+	color: var(--Danger);
+}
+.tile-rate-idle {
+	color: var(--TextFaint);
+}
+.tile-rate-metal {
+	color: var(--Metal);
+}
+.tile-rate-energy {
+	color: var(--Energy);
+}
+
+.tile-cost {
+	@include caption;
+	font-family: RobotoMono;
+	font-size: 12px;
+	color: var(--TextFaint);
+}
+
+// Buildpower, shields, missiles and cargo: a caption, a gauge, a count.
+.gauge-list {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+	padding-top: space(2);
+}
+
+.gauge-row {
+	width: 100%;
+	height: 20px;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.gauge-label {
+	@include caption;
+	width: 84px;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 12px;
+}
+
+.gauge-track {
+	@include track(6px);
+	flex-grow: 1;
+	width: auto;
+}
+
+.gauge-fill {
+	&.shield-fill {
+		@include meter($accent);
+	}
+	&.missile-fill {
+		@include meter($fight);
+	}
+	&.cargo-fill {
+		@include meter($metal);
+	}
+	&.reclaim-fill {
+		@include meter($caution);
+	}
+	&.resurrect-fill {
+		@include meter($resurrect);
+	}
+}
+
+.pip-row {
+	height: auto;
+	flex-grow: 1;
+	@include stack(row, 3px);
+	align-items: center;
+}
+
+// An empty pip is a socket; a full one is lit in its gauge's tone.
+.pip {
+	width: 10px;
+	height: 10px;
+	background-color: $void;
+	outline: 1px solid color.adjust($edge, $lightness: -15%);
+
+	&-full {
+		outline: 1px solid veil(white, 0.35);
+	}
+	&.shield-pip {
+		background-color: var(--Accent);
+	}
+	&.missile-pip {
+		background-color: var(--Fight);
+	}
+	&.cargo-pip {
+		background-color: var(--Metal);
+	}
+}
+
+.gauge-value {
+	color: var(--Text);
 	font-family: RobotoMono;
 	font-size: 13px;
 	text-align: right;
 }
 
-.progress-track {
-	@include track(8px);
+// A mixed selection: a tile per kind with its count large.
+.group-grid {
+	width: 100%;
+	height: auto;
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	grid-auto-rows: 44px;
+	gap: space(2);
 }
 
-.progress-fill {
-	@include meter($buildpower);
+.group-tile {
+	width: 68px;
+	height: 44px;
+	@include stack(column, 0);
+	justify-content: center;
+	@include cell;
+}
 
-	&.blueprint-fill {
-		@include meter($accent);
-	}
+.group-count {
+	@extend .readout;
+	width: 100%;
+	height: auto;
+	font-size: 18px;
+	color: var(--Accent);
+}
+
+.group-name {
+	width: 100%;
+	height: auto;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 10px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .queue-strip {
@@ -116,11 +392,170 @@
 }
 
 // What the selected thing is in plain words, under its name.
-.selection-subtitle {
+.subtitle-row {
 	width: 100%;
 	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.selection-subtitle {
+	height: auto;
+	flex-grow: 1;
 	color: var(--TextFaint);
 	font-family: RobotoMono;
-	font-size: 11px;
+	font-size: 13px;
 	text-align: left;
+}
+
+// Whose it is, at the end of the title: a swatch and the team's name in its colour, cut short if it is long.
+.team-tag {
+	width: auto;
+	height: auto;
+	@include stack(row, space(1));
+	align-items: center;
+}
+
+.team-name {
+	width: auto;
+	height: auto;
+	max-width: 120px;
+	font-family: RobotoMono;
+	font-size: 12px;
+	font-weight: bold;
+	text-align: right;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+// What it builds with and fights with: a row each, compact, the detail in a tooltip on hover.
+.loadout {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+}
+
+.loadout-heading {
+	width: 100%;
+	height: 18px;
+	@include stack(row, space(2));
+	align-items: center;
+	padding-top: space(1);
+}
+
+.loadout-heading-text {
+	width: auto;
+	height: auto;
+	font-family: Michroma;
+	font-size: 11px;
+	font-weight: bold;
+	text-align: left;
+
+	&.heading-weapon {
+		color: var(--Fight);
+	}
+}
+
+.loadout-rule {
+	width: auto;
+	height: 1px;
+	flex-grow: 1;
+
+	&.rule-weapon {
+		background-image: linear-gradient(90deg, veil($fight, 0.8), transparent);
+	}
+}
+
+// A row lights along its face when hovered, like a button, since hovering it is what shows its tooltip.
+.loadout-row {
+	width: 100%;
+	height: 34px;
+	@include stack(row, space(2));
+	align-items: center;
+	padding-right: space(2);
+	background-color: veil($void, 0.5);
+	outline: 1px solid veil($edge, 0.55);
+	transition: background-color $fast $ease-out;
+
+	&:hover {
+		background-color: $steel-lit;
+		outline: 1px solid $edge;
+	}
+
+	&.loadout-weapon,
+	&.loadout-manual {
+		background-image: linear-gradient(90deg, veil($fight, 0.12), transparent 55%);
+	}
+	&.loadout-build {
+		background-image: linear-gradient(90deg, veil($buildpower, 0.1), transparent 55%);
+	}
+}
+
+// The slot: a square block in the row's colour, with a short code for what sits in it.
+.loadout-slot {
+	width: 40px;
+	height: 34px;
+	color: var(--Void);
+	font-family: RobotoMono;
+	font-size: 13px;
+	font-weight: bold;
+
+	&.slot-weapon {
+		background-color: var(--Fight);
+		background-image: linear-gradient(180deg, color.adjust($fight, $lightness: 10%), color.adjust($fight, $lightness: -12%));
+	}
+	&.slot-manual {
+		background-color: var(--Danger);
+		background-image: linear-gradient(180deg, color.adjust($danger, $lightness: 10%), color.adjust($danger, $lightness: -12%));
+	}
+	&.slot-build {
+		background-color: var(--Buildpower);
+		background-image: linear-gradient(180deg, color.adjust($buildpower, $lightness: 8%), color.adjust($buildpower, $lightness: -18%));
+	}
+}
+
+.loadout-name {
+	height: auto;
+	flex-grow: 1;
+	color: var(--Text);
+	font-family: Michroma;
+	font-size: 13px;
+	font-weight: bold;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.loadout-figure {
+	width: 64px;
+	height: auto;
+	@include stack(column, 0);
+	align-items: flex-end;
+}
+
+.loadout-value {
+	@extend .readout;
+	width: 100%;
+	height: auto;
+	font-size: 19px;
+	text-align: right;
+
+	&.value-weapon {
+		color: var(--Fight);
+	}
+	&.value-manual {
+		color: var(--Energy);
+	}
+	&.value-build {
+		color: var(--Buildpower);
+	}
+}
+
+.loadout-unit {
+	width: 100%;
+	height: auto;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: right;
 }

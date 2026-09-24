@@ -35,7 +35,7 @@ local function begin_tick()
 end
 
 local function can_resurrect(rezzer: Entity, target: Entity): boolean
-	local def = unit_defs.get(rezzer.def_name)
+	local def = unit_defs.of(rezzer)
 	if def.resurrecting == false or def.buildpower == nil or rezzer.state ~= "active" then
 		return false
 	end
@@ -48,7 +48,7 @@ local function can_resurrect(rezzer: Entity, target: Entity): boolean
 end
 
 local function request(rezzer: Entity, target: Entity)
-	local buildpower = unit_defs.get(rezzer.def_name).buildpower
+	local buildpower = unit_defs.of(rezzer).buildpower
 	if buildpower == nil or can_resurrect(rezzer, target) == false then
 		return
 	end

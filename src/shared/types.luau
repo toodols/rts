@@ -90,14 +90,21 @@ export type ProjectileParams = {
 	-- fired ahead of a moving target, at where it will be by the time the rocket gets there, and not at where it
 	-- is. Rockets do not home, so a missile that has to hit something quick, like an aircraft, needs it.
 	leads: boolean?,
-	-- homes on its target, tracking it in flight rather than aiming ahead. Used by anti-air weapons.
+	-- homes on its target, tracking it in flight and steering a little ahead of it (projectile.home). Used by anti-air
+	-- weapons and anti-nuke interceptors.
 	homing: boolean?,
+	-- how fast a homing projectile turns, in radians a second; config.HOMING_TURN_RATE if nil. BAR's `turnrate`.
+	turn_rate: number?,
+	-- how many seconds a homing projectile is guided for, after which it stops steering and falls, as BAR's does at
+	-- the end of its `flighttime`. Worked out from the weapon's range at launch if nil (see projectiles.launch).
+	guidance_time: number?,
+	-- where a homing projectile steers for, off its target's middle: nothing for most shots, and just clear of its
+	-- collider for the few that are to miss (config.HOMING_MISS_CHANCE). Set for each shot at launch.
+	aim_offset: Vector3?,
 	-- a missile that goes up and comes down on its target rather than flying at it
 	missile: Missile?,
 	-- a plasma shell: one that a plasma deflector stops. Rockets, missiles and beams are not.
 	plasma: boolean?,
-	-- a projectile that homes onto a target after launch, tracking it automatically
-	homing: boolean?,
 	-- a nuclear missile: used to distinguish nuke projectiles from other missiles for anti-nuke targeting
 	nuclear: boolean?,
 	-- drawn as a purple neon line this many studs thick, the way BAR draws its anti-air missiles, instead of as a
@@ -352,6 +359,9 @@ export type EntityDef = {
 	-- how deep the water has to be for it to stand there; nil for anything that lives on land. Having one
 	-- is what makes a unit a ship: it floats on the surface rather than resting on the ground below it.
 	min_water_depth: number?,
+	-- a hovercraft: it rides the surface over water of any depth, like a ship, and the ground where there is no water,
+	-- and is never in the water, so no torpedo is aimed at it. Nil for everything else.
+	hover: boolean?,
 	-- for a submarine, a ship that goes under: how far below the water's surface its underside rides, in studs,
 	-- as BAR's `waterline` has it. Nil for everything that floats on top, or does not float at all.
 	waterline: number?,
@@ -380,6 +390,9 @@ export type EntityDef = {
 	drone: boolean?,
 	-- how heavy it is to a transport; nil for something that cannot be carried
 	weight_class: WeightClass?,
+	-- hard to pick out: an enemy weapon only picks it to shoot at from within `config.STEALTH_DETECTION_RANGE`, however
+	-- far it reaches, though one ordered to attack it still can. Nil for everything that is not.
+	stealth: boolean?,
 	-- health it mends by itself every second, whatever it is doing, without a builder or any cost; nil if it does not
 	autoheal: number?,
 	death_explosion: DeathExplosion?,
@@ -425,18 +438,98 @@ export type Wreck = {
 	resurrect_progress: number,
 }
 
--- What is left to take out of a reclaimable. Reclaiming it applies buildpower the way reclaiming a wreck does, out
--- of its def's buildpower_cost, and pays out its def's metal_cost and energy_cost in proportion.
+-- What a reclaimable holds and what is left of it. Reclaiming it applies buildpower the way reclaiming a wreck does, out
+-- of its buildpower total, and pays out its metal and energy totals in proportion. The totals are its def's metal_cost,
+-- energy_cost and buildpower_cost unless the map says otherwise, as a BAR map does for each of its features.
 export type Yield = {
+	metal_total: number,
+	energy_total: number,
+	buildpower_total: number,
 	metal_left: number,
 	energy_left: number,
 	buildpower_left: number,
+}
+
+-- What a reclaimable holds, when it is not what its def says.
+export type Holds = {
+	metal: number,
+	energy: number,
+	buildpower: number,
+}
+
+-- What a skin does to the numbers of whatever wears it, each as a multiplier; one left out is 1. A skin with none is
+-- only a look. `range` stretches every weapon's reach, and a lobbed shell is fired faster to match, so it lands there.
+export type SkinStats = {
+	health: number?,
+	damage: number?,
+	range: number?,
+}
+
+-- How a skin repaints the art of what wears it: every piece that does not glow is `color` in `material`. With
+-- `keep_team`, the team-coloured pieces keep their team colour, so whose it is still reads.
+export type SkinPaint = {
+	color: Color3,
+	material: Enum.Material,
+	reflectance: number?,
+	keep_team: boolean?,
+}
+
+-- One kind of pool float (DonutSettings.variants): the art it is drawn in (shared/art), lying flat about its own middle,
+-- the radius of its hole in that art's units, and how often it turns up against the others.
+export type DonutVariant = {
+	art: string,
+	hole: number,
+	weight: number,
+}
+
+-- A pool donut, an inflatable swim ring worn round the waist (client/donuts.luau). Which of `variants` a unit wears
+-- is its own, from its entity id, and the same for every player. It pops when what wears it is hit, and on an
+-- aircraft it shakes above `shake_speed` (a fraction of its top speed) and flies off after `fly_off_seconds` of that.
+-- On something under the water, deeper than `submerge_depth` studs, it comes off and floats up to lie on the surface
+-- for `float_seconds`. Once nothing has knocked it off for `regen_seconds`, and what wears it is out of the water, a
+-- new one inflates. It is only a look: none of it touches the sim.
+export type DonutSettings = {
+	regen_seconds: number,
+	shake_speed: number,
+	fly_off_seconds: number,
+	submerge_depth: number,
+	float_seconds: number,
+	variants: { DonutVariant },
+	-- how wide its hole is against the radius of what wears it (its collider), so it is as big as the unit is
+	hug: number,
+	-- how far up the body it is worn, from the bottom of the body (0) to its top (1): its waist
+	waist: number,
+}
+
+-- Something a skin hangs on what wears it, for the kinds of entity listed in `kinds`.
+export type SkinAttachment = {
+	kind: "donut",
+	kinds: { EntityKind },
+	donut: DonutSettings,
+}
+
+-- Another look for the same units (shared/skins). A skin may give a def other art altogether (`art`, def name to the
+-- name of the art to draw instead), repaint it (`paint`), hang things on it (`attachments`), and, for a developer's
+-- skin only, change its numbers (`stats`).
+export type Skin = {
+	name: string,
+	display_name: string,
+	description: string,
+	-- only a developer may put it on, which any skin with `stats` has to be
+	developer_only: boolean,
+	stats: SkinStats?,
+	art: { [string]: string }?,
+	paint: SkinPaint?,
+	attachments: { SkinAttachment },
 }
 
 export type Entity = {
 	id: EntityId,
 	team: TeamId,
 	def_name: string,
+	-- the skin it wears (shared/skins), from its team's when it was made; nil for a wreck or a reclaimable, which
+	-- wear none. `unit_defs.of` reads its numbers through it.
+	skin: string?,
 	kind: EntityKind,
 	state: EntityState,
 	position: Vector3,
@@ -473,6 +566,13 @@ export type Entity = {
 	wreck: Wreck?,
 	-- set for a reclaimable
 	yield: Yield?,
+	-- what it has done to enemies: how many it has killed, the damage it has dealt them (not counting what went past
+	-- their last hit point), that damage weighed as the targeting weighs it, in power (`unit_defs.power`) taken off
+	-- them, and the experience all that has earned it (see `combat.credit`)
+	kills: number,
+	damage_dealt: number,
+	score_dealt: number,
+	experience: number,
 	alive: boolean,
 }
 
@@ -480,6 +580,8 @@ export type Team = {
 	id: TeamId,
 	-- what the team is called, taken from its player's name
 	name: string,
+	-- the skin everything it makes from now on wears (shared/skins)
+	skin: string,
 	metal: number,
 	energy: number,
 	metal_income: number,

@@ -1,6 +1,6 @@
 -- The panel over the middle of the screen while the game is waiting to begin (see shared/game_phase.luau): what it is
--- waiting for, or the countdown once everyone is ready, and every player with how far along they are, still loading,
--- choosing a start, or on the one they chose. It is gone once the game is playing.
+-- waiting for, or the countdown once everyone is ready, and every player with how far along they are: still on their
+-- way from the lobby that started the game, loading, choosing where in their start area to start, or ready. It is gone once the game is playing.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -23,14 +23,26 @@ type Row = {
 local function rows(): { Row }
 	local result: { Row } = {}
 	for _, player in Players:GetPlayers() do
-		local slot = game_phase.start_of(player)
+		-- someone who came only to watch has nothing to choose, and nobody waits on them
+		if player:GetAttribute "spectator" == true then
+			table.insert(
+				result,
+				{ name = player.DisplayName, status = "WATCHING", ready = true, you = player == local_player }
+			)
+			continue
+		end
+		local chosen = game_phase.start_of(player)
 		local loaded = game_phase.is_loaded(player)
 		table.insert(result, {
 			name = player.DisplayName,
-			status = if loaded == false then "LOADING" elseif slot == nil then "CHOOSING" else `START {slot}`,
-			ready = loaded and slot ~= nil,
+			status = if loaded == false then "LOADING" elseif chosen == nil then "CHOOSING" else "READY",
+			ready = loaded and chosen ~= nil,
 			you = player == local_player,
 		})
+	end
+	-- the players a lobby sent who are still on their way
+	for _, name in game_phase.awaiting() do
+		table.insert(result, { name = name, status = "ARRIVING", ready = false, you = false })
 	end
 	table.sort(result, function(a: Row, b: Row): boolean
 		return a.name < b.name
@@ -102,16 +114,18 @@ end
 
 local function LobbyPanel()
 	local phase, seconds, players = use_lobby()
-	if phase == "playing" then
+	if phase == "playing" or phase == "ended" then
 		return nil
 	end
 
 	local mine = game_phase.start_of(local_player)
 	local title = if seconds ~= nil then `STARTING IN {seconds}` else "WAITING FOR PLAYERS"
 	local hint = if seconds ~= nil
-		then "Click another start to move"
-		elseif mine == nil then "Click a start on the map to choose it"
-		else "Waiting for everyone to load and choose a start"
+		then "Click to move your start"
+		elseif local_player:GetAttribute "spectator" == true then "Spectating"
+		elseif mine == nil then "Pick a start in your area"
+		elseif #game_phase.awaiting() > 0 then "Waiting for players"
+		else "Waiting for players"
 
 	local list = {}
 	for index, row in players do

@@ -9,6 +9,9 @@ local combat = require(script.Parent.combat)
 local scavengers = require(script.Parent.scavengers)
 local movement = require(script.Parent.movement)
 local docking = require(script.Parent.docking)
+local obstacles = require(script.Parent.obstacles)
+local missions = require(script.Parent.missions)
+local orbits = require(script.Parent.orbits)
 
 local function reap()
 	for _, id in state.reap() do
@@ -18,6 +21,9 @@ local function reap()
 		scavengers.forget(id)
 		movement.forget(id)
 		docking.forget(id)
+		obstacles.forget(id)
+		missions.forget(id)
+		orbits.forget(id)
 		-- a transport that is gone takes what it was carrying with it
 		state.drop_hold(id)
 	end

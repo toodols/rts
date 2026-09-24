@@ -1854,6 +1854,11 @@ AAAAAAAAAAAAAAAAAA==]],
 		Vector2.new(0.3739, 0.6055),
 		Vector2.new(0.6290, 0.3935),
 	},
+	-- each team's start box, where its players choose to start, from BAR's map list, the same way
+	start_boxes = {
+		{ min = Vector2.new(0.0000, 0.6000), max = Vector2.new(0.4000, 1.0000) },
+		{ min = Vector2.new(0.6000, 0.0000), max = Vector2.new(1.0000, 0.4000) },
+	},
 	metal = {
 		{ at = Vector2.new(0.5252, 0.0256), rich = false },
 		{ at = Vector2.new(0.8142, 0.0271), rich = false },

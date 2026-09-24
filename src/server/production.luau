@@ -26,6 +26,7 @@ local placement = require(script.Parent.placement)
 local construction = require(script.Parent.construction)
 local economy = require(script.Parent.economy)
 local movement = require(script.Parent.movement)
+local campaign = require(script.Parent.campaign)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -48,7 +49,7 @@ end
 
 -- Where the next unit appears: inside the factory's footprint, its def's `production_offset` from the centre.
 local function production_spot(factory: Entity, product_def_name: string): Vector3
-	local offset = unit_defs.get(factory.def_name).production_offset or Vector2.zero
+	local offset = unit_defs.of(factory).production_offset or Vector2.zero
 	local out = doorway_vector(factory.facing)
 	local right = Vector3.new(-out.Z, 0, out.X)
 	local spot = factory.position + right * offset.X + out * offset.Y
@@ -81,7 +82,7 @@ local function rally_order(factory: Entity, product: Entity, from: Vector3)
 	end
 	local given = factory.orders
 	if #given > 0 then
-		local product_def = unit_defs.get(product.def_name)
+		local product_def = unit_defs.of(product)
 		for _, order in given do
 			local copy = table.clone(order)
 			if copy.position ~= nil then
@@ -111,19 +112,23 @@ local function rally_order(factory: Entity, product: Entity, from: Vector3)
 	product.orders = {
 		{
 			kind = "move",
-			position = unit_defs.surface_position(unit_defs.get(product.def_name), destination.X, destination.Z),
+			position = unit_defs.surface_position(unit_defs.of(product), destination.X, destination.Z),
 			target_id = nil,
 		},
 	}
 end
 
 local function enqueue(factory: Entity, def_name: string): boolean
-	local factory_def = unit_defs.get(factory.def_name)
+	local factory_def = unit_defs.of(factory)
 	local builds = factory_def.build_options
 	if builds == nil then
 		return false
 	end
 	if table.find(builds, def_name) == nil then
+		return false
+	end
+	-- nothing its team has not unlocked in the campaign
+	if campaign.can_build(factory.team, def_name) == false then
 		return false
 	end
 	table.insert(factory.queue, def_name)
@@ -179,12 +184,12 @@ local function vacate_blockers(factory: Entity, product_def_name: string, spot: 
 			away = away.Unit
 		end
 		local clearance = unit_defs.collider_radius(product_def)
-			+ unit_defs.collider_radius(unit_defs.get(other.def_name))
+			+ unit_defs.collider_radius(unit_defs.of(other))
 			+ config.PRODUCTION_RALLY_GAP
 		local destination = spot + away * clearance
 		table.insert(other.orders, 1, {
 			kind = "move",
-			position = unit_defs.surface_position(unit_defs.get(other.def_name), destination.X, destination.Z),
+			position = unit_defs.surface_position(unit_defs.of(other), destination.X, destination.Z),
 			target_id = nil,
 		})
 	end
@@ -194,7 +199,7 @@ local function tick_factory(factory: Entity, delta: number)
 	if factory.state ~= "active" then
 		return
 	end
-	local factory_def = unit_defs.get(factory.def_name)
+	local factory_def = unit_defs.of(factory)
 	if factory_def.build_options == nil or factory_def.buildpower == nil then
 		return
 	end
@@ -211,7 +216,7 @@ local function tick_factory(factory: Entity, delta: number)
 			return
 		else
 			-- finished this tick's predecessor: send it out and move on
-			local way_out = exit_point(factory, unit_defs.get(current.def_name), current.position)
+			local way_out = exit_point(factory, unit_defs.of(current), current.position)
 			exit_points[current.id] = way_out
 			movement.begin_exit(current, factory)
 			rally_order(factory, current, way_out)
@@ -224,6 +229,12 @@ local function tick_factory(factory: Entity, delta: number)
 	local next_def_name = factory.queue[1]
 	if next_def_name == nil then
 		blocked_for[factory.id] = nil
+		return
+	end
+	-- something queued while its team had it unlocked, and has not now, is dropped rather than started
+	if campaign.can_build(factory.team, next_def_name) == false then
+		blocked_for[factory.id] = nil
+		table.remove(factory.queue, 1)
 		return
 	end
 

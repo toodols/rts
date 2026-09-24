@@ -18,7 +18,7 @@ local function tick(delta: number)
 		if entity.alive == false or entity.state ~= "active" or entity.kind == "wreck" then
 			continue
 		end
-		local rate = unit_defs.get(entity.def_name).autoheal
+		local rate = unit_defs.of(entity).autoheal
 		if rate ~= nil and entity.health < entity.max_health then
 			entity.health = math.min(entity.max_health, entity.health + rate * delta)
 		end

@@ -31,7 +31,7 @@ local function tick(delta: number)
 		if entity.alive == false or entity.state ~= "active" or entity.kind ~= "building" then
 			continue
 		end
-		local shield = unit_defs.get(entity.def_name).shield
+		local shield = unit_defs.of(entity).shield
 		if shield == nil then
 			continue
 		end
@@ -47,7 +47,7 @@ local function tick(delta: number)
 			local price = shield.regen_energy * delta
 			if economy.try_spend(entity.team, 0, price) then
 				held = math.min(shield.power, held + shield.regen * delta)
-				flows.add(entity.id, 0, -shield.regen_energy)
+				flows.add(entity.id, "Shield regen", 0, -shield.regen_energy)
 			else
 				flows.stall(entity.id, "energy")
 			end
@@ -65,7 +65,7 @@ end
 local function covering(at: Vector3): { [EntityId]: boolean }
 	local result = {}
 	for _, entity in standing do
-		local shield = unit_defs.get(entity.def_name).shield
+		local shield = unit_defs.of(entity).shield
 		if shield ~= nil and (at - entity.position).Magnitude <= shield.radius then
 			result[entity.id] = true
 		end
@@ -80,7 +80,7 @@ local function absorb(at: Vector3, damage: number, team: types.TeamId, exempt: {
 		if entity.alive == false or exempt[entity.id] or alliances.are_allied(entity.team, team) then
 			continue
 		end
-		local shield = unit_defs.get(entity.def_name).shield
+		local shield = unit_defs.of(entity).shield
 		local held = power[entity.id]
 		if shield == nil or held == nil or held <= 0 then
 			continue
@@ -95,7 +95,7 @@ end
 
 -- How much power a shield has left, and its most, for showing; nil for something with no shield.
 local function level_of(entity: Entity): (number?, number?)
-	local shield = unit_defs.get(entity.def_name).shield
+	local shield = unit_defs.of(entity).shield
 	if shield == nil then
 		return nil, nil
 	end

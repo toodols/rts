@@ -29,6 +29,11 @@ import requests
 ROBLOX_DIR = Path(__file__).resolve().parent
 PIPELINE_ROOT = ROBLOX_DIR.parent
 ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "art"
+# the HUD's pictures (the tutorial's keys and mouse), which belong to no def but are uploaded the same way
+UI_ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "ui_art"
+# the rocks and trees strewn over the maps, which the server builds from their meshes itself
+RECLAIMABLE_ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "reclaimable_art"
+ART_DIRS = (ART_DIR, UI_ART_DIR, RECLAIMABLE_ART_DIR)
 BUILD_DIR = PIPELINE_ROOT / "build"
 UPLOADS_PATH = ROBLOX_DIR / "uploads.json"
 # where the key may be kept, first found wins; both are gitignored
@@ -66,8 +71,16 @@ def save_uploads(uploads):
     UPLOADS_PATH.write_text(json.dumps(uploads, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def module_path(def_name):
+    for directory in ART_DIRS:
+        path = directory / f"{def_name}.luau"
+        if path.is_file():
+            return path
+    return ART_DIR / f"{def_name}.luau"
+
+
 def hashes_of(def_name):
-    source = (ART_DIR / f"{def_name}.luau").read_text(encoding="utf-8")
+    source = module_path(def_name).read_text(encoding="utf-8")
     return re.findall(r'hash = "([0-9a-f]+)"', source)
 
 
@@ -111,7 +124,9 @@ def main():
     if not key:
         sys.exit(f"no API key: put one in {KEY_PATHS[0]}, set ROBLOX_API_KEY, or pass --api-key")
 
-    defs = args.defs or sorted(p.stem for p in ART_DIR.glob("*.luau") if p.stem != "init")
+    defs = args.defs or sorted(
+        p.stem for directory in ART_DIRS for p in directory.glob("*.luau") if p.stem != "init"
+    )
     uploads = load_uploads()
     for def_name in defs:
         hashes = hashes_of(def_name)

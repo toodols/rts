@@ -8,8 +8,13 @@
 -- at the limit is passable and anything steeper is not, as it is there. A unit with no slope class, like an
 -- aircraft or a ship, has no limit.
 --
--- A cell is as steep as the average slope of its four corners' surface. Classes with the same limit share
--- one map, so there are as many maps as there are different limits, not classes.
+-- A hovercraft's classes (HOVER2 and HOVER3, `SLOPE.MODERATE`, 33) hold it to that slope only on land: BAR gives them
+-- no limit over water (`maxwaterslope = SLOPE.MAXIMUM`), since a hovercraft rides the water's flat surface and not
+-- the sea floor. So a hover class is judged by the surface it rides, the ground or the water over it, whichever is
+-- higher, and the sea is flat to it however steep the floor under it.
+--
+-- A cell is as steep as the average slope of its four corners' surface. Classes with the same limit, and that ride
+-- the same surface, share one map, so there are as many maps as there are different pairs of those, not classes.
 --
 -- The map is a `buffer` of one byte a cell, `1` where the class can stand and `0` where it cannot, in rows of
 -- `width`: cell (cx, cz), which spans `config.CELL_STUDS` studs and is counted from 0 at the map's low corner,
@@ -27,6 +32,8 @@ export type PassabilityMap = {
 	depth: number,
 	-- the steepest angle it lets through, in degrees
 	max_slope: number,
+	-- whether it is judged by the water's surface where that is over the ground, as a hovercraft is
+	over_water: boolean,
 	cells: buffer,
 }
 
@@ -52,10 +59,22 @@ local SLOPE_CLASSES: { [string]: number } = {
 	HTANK4 = 27,
 	MTANK3 = 27,
 	ATANK3 = 54,
+	HOVER2 = 33,
+	HOVER3 = 33,
 }
 
--- Keyed by max slope, so classes with the same limit share.
-local maps: { [number]: PassabilityMap } = {}
+-- The classes that ride the water's surface, a hovercraft's.
+local OVER_WATER_CLASSES: { [string]: boolean } = {
+	HOVER2 = true,
+	HOVER3 = true,
+}
+
+-- Keyed by `map_key`, so classes with the same limit that ride the same surface share.
+local maps: { [string]: PassabilityMap } = {}
+
+local function map_key(max_slope: number, over_water: boolean): string
+	return if over_water then `{max_slope}w` else `{max_slope}`
+end
 
 -- The tangent of the steepest angle a class may stand on, so a cell is judged by its rise over its run and
 -- never needs a trigonometric function; nothing is too steep for 90 degrees.
@@ -66,12 +85,20 @@ local function steepness_limit(max_slope: number): number
 	return math.tan(math.rad(max_slope))
 end
 
--- Rise over run of the ground in a cell: the length of the gradient of its surface, averaged over the cell.
-local function cell_steepness(cx: number, cz: number): number
-	local h00 = heightmap.sample(cx, cz)
-	local h10 = heightmap.sample(cx + 1, cz)
-	local h01 = heightmap.sample(cx, cz + 1)
-	local h11 = heightmap.sample(cx + 1, cz + 1)
+-- The height of the surface at corner (cx, cz): the ground, or where `over_water` the water over it if that is higher.
+local function surface_sample(cx: number, cz: number, over_water: boolean): number
+	local ground = heightmap.sample(cx, cz)
+	return if over_water then math.max(ground, config.WATER_LEVEL) else ground
+end
+
+-- Rise over run of the ground in a cell: the length of the gradient of its surface, averaged over the cell. With
+-- `over_water`, of the surface a hovercraft rides instead, the water where it is over the ground.
+local function cell_steepness(cx: number, cz: number, over_water: boolean?): number
+	local on_water = over_water == true
+	local h00 = surface_sample(cx, cz, on_water)
+	local h10 = surface_sample(cx + 1, cz, on_water)
+	local h01 = surface_sample(cx, cz + 1, on_water)
+	local h11 = surface_sample(cx + 1, cz + 1, on_water)
 	local rise_x = ((h10 + h11) - (h00 + h01)) / (2 * CELL_STUDS)
 	local rise_z = ((h01 + h11) - (h00 + h10)) / (2 * CELL_STUDS)
 	return math.sqrt(rise_x * rise_x + rise_z * rise_z)
@@ -83,11 +110,12 @@ local function refresh(first_cx: number, first_cz: number, last_cx: number, last
 	local from_z = math.max(0, first_cz)
 	local to_x = math.min(width - 1, last_cx)
 	local to_z = math.min(depth - 1, last_cz)
-	for max_slope, map in maps do
-		local limit = steepness_limit(max_slope)
+	for _, map in maps do
+		local limit = steepness_limit(map.max_slope)
+		local over_water = map.over_water
 		for cz = from_z, to_z do
 			for cx = from_x, to_x do
-				buffer.writeu8(map.cells, cz * width + cx, if cell_steepness(cx, cz) <= limit then 1 else 0)
+				buffer.writeu8(map.cells, cz * width + cx, if cell_steepness(cx, cz, over_water) <= limit then 1 else 0)
 			end
 		end
 	end
@@ -96,12 +124,15 @@ end
 local function initialize()
 	width, depth = heightmap.cells()
 	table.clear(maps)
-	for _, max_slope in SLOPE_CLASSES do
-		if maps[max_slope] == nil then
-			maps[max_slope] = {
+	for slope_class, max_slope in SLOPE_CLASSES do
+		local over_water = OVER_WATER_CLASSES[slope_class] == true
+		local key = map_key(max_slope, over_water)
+		if maps[key] == nil then
+			maps[key] = {
 				width = width,
 				depth = depth,
 				max_slope = max_slope,
+				over_water = over_water,
 				cells = buffer.create(width * depth),
 			}
 		end
@@ -126,7 +157,7 @@ local function map_for(slope_class: string?): PassabilityMap?
 	if degrees == nil then
 		return nil
 	end
-	local map = maps[degrees]
+	local map = maps[map_key(degrees, OVER_WATER_CLASSES[slope_class :: string] == true)]
 	assert(map ~= nil, "passability.initialize has not been called")
 	return map
 end

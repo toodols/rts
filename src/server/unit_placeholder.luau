@@ -264,7 +264,7 @@ local function build(model: Model, def: EntityDef)
 	local height = unit_defs.collider_height(def)
 	if unit_defs.is_air(def) then
 		build_aircraft(model, def, radius, height)
-	elseif unit_defs.floats(def) then
+	elseif unit_defs.rides_surface(def) then
 		build_hull(model, def, radius, height, SHIP_ASPECT, false)
 	elseif def.vehicle == true then
 		build_hull(model, def, radius, height, VEHICLE_ASPECT, true)

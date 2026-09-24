@@ -1,10 +1,11 @@
 -- The reclaimables a map starts with: groves of trees on its grass and fields of rocks on its stony ground, there for
 -- anyone to reclaim, as BAR's maps come strewn with trees and metal rocks (see unit_defs/reclaimable.luau).
 --
--- BAR's maps say where every one of their features is, but the pages the maps here were brought over from do not, so
--- every map has its reclaimables laid out from the seed. Like the geothermal vents, each one has a twin on the opposite
--- side of the middle of the map, so that neither side of a two-team map has more to reclaim than the other. They are
--- kept off the starts, the metal spots and the vents, and out of the water, and only put where a builder can reach.
+-- A BAR map has exactly the features it has in BAR, each holding what it holds there (`Preset.reclaimables`, brought over
+-- by tools/bar_maps/import_bar_features.py). Any other map has its reclaimables laid out from the seed, each with a twin
+-- on the opposite side of the middle of the map, so that neither side of a two-team map has more to reclaim than the
+-- other. Those are kept off the starts, the metal spots and the vents, and out of the water, and only put where a
+-- builder can reach.
 --
 -- Unlike the spots, they are entities, which the server alone lays out and the clients are sent like anything else.
 
@@ -129,6 +130,21 @@ end
 -- Lays out the reclaimables of the map as it is now. Must be called once the map is built, on an empty world.
 local function scatter()
 	local preset = map_presets.get(heightmap.get_preset())
+	-- a map that says what lies on it has exactly that, each holding what it holds there
+	if preset.reclaimables ~= nil then
+		for _, fixed in preset.reclaimables() do
+			local def = unit_defs.of(fixed)
+			local x, z = fixed.position.X, fixed.position.Y
+			local position = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
+			state.create_reclaimable(
+				fixed.def_name,
+				position,
+				fixed.facing,
+				{ metal = fixed.metal, energy = fixed.energy, buildpower = fixed.buildpower }
+			)
+		end
+		return
+	end
 	local seed = heightmap.get_seed()
 	local paint = ground_paint.make_painter(preset.theme, seed)
 	local random = Random.new(seed + SEED_OFFSET)

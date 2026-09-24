@@ -1,4 +1,5 @@
--- The lobby's game mode and who may join it. The host changes them; everyone else sees them.
+-- The lobby's game mode, who may join it and whether allies' weapons hurt each other. The host changes them; everyone
+-- else sees them. A co-op lobby's mode is its campaign mission, and it and ally griefing stay as the mission has them.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -52,12 +53,21 @@ end
 local function SettingsPanel(props: {
 	mode: string,
 	visibility: string,
+	ally_griefing: boolean,
 	is_host: boolean,
 	act: (action: string, argument: any?) -> (),
 })
 	local locked = not props.is_host
+	local current = game_modes.get(props.mode)
+	-- a co-op lobby plays its mission, and nothing about the game can be changed
+	local mission = if current ~= nil and current.kind == "campaign" then current else nil
+	local game_locked = locked or mission ~= nil
 	local by_kind: { [string]: { [string]: any } } = { scavengers = {}, teams = {}, ffa = {} }
 	for index, mode in game_modes.MODES do
+		-- a campaign mission is played from the campaign screen, never by a lobby
+		if by_kind[mode.kind] == nil then
+			continue
+		end
 		local label = mode.label
 		if mode.kind == "scavengers" then
 			-- the group's caption already says scavengers
@@ -96,18 +106,38 @@ local function SettingsPanel(props: {
 				Text = "Game mode",
 			}),
 		}),
-		Scavengers = React.createElement(Group, {
-			label = "SCAVENGERS",
-			LayoutOrder = 3,
-		}, by_kind.scavengers),
-		Teams = React.createElement(Group, {
-			label = "TEAMS",
-			LayoutOrder = 4,
-		}, by_kind.teams),
-		Ffa = React.createElement(Group, {
-			label = "FREE FOR ALL",
-			LayoutOrder = 5,
-		}, by_kind.ffa),
+		Mission = if mission ~= nil
+			then React.createElement(Group, {
+				label = "CO-OP MISSION",
+				LayoutOrder = 3,
+			}, {
+				Mission = React.createElement(Chip, {
+					label = mission.label,
+					active = true,
+					locked = true,
+					on_pick = function() end,
+					LayoutOrder = 1,
+				}),
+			})
+			else nil,
+		Scavengers = if mission == nil
+			then React.createElement(Group, {
+				label = "SCAVENGERS",
+				LayoutOrder = 3,
+			}, by_kind.scavengers)
+			else nil,
+		Teams = if mission == nil
+			then React.createElement(Group, {
+				label = "TEAMS",
+				LayoutOrder = 4,
+			}, by_kind.teams)
+			else nil,
+		Ffa = if mission == nil
+			then React.createElement(Group, {
+				label = "FREE FOR ALL",
+				LayoutOrder = 5,
+			}, by_kind.ffa)
+			else nil,
 		Seam = React.createElement("Frame", {
 			[React.Tag] = "seam",
 			LayoutOrder = 6,
@@ -131,6 +161,30 @@ local function SettingsPanel(props: {
 				locked = locked,
 				on_pick = function()
 					props.act(ACTIONS.set_visibility, "friends")
+				end,
+				LayoutOrder = 2,
+			}),
+		}),
+		-- off, a weapon only hurts its own team's things and its enemies': nobody disintegrates an ally's extractors
+		Griefing = React.createElement(Group, {
+			label = "ALLY GRIEFING",
+			LayoutOrder = 8,
+		}, {
+			Off = React.createElement(Chip, {
+				label = "Off",
+				active = props.ally_griefing == false,
+				locked = game_locked,
+				on_pick = function()
+					props.act(ACTIONS.set_ally_griefing, false)
+				end,
+				LayoutOrder = 1,
+			}),
+			On = React.createElement(Chip, {
+				label = "On",
+				active = props.ally_griefing,
+				locked = game_locked,
+				on_pick = function()
+					props.act(ACTIONS.set_ally_griefing, true)
 				end,
 				LayoutOrder = 2,
 			}),

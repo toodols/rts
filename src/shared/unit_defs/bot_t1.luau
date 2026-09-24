@@ -50,7 +50,9 @@ local defs: { [string]: EntityDef } = {
 			"wind_turbine",
 			"tidal_generator",
 			"guard",
+			"wall",
 			"thistle",
+			"hovercraft_platform",
 		},
 		-- armcomlaser
 		weapons = {
@@ -87,7 +89,6 @@ local defs: { [string]: EntityDef } = {
 		slope_class = "BOT2",
 		weight_class = "light",
 		display_name = "Construction Bot",
-		subtitle = "Builder bot",
 		kind = "unit",
 		build_range = studs(130),
 		-- armck: 27 x 30 x 27 elmos
@@ -109,6 +110,7 @@ local defs: { [string]: EntityDef } = {
 			"advanced_bot_lab",
 			"vehicle_lab",
 			"air_lab",
+			"hovercraft_platform",
 			"shipyard",
 			"solar_collector",
 			"advanced_solar_collector",
@@ -118,9 +120,9 @@ local defs: { [string]: EntityDef } = {
 			"metal_storage",
 			"energy_converter",
 			"wind_turbine",
-			"tidal_generator",
 			"construction_turret",
 			"guard",
+			"wall",
 			"thistle",
 			"twin_guard",
 			"warden",
@@ -301,7 +303,7 @@ local defs: { [string]: EntityDef } = {
 		slope_class = "ABOT3",
 		weight_class = "light",
 		display_name = "Trasher",
-		subtitle = "Anti air bot",
+		subtitle = "Amphibious anti air bot",
 		kind = "unit",
 		-- 30 x 32 x 30 elmos
 		collider = capsule(30, 32, 30),

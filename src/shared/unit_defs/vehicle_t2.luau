@@ -52,6 +52,7 @@ local defs: { [string]: EntityDef } = {
 			"prevailer",
 			"apocalypse",
 			"overseer",
+			"wall",
 			"calamity",
 			"fusion_reactor",
 			"advanced_fusion_reactor",

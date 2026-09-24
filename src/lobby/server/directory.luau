@@ -53,8 +53,9 @@ local function summarize(lobby: Lobby): Summary
 		host_name = host_name,
 		mode = lobby.mode,
 		preset = lobby.preset,
-		players = #lobby.seats,
+		players = game_modes.player_count(lobby.seats),
 		capacity = mode.capacity,
+		spectators = game_modes.spectator_count(lobby.seats),
 		visibility = lobby.visibility,
 	}
 end
@@ -76,6 +77,7 @@ local function decode(key: string, value: any): Summary?
 		preset = if typeof(value.preset) == "string" then value.preset else "",
 		players = if typeof(value.players) == "number" then value.players else 0,
 		capacity = if typeof(value.capacity) == "number" then value.capacity else 0,
+		spectators = if typeof(value.spectators) == "number" then value.spectators else 0,
 		visibility = if value.visibility == "friends" then "friends" else "public",
 	}
 end

@@ -1,0 +1,275 @@
+@use "sass:color";
+@use "theme" as *;
+@use "mixins" as *;
+// `.tutorial-title` extends `.heading`, which _main.scss declares.
+@use "main" as *;
+
+// The tutorial's cards (ui/tutorial.luau): across the top middle of the screen, the step's title over a row of cards,
+// one per way of doing it. It only shows; clicks go through it to the field.
+.tutorial {
+	position: absolute;
+	top: space(4);
+	left: 50%;
+	transform: translateX(-50%);
+	width: auto;
+	height: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(2);
+	pointer-events: none;
+	z-index: 50;
+
+	// below the metal and energy bar, once it is shown (it is 76px tall, at the top)
+	&.below-resources {
+		top: 76px + space(3);
+	}
+}
+
+.tutorial-kicker {
+	width: auto;
+	height: auto;
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 12px;
+	font-weight: bold;
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+.tutorial-title {
+	@extend .heading;
+	width: auto;
+	height: auto;
+	font-size: 26px;
+	text-align: center;
+	-webkit-text-stroke: 3px veil($void, 0.85);
+}
+
+.tutorial-status {
+	width: auto;
+	height: auto;
+	color: var(--TextDim);
+	font-size: 14px;
+	font-style: italic;
+	-webkit-text-stroke: 2px veil($void, 0.8);
+
+	&.advancing {
+		color: var(--Gain);
+		font-style: normal;
+		font-weight: bold;
+	}
+}
+
+.tutorial-cards {
+	width: auto;
+	height: auto;
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	gap: space(4);
+}
+
+// One way of doing the step: its picture, a caption, and a tick (or a cross) at the foot. A refused key's shake is
+// done on the picture itself, by art_icon.luau.
+.tutorial-card {
+	@include plate;
+	width: 220px;
+	height: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(2);
+	padding: space(3);
+	outline: 1px solid $edge;
+	transition:
+		outline-color $medium $ease-out,
+		transform $medium $ease-snap;
+
+	// done: lit green all round, and lifted a little
+	&.done {
+		outline: 2px solid var(--Gain);
+		transform: scale(1.04);
+	}
+
+	// a key that does not work was just pressed
+	// the whole card turns red, and stays red while the key is held; the plate's brushed gradient is taken off, as it
+	// would darken the red under it
+	&.refused {
+		outline: 3px solid var(--Danger);
+		background-color: color.mix($danger, $steel, 80%);
+		background-image: none;
+	}
+}
+
+.tutorial-card-art {
+	width: 196px;
+	height: 112px;
+	background-color: transparent;
+}
+
+// What a picture shows while its art is missing: the keys spelt out.
+.art-fallback {
+	color: var(--Text);
+	font-family: RobotoMono;
+	font-size: 22px;
+	font-weight: bold;
+	text-align: center;
+}
+
+.tutorial-caption {
+	width: 100%;
+	height: auto;
+	color: var(--Text);
+	font-size: 15px;
+	text-align: center;
+	text-wrap: wrap;
+}
+
+// What has to be done before the card can be, like selecting the right thing first: in the warning colour, so it is
+// read before the caption.
+.tutorial-hint {
+	width: 100%;
+	height: auto;
+	padding: 4px 8px;
+	border-radius: 4px;
+	background-color: rgba($danger, 0.2);
+	color: var(--Danger);
+	font-size: 14px;
+	font-weight: bold;
+	text-align: center;
+	text-wrap: wrap;
+
+	// what to do next, now that the right thing is in hand: in the colour of something to do
+	&.next {
+		background-color: rgba($gain, 0.2);
+		color: var(--Gain);
+	}
+}
+
+// How far a counting card has got, big enough to read at a glance, and green once it is there.
+.tutorial-progress {
+	width: 100%;
+	height: auto;
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 26px;
+	font-weight: bold;
+	text-align: center;
+
+	&.done {
+		color: var(--Gain);
+	}
+}
+
+// What a building step asks for, its own model filling the card's picture.
+.tutorial-build-unit {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
+}
+
+.tutorial-mark {
+	width: 40px;
+	height: 40px;
+	background-color: transparent;
+	font-size: 30px;
+	font-weight: bold;
+	color: var(--TextFaint);
+
+	&.done {
+		color: var(--Gain);
+	}
+
+	&.cross {
+		color: var(--Danger);
+	}
+}
+
+// A demonstration: a small window onto the field with a commander in it, a cursor moving over it, and the mouse in
+// the corner showing which button is pressed. What moves is placed by ui/tutorial.luau; this only sizes it.
+.tutorial-demo {
+	position: relative;
+	width: 196px;
+	height: 120px;
+	background-color: veil($void, 0.75);
+	outline: 1px solid color.adjust($edge, $lightness: -15%);
+	overflow: hidden;
+}
+
+.tutorial-demo-unit {
+	position: absolute;
+	width: 72px;
+	height: 72px;
+	background-color: transparent;
+	z-index: 1;
+}
+
+// The outline of a selected unit, in the selection's own green.
+.tutorial-demo-selected {
+	position: absolute;
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	outline: 2px solid var(--Buildpower);
+	background-color: veil($buildpower, 0.12);
+	z-index: 0;
+}
+
+.tutorial-demo-box {
+	z-index: 2;
+}
+
+// The move demonstration's marker on the ground, which lights when it is right clicked.
+.tutorial-demo-marker {
+	position: absolute;
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 2px solid var(--Buildpower);
+	background-color: veil($buildpower, 0.1);
+	z-index: 0;
+
+	&.ordered {
+		background-color: veil($buildpower, 0.45);
+	}
+}
+
+// A point something is hung from; it has no size of its own and draws nothing.
+.tutorial-demo-anchor {
+	position: absolute;
+	background-color: transparent;
+	overflow: visible;
+	z-index: 3;
+}
+
+// The cursor's tip is its picture's top left corner, and the picture is the cursor's own shape.
+.tutorial-demo-cursor {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 18px;
+	height: 28px;
+	background-color: transparent;
+	font-size: 20px;
+	text-align: left;
+	z-index: 3;
+}
+
+.tutorial-demo-mouse {
+	position: absolute;
+	right: space(1);
+	bottom: space(1);
+	width: 40px;
+	height: 44px;
+	background-color: transparent;
+	font-size: 9px;
+	z-index: 2;
+}
+
+// Every step done.
+.tutorial-finished {
+	@include plate;
+	padding: space(4) space(10);
+}
+

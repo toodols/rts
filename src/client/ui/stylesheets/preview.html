@@ -1,9 +1,9 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>Stylesheet preview &mdash; default.scss</title>
-		<!--
+<head>
+<meta charset="utf-8">
+<title>Stylesheet preview &mdash; default.scss</title>
+<!--
   GENERATED FILE -- do not edit. Built from src/client/ui/stylesheets/preview/ by
 
     build_preview.bat            one shot
@@ -29,1926 +29,2163 @@
   ../resource_bar.luau, ../selection_panel.luau, ../build_menu.luau and ../selection_box.luau,
   including the inline Size/Position those components set.
 -->
-		<style>
-			/* ===================================================================================
+<style>
+/* ===================================================================================
    HARNESS 1/3 -- fonts (preview/fonts.css). Roblox ships Michroma, RobotoMono and Source Sans Pro
    built in; these alias the nearest web equivalents under the exact names the sheet asks for, so
    no font-family declaration needs rewriting. Source Sans 3 is Source Sans Pro's successor.
    Michroma has one weight, so `.heading`'s bold is synthetic here. Refresh with --fonts.
    =================================================================================== */
-			@font-face {
-				font-family: "Michroma";
-				font-style: normal;
-				font-weight: 400;
-				font-display: swap;
-				src:
-					local("Michroma"),
-					url(https://fonts.gstatic.com/s/michroma/v21/PN_zRfy9qWD8fEagAPg9pTk.woff2)
-						format("woff2");
-				unicode-range:
-					U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-					U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
-					U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-			}
-			@font-face {
-				font-family: "RobotoMono";
-				font-style: normal;
-				font-weight: 400;
-				font-display: swap;
-				src:
-					local("Roboto Mono"),
-					url(https://fonts.gstatic.com/s/robotomono/v31/L0x5DF4xlVMF-BfR8bXMIjhLq38.woff2)
-						format("woff2");
-				unicode-range:
-					U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-					U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
-					U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-			}
-			@font-face {
-				font-family: "RobotoMono";
-				font-style: normal;
-				font-weight: 700;
-				font-display: swap;
-				src:
-					local("Roboto Mono"),
-					url(https://fonts.gstatic.com/s/robotomono/v31/L0x5DF4xlVMF-BfR8bXMIjhLq38.woff2)
-						format("woff2");
-				unicode-range:
-					U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-					U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
-					U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-			}
-			@font-face {
-				font-family: "Source Sans Pro";
-				font-style: italic;
-				font-weight: 400;
-				font-display: swap;
-				src:
-					local("Source Sans 3"),
-					url(https://fonts.gstatic.com/s/sourcesans3/v19/nwpDtKy2OAdR1K-IwhWudF-R3woAa8opPOrG97lwqLlOxCkSmg.woff2)
-						format("woff2");
-				unicode-range:
-					U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-					U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
-					U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-			}
-			@font-face {
-				font-family: "Source Sans Pro";
-				font-style: normal;
-				font-weight: 400;
-				font-display: swap;
-				src:
-					local("Source Sans 3"),
-					url(https://fonts.gstatic.com/s/sourcesans3/v19/nwpStKy2OAdR1K-IwhWudF-R3w8aZQ.woff2)
-						format("woff2");
-				unicode-range:
-					U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-					U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
-					U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-			}
-			@font-face {
-				font-family: "Source Sans Pro";
-				font-style: normal;
-				font-weight: 700;
-				font-display: swap;
-				src:
-					local("Source Sans 3"),
-					url(https://fonts.gstatic.com/s/sourcesans3/v19/nwpStKy2OAdR1K-IwhWudF-R3w8aZQ.woff2)
-						format("woff2");
-				unicode-range:
-					U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
-					U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
-					U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-			}
+@font-face {
+  font-family: 'Michroma';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Michroma'), url(https://fonts.gstatic.com/s/michroma/v21/PN_zRfy9qWD8fEagAPg9pTk.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+@font-face {
+  font-family: 'RobotoMono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Roboto Mono'), url(https://fonts.gstatic.com/s/robotomono/v31/L0x5DF4xlVMF-BfR8bXMIjhLq38.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+@font-face {
+  font-family: 'RobotoMono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Roboto Mono'), url(https://fonts.gstatic.com/s/robotomono/v31/L0x5DF4xlVMF-BfR8bXMIjhLq38.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Source Sans 3'), url(https://fonts.gstatic.com/s/sourcesans3/v19/nwpDtKy2OAdR1K-IwhWudF-R3woAa8opPOrG97lwqLlOxCkSmg.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Source Sans 3'), url(https://fonts.gstatic.com/s/sourcesans3/v19/nwpStKy2OAdR1K-IwhWudF-R3w8aZQ.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Source Sans 3'), url(https://fonts.gstatic.com/s/sourcesans3/v19/nwpStKy2OAdR1K-IwhWudF-R3w8aZQ.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
 
-			/* ===================================================================================
+/* ===================================================================================
    HARNESS 2/3 -- the Roblox box model. None of this is in the stylesheet; it exists so the
    browser's defaults for an unknown element do not stand in for Roblox's defaults for a
    GuiObject. Every rule here is a claim about Roblox, and each one is worth arguing with.
    =================================================================================== */
-			rbx-frame,
-			rbx-textlabel,
-			rbx-textbutton {
-				display: block; /* every GuiObject is a box; an unknown HTML element is inline */
-				box-sizing: border-box; /* Size is the outer box and UIPadding eats into it */
-				position: relative; /* every GuiObject is a positioning context for its children */
-				flex-shrink: 0; /* a flex child only resizes when UIFlexItem says so */
-				min-width: 0; /* Roblox has no min-content floor */
-			}
-			rbx-textlabel,
-			rbx-textbutton {
-				align-content: center; /* TextYAlignment.Center is the default (needs Chrome 129+ / Safari 17.6+) */
-				paint-order: stroke fill; /* TextStroke sits behind the glyph rather than cutting into it */
-			}
-			rbx-textbutton {
-				cursor: pointer;
-				-webkit-user-select: none;
-				user-select: none;
-			}
+rbx-frame,
+rbx-textlabel,
+rbx-textbutton {
+  display: block;           /* every GuiObject is a box; an unknown HTML element is inline */
+  box-sizing: border-box;   /* Size is the outer box and UIPadding eats into it */
+  position: relative;       /* every GuiObject is a positioning context for its children */
+  flex-shrink: 0;           /* a flex child only resizes when UIFlexItem says so */
+  min-width: 0;             /* Roblox has no min-content floor */
+}
+rbx-textlabel,
+rbx-textbutton {
+  align-content: center;    /* TextYAlignment.Center is the default (needs Chrome 129+ / Safari 17.6+) */
+  paint-order: stroke fill; /* TextStroke sits behind the glyph rather than cutting into it */
+}
+rbx-textbutton { cursor: pointer; -webkit-user-select: none; user-select: none; }
 
-			/* ===================================================================================
+/* ===================================================================================
    HARNESS 3/3 -- page chrome. Everything is prefixed h- so it cannot collide with the sheet.
    =================================================================================== */
-			:root {
-				color-scheme: dark;
-			}
-			body {
-				margin: 0;
-				background: #0b0d10;
-				color: #c8d2de;
-				font:
-					13px/1.5 ui-sans-serif,
-					system-ui,
-					sans-serif;
-			}
-			.h-wrap {
-				max-width: 1920px;
-				margin: 0 auto;
-				padding: 24px 16px 96px;
-			}
-			h1 {
-				font:
-					600 19px/1.3 ui-sans-serif,
-					system-ui,
-					sans-serif;
-				margin: 0 0 4px;
-				color: #eef4fa;
-			}
-			h2 {
-				font:
-					600 13px/1.3 ui-monospace,
-					monospace;
-				letter-spacing: 0.08em;
-				text-transform: uppercase;
-				color: #7ba6c8;
-				margin: 40px 0 12px;
-				padding-bottom: 6px;
-				border-bottom: 1px solid #1d2531;
-			}
-			.h-lede {
-				margin: 0 0 20px;
-				max-width: 82ch;
-				color: #8b9aac;
-			}
-			.h-lede code,
-			.h-note code,
-			.h-list code {
-				font-family: ui-monospace, monospace;
-				color: #c8d2de;
-			}
-			.h-bar {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 18px;
-				align-items: center;
-				padding: 10px 14px;
-				background: #11151c;
-				border: 1px solid #1d2531;
-				margin-bottom: 20px;
-			}
-			.h-bar label {
-				display: flex;
-				gap: 7px;
-				align-items: center;
-				cursor: pointer;
-				user-select: none;
-			}
-			.h-bar input {
-				accent-color: #60d2f2;
-			}
-			.h-bar .h-dim {
-				color: #6b7887;
-				margin-left: auto;
-				font-family: ui-monospace, monospace;
-			}
+:root { color-scheme: dark; }
+body {
+  margin: 0; background: #0b0d10; color: #c8d2de;
+  font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+}
+.h-wrap { max-width: 1920px; margin: 0 auto; padding: 24px 16px 96px; }
+h1 { font: 600 19px/1.3 ui-sans-serif, system-ui, sans-serif; margin: 0 0 4px; color: #eef4fa; }
+h2 {
+  font: 600 13px/1.3 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+  color: #7ba6c8; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #1d2531;
+}
+.h-lede { margin: 0 0 20px; max-width: 82ch; color: #8b9aac; }
+.h-lede code, .h-note code, .h-list code { font-family: ui-monospace, monospace; color: #c8d2de; }
+.h-bar {
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+  padding: 10px 14px; background: #11151c; border: 1px solid #1d2531; margin-bottom: 20px;
+}
+.h-bar label { display: flex; gap: 7px; align-items: center; cursor: pointer; user-select: none; }
+.h-bar input { accent-color: #60d2f2; }
+.h-bar .h-dim { color: #6b7887; margin-left: auto; font-family: ui-monospace, monospace; }
 
-			/* the 1920x1080 stage, scaled to fit the window by JS */
-			.h-viewport {
-				overflow: hidden;
-				border: 1px solid #1d2531;
-			}
-			.h-stage {
-				position: relative;
-				width: 1920px;
-				height: 1080px;
-				overflow: hidden;
-				transform: scale(var(--h-fit, 1));
-				transform-origin: top left;
-				background: radial-gradient(
-					120% 90% at 50% 0%,
-					#2c3a30 0%,
-					#151d19 55%,
-					#0a0e0c 100%
-				);
-			}
-			/* stands in for the 3D world, so a panel's 0.97 opacity has something to sit on */
-			.h-stage::before {
-				content: "";
-				position: absolute;
-				inset: 0;
-				opacity: 0.5;
-				background-image:
-					linear-gradient(
-						0deg,
-						transparent 49.5%,
-						rgba(255, 255, 255, 0.07) 50%,
-						transparent 50.5%
-					),
-					linear-gradient(
-						90deg,
-						transparent 49.5%,
-						rgba(255, 255, 255, 0.07) 50%,
-						transparent 50.5%
-					);
-				background-size: 96px 96px;
-			}
-			body.h-checker .h-stage,
-			body.h-checker .h-box {
-				background: #7b8794;
-			}
-			body.h-checker .h-stage::before {
-				opacity: 1;
-				background-image: conic-gradient(
-					#8e99a6 0 25%,
-					#6c7783 0 50%,
-					#8e99a6 0 75%,
-					#6c7783 0
-				);
-				background-size: 32px 32px;
-			}
-			/* the ScreenGui: IgnoreGuiInset = false, so it starts below the 36px topbar */
-			.h-gui {
-				position: absolute;
-				left: 0;
-				right: 0;
-				bottom: 0;
-				top: 36px;
-			}
-			body.h-noinset .h-gui {
-				top: 0;
-			}
-			.h-topbar {
-				position: absolute;
-				top: 0;
-				left: 0;
-				right: 0;
-				height: 36px;
-				background: rgba(0, 0, 0, 0.55);
-				color: #6b7887;
-				font:
-					11px/36px ui-monospace,
-					monospace;
-				padding-left: 12px;
-			}
-			body.h-noinset .h-topbar {
-				display: none;
-			}
+/* the 1920x1080 stage, scaled to fit the window by JS */
+.h-viewport { overflow: hidden; border: 1px solid #1d2531; }
+.h-stage {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  transform: scale(var(--h-fit, 1)); transform-origin: top left;
+  background: radial-gradient(120% 90% at 50% 0%, #2c3a30 0%, #151d19 55%, #0a0e0c 100%);
+}
+/* stands in for the 3D world, so a panel's 0.97 opacity has something to sit on */
+.h-stage::before {
+  content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image:
+    linear-gradient(0deg, transparent 49.5%, rgba(255,255,255,.07) 50%, transparent 50.5%),
+    linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,.07) 50%, transparent 50.5%);
+  background-size: 96px 96px;
+}
+body.h-checker .h-stage, body.h-checker .h-box { background: #7b8794; }
+body.h-checker .h-stage::before {
+  opacity: 1;
+  background-image: conic-gradient(#8e99a6 0 25%, #6c7783 0 50%, #8e99a6 0 75%, #6c7783 0);
+  background-size: 32px 32px;
+}
+/* the ScreenGui: IgnoreGuiInset = false, so it starts below the 36px topbar */
+.h-gui { position: absolute; left: 0; right: 0; bottom: 0; top: 36px; }
+body.h-noinset .h-gui { top: 0; }
+.h-topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 36px; background: rgba(0,0,0,.55);
+  color: #6b7887; font: 11px/36px ui-monospace, monospace; padding-left: 12px;
+}
+body.h-noinset .h-topbar { display: none; }
 
-			/* element bounds overlay -- box-shadow, because the sheet uses outline for real borders */
-			body.h-bounds rbx-frame {
-				box-shadow: inset 0 0 0 1px rgba(255, 64, 190, 0.85);
-			}
-			body.h-bounds rbx-textlabel {
-				box-shadow: inset 0 0 0 1px rgba(120, 255, 120, 0.7);
-			}
-			body.h-bounds rbx-textbutton {
-				box-shadow: inset 0 0 0 1px rgba(255, 196, 64, 0.8);
-			}
+/* element bounds overlay -- box-shadow, because the sheet uses outline for real borders */
+body.h-bounds rbx-frame { box-shadow: inset 0 0 0 1px rgba(255, 64, 190, .85); }
+body.h-bounds rbx-textlabel { box-shadow: inset 0 0 0 1px rgba(120, 255, 120, .7); }
+body.h-bounds rbx-textbutton { box-shadow: inset 0 0 0 1px rgba(255, 196, 64, .8); }
 
-			/* variant and coverage cells */
-			.h-grid {
-				display: grid;
-				grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-				gap: 16px;
-			}
-			.h-cell {
-				border: 1px solid #1d2531;
-				background: #0e1116;
-				margin: 0;
-			}
-			.h-cell > figcaption {
-				display: flex;
-				gap: 10px;
-				align-items: baseline;
-				flex-wrap: wrap;
-				padding: 8px 12px;
-				border-bottom: 1px solid #1d2531;
-				background: #11151c;
-			}
-			.h-cell > figcaption b {
-				font:
-					600 12px ui-monospace,
-					monospace;
-				color: #eef4fa;
-			}
-			.h-cell > figcaption span {
-				font:
-					11px ui-monospace,
-					monospace;
-				color: #6b7887;
-			}
-			.h-box {
-				position: relative;
-				padding: 18px;
-				overflow: hidden;
-				background: radial-gradient(
-					120% 90% at 50% 0%,
-					#2c3a30 0%,
-					#151d19 60%,
-					#0a0e0c 100%
-				);
-			}
-			.h-box.h-tall {
-				height: 360px;
-			}
-			.h-box.h-anchor {
-				padding: 0;
-			} /* for panels that position themselves */
-			.h-note {
-				margin: 0;
-				padding: 8px 12px;
-				border-top: 1px solid #1d2531;
-				color: #7f8b99;
-				font-size: 12px;
-			}
-			.h-list {
-				max-width: 104ch;
-				padding-left: 20px;
-			}
-			.h-list li {
-				margin-bottom: 10px;
-			}
-			.h-list b {
-				color: #eef4fa;
-				font-weight: 600;
-			}
-			.h-tag {
-				display: inline-block;
-				padding: 0 5px;
-				border: 1px solid currentColor;
-				font:
-					10px/16px ui-monospace,
-					monospace;
-				vertical-align: 1px;
-			}
-			.h-tag.h-gap {
-				color: #ee584a;
-			}
-			.h-tag.h-harness {
-				color: #ecb844;
-			}
+/* variant and coverage cells */
+.h-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.h-cell { border: 1px solid #1d2531; background: #0e1116; margin: 0; }
+.h-cell > figcaption {
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid #1d2531; background: #11151c;
+}
+.h-cell > figcaption b { font: 600 12px ui-monospace, monospace; color: #eef4fa; }
+.h-cell > figcaption span { font: 11px ui-monospace, monospace; color: #6b7887; }
+.h-box {
+  position: relative; padding: 18px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #2c3a30 0%, #151d19 60%, #0a0e0c 100%);
+}
+.h-box.h-tall { height: 360px; }
+.h-box.h-anchor { padding: 0; }   /* for panels that position themselves */
+.h-note { margin: 0; padding: 8px 12px; border-top: 1px solid #1d2531; color: #7f8b99; font-size: 12px; }
+.h-list { max-width: 104ch; padding-left: 20px; }
+.h-list li { margin-bottom: 10px; }
+.h-list b { color: #eef4fa; font-weight: 600; }
+.h-tag {
+  display: inline-block; padding: 0 5px; border: 1px solid currentColor;
+  font: 10px/16px ui-monospace, monospace; vertical-align: 1px;
+}
+.h-tag.h-gap { color: #ee584a; }
+.h-tag.h-harness { color: #ecb844; }
 
-			/* ===================================================================================
+/* ===================================================================================
    THE SHEET -- verbatim dart-sass output from default.scss, bar the four substitutions
    listed in the comment at the top of this file.
    =================================================================================== */
-			:root {
-				--Void: rgb(8, 11, 15);
-				--Steel: rgb(20, 26, 34);
-				--SteelRaised: rgb(31, 40, 51);
-				--SteelLit: rgb(52, 66, 82);
-				--Edge: rgb(78, 96, 118);
-				--Text: rgb(236, 244, 252);
-				--TextDim: rgb(186, 202, 220);
-				--TextFaint: rgb(146, 166, 188);
-				--Metal: rgb(236, 184, 68);
-				--Energy: rgb(96, 210, 242);
-				--Buildpower: rgb(126, 240, 154);
-				--Danger: rgb(238, 88, 74);
-				--Accent: rgb(96, 210, 242);
-			}
-
-			rbx-frame,
-			rbx-textbutton,
-			rbx-textlabel {
-				border: none;
-				background-color: transparent;
-			}
-
-			rbx-textlabel,
-			rbx-textbutton {
-				color: var(--Text);
-				font-family: Source Sans Pro;
-				font-size: 14px;
-				text-align: center;
-			}
-
-			.panel {
-				background-color: rgb(20, 26, 34);
-				background-image: linear-gradient(
-					180deg,
-					rgb(52, 66, 82) 0%,
-					rgb(52, 66, 82) 3%,
-					rgb(20, 26, 34) 4%,
-					rgb(20, 26, 34) 55%,
-					rgb(0.4357298475%, 0.5664488017%, 0.7407407407%) 100%
-				);
-				opacity: 0.97;
-				padding: 16px;
-			}
-
-			.rail {
-				width: 100%;
-				height: 2px;
-				background-image: linear-gradient(
-					90deg,
-					rgb(96, 210, 242) 0%,
-					rgb(96, 210, 242) 55%,
-					transparent 100%
-				);
-			}
-
-			.hazard,
-			.build-option.unaffordable {
-				background-image: repeating-linear-gradient(
-					45deg,
-					rgba(238, 88, 74, 0.9) 0 12%,
-					rgba(8, 11, 15, 0.9) 12% 25%
-				);
-			}
-
-			.faint {
-				color: var(--TextFaint);
-			}
-
-			.metal {
-				color: var(--Metal);
-			}
-
-			.energy {
-				color: var(--Energy);
-			}
-
-			.accent {
-				color: var(--Accent);
-			}
-
-			.heading,
-			.selection-name {
-				font-family: Michroma;
-				font-weight: bold;
-				font-size: 13px;
-				text-align: left;
-				-webkit-text-stroke: 2px rgba(8, 11, 15, 0.85);
-			}
-
-			.readout,
-			.resource-amount {
-				font-family: RobotoMono;
-				font-weight: bold;
-				-webkit-text-stroke: 2px rgba(8, 11, 15, 0.8);
-			}
-
-			.grow {
-				flex-grow: 1;
-			}
-
-			.resource-bar {
-				position: absolute;
-				top: 0;
-				left: 50%;
-				transform: translateX(-50%);
-				width: 620px;
-				height: 76px;
-				display: flex;
-				flex-direction: row;
-				gap: 24px;
-				align-items: center;
-				padding: 16px 28px;
-				background-color: rgb(20, 26, 34);
-				background-image: linear-gradient(
-					180deg,
-					rgb(52, 66, 82) 0%,
-					rgb(52, 66, 82) 3%,
-					rgb(20, 26, 34) 4%,
-					rgb(20, 26, 34) 55%,
-					rgb(0.4357298475%, 0.5664488017%, 0.7407407407%) 100%
-				);
-				opacity: 0.97;
-			}
-
-			.resource {
-				height: auto;
-				display: flex;
-				flex-direction: column;
-				gap: 8px;
-				align-items: stretch;
-				flex-grow: 1;
-			}
-
-			.resource-chip {
-				width: 4px;
-				height: 14px;
-			}
-			.resource-chip.metal-chip {
-				background-color: var(--Metal);
-				background-image: linear-gradient(
-					180deg,
-					rgb(96.2383399962%, 85.9432705121%, 62.9773462783%),
-					rgb(236, 184, 68)
-				);
-			}
-			.resource-chip.energy-chip {
-				background-color: var(--Energy);
-				background-image: linear-gradient(
-					180deg,
-					rgb(74.6238030096%, 92.8180574555%, 97.9252165983%),
-					rgb(96, 210, 242)
-				);
-			}
-
-			.resource-head {
-				width: 100%;
-				height: auto;
-				display: flex;
-				flex-direction: row;
-				gap: 8px;
-				align-items: center;
-			}
-
-			.resource-name {
-				color: var(--TextDim);
-				font-size: 11px;
-				text-align: left;
-				flex-grow: 1;
-			}
-
-			.resource-amount {
-				font-size: 19px;
-				text-align: right;
-			}
-
-			.resource-income {
-				font-family: RobotoMono;
-				font-size: 12px;
-				color: var(--Buildpower);
-				text-align: right;
-			}
-
-			.resource-track {
-				width: 100%;
-				height: 6px;
-				background-color: rgb(8, 11, 15);
-				outline: 1px solid
-					rgb(10.6902761104%, 13.1572629052%, 16.1724689876%);
-				overflow: hidden;
-			}
-
-			.resource-fill {
-				background-color: rgb(236, 184, 68);
-				background-image: linear-gradient(
-					90deg,
-					rgb(26.5210355987%, 19.1462021702%, 2.6946506758%) 0%,
-					rgb(236, 184, 68) 85%,
-					rgb(97.1606700933%, 89.3898724538%, 72.0550161812%) 100%
-				);
-				transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-			}
-			.resource-fill.energy-fill {
-				background-color: rgb(96, 210, 242);
-				background-image: linear-gradient(
-					90deg,
-					rgb(3.2159142727%, 31.4170086639%, 39.3331053352%) 0%,
-					rgb(96, 210, 242) 85%,
-					rgb(83.8679890561%, 95.4343365253%, 98.6810305518%) 100%
-				);
-				transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-			}
-
-			.stalling {
-				color: var(--Danger);
-				/* @priority 20; outlass-only */
-			}
-
-			.resource-divider {
-				width: 2px;
-				height: 44px;
-				background-image: linear-gradient(
-					180deg,
-					transparent,
-					rgb(78, 96, 118) 35%,
-					rgb(78, 96, 118) 65%,
-					transparent
-				);
-			}
-
-			.selection-panel {
-				position: absolute;
-				left: 20px;
-				bottom: 20px;
-				width: 330px;
-				height: auto;
-				display: flex;
-				flex-direction: column;
-				gap: 12px;
-				padding: 16px;
-			}
-
-			.selection-title {
-				width: 100%;
-				height: auto;
-				display: flex;
-				flex-direction: row;
-				gap: 8px;
-				align-items: center;
-			}
-
-			.selection-name {
-				flex-grow: 1;
-			}
-
-			.badge {
-				width: auto;
-				height: 17px;
-				padding: 0 8px;
-				outline: 1px solid rgb(78, 96, 118);
-				color: var(--TextDim);
-				font-family: RobotoMono;
-				font-size: 11px;
-			}
-			.badge-blueprint {
-				color: var(--Energy);
-				outline: 1px solid var(--Energy);
-			}
-			.badge-count {
-				color: var(--Accent);
-				outline: 1px solid var(--Accent);
-			}
-
-			.stat-list {
-				width: 100%;
-				height: auto;
-				display: flex;
-				flex-direction: column;
-				gap: 4px;
-			}
-
-			.stat {
-				display: flex;
-				flex-direction: row;
-				gap: 8px;
-				align-items: center;
-				width: 100%;
-				height: 17px;
-			}
-
-			.stat-label {
-				color: var(--TextDim);
-				font-size: 11px;
-				text-align: left;
-				flex-grow: 1;
-			}
-
-			.stat-value {
-				font-family: RobotoMono;
-				font-size: 13px;
-				text-align: right;
-			}
-
-			.progress-track {
-				width: 100%;
-				height: 8px;
-				background-color: rgb(8, 11, 15);
-				outline: 1px solid
-					rgb(10.6902761104%, 13.1572629052%, 16.1724689876%);
-				overflow: hidden;
-			}
-
-			.progress-fill {
-				background-color: rgb(126, 240, 154);
-				background-image: linear-gradient(
-					90deg,
-					rgb(5.5759803922%, 47.9534313725%, 15.9844771242%) 0%,
-					rgb(126, 240, 154) 85%,
-					rgb(94.2034313725%, 99.3259803922%, 95.4616013072%) 100%
-				);
-				transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-			}
-			.progress-fill.blueprint-fill {
-				background-color: rgb(96, 210, 242);
-				background-image: linear-gradient(
-					90deg,
-					rgb(3.2159142727%, 31.4170086639%, 39.3331053352%) 0%,
-					rgb(96, 210, 242) 85%,
-					rgb(83.8679890561%, 95.4343365253%, 98.6810305518%) 100%
-				);
-				transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-			}
-
-			.queue-strip {
-				width: 100%;
-				height: auto;
-				display: flex;
-				flex-direction: row;
-				gap: 4px;
-				flex-wrap: wrap;
-			}
-
-			.queue-chip {
-				width: 30px;
-				height: 30px;
-				background-color: rgb(31, 40, 51);
-				background-image: linear-gradient(
-					180deg,
-					rgba(255, 255, 255, 0.06),
-					rgba(0, 0, 0, 0.2)
-				);
-				outline: 1px solid rgb(78, 96, 118);
-				transition: background-color 0.1s cubic-bezier(0.22, 1, 0.36, 1);
-			}
-			.queue-chip:hover {
-				background-color: rgb(52, 66, 82);
-				outline: 1px solid var(--Accent);
-			}
-			.queue-chip:active {
-				background-color: rgb(
-					7.6202773792%,
-					9.8326159732%,
-					12.5365853659%
-				);
-			}
-			.queue-chip:disabled {
-				opacity: 0.4;
-			}
-			.queue-chip {
-				font-family: RobotoMono;
-				font-size: 11px;
-				font-weight: bold;
-			}
-			.queue-chip:hover {
-				outline: 1px solid var(--Danger);
-				color: var(--Danger);
-			}
-
-			.build-menu {
-				position: absolute;
-				right: 20px;
-				bottom: 20px;
-				width: 276px;
-				height: auto;
-				display: flex;
-				flex-direction: column;
-				gap: 12px;
-				padding: 16px;
-			}
-
-			.build-title {
-				width: 100%;
-				height: auto;
-				display: flex;
-				flex-direction: row;
-				gap: 8px;
-				align-items: center;
-			}
-
-			.build-grid {
-				display: grid;
-				grid-template-columns: repeat(3, 76px);
-				grid-auto-rows: 76px;
-				gap: 8px;
-			}
-
-			.build-option {
-				width: 76px;
-				height: 76px;
-				background-color: rgb(31, 40, 51);
-				background-image: linear-gradient(
-					180deg,
-					rgba(255, 255, 255, 0.06),
-					rgba(0, 0, 0, 0.2)
-				);
-				outline: 1px solid rgb(78, 96, 118);
-				transition: background-color 0.1s cubic-bezier(0.22, 1, 0.36, 1);
-			}
-			.build-option:hover {
-				background-color: rgb(52, 66, 82);
-				outline: 1px solid var(--Accent);
-			}
-			.build-option:active {
-				background-color: rgb(
-					7.6202773792%,
-					9.8326159732%,
-					12.5365853659%
-				);
-			}
-			.build-option:disabled {
-				opacity: 0.4;
-			}
-			.build-option {
-				display: flex;
-				flex-direction: column;
-				gap: 4px;
-				justify-content: flex-end;
-				align-items: center;
-				padding: 8px;
-			}
-			.build-option.unaffordable {
-				outline: 1px solid var(--Danger);
-				opacity: 0.75;
-			}
-
-			.build-option-name {
-				font-size: 12px;
-				font-weight: bold;
-			}
-
-			.build-cost {
-				display: flex;
-				flex-direction: row;
-				gap: 8px;
-				justify-content: center;
-			}
-
-			.cost {
-				font-family: RobotoMono;
-				font-size: 10px;
-			}
-			.cost-metal {
-				color: var(--Metal);
-			}
-			.cost-energy {
-				color: var(--Energy);
-			}
-
-			.build-hint {
-				width: 100%;
-				height: auto;
-				color: var(--TextDim);
-				font-size: 11px;
-				font-style: italic;
-				text-align: left;
-			}
-
-			.selection-box {
-				position: absolute;
-				background-color: rgba(96, 210, 242, 0.1);
-				outline: 1px solid var(--Accent);
-				z-index: 100;
-			}
-
-			.placement-hint {
-				position: absolute;
-				bottom: 128px;
-				left: 50%;
-				transform: translateX(-50%);
-				padding: 8px 16px;
-				background-color: rgba(8, 11, 15, 0.82);
-				outline: 1px solid rgb(78, 96, 118);
-				color: var(--Text);
-				font-family: RobotoMono;
-				font-size: 12px;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="h-wrap">
-			<h1>default.scss &mdash; browser reference render</h1>
-			<p class="h-lede">
-				Every element the stylesheet styles, marked up the way the React
-				components mark it up, rendered by a browser from dart-sass
-				output of the same SCSS. Compare against the Roblox render:
-				anything that differs is either outlass translating a property
-				differently, Roblox lacking it, or one of the harness
-				assumptions at the top of this file being wrong. The stage is
-				1920&times;1080, the resolution the sheet is authored against
-				(<code>use_viewport.DESIGN_HEIGHT</code>), so
-				<code>UIScale</code> is 1 and every pixel value is directly
-				comparable.
-			</p>
-
-			<div class="h-bar">
-				<label
-					><input type="checkbox" id="h-noinset" /> ignore GUI inset
-					<code>(top: 0)</code></label
-				>
-				<label
-					><input type="checkbox" id="h-bounds" /> element
-					bounds</label
-				>
-				<label
-					><input type="checkbox" id="h-checker" /> grey backdrop
-					<code>(opacity: .97)</code></label
-				>
-				<span class="h-dim" id="h-scale">stage 1:1</span>
-			</div>
-
-			<h2>1 &mdash; The HUD</h2>
-			<div class="h-viewport">
-				<div class="h-stage">
-					<div class="h-topbar">
-						Roblox topbar &mdash; 36px, ScreenGui.IgnoreGuiInset =
-						false
-					</div>
-					<div class="h-gui">
-						<!-- resource_bar.luau: ResourceBar -->
-						<rbx-frame class="resource-bar panel">
-							<rbx-frame class="resource">
-								<rbx-frame class="resource-head">
-									<rbx-frame
-										class="resource-chip metal-chip"
-									></rbx-frame>
-									<rbx-textlabel class="resource-name"
-										>METAL</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-amount"
-										>1240</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-income faint"
-										>/2000</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="resource-track">
-									<!-- inline Size = UDim2.new(fraction, 0, 1, 0) -->
-									<rbx-frame
-										class="resource-fill metal-fill"
-										style="width: 62%; height: 100%"
-									></rbx-frame>
-								</rbx-frame>
-								<rbx-textlabel class="resource-income"
-									>+12/s</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="resource-divider"></rbx-frame>
-							<rbx-frame class="resource">
-								<rbx-frame class="resource-head">
-									<rbx-frame
-										class="resource-chip energy-chip"
-									></rbx-frame>
-									<rbx-textlabel class="resource-name"
-										>ENERGY</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-amount"
-										>18.4k</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-income faint"
-										>/25.0k</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="resource-track">
-									<rbx-frame
-										class="resource-fill energy-fill"
-										style="width: 73.6%; height: 100%"
-									></rbx-frame>
-								</rbx-frame>
-								<rbx-textlabel class="resource-income"
-									>+180/s</rbx-textlabel
-								>
-							</rbx-frame>
-						</rbx-frame>
-
-						<!-- selection_panel.luau: SelectionPanel -> Single -->
-						<rbx-frame class="selection-panel panel">
-							<rbx-frame class="rail"></rbx-frame>
-							<rbx-frame class="selection-title">
-								<rbx-frame class="accent-bar"></rbx-frame>
-								<rbx-textlabel class="selection-name"
-									>Bot Lab</rbx-textlabel
-								>
-								<rbx-textlabel class="badge"
-									>ACTIVE</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="progress-track">
-								<rbx-frame
-									class="progress-fill"
-									style="width: 100%; height: 100%"
-								></rbx-frame>
-							</rbx-frame>
-							<rbx-frame class="stat-list">
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>HEALTH</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>3000 / 3000</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>METAL</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>500</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>ENERGY</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>10000</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>BUILDPOWER</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>100</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>ORDERS</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>0</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-frame>
-							<rbx-frame class="queue-strip">
-								<rbx-textbutton class="queue-chip"
-									>Gr</rbx-textbutton
-								>
-								<rbx-textbutton class="queue-chip"
-									>Gr</rbx-textbutton
-								>
-								<rbx-textbutton class="queue-chip"
-									>Gr</rbx-textbutton
-								>
-								<rbx-textbutton class="queue-chip"
-									>Co</rbx-textbutton
-								>
-								<rbx-textbutton class="queue-chip"
-									>Gr</rbx-textbutton
-								>
-							</rbx-frame>
-						</rbx-frame>
-
-						<!-- build_menu.luau: BuildMenu, a Bot Lab selected -->
-						<rbx-frame class="build-menu panel">
-							<rbx-frame class="rail"></rbx-frame>
-							<rbx-frame class="build-title">
-								<rbx-frame class="accent-bar"></rbx-frame>
-								<rbx-textlabel class="heading grow"
-									>Bot Lab</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="build-grid">
-								<rbx-textbutton class="build-option">
-									<rbx-textlabel class="build-option-name"
-										>Construction Bot</rbx-textlabel
-									>
-									<rbx-frame class="build-cost">
-										<rbx-textlabel class="cost cost-metal"
-											>200</rbx-textlabel
-										>
-										<rbx-textlabel class="cost cost-energy"
-											>3000</rbx-textlabel
-										>
-									</rbx-frame>
-								</rbx-textbutton>
-								<rbx-textbutton class="build-option">
-									<rbx-textlabel class="build-option-name"
-										>Grunt</rbx-textlabel
-									>
-									<rbx-frame class="build-cost">
-										<rbx-textlabel class="cost cost-metal"
-											>50</rbx-textlabel
-										>
-										<rbx-textlabel class="cost cost-energy"
-											>500</rbx-textlabel
-										>
-									</rbx-frame>
-								</rbx-textbutton>
-							</rbx-frame>
-							<rbx-textlabel class="build-hint"
-								>Build orders always queue; shift adds
-								five</rbx-textlabel
-							>
-						</rbx-frame>
-
-						<!-- selection_box.luau: SelectionBox, inline Position/Size from the drag rect -->
-						<rbx-frame
-							class="selection-box"
-							style="
-								left: 690px;
-								top: 300px;
-								width: 420px;
-								height: 260px;
-							"
-						></rbx-frame>
-					</div>
-				</div>
-			</div>
-
-			<h2>2 &mdash; States the HUD above does not show</h2>
-			<div class="h-grid">
-				<figure class="h-cell">
-					<figcaption>
-						<b>.badge-blueprint · .blueprint-fill</b>
-						<span
-							>selection_panel.luau &rarr; Single, state ==
-							"blueprint"</span
-						>
-					</figcaption>
-					<div class="h-box h-tall h-anchor">
-						<rbx-frame class="selection-panel panel">
-							<rbx-frame class="rail"></rbx-frame>
-							<rbx-frame class="selection-title">
-								<rbx-frame class="accent-bar"></rbx-frame>
-								<rbx-textlabel class="selection-name"
-									>Construction Bot</rbx-textlabel
-								>
-								<rbx-textlabel class="badge badge-blueprint"
-									>BLUEPRINT</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="progress-track">
-								<rbx-frame
-									class="progress-fill blueprint-fill"
-									style="width: 45%; height: 100%"
-								></rbx-frame>
-							</rbx-frame>
-							<rbx-frame class="stat-list">
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>HEALTH</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>180 / 180</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>METAL</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>200</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>BUILDPOWER</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>70</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-frame>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						The fill is the energy tone rather than buildpower
-						green, and the badge outline is
-						<code>var(--Energy)</code>. Note
-						<code>.badge-blueprint</code> is a sibling class, not
-						<code>.badge.badge-blueprint</code>, so it beats
-						<code>.badge</code> on source order alone.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.badge-count</b>
-						<span>selection_panel.luau &rarr; Many</span>
-					</figcaption>
-					<div class="h-box h-tall h-anchor">
-						<rbx-frame class="selection-panel panel">
-							<rbx-frame class="rail"></rbx-frame>
-							<rbx-frame class="selection-title">
-								<rbx-frame class="accent-bar"></rbx-frame>
-								<rbx-textlabel class="selection-name"
-									>SELECTION</rbx-textlabel
-								>
-								<rbx-textlabel class="badge badge-count"
-									>7</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="stat-list">
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>GRUNT</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>x5</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="stat">
-									<rbx-textlabel class="stat-label"
-										>CONSTRUCTOR</rbx-textlabel
-									>
-									<rbx-textlabel class="stat-value"
-										>x2</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-frame>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						No progress track and no queue:
-						<code>Many</code> renders the title and the rows only,
-						so the panel is whatever
-						<code>height: auto</code> resolves to.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.unaffordable</b>
-						<span>build_menu.luau &rarr; @extend .hazard</span>
-					</figcaption>
-					<div class="h-box h-tall h-anchor">
-						<rbx-frame class="build-menu panel">
-							<rbx-frame class="rail"></rbx-frame>
-							<rbx-frame class="build-title">
-								<rbx-frame class="accent-bar"></rbx-frame>
-								<rbx-textlabel class="heading grow"
-									>Construction Bot</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="build-grid">
-								<rbx-textbutton
-									class="build-option unaffordable"
-								>
-									<rbx-textlabel class="build-option-name"
-										>Bot Lab</rbx-textlabel
-									>
-									<rbx-frame class="build-cost">
-										<rbx-textlabel class="cost cost-metal"
-											>500</rbx-textlabel
-										>
-										<rbx-textlabel class="cost cost-energy"
-											>10000</rbx-textlabel
-										>
-									</rbx-frame>
-								</rbx-textbutton>
-								<rbx-textbutton class="build-option">
-									<rbx-textlabel class="build-option-name"
-										>Bot Lab</rbx-textlabel
-									>
-									<rbx-frame class="build-cost">
-										<rbx-textlabel class="cost cost-metal"
-											>500</rbx-textlabel
-										>
-										<rbx-textlabel class="cost cost-energy"
-											>10000</rbx-textlabel
-										>
-									</rbx-frame>
-								</rbx-textbutton>
-							</rbx-frame>
-							<rbx-textlabel class="build-hint"
-								>Pick a building to place</rbx-textlabel
-							>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						Affordable on the right for comparison. The hazard fill
-						is sixteen hand-written stops standing in for
-						<code>repeating-linear-gradient</code>; in Roblox a
-						UIGradient has 20 keypoints maximum, so this is close to
-						the ceiling.
-					</p>
-				</figure>
-
-				<figure class="h-cell" style="grid-column: 1 / -1">
-					<figcaption>
-						<b>.stalling</b>
-						<span
-							>resource_bar.luau &rarr; fraction &lt;= 0.02</span
-						>
-					</figcaption>
-					<div class="h-box h-anchor" style="height: 200px">
-						<rbx-frame
-							class="resource-bar panel"
-							style="position: absolute; top: 20px"
-						>
-							<rbx-frame class="resource">
-								<rbx-frame class="resource-head">
-									<rbx-frame
-										class="resource-chip metal-chip"
-									></rbx-frame>
-									<rbx-textlabel class="resource-name"
-										>METAL</rbx-textlabel
-									>
-									<rbx-textlabel
-										class="resource-amount stalling"
-										>30</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-income faint"
-										>/2000</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="resource-track">
-									<rbx-frame
-										class="resource-fill metal-fill"
-										style="width: 1.5%; height: 100%"
-									></rbx-frame>
-								</rbx-frame>
-								<rbx-textlabel class="resource-income"
-									>-4/s</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="resource-divider"></rbx-frame>
-							<rbx-frame class="resource">
-								<rbx-frame class="resource-head">
-									<rbx-frame
-										class="resource-chip energy-chip"
-									></rbx-frame>
-									<rbx-textlabel class="resource-name"
-										>ENERGY</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-amount"
-										>18.4k</rbx-textlabel
-									>
-									<rbx-textlabel class="resource-income faint"
-										>/25.0k</rbx-textlabel
-									>
-								</rbx-frame>
-								<rbx-frame class="resource-track">
-									<rbx-frame
-										class="resource-fill energy-fill"
-										style="width: 73.6%; height: 100%"
-									></rbx-frame>
-								</rbx-frame>
-								<rbx-textlabel class="resource-income"
-									>+180/s</rbx-textlabel
-								>
-							</rbx-frame>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						<code>position: absolute; top: 20px</code> is set inline
-						here only so the bar sits inside the cell. The looping
-						fade is driven from Luau by TweenService, not by the
-						sheet, so it is absent here; only the red is the
-						sheet's.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.placement-hint</b>
-						<span>selection_box.luau &rarr; PlacementHint</span>
-					</figcaption>
-					<div class="h-box" style="height: 220px">
-						<rbx-textlabel class="placement-hint"
-							>[ ] rotate · right click cancels · hold shift to
-							keep placing</rbx-textlabel
-						>
-					</div>
-					<p class="h-note">
-						<code>bottom: 128px</code> from the bottom of the
-						ScreenGui, centred with <code>left: 50%</code> plus
-						<code>translateX(-50%)</code>. Width comes from the
-						text, so this is the one place the sheet relies on
-						shrink-to-fit.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.selection-box</b>
-						<span>selection_box.luau &rarr; SelectionBox</span>
-					</figcaption>
-					<div class="h-box" style="height: 220px">
-						<rbx-frame
-							class="selection-box"
-							style="
-								left: 40px;
-								top: 30px;
-								width: 240px;
-								height: 150px;
-							"
-						></rbx-frame>
-					</div>
-					<p class="h-note">
-						10% accent fill, 1px accent outline,
-						<code>z-index: 100</code>. Position and Size are always
-						inline &mdash; the sheet only supplies the paint.
-					</p>
-				</figure>
-			</div>
-
-			<h2>3 &mdash; Every class in the sheet</h2>
-			<p class="h-lede">
-				One sample per selector, so nothing in the sheet goes
-				unrendered. The source file is on the right of each caption.
-			</p>
-			<div class="h-grid">
-				<figure class="h-cell">
-					<figcaption>
-						<b>.panel</b> <span>_main.scss · @include plate</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="panel">
-							<rbx-textlabel
-								>brushed metal, lit lip, 16px padding, opacity
-								.97</rbx-textlabel
-							>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						The lit lip is the first 3% of a 180&deg; gradient, then
-						a hard step into the body and a fall to
-						<code>darken($steel, 10%)</code>. Tick the grey backdrop
-						to see the .97.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.rail</b> <span>_main.scss · @include rail</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="panel" style="padding: 0">
-							<rbx-frame class="rail"></rbx-frame>
-						</rbx-frame>
-						<rbx-frame style="height: 12px"></rbx-frame>
-						<rbx-frame class="rail"></rbx-frame>
-					</div>
-					<p class="h-note">
-						2px, accent, fading to transparent from 55% rightwards.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.hazard</b> <span>_main.scss · hazard()</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame
-							class="hazard"
-							style="height: 64px"
-						></rbx-frame>
-					</div>
-					<p class="h-note">
-						45&deg;, doubled stops so each transition is hard rather
-						than blended.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.faint .metal .energy .accent</b>
-						<span>_main.scss</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-textlabel style="text-align: left"
-							>TextLabel default &mdash; var(--Text), 14px Source
-							Sans Pro</rbx-textlabel
-						>
-						<rbx-textlabel class="faint" style="text-align: left"
-							>.faint &mdash; var(--TextFaint)</rbx-textlabel
-						>
-						<rbx-textlabel class="metal" style="text-align: left"
-							>.metal &mdash; var(--Metal)</rbx-textlabel
-						>
-						<rbx-textlabel class="energy" style="text-align: left"
-							>.energy &mdash; var(--Energy)</rbx-textlabel
-						>
-						<rbx-textlabel class="accent" style="text-align: left"
-							>.accent &mdash; var(--Accent)</rbx-textlabel
-						>
-					</div>
-					<p class="h-note">
-						<code>text-align: left</code> is inline here only, to
-						make the colours easy to line up; the sheet's base rule
-						centres these. <code>.metal</code>,
-						<code>.energy</code> and <code>.accent</code> are not
-						used by any component today.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.heading · .readout</b> <span>_main.scss</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="panel">
-							<rbx-textlabel class="heading"
-								>BOT LAB &mdash; .heading, Michroma 13
-								bold</rbx-textlabel
-							>
-							<rbx-textlabel
-								class="readout"
-								style="font-size: 19px"
-								>1240 &mdash; .readout</rbx-textlabel
-							>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						Both carry a 2px void text-stroke so they survive the
-						plate's lit lip. Sat on a <code>.panel</code> here
-						because that is the only place the stroke earns itself.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.resource-chip · .resource-divider</b>
-						<span>_resource_bar.scss</span>
-					</figcaption>
-					<div
-						class="h-box"
-						style="display: flex; gap: 20px; align-items: center"
-					>
-						<rbx-frame class="resource-chip metal-chip"></rbx-frame>
-						<rbx-frame
-							class="resource-chip energy-chip"
-						></rbx-frame>
-						<rbx-frame class="resource-divider"></rbx-frame>
-						<rbx-textlabel class="faint" style="text-align: left"
-							>4&times;14 chips, 2&times;44 divider</rbx-textlabel
-						>
-					</div>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.resource-track · .resource-fill</b>
-						<span>_resource_bar.scss · @include track/meter</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="resource-track">
-							<rbx-frame
-								class="resource-fill"
-								style="width: 62%; height: 100%"
-							></rbx-frame>
-						</rbx-frame>
-						<rbx-frame style="height: 10px"></rbx-frame>
-						<rbx-frame class="resource-track">
-							<rbx-frame
-								class="resource-fill energy-fill"
-								style="width: 38%; height: 100%"
-							></rbx-frame>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						6px channel, dark floor, 1px outline at
-						<code>darken($edge, 25%)</code>. The meter runs from
-						<code>darken(tone, 45%)</code> to
-						<code>lighten(tone, 25%)</code>.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.progress-track · .progress-fill</b>
-						<span>_selection_panel.scss</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="progress-track">
-							<rbx-frame
-								class="progress-fill"
-								style="width: 72%; height: 100%"
-							></rbx-frame>
-						</rbx-frame>
-						<rbx-frame style="height: 10px"></rbx-frame>
-						<rbx-frame class="progress-track">
-							<rbx-frame
-								class="progress-fill blueprint-fill"
-								style="width: 45%; height: 100%"
-							></rbx-frame>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						Same mixins as the resource meters at 8px: buildpower
-						green for health, energy blue for build progress.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.badge</b> <span>_selection_panel.scss</span>
-					</figcaption>
-					<div
-						class="h-box"
-						style="display: flex; gap: 10px; align-items: center"
-					>
-						<rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
-						<rbx-textlabel class="badge badge-blueprint"
-							>BLUEPRINT</rbx-textlabel
-						>
-						<rbx-textlabel class="badge badge-count"
-							>12</rbx-textlabel
-						>
-					</div>
-					<p class="h-note">
-						17px tall, <code>width: auto</code>, 8px side padding
-						&mdash; the only shrink-to-fit box in a panel.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.stat-list · .stat · .stat-label · .stat-value</b>
-						<span>_selection_panel.scss</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="stat-list">
-							<rbx-frame class="stat">
-								<rbx-textlabel class="stat-label"
-									>HEALTH</rbx-textlabel
-								>
-								<rbx-textlabel class="stat-value"
-									>3000 / 3000</rbx-textlabel
-								>
-							</rbx-frame>
-							<rbx-frame class="stat">
-								<rbx-textlabel class="stat-label"
-									>BUILDPOWER</rbx-textlabel
-								>
-								<rbx-textlabel class="stat-value"
-									>100</rbx-textlabel
-								>
-							</rbx-frame>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						17px rows, 4px gaps. The label grows, the value is
-						right-aligned RobotoMono 13.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.queue-strip · .queue-chip</b>
-						<span>_selection_panel.scss · @include cell</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="queue-strip" style="width: 260px">
-							<rbx-textbutton class="queue-chip"
-								>Gr</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Gr</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Co</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Gr</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Gr</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Gr</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Co</rbx-textbutton
-							>
-							<rbx-textbutton class="queue-chip"
-								>Gr</rbx-textbutton
-							>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						Hover one: the cell lights, then the chip's own
-						<code>:hover</code> overrides the accent outline with
-						danger red, because cancelling is what a click does.
-						Constrained to 260px here so the wrap is visible.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.build-grid · .build-option</b>
-						<span>_build_menu.scss</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="build-grid">
-							<rbx-textbutton class="build-option">
-								<rbx-textlabel class="build-option-name"
-									>Construction Bot</rbx-textlabel
-								>
-								<rbx-frame class="build-cost">
-									<rbx-textlabel class="cost cost-metal"
-										>200</rbx-textlabel
-									>
-									<rbx-textlabel class="cost cost-energy"
-										>3000</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-textbutton>
-							<rbx-textbutton class="build-option">
-								<rbx-textlabel class="build-option-name"
-									>Grunt</rbx-textlabel
-								>
-								<rbx-frame class="build-cost">
-									<rbx-textlabel class="cost cost-metal"
-										>50</rbx-textlabel
-									>
-									<rbx-textlabel class="cost cost-energy"
-										>500</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-textbutton>
-							<rbx-textbutton class="build-option unaffordable">
-								<rbx-textlabel class="build-option-name"
-									>Bot Lab</rbx-textlabel
-								>
-								<rbx-frame class="build-cost">
-									<rbx-textlabel class="cost cost-metal"
-										>500</rbx-textlabel
-									>
-									<rbx-textlabel class="cost cost-energy"
-										>10000</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-textbutton>
-							<rbx-textbutton class="build-option">
-								<rbx-textlabel class="build-option-name"
-									>Grunt</rbx-textlabel
-								>
-								<rbx-frame class="build-cost">
-									<rbx-textlabel class="cost cost-metal"
-										>50</rbx-textlabel
-									>
-									<rbx-textlabel class="cost cost-energy"
-										>500</rbx-textlabel
-									>
-								</rbx-frame>
-							</rbx-textbutton>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						Three 76px columns, 8px gaps, content bottom-aligned
-						(<code>justify-content: flex-end</code>). Hover and
-						press to see the <code>cell</code> mixin's three states.
-						Four options so the second row shows.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.build-hint · .grow</b>
-						<span>_build_menu.scss, _main.scss</span>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="build-title" style="width: 244px">
-							<rbx-textlabel class="heading grow"
-								>Bot Lab</rbx-textlabel
-							>
-							<rbx-textlabel class="badge"
-								>.grow pushes me</rbx-textlabel
-							>
-						</rbx-frame>
-						<rbx-frame style="height: 10px"></rbx-frame>
-						<rbx-textlabel class="build-hint" style="width: 244px"
-							>Left click to place, [ ] to rotate, right click to
-							cancel</rbx-textlabel
-						>
-					</div>
-					<p class="h-note">
-						Both at the menu's 244px content width. The hint is the
-						sheet's only italic, and its
-						<code>width: 100%</code> exists purely to give the text
-						something to wrap against.
-					</p>
-				</figure>
-
-				<figure class="h-cell">
-					<figcaption>
-						<b>.accent-bar</b>
-						<span
-							>not in the sheet
-							<span class="h-tag h-gap">gap</span></span
-						>
-					</figcaption>
-					<div class="h-box">
-						<rbx-frame class="selection-title" style="width: 298px">
-							<rbx-frame class="accent-bar"></rbx-frame>
-							<rbx-textlabel class="selection-name"
-								>Bot Lab</rbx-textlabel
-							>
-							<rbx-textlabel class="badge">ACTIVE</rbx-textlabel>
-						</rbx-frame>
-					</div>
-					<p class="h-note">
-						Three components render an <code>accent-bar</code> Frame
-						(selection_panel.luau:96 and :154, build_menu.luau:146)
-						and no rule defines it. In the browser it collapses to
-						nothing, as above. In Roblox an unstyled Frame keeps its
-						defaults &mdash; a white 100&times;100 box &mdash; so
-						this is the one divergence where the two renders should
-						look nothing alike. <code>@include rail</code> in a
-						<code>.accent-bar</code> rule, or dropping the three
-						Frames, settles it either way.
-					</p>
-				</figure>
-			</div>
-
-			<h2>4 &mdash; What the two renders cannot agree on</h2>
-			<ol class="h-list">
-				<li>
-					<b>Nothing here is authoritative about Roblox.</b> The
-					harness block at the top of this file is five guesses about
-					GuiObject defaults (box, border-box, positioning context, no
-					flex shrink, vertically centred text). Where this render and
-					Roblox differ, suspect those first.
-				</li>
-				<li>
-					<b
-						><code>opacity: .97</code> on
-						<code>.panel</code> composites differently.</b
-					>
-					CSS opacity applies to the whole subtree, so panel text is
-					97% opaque too; Roblox
-					<code>BackgroundTransparency</code> touches only the fill.
-					Every panel is affected.
-				</li>
-				<li>
-					<b><code>.resource</code> eats its bar's padding.</b>
-					Measured here: the bar is 620&times;76 with 16px of vertical
-					padding, leaving a 44px content box, and the column inside
-					resolves to 68.5px (28px head + 6px track + 17.7px income +
-					two 8px gaps). Centred, it runs from y=3.75 to y=72.25, so
-					it stays inside the plate but the 16px padding buys nothing.
-					Whether Roblox clips, overflows or grows the bar depends on
-					what outlass does with <code>height: auto</code> &mdash;
-					probably the single most useful thing to diff.
-				</li>
-				<li>
-					<b>Text that does not fit.</b> A
-					<code>.build-option</code> is 76px wide with 8px padding, so
-					its content box is 60px; "Construction Bot" at 12px bold
-					measures 63px and, because the option centres rather than
-					stretches its children, it overflows by 3px on each side
-					instead of wrapping. Where text does wrap &mdash;
-					<code>.build-hint</code> at 244px &mdash; Roblox lays lines
-					out at the font's own height while the browser adds its
-					<code>normal</code> leading of about 1.2, so multi-line
-					boxes will not agree on height either.
-				</li>
-				<li>
-					<b><code>-webkit-text-stroke</code> is approximated.</b> The
-					sheet writes the property both sides understand, but Roblox
-					strokes a glyph outward where the browser centres the stroke
-					on the outline, so <code>paint-order: stroke fill</code> is
-					doing the work of keeping it behind the glyph. Expect the
-					browser's to read slightly heavier.
-				</li>
-				<li>
-					<b
-						><code>@priority 20</code> on
-						<code>.stalling</code> does nothing here.</b
-					>
-					It is commented out. The browser gets the same result
-					anyway, by source order: <code>.stalling</code> comes after
-					<code>.resource-amount</code> at equal specificity.
-				</li>
-				<li>
-					<b>The hazard stripes are a 16-keypoint expansion.</b> Both
-					sides read the same <code>repeating-linear-gradient</code>:
-					the browser renders it natively, while outlass writes the
-					pattern out stop by stop into a UIGradient, which caps at 20
-					keypoints. Both interpolate in sRGB, so the colour ramps
-					should match closely &mdash; the stop positions are the
-					thing to check.
-				</li>
-				<li>
-					<b><code>@include seam</code> is never called.</b> The mixin
-					is defined in _mixins.scss and no rule uses it, so there is
-					nothing to render and nothing to compare.
-				</li>
-				<li>
-					<b><code>.metal-fill</code> is referenced but undefined.</b>
-					resource_bar.luau tags the metal fill
-					<code>resource-fill metal-fill</code>; only
-					<code>.energy-fill</code> exists as a rule. Harmless &mdash;
-					<code>.resource-fill</code> is already the metal tone
-					&mdash; but the class name suggests a rule that is not
-					there.
-				</li>
-				<li>
-					<b>Hover and press states only exist here.</b>
-					<code>.queue-chip</code> and <code>.build-option</code> come
-					from <code>@include cell</code>, which has
-					<code>:hover</code>, <code>:active</code> and
-					<code>:disabled</code>. Nothing in the components is ever
-					disabled, so that branch is untested on both sides.
-				</li>
-			</ol>
-		</div>
-
-		<script>
-			// Fit the 1920x1080 stage to the window, and report the scale so a screenshot can be matched.
-			function fit() {
-				var vp = document.querySelector(".h-viewport");
-				var stage = document.querySelector(".h-stage");
-				var s = Math.min(1, vp.clientWidth / 1920);
-				stage.style.setProperty("--h-fit", s);
-				vp.style.height = Math.round(1080 * s) + "px";
-				document.getElementById("h-scale").textContent =
-					s === 1
-						? "stage 1:1"
-						: "stage " + (s * 100).toFixed(1) + "% of 1920×1080";
-			}
-			addEventListener("resize", fit);
-			fit();
-
-			[
-				["h-noinset", "h-noinset"],
-				["h-bounds", "h-bounds"],
-				["h-checker", "h-checker"],
-			].forEach(function (pair) {
-				var box = document.getElementById(pair[0]);
-				box.addEventListener("change", function () {
-					document.body.classList.toggle(pair[1], box.checked);
-				});
-			});
-		</script>
-	</body>
+:root {
+  --Void: rgb(8, 11, 15);
+  --Steel: rgb(20, 26, 34);
+  --SteelRaised: rgb(31, 40, 51);
+  --SteelLit: rgb(52, 66, 82);
+  --Edge: rgb(78, 96, 118);
+  --Text: rgb(236, 244, 252);
+  --TextDim: rgb(186, 202, 220);
+  --TextFaint: rgb(146, 166, 188);
+  --Metal: rgb(196, 206, 220);
+  --Energy: rgb(255, 230, 64);
+  --Buildpower: rgb(126, 240, 154);
+  --Gain: rgb(96, 224, 128);
+  --Danger: rgb(238, 88, 74);
+  --Caution: rgb(236, 184, 68);
+  --Accent: rgb(96, 210, 242);
+  --Resurrect: rgb(176, 96, 240);
+  --Fight: rgb(255, 138, 64);
+}
+
+rbx-frame,
+rbx-textbutton,
+rbx-textlabel {
+  border: none;
+  background-color: transparent;
+}
+
+rbx-textlabel,
+rbx-textbutton {
+  color: var(--Text);
+  font-family: Source Sans Pro;
+  font-size: 14px;
+  text-align: center;
+}
+
+.panel {
+  background-color: rgb(20, 26, 34);
+  background-image: linear-gradient(180deg, rgb(52, 66, 82) 0%, rgb(52, 66, 82) 3%, rgb(20, 26, 34) 4%, rgb(20, 26, 34) 55%, rgb(0.4357298475%, 0.5664488017%, 0.7407407407%) 100%);
+  opacity: 0.97;
+  padding: 16px;
+}
+
+.rail {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(96, 210, 242) 0%, rgb(96, 210, 242) 55%, transparent 100%);
+}
+
+.hazard, .build-option.unaffordable {
+  background-image: repeating-linear-gradient(45deg, rgba(238, 88, 74, 0.9) 0 12%, rgba(8, 11, 15, 0.9) 12% 25%);
+}
+
+.faint {
+  color: var(--TextFaint);
+}
+
+.metal {
+  color: var(--Metal);
+}
+
+.energy {
+  color: var(--Energy);
+}
+
+.accent {
+  color: var(--Accent);
+}
+
+.heading, .tooltip-title, .selection-name {
+  font-family: Michroma;
+  font-weight: bold;
+  font-size: 13px;
+  text-align: left;
+  -webkit-text-stroke: 2px rgba(8, 11, 15, 0.85);
+}
+
+.readout, .tooltip-value, .vitals-label, .tile-rate-value, .group-count, .loadout-value, .resource-amount, .wind-speed, .scavenger-value {
+  font-family: RobotoMono;
+  font-weight: bold;
+  -webkit-text-stroke: 2px rgba(8, 11, 15, 0.8);
+}
+
+.grow {
+  flex-grow: 1;
+}
+
+.resource-bar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 780px;
+  height: 76px;
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  align-items: center;
+  padding: 16px 28px;
+  background-color: rgb(20, 26, 34);
+  background-image: linear-gradient(180deg, rgb(52, 66, 82) 0%, rgb(52, 66, 82) 3%, rgb(20, 26, 34) 4%, rgb(20, 26, 34) 55%, rgb(0.4357298475%, 0.5664488017%, 0.7407407407%) 100%);
+  opacity: 0.97;
+}
+.resource-bar.with-scavengers {
+  width: 960px;
+}
+
+.resource {
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  flex-grow: 1;
+}
+
+.resource-chip {
+  width: 4px;
+  height: 14px;
+}
+.resource-chip.metal-chip {
+  background-color: var(--Metal);
+  background-image: linear-gradient(180deg, hsl(215, 25.5319148936%, 101.568627451%), rgb(196, 206, 220));
+}
+.resource-chip.energy-chip {
+  background-color: var(--Energy);
+  background-image: linear-gradient(180deg, rgb(100%, 95.4316805256%, 65.0980392157%), rgb(255, 230, 64));
+}
+
+.resource-head {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.resource-name {
+  color: var(--TextDim);
+  font-size: 11px;
+  text-align: left;
+  flex-grow: 1;
+}
+
+.resource-amount {
+  font-size: 19px;
+  text-align: right;
+}
+
+.resource-income {
+  font-family: RobotoMono;
+  font-size: 12px;
+  color: var(--Buildpower);
+  text-align: right;
+}
+
+.resource-flow {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.resource-revenue {
+  font-family: RobotoMono;
+  font-size: 12px;
+  color: var(--Gain);
+  text-align: left;
+}
+
+.resource-expense {
+  font-family: RobotoMono;
+  font-size: 12px;
+  color: var(--Danger);
+  text-align: right;
+}
+
+.resource-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgb(8, 11, 15);
+  outline: 1px solid rgb(10.6902761104%, 13.1572629052%, 16.1724689876%);
+  overflow: hidden;
+}
+
+.resource-fill {
+  background-color: rgb(196, 206, 220);
+  background-image: linear-gradient(90deg, rgb(27.2319566124%, 35.0125156446%, 45.9052982895%) 0%, rgb(196, 206, 220) 85%, hsl(215, 25.5319148936%, 106.568627451%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.resource-fill.energy-fill {
+  background-color: rgb(255, 230, 64);
+  background-image: linear-gradient(90deg, rgb(35.0980392157%, 30.5040550252%, 0%) 0%, rgb(255, 230, 64) 85%, rgb(100%, 96.7405810492%, 75.0980392157%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stalling {
+  color: var(--Danger);
+  /* @priority 20; outlass-only */
+}
+
+.resource-divider {
+  width: 2px;
+  height: 44px;
+  background-image: linear-gradient(180deg, transparent, rgb(78, 96, 118) 35%, rgb(78, 96, 118) 65%, transparent);
+}
+
+.wind-block {
+  width: 130px;
+  height: 64px;
+  background-color: rgba(8, 11, 15, 0.5);
+  outline: 1px solid rgb(78, 96, 118);
+}
+
+.wind-field {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.wind-content {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.wind-head {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.wind-speed {
+  font-size: 19px;
+  color: var(--Accent);
+  text-align: left;
+}
+
+.wind-gauge {
+  width: 100%;
+  height: 5px;
+  background-color: rgb(8, 11, 15);
+  outline: 1px solid rgb(10.6902761104%, 13.1572629052%, 16.1724689876%);
+  overflow: hidden;
+  width: 100%;
+  background-color: rgba(8, 11, 15, 0.85);
+}
+
+.wind-gauge-fill {
+  background-color: rgb(96, 210, 242);
+  background-image: linear-gradient(90deg, rgb(3.2159142727%, 31.4170086639%, 39.3331053352%) 0%, rgb(96, 210, 242) 85%, rgb(83.8679890561%, 95.4343365253%, 98.6810305518%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wind-range {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.wind-limit {
+  color: var(--TextDim);
+  font-family: RobotoMono;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+.wind-limit.right {
+  text-align: right;
+}
+
+.scavenger-block {
+  width: 130px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  background-color: rgba(8, 11, 15, 0.5);
+  outline: 1px solid rgb(78, 96, 118);
+}
+
+.scavenger-head {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.scavenger-value {
+  font-size: 19px;
+  color: var(--Danger);
+  text-align: left;
+}
+
+.bottom-left {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.selection-panel {
+  width: 360px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.selection-title {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.selection-name {
+  flex-grow: 1;
+  font-size: 16px;
+}
+
+.badge {
+  width: auto;
+  height: 19px;
+  padding: 0 8px;
+  outline: 1px solid rgb(78, 96, 118);
+  color: var(--TextDim);
+  font-family: RobotoMono;
+  font-size: 12px;
+}
+.badge-blueprint {
+  color: var(--Accent);
+  outline: 1px solid var(--Accent);
+}
+.badge-count {
+  color: var(--Accent);
+  outline: 1px solid var(--Accent);
+}
+.badge-remnant {
+  color: var(--Caution);
+  outline: 1px solid var(--Caution);
+}
+
+.veterancy {
+  width: auto;
+  height: auto;
+  color: var(--Accent);
+  font-family: RobotoMono;
+  font-size: 12px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.team-swatch {
+  width: 10px;
+  height: 10px;
+  background-color: white;
+  outline: 1px solid rgba(8, 11, 15, 0.8);
+}
+.team-swatch-neutral {
+  background-color: var(--TextFaint);
+}
+
+.vitals-track {
+  width: 100%;
+  height: 20px;
+  background-color: rgb(8, 11, 15);
+  outline: 1px solid rgb(10.6902761104%, 13.1572629052%, 16.1724689876%);
+  overflow: hidden;
+  position: relative;
+}
+
+.vitals-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.vitals-fill-good {
+  background-color: rgb(96, 224, 128);
+  background-image: linear-gradient(90deg, rgb(5.790505676%, 29.6996904025%, 11.7678018576%) 0%, rgb(96, 224, 128) 85%, rgb(79.4891640867%, 96.0010319917%, 83.617131063%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vitals-fill-worn {
+  background-color: rgb(236, 184, 68);
+  background-image: linear-gradient(90deg, rgb(26.5210355987%, 19.1462021702%, 2.6946506758%) 0%, rgb(236, 184, 68) 85%, rgb(97.1606700933%, 89.3898724538%, 72.0550161812%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vitals-fill-critical {
+  background-color: rgb(238, 88, 74);
+  background-image: linear-gradient(90deg, rgb(29.5751633987%, 5.0653594771%, 2.7777777778%) 0%, rgb(238, 88, 74) 85%, rgb(97.6262626263%, 76.6815210933%, 74.7266785502%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: pulse 0.8s ease-in-out infinite alternate;
+}
+.vitals-fill-blueprint {
+  background-color: rgb(96, 210, 242);
+  background-image: linear-gradient(90deg, rgb(3.2159142727%, 31.4170086639%, 39.3331053352%) 0%, rgb(96, 210, 242) 85%, rgb(83.8679890561%, 95.4343365253%, 98.6810305518%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vitals-fill-wreck {
+  background-color: rgb(236, 184, 68);
+  background-image: linear-gradient(90deg, rgb(26.5210355987%, 19.1462021702%, 2.6946506758%) 0%, rgb(236, 184, 68) 85%, rgb(97.1606700933%, 89.3898724538%, 72.0550161812%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+.vitals-label {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  text-align: center;
+  line-height: 20px;
+}
+
+.economy-row {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.resource-tile {
+  position: relative;
+  flex: 1 1 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px 8px 12px;
+  background-color: rgba(8, 11, 15, 0.55);
+  outline: 1px solid rgb(78, 96, 118);
+  transition: outline-color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.resource-tile.metal-tile {
+  background-image: linear-gradient(160deg, rgba(196, 206, 220, 0.14) 0%, transparent 60%);
+}
+.resource-tile.energy-tile {
+  background-image: linear-gradient(160deg, rgba(255, 230, 64, 0.16) 0%, transparent 60%);
+}
+.resource-tile.tile-stalled {
+  outline: 1px solid var(--Danger);
+  box-shadow: inset 0 0 12px rgba(238, 88, 74, 0.35);
+  /* @priority 20; outlass-only */
+}
+
+.tile-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+}
+.tile-rail.metal-rail {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(196, 206, 220) 0%, rgb(196, 206, 220) 55%, transparent 100%);
+}
+.tile-rail.energy-rail {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(255, 230, 64) 0%, rgb(255, 230, 64) 55%, transparent 100%);
+}
+
+.tile-head {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+}
+
+.tile-name {
+  font-family: Michroma;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-align: left;
+  flex-grow: 1;
+}
+
+.tile-stall {
+  padding: 0 4px;
+  background-color: var(--Danger);
+  color: var(--Void);
+  font-family: RobotoMono;
+  font-size: 11px;
+  font-weight: bold;
+  animation: pulse 0.6s steps(2) infinite;
+}
+
+.tile-rate {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  align-items: baseline;
+}
+
+.tile-rate-value {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.tile-rate-unit {
+  font-family: RobotoMono;
+  font-size: 14px;
+  text-align: left;
+}
+
+.tile-rate-unit.tile-rate-gain {
+  color: rgb(14.6010319917%, 74.8891640867%, 29.6730650155%);
+}
+
+.tile-rate-unit.tile-rate-loss {
+  color: rgb(84.4236482472%, 14.4592988711%, 7.9292929293%);
+}
+
+.tile-rate-gain {
+  color: var(--Gain);
+  text-shadow: 0 0 8px rgba(96, 224, 128, 0.6);
+}
+
+.tile-rate-loss {
+  color: var(--Danger);
+  text-shadow: 0 0 8px rgba(238, 88, 74, 0.6);
+}
+
+.tile-rate-idle {
+  color: var(--TextFaint);
+}
+
+.tile-rate-metal {
+  color: var(--Metal);
+}
+
+.tile-rate-energy {
+  color: var(--Energy);
+}
+
+.tile-cost {
+  color: var(--TextDim);
+  font-size: 11px;
+  text-align: left;
+  font-family: RobotoMono;
+  font-size: 12px;
+  color: var(--TextFaint);
+}
+
+.gauge-list {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(78, 96, 118, 0.45);
+}
+
+.gauge-row {
+  width: 100%;
+  height: 20px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.gauge-label {
+  color: var(--TextDim);
+  font-size: 11px;
+  text-align: left;
+  width: 84px;
+  height: auto;
+  font-family: RobotoMono;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.gauge-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgb(8, 11, 15);
+  outline: 1px solid rgb(10.6902761104%, 13.1572629052%, 16.1724689876%);
+  overflow: hidden;
+  flex-grow: 1;
+  width: auto;
+}
+
+.gauge-fill.shield-fill {
+  background-color: rgb(96, 210, 242);
+  background-image: linear-gradient(90deg, rgb(3.2159142727%, 31.4170086639%, 39.3331053352%) 0%, rgb(96, 210, 242) 85%, rgb(83.8679890561%, 95.4343365253%, 98.6810305518%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gauge-fill.missile-fill {
+  background-color: rgb(255, 138, 64);
+  background-image: linear-gradient(90deg, rgb(35.0980392157%, 13.598193204%, 0%) 0%, rgb(255, 138, 64) 85%, rgb(100%, 84.7459193101%, 75.0980392157%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gauge-fill.cargo-fill {
+  background-color: rgb(196, 206, 220);
+  background-image: linear-gradient(90deg, rgb(27.2319566124%, 35.0125156446%, 45.9052982895%) 0%, rgb(196, 206, 220) 85%, hsl(215, 25.5319148936%, 106.568627451%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gauge-fill.reclaim-fill {
+  background-color: rgb(236, 184, 68);
+  background-image: linear-gradient(90deg, rgb(26.5210355987%, 19.1462021702%, 2.6946506758%) 0%, rgb(236, 184, 68) 85%, rgb(97.1606700933%, 89.3898724538%, 72.0550161812%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gauge-fill.resurrect-fill {
+  background-color: rgb(176, 96, 240);
+  background-image: linear-gradient(90deg, rgb(22.8025693036%, 3.6004056795%, 38.1643002028%) 0%, rgb(176, 96, 240) 85%, rgb(91.7207572684%, 83.3367139959%, 98.4279918864%) 100%);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pip-row {
+  height: auto;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  align-items: center;
+}
+
+.pip {
+  width: 10px;
+  height: 10px;
+  background-color: rgb(8, 11, 15);
+  outline: 1px solid rgb(18.6494597839%, 22.9531812725%, 28.2132853141%);
+  transform: skewX(-12deg);
+}
+.pip-full {
+  outline: 1px solid rgba(255, 255, 255, 0.35);
+}
+.pip.shield-pip {
+  background-color: var(--Accent);
+}
+.pip.missile-pip {
+  background-color: var(--Fight);
+}
+.pip.cargo-pip {
+  background-color: var(--Metal);
+}
+
+.gauge-value {
+  margin-left: auto;
+  color: var(--Text);
+  font-family: RobotoMono;
+  font-size: 13px;
+  text-align: right;
+}
+
+.group-grid {
+  width: 100%;
+  height: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 44px;
+  gap: 8px;
+}
+
+.group-tile {
+  width: 68px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  justify-content: center;
+  background-color: rgb(31, 40, 51);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2));
+  outline: 1px solid rgb(78, 96, 118);
+  transition: background-color 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.group-tile:hover {
+  background-color: rgb(52, 66, 82);
+  outline: 1px solid var(--Accent);
+}
+.group-tile:active {
+  background-color: rgb(7.6202773792%, 9.8326159732%, 12.5365853659%);
+}
+.group-tile:disabled {
+  opacity: 0.4;
+}
+
+.group-count {
+  width: 100%;
+  height: auto;
+  font-size: 18px;
+  color: var(--Accent);
+}
+
+.group-name {
+  width: 100%;
+  height: auto;
+  color: var(--TextDim);
+  font-family: RobotoMono;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-strip {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.queue-chip {
+  width: 30px;
+  height: 30px;
+  background-color: rgb(31, 40, 51);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2));
+  outline: 1px solid rgb(78, 96, 118);
+  transition: background-color 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.queue-chip:hover {
+  background-color: rgb(52, 66, 82);
+  outline: 1px solid var(--Accent);
+}
+.queue-chip:active {
+  background-color: rgb(7.6202773792%, 9.8326159732%, 12.5365853659%);
+}
+.queue-chip:disabled {
+  opacity: 0.4;
+}
+.queue-chip {
+  font-family: RobotoMono;
+  font-size: 11px;
+  font-weight: bold;
+}
+.queue-chip:hover {
+  outline: 1px solid var(--Danger);
+  color: var(--Danger);
+}
+
+.subtitle-row {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.selection-subtitle {
+  height: auto;
+  flex-grow: 1;
+  color: var(--TextFaint);
+  font-family: RobotoMono;
+  font-size: 13px;
+  text-align: left;
+}
+
+.team-tag {
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+}
+
+.team-name {
+  width: auto;
+  height: auto;
+  max-width: 120px;
+  font-family: RobotoMono;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loadout {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loadout-heading {
+  width: 100%;
+  height: 18px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.loadout-heading-text {
+  width: auto;
+  height: auto;
+  font-family: Michroma;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.14em;
+  text-align: left;
+}
+.loadout-heading-text.heading-weapon {
+  color: var(--Fight);
+}
+
+.loadout-rule {
+  width: auto;
+  height: 1px;
+  flex-grow: 1;
+}
+.loadout-rule.rule-weapon {
+  background-image: linear-gradient(90deg, rgba(255, 138, 64, 0.8), transparent);
+}
+
+.loadout-row {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  padding-right: 8px;
+  background-color: rgba(8, 11, 15, 0.5);
+  outline: 1px solid rgba(78, 96, 118, 0.55);
+  transition: background-color 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.loadout-row:hover {
+  background-color: rgb(52, 66, 82);
+  outline: 1px solid rgb(78, 96, 118);
+}
+.loadout-row.loadout-weapon, .loadout-row.loadout-manual {
+  background-image: linear-gradient(90deg, rgba(255, 138, 64, 0.12), transparent 55%);
+}
+.loadout-row.loadout-build {
+  background-image: linear-gradient(90deg, rgba(126, 240, 154, 0.1), transparent 55%);
+}
+
+.loadout-slot {
+  width: 40px;
+  height: 34px;
+  color: var(--Void);
+  font-family: RobotoMono;
+  font-size: 13px;
+  font-weight: bold;
+}
+.loadout-slot.slot-weapon {
+  background-color: var(--Fight);
+  background-image: linear-gradient(180deg, rgb(100%, 66.3689559593%, 45.0980392157%), rgb(100%, 39.4160763782%, 1.0980392157%));
+}
+.loadout-slot.slot-manual {
+  background-color: var(--Danger);
+  background-image: linear-gradient(180deg, rgb(95.0505050505%, 51.3784907903%, 47.302436126%), rgb(89.908496732%, 15.3986928105%, 8.4444444444%));
+}
+.loadout-slot.slot-build {
+  background-color: var(--Buildpower);
+  background-image: linear-gradient(180deg, rgb(63.7450980392%, 95.7843137255%, 71.614379085%), rgb(17.1617647059%, 90.3676470588%, 35.1421568627%));
+}
+
+.loadout-name {
+  height: auto;
+  flex-grow: 1;
+  color: var(--Text);
+  font-family: Michroma;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.loadout-figure {
+  width: 64px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-end;
+}
+
+.loadout-value {
+  width: 100%;
+  height: auto;
+  font-size: 19px;
+  text-align: right;
+}
+.loadout-value.value-weapon {
+  color: var(--Fight);
+}
+.loadout-value.value-manual {
+  color: var(--Energy);
+}
+.loadout-value.value-build {
+  color: var(--Buildpower);
+}
+
+.loadout-unit {
+  width: 100%;
+  height: auto;
+  color: var(--TextDim);
+  font-family: RobotoMono;
+  font-size: 11px;
+  text-align: right;
+}
+
+.build-menu {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 336px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.build-title {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.build-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 96px);
+  grid-auto-rows: 96px;
+  gap: 8px;
+}
+
+.build-option {
+  width: 96px;
+  height: 96px;
+  background-color: rgb(31, 40, 51);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2));
+  outline: 1px solid rgb(78, 96, 118);
+  transition: background-color 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.build-option:hover {
+  background-color: rgb(52, 66, 82);
+  outline: 1px solid var(--Accent);
+}
+.build-option:active {
+  background-color: rgb(7.6202773792%, 9.8326159732%, 12.5365853659%);
+}
+.build-option:disabled {
+  opacity: 0.4;
+}
+.build-option.unaffordable {
+  outline: 1px solid var(--Danger);
+  opacity: 0.75;
+}
+
+.build-option-body {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px;
+  background-color: transparent;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.build-option-category {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  padding: 0 4px;
+  background-color: rgba(8, 11, 15, 0.7);
+  color: var(--Accent);
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.build-page-name {
+  width: auto;
+  height: auto;
+  color: var(--Accent);
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.build-option-key {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  padding: 0 4px;
+  background-color: rgba(8, 11, 15, 0.7);
+  outline: 1px solid var(--Accent);
+  color: var(--Accent);
+  font-family: RobotoMono;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.build-option-icon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.build-option-name,
+.build-option-subtitle,
+.cost {
+  z-index: 1;
+  text-shadow: 0 1px 2px black;
+}
+
+.build-option-name {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.build-cost {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  justify-content: center;
+}
+
+.cost {
+  font-family: RobotoMono;
+  font-size: 13px;
+}
+.cost-metal {
+  color: var(--Metal);
+}
+.cost-energy {
+  color: var(--Energy);
+}
+
+.build-hint {
+  width: 100%;
+  height: auto;
+  color: var(--TextDim);
+  font-size: 11px;
+  font-style: italic;
+  text-align: left;
+}
+
+.build-option-subtitle {
+  color: var(--TextFaint);
+  font-size: 12px;
+}
+
+.selection-box {
+  position: absolute;
+  background-color: rgba(96, 210, 242, 0.1);
+  outline: 1px solid var(--Accent);
+  z-index: 100;
+}
+
+.placement-hint {
+  position: absolute;
+  bottom: 128px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background-color: rgba(8, 11, 15, 0.82);
+  outline: 1px solid rgb(78, 96, 118);
+  color: var(--Text);
+  font-family: RobotoMono;
+  font-size: 12px;
+}
+
+.placement-problem {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  background-color: rgba(8, 11, 15, 0.82);
+  outline: 1px solid var(--Danger);
+  color: var(--Danger);
+  font-family: RobotoMono;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 110;
+}
+
+.mode-hint {
+  color: var(--Accent);
+  outline: 1px solid var(--Accent);
+}
+
+.mode-hint.attack {
+  color: var(--Danger);
+  outline: 1px solid var(--Danger);
+}
+
+.mode-hint.fight {
+  color: var(--Fight);
+  outline: 1px solid var(--Fight);
+}
+
+.mode-hint.repair {
+  color: var(--Energy);
+  outline: 1px solid var(--Energy);
+}
+
+.mode-hint.resurrect {
+  color: var(--Resurrect);
+  outline: 1px solid var(--Resurrect);
+}
+
+.pause-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(8, 11, 15, 0.45);
+  z-index: 90;
+}
+
+.pause-plate {
+  background-color: rgb(20, 26, 34);
+  background-image: linear-gradient(180deg, rgb(52, 66, 82) 0%, rgb(52, 66, 82) 3%, rgb(20, 26, 34) 4%, rgb(20, 26, 34) 55%, rgb(0.4357298475%, 0.5664488017%, 0.7407407407%) 100%);
+  opacity: 0.97;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 380px;
+  padding: 24px 48px;
+  border-top: 3px solid var(--Caution);
+  border-bottom: 3px solid var(--Caution);
+  box-shadow: 0 12px 48px rgba(8, 11, 15, 0.8);
+}
+
+.pause-title {
+  font-family: Michroma;
+  font-weight: bold;
+  font-size: 56px;
+  letter-spacing: 0.3em;
+  color: var(--Caution);
+  -webkit-text-stroke: 3px rgba(8, 11, 15, 0.85);
+  animation: pause-blink 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes pause-blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.6;
+  }
+}
+.pause-hint {
+  font-size: 15px;
+  color: var(--TextDim);
+  text-align: center;
+}
+
+.tooltip {
+  width: 320px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 16px 16px;
+  background-color: rgb(20, 26, 34);
+  background-image: linear-gradient(180deg, rgb(52, 66, 82) 0%, rgb(52, 66, 82) 3%, rgb(20, 26, 34) 4%, rgb(20, 26, 34) 55%, rgb(0.4357298475%, 0.5664488017%, 0.7407407407%) 100%);
+  opacity: 0.97;
+  outline: 1px solid rgb(78, 96, 118);
+  box-shadow: 0 8px 32px rgba(8, 11, 15, 0.8);
+  z-index: 200;
+}
+
+.tooltip-rail {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(96, 210, 242) 0%, rgb(96, 210, 242) 55%, transparent 100%);
+}
+.tooltip-rail.tooltip-weapon {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(255, 138, 64) 0%, rgb(255, 138, 64) 55%, transparent 100%);
+}
+.tooltip-rail.tooltip-build {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(126, 240, 154) 0%, rgb(126, 240, 154) 55%, transparent 100%);
+}
+.tooltip-rail.tooltip-metal {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(196, 206, 220) 0%, rgb(196, 206, 220) 55%, transparent 100%);
+}
+.tooltip-rail.tooltip-energy {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(255, 230, 64) 0%, rgb(255, 230, 64) 55%, transparent 100%);
+}
+.tooltip-rail.tooltip-danger {
+  width: 100%;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgb(238, 88, 74) 0%, rgb(238, 88, 74) 55%, transparent 100%);
+}
+
+.tooltip-kicker {
+  width: 100%;
+  height: auto;
+  color: var(--TextFaint);
+  font-family: RobotoMono;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-align: left;
+}
+
+.tooltip-title {
+  width: 100%;
+  height: auto;
+  font-size: 17px;
+}
+.tooltip-title.tooltip-weapon {
+  color: var(--Fight);
+}
+.tooltip-title.tooltip-build {
+  color: var(--Buildpower);
+}
+.tooltip-title.tooltip-metal {
+  color: var(--Metal);
+}
+.tooltip-title.tooltip-energy {
+  color: var(--Energy);
+}
+.tooltip-title.tooltip-danger {
+  color: var(--Danger);
+}
+
+.tooltip-text {
+  width: 100%;
+  height: auto;
+  color: var(--TextDim);
+  font-size: 15px;
+  text-align: left;
+}
+
+.tooltip-rows {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(78, 96, 118, 0.5);
+}
+
+.tooltip-row {
+  width: 100%;
+  height: 20px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.tooltip-divider {
+  width: 100%;
+  height: 1px;
+  background-color: rgb(78, 96, 118);
+  opacity: 0.7;
+}
+
+.tooltip-label {
+  height: auto;
+  flex-grow: 1;
+  color: var(--TextDim);
+  font-size: 15px;
+  text-align: left;
+}
+
+.tooltip-value {
+  width: auto;
+  height: auto;
+  color: var(--Text);
+  font-size: 15px;
+  text-align: right;
+  white-space: nowrap;
+}
+.tooltip-value.weapon {
+  color: var(--Fight);
+}
+.tooltip-value.buildpower {
+  color: var(--Buildpower);
+}
+.tooltip-value.metal {
+  color: var(--Metal);
+}
+.tooltip-value.energy {
+  color: var(--Energy);
+}
+.tooltip-value.gain {
+  color: var(--Gain);
+}
+.tooltip-value.loss {
+  color: var(--Danger);
+}
+
+.tooltip-notes {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.tooltip-note {
+  width: 100%;
+  height: auto;
+  color: var(--Text);
+  font-size: 14px;
+  text-align: left;
+}
+</style>
+</head>
+<body>
+<div class="h-wrap">
+
+<h1>default.scss &mdash; browser reference render</h1>
+<p class="h-lede">
+  Every element the stylesheet styles, marked up the way the React components mark it up, rendered
+  by a browser from dart-sass output of the same SCSS. Compare against the Roblox render: anything
+  that differs is either outlass translating a property differently, Roblox lacking it, or one of
+  the harness assumptions at the top of this file being wrong. The stage is 1920&times;1080, the
+  resolution the sheet is authored against (<code>use_viewport.DESIGN_HEIGHT</code>), so
+  <code>UIScale</code> is 1 and every pixel value is directly comparable.
+</p>
+
+<div class="h-bar">
+  <label><input type="checkbox" id="h-noinset"> ignore GUI inset <code>(top: 0)</code></label>
+  <label><input type="checkbox" id="h-bounds"> element bounds</label>
+  <label><input type="checkbox" id="h-checker"> grey backdrop <code>(opacity: .97)</code></label>
+  <span class="h-dim" id="h-scale">stage 1:1</span>
+</div>
+
+<h2>1 &mdash; The HUD</h2>
+<div class="h-viewport">
+  <div class="h-stage">
+    <div class="h-topbar">Roblox topbar &mdash; 36px, ScreenGui.IgnoreGuiInset = false</div>
+    <div class="h-gui">
+
+      <!-- resource_bar.luau: ResourceBar -->
+      <rbx-frame class="resource-bar panel">
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">METAL</rbx-textlabel>
+            <rbx-textlabel class="resource-amount">1240</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/2000</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <!-- inline Size = UDim2.new(fraction, 0, 1, 0) -->
+            <rbx-frame class="resource-fill metal-fill" style="width: 62%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">+12/s</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="resource-divider"></rbx-frame>
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="resource-amount">18.4k</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/25.0k</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <rbx-frame class="resource-fill energy-fill" style="width: 73.6%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">+180/s</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+
+      <!-- selection_panel.luau: SelectionPanel -> Single -->
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Builds T1 bots</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-good" style="width: 100%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">3000 / 3000</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile metal-tile"><rbx-frame class="tile-rail metal-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip metal-chip"></rbx-frame><rbx-textlabel class="tile-name metal">METAL</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-4.5</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-45.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="loadout"><rbx-frame class="loadout-row loadout-build"><rbx-textlabel class="loadout-slot slot-build">BLD</rbx-textlabel><rbx-textlabel class="loadout-name">BUILDPOWER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-build">100</rbx-textlabel><rbx-textlabel class="loadout-unit">PER SEC</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="queue-strip"><rbx-textbutton class="queue-chip">Gr</rbx-textbutton><rbx-textbutton class="queue-chip">Gr</rbx-textbutton><rbx-textbutton class="queue-chip">Gr</rbx-textbutton><rbx-textbutton class="queue-chip">Co</rbx-textbutton><rbx-textbutton class="queue-chip">Gr</rbx-textbutton></rbx-frame></rbx-frame>
+
+      <!-- build_menu.luau: BuildMenu, a Bot Lab selected -->
+      <rbx-frame class="build-menu panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="build-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="heading grow">Bot Lab</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="build-grid">
+          <rbx-textbutton class="build-option">
+            <rbx-textlabel class="build-option-name">Construction Bot</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">200</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">3000</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+          <rbx-textbutton class="build-option">
+            <rbx-textlabel class="build-option-name">Grunt</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">50</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">500</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+        </rbx-frame>
+        <rbx-textlabel class="build-hint">Build orders always queue; shift adds five</rbx-textlabel>
+      </rbx-frame>
+
+      <!-- selection_box.luau: SelectionBox, inline Position/Size from the drag rect -->
+      <rbx-frame class="selection-box" style="left: 690px; top: 300px; width: 420px; height: 260px"></rbx-frame>
+
+    </div>
+  </div>
+</div>
+
+<h2>2 &mdash; States the HUD above does not show</h2>
+<div class="h-grid">
+
+  <figure class="h-cell">
+    <figcaption><b>.badge-blueprint · .vitals-fill-blueprint</b> <span>selection_panel.luau &rarr; Single, state == "blueprint"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Construction Bot</rbx-textlabel><rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Builds T1 structures</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-blueprint" style="width: 45%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">BUILDING  45%</rbx-textlabel></rbx-frame><rbx-frame class="loadout"><rbx-frame class="loadout-row loadout-build"><rbx-textlabel class="loadout-slot slot-build">BLD</rbx-textlabel><rbx-textlabel class="loadout-name">BUILDPOWER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-build">70</rbx-textlabel><rbx-textlabel class="loadout-unit">PER SEC</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">A blueprint makes and spends nothing, so it has no resource tiles, only its progress stamped on the bar. Only a state worth pointing out gets a badge.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.badge-count · .group-grid</b> <span>selection_panel.luau &rarr; Many</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="selection-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="selection-name">SELECTION</rbx-textlabel>
+          <rbx-textlabel class="badge badge-count">7</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="group-grid">
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×5</rbx-textlabel><rbx-textlabel class="group-name">GRUNT</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×2</rbx-textlabel><rbx-textlabel class="group-name">CONSTRUCTION BOT</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×3</rbx-textlabel><rbx-textlabel class="group-name">ROCKETEER</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×1</rbx-textlabel><rbx-textlabel class="group-name">COMMANDER</rbx-textlabel></rbx-frame>
+          <rbx-frame class="group-tile"><rbx-textlabel class="group-count">×4</rbx-textlabel><rbx-textlabel class="group-name">SCOUT</rbx-textlabel></rbx-frame>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">A tile per kind, four to a row, the count large in the accent colour and the name
+      under it, cut off with an ellipsis when it is too long.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tile-rate-gain · .vitals-fill-worn</b> <span>selection_panel.luau &rarr; Single, energy_rate &gt; 0</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Wind Turbine</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(232, 64, 64)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(232, 64, 64)">CRIMSON</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Makes energy from the wind</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-worn" style="width: 52%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">104 / 200</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-gain">+18.4</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-gain">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">Only the resource it is making gets a tile.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tile-stalled · .vitals-fill-critical · .gauge-list</b> <span>selection_panel.luau &rarr; Single, stalled == "energy"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Deflector</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Plasma shield</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-critical" style="width: 22%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">440 / 2000</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile energy-tile tile-stalled"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel><rbx-textlabel class="tile-stall">SHORT</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-60.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="gauge-list"><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">SHIELD</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill shield-fill" style="width: 42%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">1350/3250</rbx-textlabel></rbx-frame><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">MISSILES</rbx-textlabel><rbx-frame class="pip-row"><rbx-frame class="pip pip-full missile-pip"></rbx-frame><rbx-frame class="pip pip-full missile-pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">2/5</rbx-textlabel></rbx-frame><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">CARGO</rbx-textlabel><rbx-frame class="pip-row"><rbx-frame class="pip pip-full cargo-pip"></rbx-frame><rbx-frame class="pip pip-full cargo-pip"></rbx-frame><rbx-frame class="pip pip-full cargo-pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame><rbx-frame class="pip"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">3/8</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">The resource holding it back outlines its tile in red with a flag. Not every gauge row appears on one entity in game.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.loadout · .loadout-row</b> <span>selection_panel.luau &rarr; Loadout</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Commander</rbx-textlabel><rbx-frame class="team-tag"><rbx-frame class="team-swatch" style="background-color: rgb(64, 132, 255)"></rbx-frame><rbx-textlabel class="team-name" style="color: rgb(64, 132, 255)">BLUE</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Builds, fights, and ends the game</rbx-textlabel><rbx-textlabel class="veterancy">3 KILLS · XP 0.40</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-good" style="width: 88%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">2900 / 3300</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile metal-tile"><rbx-frame class="tile-rail metal-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip metal-chip"></rbx-frame><rbx-textlabel class="tile-name metal">METAL</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-8.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-loss">-75.0</rbx-textlabel><rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame><rbx-frame class="loadout"><rbx-frame class="loadout-row loadout-build"><rbx-textlabel class="loadout-slot slot-build">BLD</rbx-textlabel><rbx-textlabel class="loadout-name">BUILDPOWER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-build">300</rbx-textlabel><rbx-textlabel class="loadout-unit">PER SEC</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="loadout-heading"><rbx-textlabel class="loadout-heading-text heading-weapon">WEAPONS</rbx-textlabel><rbx-frame class="loadout-rule rule-weapon"></rbx-frame></rbx-frame><rbx-frame class="loadout-row loadout-weapon"><rbx-textlabel class="loadout-slot slot-weapon">LSR</rbx-textlabel><rbx-textlabel class="loadout-name">LASER</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-weapon">188</rbx-textlabel><rbx-textlabel class="loadout-unit">DPS</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="loadout-row loadout-manual"><rbx-textlabel class="loadout-slot slot-manual">DGN</rbx-textlabel><rbx-textlabel class="loadout-name">DISINTEGRATOR</rbx-textlabel><rbx-frame class="loadout-figure"><rbx-textlabel class="loadout-value value-manual">500</rbx-textlabel><rbx-textlabel class="loadout-unit">E/SHOT</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">The team sits at the end of the title, and kills and experience at the end of the subtitle once there are any. A row for buildpower and one for each weapon: the rest is in their tooltips.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tooltip · .tooltip-weapon</b> <span>tooltip.luau &rarr; WithTooltip, a weapon row hovered</span></figcaption>
+    <div class="h-box h-tall">
+      <rbx-frame class="tooltip" style="position: relative"><rbx-frame class="tooltip-rail tooltip-weapon"></rbx-frame><rbx-textlabel class="tooltip-kicker">WEAPON</rbx-textlabel><rbx-textlabel class="tooltip-title tooltip-weapon">LASER</rbx-textlabel><rbx-textlabel class="tooltip-text">Hits the instant it fires; the beam is only what is drawn.</rbx-textlabel><rbx-frame class="tooltip-rows"><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Damage a second</rbx-textlabel><rbx-textlabel class="tooltip-value weapon">188</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Damage a shot</rbx-textlabel><rbx-textlabel class="tooltip-value">75</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Reload</rbx-textlabel><rbx-textlabel class="tooltip-value">0.40s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Range</rbx-textlabel><rbx-textlabel class="tooltip-value">300 studs</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Targets</rbx-textlabel><rbx-textlabel class="tooltip-value">Ground and air</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="tooltip-notes"><rbx-textlabel class="tooltip-note">· Only 15% of its damage lands on aircraft.</rbx-textlabel></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">Portalled into the HUD's ScreenGui, beside the panel and level with the bottom of the row.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tooltip · .gain · .loss</b> <span>tooltip.luau &rarr; a resource tile hovered</span></figcaption>
+    <div class="h-box h-tall">
+      <rbx-frame class="tooltip" style="position: relative"><rbx-frame class="tooltip-rail tooltip-metal"></rbx-frame><rbx-textlabel class="tooltip-kicker">ECONOMY</rbx-textlabel><rbx-textlabel class="tooltip-title tooltip-metal">METAL</rbx-textlabel><rbx-frame class="tooltip-rows"><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Generating</rbx-textlabel><rbx-textlabel class="tooltip-value gain">+2.0/s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Building Solar Collector</rbx-textlabel><rbx-textlabel class="tooltip-value loss">-10.0/s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-divider"></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Net</rbx-textlabel><rbx-textlabel class="tooltip-value loss">-8.0/s</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">Where the rate comes from, a row a source as the server names it, and the net when there is more than one.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tooltip · .tooltip-plain</b> <span>tooltip.luau &rarr; the title hovered</span></figcaption>
+    <div class="h-box h-tall">
+      <rbx-frame class="tooltip" style="position: relative"><rbx-frame class="tooltip-rail tooltip-plain"></rbx-frame><rbx-textlabel class="tooltip-kicker">UNIT</rbx-textlabel><rbx-textlabel class="tooltip-title tooltip-plain">COMMANDER</rbx-textlabel><rbx-textlabel class="tooltip-text">Builds, fights, and ends the game</rbx-textlabel><rbx-frame class="tooltip-rows"><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Health</rbx-textlabel><rbx-textlabel class="tooltip-value">3300</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Metal cost</rbx-textlabel><rbx-textlabel class="tooltip-value metal">1400</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Energy cost</rbx-textlabel><rbx-textlabel class="tooltip-value energy">26000</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Buildpower cost</rbx-textlabel><rbx-textlabel class="tooltip-value buildpower">75000</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Speed</rbx-textlabel><rbx-textlabel class="tooltip-value">37.5 studs/s</rbx-textlabel></rbx-frame><rbx-frame class="tooltip-row"><rbx-textlabel class="tooltip-label">Orders queued</rbx-textlabel><rbx-textlabel class="tooltip-value">2</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">What it costs, how tough and quick it is, and its queued orders.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.badge-remnant · .vitals-fill-wreck</b> <span>selection_panel.luau &rarr; Remnant, kind == "wreck"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Grunt Wreck</rbx-textlabel><rbx-textlabel class="badge badge-remnant">WRECK</rbx-textlabel></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Reclaim for metal, or resurrect it</rbx-textlabel></rbx-frame><rbx-frame class="vitals-track"><rbx-frame class="vitals-fill vitals-fill-wreck" style="width: 70%; height: 100%"></rbx-frame><rbx-textlabel class="vitals-label">105 / 150</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile metal-tile"><rbx-frame class="tile-rail metal-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip metal-chip"></rbx-frame><rbx-textlabel class="tile-name metal">METAL</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-metal">19</rbx-textlabel></rbx-frame><rbx-textlabel class="tile-cost">TO RECLAIM</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="gauge-list"><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">RECLAIMED</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill reclaim-fill" style="width: 24%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">24/100</rbx-textlabel></rbx-frame><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">RAISED</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill resurrect-fill" style="width: 40%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">40/100</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">No team, no rates. What is left to reclaim, how far that and raising it have got, and what
+      the unit it was cost.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.tile-rate-energy</b> <span>selection_panel.luau &rarr; Remnant, kind == "reclaimable"</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="selection-panel panel"><rbx-frame class="rail"></rbx-frame><rbx-frame class="selection-title"><rbx-frame class="accent-bar"></rbx-frame><rbx-textlabel class="selection-name">Tree</rbx-textlabel><rbx-textlabel class="badge badge-remnant">FEATURE</rbx-textlabel></rbx-frame><rbx-frame class="subtitle-row"><rbx-textlabel class="selection-subtitle">Reclaim for energy</rbx-textlabel></rbx-frame><rbx-frame class="economy-row"><rbx-frame class="resource-tile energy-tile"><rbx-frame class="tile-rail energy-rail"></rbx-frame><rbx-frame class="tile-head"><rbx-frame class="resource-chip energy-chip"></rbx-frame><rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel></rbx-frame><rbx-frame class="tile-rate"><rbx-textlabel class="tile-rate-value tile-rate-energy">250</rbx-textlabel></rbx-frame><rbx-textlabel class="tile-cost">TO RECLAIM</rbx-textlabel></rbx-frame></rbx-frame><rbx-frame class="gauge-list"><rbx-frame class="gauge-row"><rbx-textlabel class="gauge-label">RECLAIMED</rbx-textlabel><rbx-frame class="gauge-track"><rbx-frame class="gauge-fill reclaim-fill" style="width: 0%; height: 100%"></rbx-frame></rbx-frame><rbx-textlabel class="gauge-value">0/100</rbx-textlabel></rbx-frame></rbx-frame></rbx-frame>
+    </div>
+    <p class="h-note">A rock or tree takes no harm, so it has no health bar, and shows only the resource it holds.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.pause-overlay</b> <span>pause_overlay.luau &rarr; Workspace.paused</span></figcaption>
+    <div class="h-box h-tall h-anchor" style="position: relative">
+      <rbx-frame class="pause-overlay">
+        <rbx-frame class="pause-plate">
+          <rbx-textlabel class="pause-title">PAUSED</rbx-textlabel>
+          <rbx-textlabel class="pause-hint">The game is stopped until it is unpaused</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Dims the whole screen and says so across the middle, in the caution colour. Clicks go
+      through to the world.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.unaffordable</b> <span>build_menu.luau &rarr; @extend .hazard</span></figcaption>
+    <div class="h-box h-tall h-anchor">
+      <rbx-frame class="build-menu panel">
+        <rbx-frame class="rail"></rbx-frame>
+        <rbx-frame class="build-title">
+          <rbx-frame class="accent-bar"></rbx-frame>
+          <rbx-textlabel class="heading grow">Construction Bot</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="build-grid">
+          <rbx-textbutton class="build-option unaffordable">
+            <rbx-textlabel class="build-option-name">Bot Lab</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">500</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">10000</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+          <rbx-textbutton class="build-option">
+            <rbx-textlabel class="build-option-name">Bot Lab</rbx-textlabel>
+            <rbx-frame class="build-cost">
+              <rbx-textlabel class="cost cost-metal">500</rbx-textlabel>
+              <rbx-textlabel class="cost cost-energy">10000</rbx-textlabel>
+            </rbx-frame>
+          </rbx-textbutton>
+        </rbx-frame>
+        <rbx-textlabel class="build-hint">Pick a building to place</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Affordable on the right for comparison. The hazard fill is sixteen hand-written
+      stops standing in for <code>repeating-linear-gradient</code>; in Roblox a UIGradient has 20
+      keypoints maximum, so this is close to the ceiling.</p>
+  </figure>
+
+  <figure class="h-cell" style="grid-column: 1 / -1">
+    <figcaption><b>.stalling</b> <span>resource_bar.luau &rarr; fraction &lt;= 0.02</span></figcaption>
+    <div class="h-box h-anchor" style="height: 200px">
+      <rbx-frame class="resource-bar panel" style="position: absolute; top: 20px">
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">METAL</rbx-textlabel>
+            <rbx-textlabel class="resource-amount stalling">30</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/2000</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <rbx-frame class="resource-fill metal-fill" style="width: 1.5%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">-4/s</rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="resource-divider"></rbx-frame>
+        <rbx-frame class="resource">
+          <rbx-frame class="resource-head">
+            <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+            <rbx-textlabel class="resource-name">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="resource-amount">18.4k</rbx-textlabel>
+            <rbx-textlabel class="resource-income faint">/25.0k</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="resource-track">
+            <rbx-frame class="resource-fill energy-fill" style="width: 73.6%; height: 100%"></rbx-frame>
+          </rbx-frame>
+          <rbx-textlabel class="resource-income">+180/s</rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note"><code>position: absolute; top: 20px</code> is set inline here only so the bar
+      sits inside the cell. The looping fade is driven from Luau by TweenService, not by the sheet,
+      so it is absent here; only the red is the sheet's.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.placement-hint</b> <span>selection_box.luau &rarr; PlacementHint</span></figcaption>
+    <div class="h-box" style="height: 220px">
+      <rbx-textlabel class="placement-hint">[ ] rotate · right click cancels · hold shift to keep placing</rbx-textlabel>
+    </div>
+    <p class="h-note"><code>bottom: 128px</code> from the bottom of the ScreenGui, centred with
+      <code>left: 50%</code> plus <code>translateX(-50%)</code>. Width comes from the text, so this
+      is the one place the sheet relies on shrink-to-fit.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.selection-box</b> <span>selection_box.luau &rarr; SelectionBox</span></figcaption>
+    <div class="h-box" style="height: 220px">
+      <rbx-frame class="selection-box" style="left: 40px; top: 30px; width: 240px; height: 150px"></rbx-frame>
+    </div>
+    <p class="h-note">10% accent fill, 1px accent outline, <code>z-index: 100</code>. Position and
+      Size are always inline &mdash; the sheet only supplies the paint.</p>
+  </figure>
+
+</div>
+
+<h2>3 &mdash; Every class in the sheet</h2>
+<p class="h-lede">
+  One sample per selector, so nothing in the sheet goes unrendered. The source file is on the right
+  of each caption.
+</p>
+<div class="h-grid">
+
+  <figure class="h-cell">
+    <figcaption><b>.panel</b> <span>_main.scss · @include plate</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="panel">
+        <rbx-textlabel>brushed metal, lit lip, 16px padding, opacity .97</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">The lit lip is the first 3% of a 180&deg; gradient, then a hard step into the
+      body and a fall to <code>darken($steel, 10%)</code>. Tick the grey backdrop to see the .97.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.rail</b> <span>_main.scss · @include rail</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="panel" style="padding: 0">
+        <rbx-frame class="rail"></rbx-frame>
+      </rbx-frame>
+      <rbx-frame style="height: 12px"></rbx-frame>
+      <rbx-frame class="rail"></rbx-frame>
+    </div>
+    <p class="h-note">2px, accent, fading to transparent from 55% rightwards.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.hazard</b> <span>_main.scss · hazard()</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="hazard" style="height: 64px"></rbx-frame>
+    </div>
+    <p class="h-note">45&deg;, doubled stops so each transition is hard rather than blended.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.faint .metal .energy .accent</b> <span>_main.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-textlabel style="text-align: left">TextLabel default &mdash; var(--Text), 14px Source Sans Pro</rbx-textlabel>
+      <rbx-textlabel class="faint" style="text-align: left">.faint &mdash; var(--TextFaint)</rbx-textlabel>
+      <rbx-textlabel class="metal" style="text-align: left">.metal &mdash; var(--Metal)</rbx-textlabel>
+      <rbx-textlabel class="energy" style="text-align: left">.energy &mdash; var(--Energy)</rbx-textlabel>
+      <rbx-textlabel class="accent" style="text-align: left">.accent &mdash; var(--Accent)</rbx-textlabel>
+    </div>
+    <p class="h-note"><code>text-align: left</code> is inline here only, to make the colours easy to
+      line up; the sheet's base rule centres these. <code>.metal</code>, <code>.energy</code> and
+      <code>.accent</code> are not used by any component today.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.heading · .readout</b> <span>_main.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="panel">
+        <rbx-textlabel class="heading">BOT LAB &mdash; .heading, Michroma 13 bold</rbx-textlabel>
+        <rbx-textlabel class="readout" style="font-size: 19px">1240 &mdash; .readout</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Both carry a 2px void text-stroke so they survive the plate's lit lip. Sat on
+      a <code>.panel</code> here because that is the only place the stroke earns itself.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.resource-chip · .resource-divider</b> <span>_resource_bar.scss</span></figcaption>
+    <div class="h-box" style="display: flex; gap: 20px; align-items: center">
+      <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+      <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+      <rbx-frame class="resource-divider"></rbx-frame>
+      <rbx-textlabel class="faint" style="text-align: left">4&times;14 chips, 2&times;44 divider</rbx-textlabel>
+    </div>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.resource-track · .resource-fill</b> <span>_resource_bar.scss · @include track/meter</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="resource-track">
+        <rbx-frame class="resource-fill" style="width: 62%; height: 100%"></rbx-frame>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-frame class="resource-track">
+        <rbx-frame class="resource-fill energy-fill" style="width: 38%; height: 100%"></rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">6px channel, dark floor, 1px outline at <code>darken($edge, 25%)</code>. The
+      meter runs from <code>darken(tone, 45%)</code> to <code>lighten(tone, 25%)</code>.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.vitals-track · .vitals-fill · .vitals-label</b> <span>_selection_panel.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="vitals-track">
+        <rbx-frame class="vitals-fill vitals-fill-good" style="width: 88%; height: 100%"></rbx-frame>
+        <rbx-textlabel class="vitals-label">2640 / 3000</rbx-textlabel>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-frame class="vitals-track">
+        <rbx-frame class="vitals-fill vitals-fill-worn" style="width: 48%; height: 100%"></rbx-frame>
+        <rbx-textlabel class="vitals-label">1440 / 3000</rbx-textlabel>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-frame class="vitals-track">
+        <rbx-frame class="vitals-fill vitals-fill-critical" style="width: 18%; height: 100%"></rbx-frame>
+        <rbx-textlabel class="vitals-label">540 / 3000</rbx-textlabel>
+      </rbx-frame>
+    </div>
+    <p class="h-note">18px channel with the numbers stamped on it. Green over 60%, amber over 30%, red and
+      pulsing below.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.badge</b> <span>_selection_panel.scss</span></figcaption>
+    <div class="h-box" style="display: flex; gap: 10px; align-items: center">
+      
+      <rbx-textlabel class="badge badge-blueprint">BLUEPRINT</rbx-textlabel>
+      <rbx-textlabel class="badge badge-count">12</rbx-textlabel>
+    </div>
+    <p class="h-note">17px tall, <code>width: auto</code>, 8px side padding &mdash; the only
+      shrink-to-fit box in a panel.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.resource-tile · .tile-rate-*</b> <span>_selection_panel.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="economy-row">
+        <rbx-frame class="resource-tile metal-tile">
+          <rbx-frame class="tile-rail metal-rail"></rbx-frame>
+          <rbx-frame class="tile-head">
+            <rbx-frame class="resource-chip metal-chip"></rbx-frame>
+            <rbx-textlabel class="tile-name metal">METAL</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="tile-rate">
+            <rbx-textlabel class="tile-rate-value tile-rate-gain">+2.5</rbx-textlabel>
+            <rbx-textlabel class="tile-rate-unit tile-rate-gain">/s</rbx-textlabel>
+          </rbx-frame>
+          <rbx-textlabel class="tile-cost">COST <b>150</b></rbx-textlabel>
+        </rbx-frame>
+        <rbx-frame class="resource-tile energy-tile tile-stalled">
+          <rbx-frame class="tile-rail energy-rail"></rbx-frame>
+          <rbx-frame class="tile-head">
+            <rbx-frame class="resource-chip energy-chip"></rbx-frame>
+            <rbx-textlabel class="tile-name energy">ENERGY</rbx-textlabel>
+            <rbx-textlabel class="tile-stall">SHORT</rbx-textlabel>
+          </rbx-frame>
+          <rbx-frame class="tile-rate">
+            <rbx-textlabel class="tile-rate-value tile-rate-loss">-12.0</rbx-textlabel>
+            <rbx-textlabel class="tile-rate-unit tile-rate-loss">/s</rbx-textlabel>
+          </rbx-frame>
+          <rbx-textlabel class="tile-cost">COST <b>1400</b></rbx-textlabel>
+        </rbx-frame>
+      </rbx-frame>
+    </div>
+    <p class="h-note">A tile per resource, tinted and lipped in its colour. The rate is big and signed: green
+      for income, red for upkeep, faint when idle. The cost sits underneath.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.queue-strip · .queue-chip</b> <span>_selection_panel.scss · @include cell</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="queue-strip" style="width: 260px">
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Co</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Co</rbx-textbutton>
+        <rbx-textbutton class="queue-chip">Gr</rbx-textbutton>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Hover one: the cell lights, then the chip's own <code>:hover</code> overrides
+      the accent outline with danger red, because cancelling is what a click does. Constrained to
+      260px here so the wrap is visible.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.build-grid · .build-option</b> <span>_build_menu.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="build-grid">
+        <rbx-textbutton class="build-option">
+          <rbx-textlabel class="build-option-name">Construction Bot</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">200</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">3000</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+        <rbx-textbutton class="build-option">
+          <rbx-textlabel class="build-option-name">Grunt</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">50</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">500</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+        <rbx-textbutton class="build-option unaffordable">
+          <rbx-textlabel class="build-option-name">Bot Lab</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">500</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">10000</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+        <rbx-textbutton class="build-option">
+          <rbx-textlabel class="build-option-name">Grunt</rbx-textlabel>
+          <rbx-frame class="build-cost">
+            <rbx-textlabel class="cost cost-metal">50</rbx-textlabel>
+            <rbx-textlabel class="cost cost-energy">500</rbx-textlabel>
+          </rbx-frame>
+        </rbx-textbutton>
+      </rbx-frame>
+    </div>
+    <p class="h-note">Three 76px columns, 8px gaps, content bottom-aligned
+      (<code>justify-content: flex-end</code>). Hover and press to see the <code>cell</code>
+      mixin's three states. Four options so the second row shows.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.build-hint · .grow</b> <span>_build_menu.scss, _main.scss</span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="build-title" style="width: 244px">
+        <rbx-textlabel class="heading grow">Bot Lab</rbx-textlabel>
+        <rbx-textlabel class="badge">.grow pushes me</rbx-textlabel>
+      </rbx-frame>
+      <rbx-frame style="height: 10px"></rbx-frame>
+      <rbx-textlabel class="build-hint" style="width: 244px">Left click to place, [ ] to rotate, right click to cancel</rbx-textlabel>
+    </div>
+    <p class="h-note">Both at the menu's 244px content width. The hint is the sheet's only italic,
+      and its <code>width: 100%</code> exists purely to give the text something to wrap against.</p>
+  </figure>
+
+  <figure class="h-cell">
+    <figcaption><b>.accent-bar</b> <span>not in the sheet <span class="h-tag h-gap">gap</span></span></figcaption>
+    <div class="h-box">
+      <rbx-frame class="selection-title" style="width: 298px">
+        <rbx-frame class="accent-bar"></rbx-frame>
+        <rbx-textlabel class="selection-name">Bot Lab</rbx-textlabel>
+        
+      </rbx-frame>
+    </div>
+    <p class="h-note">Three components render an <code>accent-bar</code> Frame
+      (selection_panel.luau:96 and :154, build_menu.luau:146) and no rule defines it. In the browser
+      it collapses to nothing, as above. In Roblox an unstyled Frame keeps its defaults &mdash; a
+      white 100&times;100 box &mdash; so this is the one divergence where the two renders should
+      look nothing alike. <code>@include rail</code> in a <code>.accent-bar</code> rule, or dropping
+      the three Frames, settles it either way.</p>
+  </figure>
+
+</div>
+
+<h2>4 &mdash; What the two renders cannot agree on</h2>
+<ol class="h-list">
+  <li><b>Nothing here is authoritative about Roblox.</b> The harness block at the top of this file
+    is five guesses about GuiObject defaults (box, border-box, positioning context, no flex shrink,
+    vertically centred text). Where this render and Roblox differ, suspect those first.</li>
+  <li><b><code>opacity: .97</code> on <code>.panel</code> composites differently.</b> CSS opacity
+    applies to the whole subtree, so panel text is 97% opaque too; Roblox
+    <code>BackgroundTransparency</code> touches only the fill. Every panel is affected.</li>
+  <li><b><code>.resource</code> eats its bar's padding.</b> Measured here: the bar is 620&times;76
+    with 16px of vertical padding, leaving a 44px content box, and the column inside resolves to
+    68.5px (28px head + 6px track + 17.7px income + two 8px gaps). Centred, it runs from y=3.75 to
+    y=72.25, so it stays inside the plate but the 16px padding buys nothing. Whether Roblox clips,
+    overflows or grows the bar depends on what outlass does with <code>height: auto</code> &mdash;
+    probably the single most useful thing to diff.</li>
+  <li><b>Text that does not fit.</b> A <code>.build-option</code> is 76px wide with 8px padding, so
+    its content box is 60px; "Construction Bot" at 12px bold measures 63px and, because the option
+    centres rather than stretches its children, it overflows by 3px on each side instead of
+    wrapping. Where text does wrap &mdash; <code>.build-hint</code> at 244px &mdash; Roblox lays
+    lines out at the font's own height while the browser adds its <code>normal</code> leading of
+    about 1.2, so multi-line boxes will not agree on height either.</li>
+  <li><b><code>-webkit-text-stroke</code> is approximated.</b> The sheet writes the property both
+    sides understand, but Roblox strokes a glyph outward where the browser centres the stroke on
+    the outline, so <code>paint-order: stroke fill</code> is doing the work of keeping it behind
+    the glyph. Expect the browser's to read slightly heavier.</li>
+  <li><b><code>@priority 20</code> on <code>.stalling</code> does nothing here.</b> It is commented
+    out. The browser gets the same result anyway, by source order: <code>.stalling</code> comes
+    after <code>.resource-amount</code> at equal specificity.</li>
+  <li><b>The hazard stripes are a 16-keypoint expansion.</b> Both sides read the same
+    <code>repeating-linear-gradient</code>: the browser renders it natively, while outlass writes
+    the pattern out stop by stop into a UIGradient, which caps at 20 keypoints. Both interpolate in
+    sRGB, so the colour ramps should match closely &mdash; the stop positions are the thing to
+    check.</li>
+  <li><b><code>@include seam</code> is never called.</b> The mixin is defined in _mixins.scss and no
+    rule uses it, so there is nothing to render and nothing to compare.</li>
+  <li><b><code>.metal-fill</code> is referenced but undefined.</b> resource_bar.luau tags the metal
+    fill <code>resource-fill metal-fill</code>; only <code>.energy-fill</code> exists as a rule.
+    Harmless &mdash; <code>.resource-fill</code> is already the metal tone &mdash; but the class name
+    suggests a rule that is not there.</li>
+  <li><b>Hover and press states only exist here.</b> <code>.queue-chip</code> and
+    <code>.build-option</code> come from <code>@include cell</code>, which has
+    <code>:hover</code>, <code>:active</code> and <code>:disabled</code>. Nothing in the components
+    is ever disabled, so that branch is untested on both sides.</li>
+</ol>
+
+</div>
+
+<script>
+// Fit the 1920x1080 stage to the window, and report the scale so a screenshot can be matched.
+function fit() {
+  var vp = document.querySelector(".h-viewport");
+  var stage = document.querySelector(".h-stage");
+  var s = Math.min(1, vp.clientWidth / 1920);
+  stage.style.setProperty("--h-fit", s);
+  vp.style.height = Math.round(1080 * s) + "px";
+  document.getElementById("h-scale").textContent =
+    s === 1 ? "stage 1:1" : "stage " + (s * 100).toFixed(1) + "% of 1920×1080";
+}
+addEventListener("resize", fit);
+fit();
+
+[["h-noinset", "h-noinset"], ["h-bounds", "h-bounds"], ["h-checker", "h-checker"]].forEach(function (pair) {
+  var box = document.getElementById(pair[0]);
+  box.addEventListener("change", function () {
+    document.body.classList.toggle(pair[1], box.checked);
+  });
+});
+</script>
+</body>
 </html>

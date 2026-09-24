@@ -24,7 +24,7 @@ local function is_drowning(entity: Entity): boolean
 	if entity.kind ~= "unit" or entity.state ~= "active" or entity.alive == false then
 		return false
 	end
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	if unit_defs.is_air(def) then
 		return false
 	end

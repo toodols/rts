@@ -605,8 +605,8 @@ local function run(log: (string) -> ())
 		-- warped for the whole run so every scenario is measured over a fixed number of ticks
 		-- rather than however many ticks real time happens to buy it - restored to whatever it
 		-- actually was once every scenario is done, win or not, same as scavengers above
-		local was_warping = warp.is_warping()
-		warp.set(true)
+		local was_remaining = warp.ticks_remaining()
+		warp.start(nil)
 
 		task.wait(config.TICK_DELTA * 3)
 
@@ -651,7 +651,7 @@ local function run(log: (string) -> ())
 		end
 
 		scavengers.set_enabled(was_enabled)
-		warp.set(was_warping)
+		warp.start(was_remaining)
 
 		table.insert(lines, "")
 		-- wall-clock, not sim time: with every scenario now warped to a fixed tick count (see

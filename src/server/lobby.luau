@@ -1,9 +1,16 @@
 -- Getting the game started (see shared/game_phase.luau). While it is waiting nothing steps: each player's client
--- says when it has loaded, and each player chooses a start among the map's, one to a player. With every player loaded
--- and on a start it counts down, and when the countdown is out every team's commander is put on its start and the game
--- is playing. Someone arriving, or leaving the rest all ready, is taken account of whenever it happens; during the
--- countdown, anyone not ready sends it back to waiting. A player arriving once the game is playing is given the first
--- start nobody has and their commander at once.
+-- says when it has loaded, and each player chooses where to start, anywhere in their team's start box (`starts`) that
+-- a team can start on. With every player loaded and a start chosen it counts down, and when the countdown is out every
+-- team's commander is put where its player chose and the game is playing. Someone arriving, or leaving the rest all
+-- ready, is taken account of whenever it happens; during the countdown, anyone not ready sends it back to waiting. A
+-- player arriving once the game is playing starts in their box at once, where the box's usual start is.
+--
+-- A team's box is its side's: allied teams share one, as BAR's ally teams do, and the sides take the boxes in order of
+-- their lowest team, so a match's first side (see match.luau) has the first box. A player's box can change while the
+-- game is waiting, as others arrive and leave; a start chosen in the old box is dropped, to be chosen again.
+--
+-- In a campaign mission there is nothing to choose: the player's start is the mission's (missions.player_start), set
+-- as they arrive, so the game waits only for their client to load.
 --
 -- A session nobody plays in, a Studio test or Run, skips all of it and plays from the start.
 
@@ -11,40 +18,78 @@ local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
+local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
+local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local starts = require(ReplicatedStorage.Shared.starts)
 
 local players = require(script.Parent.players)
 local spawning = require(script.Parent.spawning)
+local alliances = require(script.Parent.alliances)
+local match = require(script.Parent.match)
+local missions = require(script.Parent.missions)
+
+type TeamId = types.TeamId
 
 local client_loaded: RemoteEvent = ReplicatedStorage.Shared.ClientLoaded
 local choose_start: RemoteEvent = ReplicatedStorage.Shared.ChooseStart
-
--- The player on each start, by slot.
-local function taken(): { [number]: Player }
-	local by_slot = {}
-	for _, player in Players:GetPlayers() do
-		local slot = game_phase.start_of(player)
-		if slot ~= nil then
-			by_slot[slot] = player
-		end
-	end
-	return by_slot
-end
 
 local function is_ready(player: Player): boolean
 	return game_phase.is_loaded(player) and game_phase.start_of(player) ~= nil
 end
 
--- Puts `player`'s team's commander on the start they chose.
+-- Gives every player here, but `leaving`, the start box of their side: every team a match seated counts, so that its
+-- sides keep their boxes while their players are still arriving. A start no longer in its player's box is dropped.
+local function assign_boxes(leaving: Player?)
+	local teams: { [TeamId]: boolean } = {}
+	for team_id = 1, match.seated_count() do
+		teams[team_id] = true
+	end
+	for _, player in Players:GetPlayers() do
+		local team_id = players.team_of(player)
+		if player ~= leaving and team_id ~= nil then
+			teams[team_id] = true
+		end
+	end
+	-- each side by the lowest team on it, and the sides in that order
+	local lowest_of_side: { [TeamId]: TeamId } = {}
+	for team_id in teams do
+		local root = alliances.root_of(team_id)
+		local lowest = lowest_of_side[root]
+		if lowest == nil or team_id < lowest then
+			lowest_of_side[root] = team_id
+		end
+	end
+	local order: { TeamId } = {}
+	for _, lowest in lowest_of_side do
+		table.insert(order, lowest)
+	end
+	table.sort(order)
+
+	for _, player in Players:GetPlayers() do
+		local team_id = players.team_of(player)
+		if player == leaving or team_id == nil then
+			continue
+		end
+		local side = table.find(order, lowest_of_side[alliances.root_of(team_id)]) :: number
+		local index = (side - 1) % starts.box_count() + 1
+		game_phase.set_box(player, index)
+		local chosen = game_phase.start_of(player)
+		if chosen ~= nil and starts.in_box(index, chosen.X, chosen.Z) == false then
+			game_phase.set_start(player, nil)
+		end
+	end
+end
+
+-- Puts `player`'s team's commander where they chose to start.
 local function spawn(player: Player)
 	local team_id = players.team_of(player)
-	local slot = game_phase.start_of(player)
-	if team_id == nil or slot == nil then
+	local chosen = game_phase.start_of(player)
+	if team_id == nil or chosen == nil then
 		return
 	end
-	spawning.set_start(team_id, slot)
+	spawning.set_start(team_id, Vector2.new(chosen.X, chosen.Z))
 	spawning.give_starting_force(team_id)
 end
 
@@ -58,14 +103,15 @@ end
 -- Moves between waiting and counting down as players become ready or stop being, once there is anyone at all.
 -- `leaving` is a player on their way out, who no longer counts.
 local function evaluate(leaving: Player?)
-	local phase = game_phase.phase()
-	if phase == "playing" then
+	if game_phase.has_begun() then
 		return
 	end
+	local phase = game_phase.phase()
 	local count = 0
 	local ready = true
 	for _, player in Players:GetPlayers() do
-		if player == leaving then
+		-- a spectator has no team, and nothing to be ready for
+		if player == leaving or players.team_of(player) == nil then
 			continue
 		end
 		count += 1
@@ -73,7 +119,8 @@ local function evaluate(leaving: Player?)
 			ready = false
 		end
 	end
-	ready = ready and count > 0
+	-- a game a lobby started also waits for everyone it sent (see match.luau)
+	ready = ready and count > 0 and match.is_awaiting() == false
 	if ready and phase == "waiting" then
 		game_phase.set_phase("countdown", Workspace:GetServerTimeNow() + config.START_COUNTDOWN_SECONDS)
 	elseif ready == false and phase == "countdown" then
@@ -81,54 +128,95 @@ local function evaluate(leaving: Player?)
 	end
 end
 
-local function on_choose(player: Player, slot: unknown)
-	if game_phase.is_playing() then
+-- A start is taken if it is in the player's own box, on the map, and somewhere a team can start.
+local function on_choose(player: Player, position: unknown)
+	if game_phase.has_begun() or typeof(position) ~= "Vector3" then
 		return
 	end
-	if typeof(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > starts.count() then
+	-- a campaign mission says where its player starts
+	if missions.player_start() ~= nil then
 		return
 	end
-	local holder = taken()[slot]
-	if holder ~= nil and holder ~= player then
+	local index = game_phase.box_of(player)
+	if index == nil or heightmap.in_bounds(position.X, position.Z) == false then
 		return
 	end
-	game_phase.set_start(player, slot)
+	if
+		starts.in_box(index, position.X, position.Z) == false
+		or starts.can_start_at(position.X, position.Z) == false
+	then
+		return
+	end
+	game_phase.set_start(player, heightmap.ground_position(position.X, position.Z))
 	evaluate()
 end
 
--- A player the game has begun without: they take the first start nobody has, or share the first if all are taken.
+-- A player the game has begun without starts where their box's usual start is, unless they chose already.
 local function join_late(player: Player)
-	if game_phase.start_of(player) == nil then
-		local by_slot = taken()
-		local slot = 1
-		for candidate = 1, starts.count() do
-			if by_slot[candidate] == nil then
-				slot = candidate
-				break
-			end
-		end
-		game_phase.set_start(player, slot)
+	assign_boxes()
+	local index = game_phase.box_of(player)
+	if game_phase.start_of(player) == nil and index ~= nil then
+		local spot = starts.default_spot(index)
+		game_phase.set_start(player, heightmap.ground_position(spot.X, spot.Y))
 	end
 	spawn(player)
 end
 
+-- A new map, while the game is playing: nobody has chosen anywhere on it, so every player starts where their box's usual
+-- start is, or where the campaign mission being played says. Called once it is built, before the commanders go down.
+local function restart_on_new_map()
+	assign_boxes()
+	local mission_start = missions.player_start()
+	for _, player in Players:GetPlayers() do
+		local index = game_phase.box_of(player)
+		local team_id = players.team_of(player)
+		if index == nil or team_id == nil then
+			continue
+		end
+		local spot = if mission_start ~= nil then mission_start else starts.default_spot(index)
+		game_phase.set_start(player, heightmap.ground_position(spot.X, spot.Y))
+		spawning.set_start(team_id, spot)
+	end
+end
+
 -- Called once a player has been given a team.
 local function player_added(player: Player)
+	-- someone arriving once it is over has nothing to join
+	if game_phase.phase() == "ended" then
+		return
+	end
+	-- in a campaign mission they start where it says, and have nothing to choose: only their client to load
+	local mission_start = missions.player_start()
+	if mission_start ~= nil and players.team_of(player) ~= nil and game_phase.start_of(player) == nil then
+		game_phase.set_start(player, heightmap.ground_position(mission_start.X, mission_start.Y))
+	end
 	if game_phase.is_playing() then
 		join_late(player)
 		return
 	end
+	assign_boxes()
 	evaluate()
 end
 
 local function player_removing(player: Player)
 	-- they are still in the list while this runs
+	if game_phase.has_begun() == false then
+		assign_boxes(player)
+	end
 	evaluate(player)
 end
 
--- Counts the countdown out. Runs every frame, stepping or not.
+-- Counts the countdown out, and while waiting keeps who is still on their way up to date: someone arriving, or the
+-- wait for them running out, can be what makes everyone ready. Runs every frame, stepping or not.
 local function tick()
-	if game_phase.phase() ~= "countdown" then
+	local phase = game_phase.phase()
+	if phase == "waiting" then
+		if match.update() then
+			evaluate()
+		end
+		return
+	end
+	if phase ~= "countdown" then
 		return
 	end
 	local ends = game_phase.countdown_ends()
@@ -152,4 +240,5 @@ return table.freeze({
 	tick = tick,
 	player_added = player_added,
 	player_removing = player_removing,
+	restart_on_new_map = restart_on_new_map,
 })

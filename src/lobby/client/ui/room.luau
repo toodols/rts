@@ -1,5 +1,6 @@
 -- The lobby this player is in: the map on the left, the mode and the players on the right, and leaving or starting
--- along the bottom of them.
+-- along the bottom of them. Every player but the host marks themselves ready there, and the host can start once they
+-- all have.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -7,6 +8,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local React = require(ReplicatedStorage.Packages.react)
 
 local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local game_modes = require(ReplicatedStorage.Shared.game_modes)
 
 local protocol = require(ReplicatedStorage.Lobby.protocol)
 
@@ -24,16 +26,23 @@ local local_player = Players.LocalPlayer
 
 -- Why the lobby cannot start, or a warning worth showing beside the start button even though it can.
 local function status_of(lobby: LobbyView, is_host: boolean): (string, boolean)
+	if lobby.teleporting then
+		return "Teleporting to the game...", false
+	end
 	if lobby.starting then
-		return "Starting the game...", false
+		return "Reserving a server...", false
 	end
 	if lobby.blocked ~= nil then
 		return lobby.blocked, true
 	end
-	if map_presets.presets[lobby.preset] ~= nil then
+	-- in a co-op mission everyone starts where the mission says, however many starts its map has
+	local mode = game_modes.get(lobby.mode)
+	local mission = mode ~= nil and mode.kind == "campaign"
+	if mission == false and map_presets.presets[lobby.preset] ~= nil then
 		local starts = map_preview.info(lobby.preset).starts
-		if #lobby.seats > starts then
-			return `{#lobby.seats} players on a map with {starts} starts: some will share`, true
+		local players = game_modes.player_count(lobby.seats)
+		if players > starts then
+			return `{players} players on a map with {starts} starts: some will share`, true
 		end
 	end
 	if is_host then
@@ -47,9 +56,18 @@ local function Room(props: {
 	act: (action: string, argument: any?) -> (),
 })
 	local lobby = props.lobby
+	local mode = game_modes.get(lobby.mode)
 	local is_host = lobby.host == local_player.UserId
 	local status, warning = status_of(lobby, is_host)
 	local can_start = is_host and lobby.blocked == nil and lobby.starting == false
+	-- whether this is a player who is not the host, who has to say they are ready
+	local must_ready = false
+	for _, seat in lobby.seats do
+		if seat.user_id == local_player.UserId and is_host == false and seat.side ~= game_modes.SPECTATOR_SIDE then
+			must_ready = true
+		end
+	end
+	local ready = table.find(lobby.ready, local_player.UserId) ~= nil
 
 	return React.createElement("Frame", {
 		[React.Tag] = "room",
@@ -58,7 +76,8 @@ local function Room(props: {
 			preset = lobby.preset,
 			seed = lobby.seed,
 			is_host = is_host,
-			players = #lobby.seats,
+			fixed = mode ~= nil and mode.kind == "campaign",
+			players = game_modes.player_count(lobby.seats),
 			act = props.act,
 		}),
 		Side = React.createElement("Frame", {
@@ -68,6 +87,7 @@ local function Room(props: {
 			Settings = React.createElement(settings_panel.SettingsPanel, {
 				mode = lobby.mode,
 				visibility = lobby.visibility,
+				ally_griefing = lobby.ally_griefing,
 				is_host = is_host,
 				act = props.act,
 			}),
@@ -100,6 +120,16 @@ local function Room(props: {
 						locked = not can_start,
 						on_press = function()
 							props.act(ACTIONS.start)
+						end,
+						LayoutOrder = 3,
+					})
+					elseif must_ready then React.createElement(controls.Button, {
+						kind = "button",
+						tag = if ready then nil else "primary",
+						label = if ready then "Not ready" else "Ready",
+						locked = lobby.starting,
+						on_press = function()
+							props.act(ACTIONS.set_ready, not ready)
 						end,
 						LayoutOrder = 3,
 					})

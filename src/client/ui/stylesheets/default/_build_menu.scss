@@ -1,3 +1,4 @@
+@use "sass:color";
 @use "theme" as *;
 @use "mixins" as *;
 // `.build-option.unaffordable` extends `.hazard`, which _main.scss declares: an @extend only
@@ -34,10 +35,6 @@
 	width: 96px;
 	height: 96px;
 	@include cell;
-	@include stack(column, space(1));
-	justify-content: flex-end;
-	align-items: center;
-	padding: space(2);
 
 	// hazard stripes read as "blocked" far faster than a dimmed border does
 	&.unaffordable {
@@ -47,44 +44,55 @@
 	}
 }
 
-.build-tabs {
+// The text of an option, stacked at the foot of the cell over its icon.
+.build-option-body {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(1));
+	justify-content: flex-end;
+	align-items: center;
+	padding: space(2);
+	background-color: transparent;
+	z-index: 1;
+	pointer-events: none;
+}
+
+// The first page: one full-width row per category, stacked.
+.build-category-list {
 	width: 100%;
 	height: auto;
-	@include stack(row, space(1));
+	@include stack(column, space(2));
 }
 
-// One category. The key that starts it is written beside its name, and the open one is lit.
-.build-tab {
-	width: 74px;
-	height: 34px;
+.build-category-row {
+	width: 100%;
+	height: auto;
 	@include cell;
 	@include stack(column, 0);
-	justify-content: center;
+}
+
+// The row's header: the category's name, and the key that starts it at the far end.
+.build-category-header {
+	width: 100%;
+	height: 22px;
+	@include stack(row, space(2));
 	align-items: center;
-
-	&.active {
-		background-color: $steel-lit;
-		outline: 1px solid var(--Accent);
-	}
+	padding: 0 space(2);
+	background-image: linear-gradient(90deg, veil($accent, 0.35), veil($accent, 0.05));
 }
 
-.build-tab-name {
+.build-category-name {
+	height: auto;
 	color: var(--Text);
-	font-size: 10px;
+	font-size: 12px;
 	font-weight: bold;
+	text-align: left;
 }
 
-.build-tab-key {
-	color: var(--Accent);
-	font-family: RobotoMono;
-	font-size: 10px;
-	font-weight: bold;
-}
-
-.build-option-key {
-	position: absolute;
-	right: space(1);
-	top: space(1);
+.build-category-key,
+.build-page-key {
 	width: auto;
 	height: auto;
 	padding: 0 space(1);
@@ -94,6 +102,102 @@
 	font-family: RobotoMono;
 	font-size: 11px;
 	font-weight: bold;
+}
+
+// Under the header, the building the key places: its picture, then its name and cost.
+.build-category-body {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: space(1) space(2);
+}
+
+.build-category-icon {
+	width: 56px;
+	height: 56px;
+	background-color: transparent;
+	pointer-events: none;
+}
+
+.build-category-info {
+	height: auto;
+	@include stack(column, 2px);
+	align-items: flex-start;
+}
+
+.build-category-building {
+	color: var(--Text);
+	font-size: 14px;
+	font-weight: bold;
+	text-align: left;
+}
+
+.build-category-subtitle {
+	color: var(--TextFaint);
+	font-size: 12px;
+	text-align: left;
+}
+
+// Inside a category: a banner under the title naming it, lit in the accent so the page reads as a place of its own.
+.build-page-header {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+	padding: space(2);
+	background-image: linear-gradient(90deg, veil($accent, 0.4), veil($accent, 0.08));
+	outline: 1px solid var(--Accent);
+}
+
+.build-page-name {
+	height: auto;
+	color: var(--Text);
+	font-size: 16px;
+	font-weight: bold;
+	text-align: left;
+}
+
+.build-page-back {
+	width: auto;
+	height: auto;
+	color: var(--TextDim);
+	font-size: 11px;
+	font-style: italic;
+}
+
+.build-option-key {
+	position: absolute;
+	right: space(1);
+	top: space(1);
+	z-index: 2;
+	width: auto;
+	height: auto;
+	padding: 0 space(1);
+	background-color: veil($void, 0.7);
+	outline: 1px solid var(--Accent);
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+}
+
+// The option's model, drawn behind everything else in the cell; the camera leaves the bottom of it to the
+// name and cost, which are shadowed so they still read where they cross the model.
+.build-option-icon {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.build-option-name,
+.build-option-subtitle,
+.cost {
+	z-index: 1;
 }
 
 .build-option-name {
@@ -131,4 +235,82 @@
 .build-option-subtitle {
 	color: var(--TextFaint);
 	font-size: 12px;
+}
+
+// Locked: not unlocked through the campaign yet. Still listed, so it can be seen what there is to earn, but sunk into
+// the plate: darker, flat, a dim edge instead of a lit one, and nothing lights when it is hovered (it is a plain
+// frame, not a button, so it has no hover or press state to light). The picture is greyed in build_menu.luau as well
+// as here, since the model's own colours are drawn by the viewport.
+.build-option.locked,
+.build-category-row.locked {
+	background-color: color.adjust($steel-raised, $lightness: -5%);
+	// five stripes: a ColorSequence holds 20 keypoints, and narrower ones ran out of them partway across (outlass)
+	background-image: repeating-linear-gradient(45deg, veil($void, 0.35) 0 10%, transparent 10% 20%);
+	outline: 1px solid veil($edge, 0.7);
+}
+
+.build-option.locked .build-option-name,
+.build-category-row.locked .build-category-building {
+	color: var(--TextFaint);
+}
+
+// its header dimmed to match
+.build-category-row.locked .build-category-header {
+	background-image: linear-gradient(90deg, veil($edge, 0.35), veil($edge, 0.05));
+}
+
+// Faded; build_menu.luau greys the model's own parts.
+.locked-icon {
+	opacity: 0.55;
+}
+
+// The lock, where the key would be: the key does nothing for a locked option.
+.build-option-lock,
+.build-category-lock {
+	width: auto;
+	height: auto;
+	padding: 0 space(1);
+	background-color: veil($void, 0.7);
+	outline: 1px solid veil($edge, 0.8);
+	font-size: 12px;
+}
+
+.build-option-lock {
+	position: absolute;
+	right: space(1);
+	top: space(1);
+	z-index: 2;
+}
+
+// LOCKED, where the cost would be.
+.build-locked-label {
+	width: auto;
+	height: auto;
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+	z-index: 1;
+}
+
+// The tutorial's pointer at the button it wants clicked (see build_menu.luau's TutorialPointer, which places it and
+// bobs it, so nothing here sets where it is): the button lit in the colour of something to do, and a tag beside it.
+// The outline is a literal colour rather than var(--Gain), whose colour outlass drops from an outline.
+.tutorial-highlight {
+	outline: 2px solid $gain;
+}
+
+.tutorial-pointer {
+	width: auto;
+	height: auto;
+	padding: 4px 10px;
+	border-radius: 4px;
+	background-color: $gain;
+	color: $void;
+	font-family: RobotoMono;
+	font-size: 14px;
+	font-weight: bold;
+	white-space: nowrap;
+	z-index: 20;
+	pointer-events: none;
 }

@@ -844,6 +844,11 @@ AwICAgIDAwMDAwMDAwMDAwMDBAQDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwICAwMD]],
 		Vector2.new(0.0625, 0.8125),
 		Vector2.new(0.9375, 0.1875),
 	},
+	-- each team's start box, where its players choose to start, from BAR's map list, the same way
+	start_boxes = {
+		{ min = Vector2.new(0.0000, 0.7500), max = Vector2.new(0.2500, 1.0000) },
+		{ min = Vector2.new(0.7500, 0.0000), max = Vector2.new(1.0000, 0.2500) },
+	},
 	metal = {
 		{ at = Vector2.new(0.7876, 0.0356), rich = false },
 		{ at = Vector2.new(0.9453, 0.0479), rich = false },

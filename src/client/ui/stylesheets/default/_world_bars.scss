@@ -7,6 +7,7 @@
 	@include stack(column, 2px);
 	align-items: center;
 	width: 52px;
+	height: auto;
 	pointer-events: none;
 }
 
@@ -16,8 +17,6 @@
 	font-family: Michroma;
 	font-size: 10px;
 	color: var(--Text);
-	text-shadow: 0 1px 2px black;
-	letter-spacing: 0.08em;
 	white-space: nowrap;
 }
 
@@ -30,13 +29,11 @@
 	border-radius: 50%;
 	background-color: $void;
 	border: 1px solid veil(black, 0.4);
-	box-shadow: 0 1px 2px black;
 }
 
 .bar-track {
 	@include track(6px);
 	background-color: veil($void, 0.85);
-	box-shadow: 0 1px 3px veil(black, 0.6);
 }
 
 // Left without `height: 100%`, which is how this would be written on the web. outlass turns that into
@@ -64,6 +61,11 @@
 		@include meter($metal);
 	}
 
+	// what is left of a reclaimable that still has energy in it
+	&.reclaim.energy {
+		@include meter($energy);
+	}
+
 	// how far along a wreck is to being raised
 	&.resurrect {
 		@include meter($resurrect);
@@ -79,8 +81,6 @@
 	font-family: RobotoMono;
 	font-size: 11px;
 	color: var(--Accent);
-	text-shadow: 0 1px 2px black;
-	letter-spacing: 0.04em;
 	white-space: nowrap;
 
 	&.decaying {
@@ -94,29 +94,12 @@
 	}
 }
 
-// How this would be written on the web: a hard two-step flash on the whole readout.
-@keyframes flash {
-	0%,
-	49% {
-		opacity: 1;
-	}
-	50%,
-	100% {
-		opacity: 0.2;
-	}
-}
-
-.bar-eta.decaying {
-	animation: flash 0.66s steps(1) infinite;
-}
-
 // What a shooter says when it cannot fire for want of energy. Energy is yellow; the flash is the same
 // state toggle the decay readout uses.
 .bar-warning {
 	font-family: RobotoMono;
 	font-size: 11px;
 	color: var(--Energy);
-	text-shadow: 0 1px 2px black;
 	white-space: nowrap;
 
 	&.lit {
@@ -144,7 +127,5 @@
 	font-family: RobotoMono;
 	font-size: 11px;
 	color: var(--Metal);
-	text-shadow: 0 1px 2px black;
-	letter-spacing: 0.04em;
 	white-space: nowrap;
 }

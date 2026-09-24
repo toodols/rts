@@ -99,6 +99,9 @@ local WIND_MAX_DELTA = 4
 -- buildpower_cost that reclaiming the wreck has to chew through.
 local WRECK_METAL_FRACTION = 0.5
 local WRECK_BUILDPOWER_FRACTION = 0.2
+-- The fraction of a reclaimable's buildpower, its def's or its map's, that reclaiming it takes: a rock or a tree is
+-- quick work, so clearing ground does not tie a builder up
+local RECLAIMABLE_BUILDPOWER_FRACTION = 0.1
 -- how much damage a wreck takes before it is gone, as a fraction of what the thing it was had in health
 local WRECK_HEALTH_FRACTION = 0.5
 
@@ -145,11 +148,30 @@ local NON_AA_AIR_DAMAGE_FRACTION = 0.15
 -- How long an aircraft with nothing to do hovers before it settles onto the ground. One on wings cannot hover, and
 -- comes down at once.
 local AIR_LAND_DELAY = 2
+-- How near an enemy has to be to something stealthy (`EntityDef.stealth`) for its weapons to pick it as a target,
+-- in studs: about BAR's line of sight for a light unit, which is all it has to spot something its radar does not show.
+local STEALTH_DETECTION_RANGE = 32
+-- A hovering aircraft working on something or shooting at it keeps on the move round it, on a spot in a ring about
+-- it that it picks afresh every so often (see server/orbits.luau): a builder every ORBIT_BUILD_REPICK seconds or so,
+-- and a gunship every ORBIT_GUNSHIP_REPICK, each give or take ORBIT_REPICK_JITTER of that. The ring runs from
+-- ORBIT_INNER to ORBIT_OUTER of how far it reaches, and each pick is the best of ORBIT_CANDIDATES spots.
+local ORBIT_BUILD_REPICK = 4
+local ORBIT_GUNSHIP_REPICK = 2
+local ORBIT_REPICK_JITTER = 0.5
+local ORBIT_INNER = 0.55
+local ORBIT_OUTER = 0.8
+local ORBIT_CANDIDATES = 10
 -- A missile is gone after this many seconds in the air, which is longer than the flight of any rocket, since
 -- one that climbs and crosses the map takes a while.
 local MISSILE_MAX_AGE = 120
 -- How fast a missile turns onto a new heading, as the fraction of the turn it makes in a second's flight.
 local MISSILE_TURN_RATE = 6
+-- How fast a homing projectile turns, in radians a second, where its weapon does not say.
+local HOMING_TURN_RATE = 4
+-- The chance an anti-air missile misses whatever its target does: it is fired to pass just clear of it, and falls away
+-- once it has. A homing missile does not otherwise miss something that stays in its reach, so without this every one
+-- would be certain to hit.
+local HOMING_MISS_CHANCE = 0.1
 -- Transports. A unit takes a slot for every this many studs of its radius, and a transport sets down what it
 -- carries this far apart beyond their colliders.
 local TRANSPORT_SLOT_RADIUS = 1.5
@@ -179,44 +201,71 @@ local RECLAIM_RANGE = 24
 local RESURRECT_RANGE = 24
 local RESURRECT_HEALTH_FRACTION = 0.5
 
--- Scavengers. A gamemode where the map fights back: every few minutes a beacon appears somewhere on the
--- map, and while it stands it keeps producing hostile units and defences that roam looking for players.
--- The scavengers are a team of their own, which is what makes everything they own an enemy of every player.
+-- The skin (shared/skins) every team starts in, and what everything wears that nobody chose a skin for: units as they
+-- are. Every special skin is opt in: a team wears one only when its player has equipped it, or a developer's command
+-- puts it on. shared/skins refuses a default that is anything but plain.
+local DEFAULT_SKIN = "default"
+
+-- Scavengers. A gamemode where the map fights back: as the game begins a beacon stands in a start box nobody was
+-- given, and more follow, each near one already standing, so that they spread out over the map. While a beacon
+-- stands it keeps producing hostile units and defences that roam looking for players. When the last beacon falls, or
+-- the progress runs out, their boss comes, and killing it wins. The scavengers are a team of their own, which is what
+-- makes everything they own an enemy of every player.
 local SCAVENGERS_ENABLED = true
 local SCAVENGER_TEAM = 100
--- How far along the game is runs from 0 to 1 over this many seconds, an hour, and it is all that decides when
--- things happen: the first beacon comes once it reaches this much, and after that at a random gap between one
--- beacon and the next.
+-- How far along the game is runs from 0 to 1 over this many seconds, and it is all that decides when things
+-- happen: the beacons make nothing until it reaches SCAVENGER_SPAWN_PROGRESS, and from then on another beacon
+-- comes at a random gap after the last.
 local SCAVENGER_GAME_LENGTH = 4800
-local SCAVENGER_FIRST_BEACON_PROGRESS = 0.06
--- What the scavengers may field, in difficulty (a thing's metal plus its energy, over 60), grows exponentially
--- with progress from this much at the start. How fast is worked out from the next two numbers: by the progress
--- given, the budget has reached this many times the hardest thing they can make. That is not once, because they
--- spend nearly all of it on what is cheaper as it grows, and a budget that only just covered the hardest thing
--- would leave no room for it until well after. So by then everything in the game is on offer, as the game has no
--- third tier to hold back, and the budget goes on growing past it, into more of the same.
+local SCAVENGER_SPAWN_PROGRESS = 0.05
+-- The hardest single thing a beacon may make now, in difficulty (a thing's metal plus its energy, over 60), which is
+-- also the difficulty the players see. It runs from SCAVENGER_BUDGET_START at the start of the game to
+-- SCAVENGER_BUDGET_END at the end, a little slower than exponentially: it is START * (END / START) ^ (progress ^
+-- SCAVENGER_BUDGET_SHAPE), and a shape under 1 has it gain fastest early and ease off late, where 1 would be
+-- exponential. With these numbers the Juggernaut (10,733) comes in at about 70% and the Calamity (14,467), the
+-- hardest thing there is, at about 74%.
 local SCAVENGER_BUDGET_START = 20
-local SCAVENGER_ROSTER_PROGRESS = 0.5
-local SCAVENGER_ROSTER_COPIES = 3
+local SCAVENGER_BUDGET_END = 100000
+local SCAVENGER_BUDGET_SHAPE = 0.85
 local SCAVENGER_BEACON_INTERVAL_MIN = 180
 local SCAVENGER_BEACON_INTERVAL_MAX = 300
 -- Beacons that stand at once; no new one arrives while this many are up.
-local SCAVENGER_MAX_BEACONS = 3
+local SCAVENGER_MAX_BEACONS = 10
 -- How close to anything a player owns, or to another beacon, a beacon may appear.
 local SCAVENGER_BEACON_PLAYER_CLEARANCE = 150
 local SCAVENGER_BEACON_SPACING = 200
+-- A new beacon goes up at least SCAVENGER_BEACON_SPACING and at most this far from one already standing, so
+-- they spread out from where they began. With none standing, one goes anywhere.
+local SCAVENGER_BEACON_SPREAD = 350
 -- How far a beacon keeps from the edge of the map.
 local SCAVENGER_BEACON_EDGE_MARGIN = 40
--- Seconds between one beacon's units and between its defences, which are made on separate clocks, how many
--- scavenger units may be alive across all beacons, and how many defences one beacon may keep standing around
--- itself. A beacon with all the defences it will take still makes units.
-local SCAVENGER_SPAWN_INTERVAL = 10
-local SCAVENGER_DEFENSE_SPAWN_INTERVAL = 15
-local SCAVENGER_MAX_UNITS = 40
+-- Beacons grow tougher as the game goes on: a beacon's health is its def's times 1 plus this times the progress, so
+-- by the end five times what it starts with. Every beacon standing grows, not only new ones.
+local SCAVENGER_BEACON_HEALTH_GROWTH = 4
+-- Killing a beacon moves the progress on by this much. It is small beside what it buys: one beacon fewer making
+-- units. Killing the last one standing brings their boss at once.
+local SCAVENGER_BEACON_KILL_PROGRESS = 0.01
+-- A scavenger unit that gets nothing done for this many seconds, stranded on an island, say, with no way across to
+-- anything of a player's, is taken away, and what it was worth goes to making something that can get across: an
+-- aircraft, a hovercraft or something amphibious. Getting SCAVENGER_FUTILE_PROGRESS studs nearer to the nearest thing
+-- of a player's than it has been yet, or going after something it can reach, counts as getting something done.
+local SCAVENGER_FUTILE_SECONDS = 120
+local SCAVENGER_FUTILE_PROGRESS = 30
+-- Seconds between one beacon's units and between its defences, which are made on separate clocks, and how many
+-- defences one beacon may keep standing around itself. Units have no limit: every beacon keeps making them, so
+-- how fast they come is this interval times how many beacons stand. A beacon with all the defences it will take
+-- still makes units.
+local SCAVENGER_SPAWN_INTERVAL = 20
+local SCAVENGER_DEFENSE_SPAWN_INTERVAL = 30
 local SCAVENGER_MAX_DEFENSES_PER_BEACON = 6
--- How long a wreck of a unit lies on the ground before it stands up again as a scavenger, while the gamemode is on.
--- Something that takes the wreck apart first, by reclaiming it, wins.
+-- Not a limit the game is balanced round, only a guard for the server: with this many scavenger units out,
+-- beacons and wrecks wait before adding more.
+local SCAVENGER_UNIT_CEILING = 300
+-- How long a wreck of a unit lies on the ground before it stands up again as a scavenger, while the gamemode is
+-- on, and how near a beacon it has to lie for that: one further from every beacon just lies there. Something that
+-- takes the wreck apart first, by reclaiming it, wins.
 local SCAVENGER_REVIVE_SECONDS = 60
+local SCAVENGER_REVIVE_RANGE = 300
 -- How far from a player's things a scavenger unit notices them, and how far it wanders in one go.
 local SCAVENGER_DETECTION_RANGE = 220
 -- The share of scavenger units, from 0 to 1, that go looking for the nearest thing of a player's anywhere on the
@@ -292,6 +341,7 @@ return table.freeze({
 	WIND_MAX_DELTA = WIND_MAX_DELTA,
 	WRECK_METAL_FRACTION = WRECK_METAL_FRACTION,
 	WRECK_BUILDPOWER_FRACTION = WRECK_BUILDPOWER_FRACTION,
+	RECLAIMABLE_BUILDPOWER_FRACTION = RECLAIMABLE_BUILDPOWER_FRACTION,
 	WRECK_HEALTH_FRACTION = WRECK_HEALTH_FRACTION,
 	BLUEPRINT_DECAY_DELAY = BLUEPRINT_DECAY_DELAY,
 	BUILD_STUCK_SECONDS = BUILD_STUCK_SECONDS,
@@ -312,8 +362,17 @@ return table.freeze({
 
 	NON_AA_AIR_DAMAGE_FRACTION = NON_AA_AIR_DAMAGE_FRACTION,
 	AIR_LAND_DELAY = AIR_LAND_DELAY,
+	STEALTH_DETECTION_RANGE = STEALTH_DETECTION_RANGE,
+	ORBIT_BUILD_REPICK = ORBIT_BUILD_REPICK,
+	ORBIT_GUNSHIP_REPICK = ORBIT_GUNSHIP_REPICK,
+	ORBIT_REPICK_JITTER = ORBIT_REPICK_JITTER,
+	ORBIT_INNER = ORBIT_INNER,
+	ORBIT_OUTER = ORBIT_OUTER,
+	ORBIT_CANDIDATES = ORBIT_CANDIDATES,
 	MISSILE_MAX_AGE = MISSILE_MAX_AGE,
 	MISSILE_TURN_RATE = MISSILE_TURN_RATE,
+	HOMING_TURN_RATE = HOMING_TURN_RATE,
+	HOMING_MISS_CHANCE = HOMING_MISS_CHANCE,
 	TRANSPORT_SLOT_RADIUS = TRANSPORT_SLOT_RADIUS,
 	TRANSPORT_LOAD_RANGE = TRANSPORT_LOAD_RANGE,
 	TRANSPORT_DESCEND_RANGE = TRANSPORT_DESCEND_RANGE,
@@ -331,24 +390,32 @@ return table.freeze({
 	RESURRECT_RANGE = RESURRECT_RANGE,
 	RESURRECT_HEALTH_FRACTION = RESURRECT_HEALTH_FRACTION,
 
+	DEFAULT_SKIN = DEFAULT_SKIN,
+
 	SCAVENGERS_ENABLED = SCAVENGERS_ENABLED,
 	SCAVENGER_TEAM = SCAVENGER_TEAM,
 	SCAVENGER_GAME_LENGTH = SCAVENGER_GAME_LENGTH,
-	SCAVENGER_FIRST_BEACON_PROGRESS = SCAVENGER_FIRST_BEACON_PROGRESS,
+	SCAVENGER_SPAWN_PROGRESS = SCAVENGER_SPAWN_PROGRESS,
 	SCAVENGER_BUDGET_START = SCAVENGER_BUDGET_START,
-	SCAVENGER_ROSTER_PROGRESS = SCAVENGER_ROSTER_PROGRESS,
-	SCAVENGER_ROSTER_COPIES = SCAVENGER_ROSTER_COPIES,
+	SCAVENGER_BUDGET_END = SCAVENGER_BUDGET_END,
+	SCAVENGER_BUDGET_SHAPE = SCAVENGER_BUDGET_SHAPE,
 	SCAVENGER_BEACON_INTERVAL_MIN = SCAVENGER_BEACON_INTERVAL_MIN,
 	SCAVENGER_BEACON_INTERVAL_MAX = SCAVENGER_BEACON_INTERVAL_MAX,
 	SCAVENGER_MAX_BEACONS = SCAVENGER_MAX_BEACONS,
 	SCAVENGER_BEACON_PLAYER_CLEARANCE = SCAVENGER_BEACON_PLAYER_CLEARANCE,
 	SCAVENGER_BEACON_SPACING = SCAVENGER_BEACON_SPACING,
+	SCAVENGER_BEACON_SPREAD = SCAVENGER_BEACON_SPREAD,
 	SCAVENGER_BEACON_EDGE_MARGIN = SCAVENGER_BEACON_EDGE_MARGIN,
+	SCAVENGER_BEACON_HEALTH_GROWTH = SCAVENGER_BEACON_HEALTH_GROWTH,
+	SCAVENGER_BEACON_KILL_PROGRESS = SCAVENGER_BEACON_KILL_PROGRESS,
+	SCAVENGER_FUTILE_SECONDS = SCAVENGER_FUTILE_SECONDS,
+	SCAVENGER_FUTILE_PROGRESS = SCAVENGER_FUTILE_PROGRESS,
 	SCAVENGER_SPAWN_INTERVAL = SCAVENGER_SPAWN_INTERVAL,
 	SCAVENGER_DEFENSE_SPAWN_INTERVAL = SCAVENGER_DEFENSE_SPAWN_INTERVAL,
-	SCAVENGER_MAX_UNITS = SCAVENGER_MAX_UNITS,
+	SCAVENGER_UNIT_CEILING = SCAVENGER_UNIT_CEILING,
 	SCAVENGER_MAX_DEFENSES_PER_BEACON = SCAVENGER_MAX_DEFENSES_PER_BEACON,
 	SCAVENGER_REVIVE_SECONDS = SCAVENGER_REVIVE_SECONDS,
+	SCAVENGER_REVIVE_RANGE = SCAVENGER_REVIVE_RANGE,
 	SCAVENGER_DETECTION_RANGE = SCAVENGER_DETECTION_RANGE,
 	SCAVENGER_SEEKER_SHARE = SCAVENGER_SEEKER_SHARE,
 	SCAVENGER_ROAM_MIN = SCAVENGER_ROAM_MIN,

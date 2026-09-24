@@ -3,13 +3,18 @@
 -- has one height sample to each corner of the game's heightmap cells and one material to each cell, so it is laid
 -- down as it is: centred on (0, 0), and never stretched or shrunk.
 --
+-- What lies on each map, its geothermal vents and its reclaimable features, is in a module of its own beside it, written
+-- by tools/bar_maps/import_bar_features.py from the map's archive (`features_of`).
+--
 -- In the data, a position is a fraction of the map across (u, from its west edge) and down (v, from its north edge);
 -- here u runs along +x and v along +z, which is the same way round as the map's picture seen from above with north at
 -- the top.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
+local RunService = game:GetService "RunService"
 
 local config = require(ReplicatedStorage.Shared.config)
+local rights = require(script.rights)
 
 local supreme_isthmus = require(script.supreme_isthmus)
 local hooked = require(script.hooked)
@@ -19,6 +24,23 @@ local comet_catcher = require(script.comet_catcher)
 local altair_crossing = require(script.altair_crossing)
 local ancient_bastion = require(script.ancient_bastion)
 local folsom_dam = require(script.folsom_dam)
+
+-- What lies on a map, as its `<name>_features` module has it (see tools/bar_maps/import_bar_features.py).
+export type Features = {
+	geovents: { Vector2 },
+	-- one reclaimable a line: what it is drawn as, across, down, heading, metal, energy, reclaim buildpower
+	features: string,
+}
+
+-- One reclaimable, read out of a `Features`: where it is as a fraction of the map, and what it holds.
+export type Feature = {
+	def_name: string,
+	at: Vector2,
+	heading: number,
+	metal: number,
+	energy: number,
+	buildpower: number,
+}
 
 export type MetalSpot = {
 	at: Vector2,
@@ -44,6 +66,8 @@ export type BarMap = {
 	max_wind: number,
 	tidal_strength: number,
 	starts: { Vector2 },
+	-- each team's start box, its corners as fractions of the map across and down, as `starts` are
+	start_boxes: { { min: Vector2, max: Vector2 } },
 	metal: { MetalSpot },
 }
 
@@ -146,7 +170,7 @@ local function fit(map: BarMap): Fitted
 	})
 end
 
-local MAPS: { BarMap } = {
+local ALL_MAPS: { BarMap } = {
 	supreme_isthmus,
 	hooked,
 	center_command,
@@ -157,7 +181,46 @@ local MAPS: { BarMap } = {
 	folsom_dam,
 }
 
+-- The maps in the game: in Studio every one, and anywhere else only those whose makers have said we may use them
+-- (see rights.luau). The rest are a developer's maps, as if they were not part of the game: no preset is made for
+-- them, so a lobby does not offer them and nothing can load them.
+local MAPS: { BarMap } = {}
+for _, map in ALL_MAPS do
+	if RunService:IsStudio() or rights.of(map.name).status == "permitted" then
+		table.insert(MAPS, map)
+	end
+end
+
+-- The geothermal vents and reclaimables of the map called `name`, from its features module.
+local function features_of(name: string): Features
+	return require(script:FindFirstChild(`{name}_features`) :: ModuleScript) :: Features
+end
+
+-- Every reclaimable in `features`, read out of its lines.
+local function read_features(features: Features): { Feature }
+	local out: { Feature } = {}
+	for line in string.gmatch(features.features, "[^\n]+") do
+		local def_name, u, v, heading, metal, energy, buildpower =
+			string.match(line, "^(%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+)")
+		if def_name == nil then
+			continue
+		end
+		table.insert(out, {
+			def_name = def_name,
+			at = Vector2.new(tonumber(u) :: number, tonumber(v) :: number),
+			heading = tonumber(heading) :: number,
+			metal = tonumber(metal) :: number,
+			energy = tonumber(energy) :: number,
+			buildpower = tonumber(buildpower) :: number,
+		})
+	end
+	return out
+end
+
 return table.freeze({
 	MAPS = MAPS,
+	rights = rights,
 	fit = fit,
+	features_of = features_of,
+	read_features = read_features,
 })

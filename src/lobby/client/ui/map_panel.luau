@@ -1,11 +1,14 @@
 -- The lobby's map: a large picture of it with its grid, what it is, and every map to pick from. Only the host can
--- pick; everyone else sees the list but cannot change it.
+-- pick; everyone else sees the list but cannot change it. A co-op lobby's map is its mission's, so it has no list. BAR's
+-- maps are listed only to a developer (shared/developers.luau).
 
+local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local React = require(ReplicatedStorage.Packages.react)
 
 local protocol = require(ReplicatedStorage.Lobby.protocol)
+local developers = require(ReplicatedStorage.Shared.developers)
 
 local map_preview = require(ReplicatedStorage.LobbyClient.map_preview)
 local map_image = require(script.Parent.map_image)
@@ -13,6 +16,8 @@ local map_image = require(script.Parent.map_image)
 type MapInfo = map_preview.MapInfo
 
 local ACTIONS = protocol.ACTIONS
+
+local local_player = Players.LocalPlayer
 
 local function format_units(units: Vector2): string
 	return `{math.round(units.X)} × {math.round(units.Y)}`
@@ -84,17 +89,22 @@ local function MapCard(props: {
 	})
 end
 
-local function MapPanel(props: {
-	preset: string,
-	seed: number,
-	is_host: boolean,
-	players: number,
-	act: (action: string, argument: any?) -> (),
-})
+local function MapPanel(
+	props: {
+		preset: string,
+		seed: number,
+		is_host: boolean,
+		-- the map is a co-op mission's, and cannot be changed
+		fixed: boolean,
+		players: number,
+		act: (action: string, argument: any?) -> (),
+	}
+)
 	local info = map_preview.info(props.preset)
 
+	local maps: { MapInfo } = if props.fixed then {} else map_preview.all(developers.is_developer(local_player))
 	local cards: { [string]: any } = {}
-	for index, map in map_preview.all() do
+	for index, map in maps do
 		cards[map.preset] = React.createElement(MapCard, {
 			map = map,
 			seed = props.seed,
@@ -168,7 +178,7 @@ local function MapPanel(props: {
 		Grid = React.createElement("TextLabel", {
 			[React.Tag] = "map-grid-note faint",
 			LayoutOrder = 5,
-			Text = `Grid squares are 512 elmos (about {math.round(map_preview.UNIT_STUDS)} studs) a side`,
+			Text = `Grid: {math.round(map_preview.UNIT_STUDS)} studs`,
 		}),
 		List = React.createElement("ScrollingFrame", {
 			[React.Tag] = "map-list",

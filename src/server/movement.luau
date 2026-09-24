@@ -46,6 +46,9 @@ local HIT_ACCELERATION = 0.5
 -- The lab each unit that has just been made is on its way out of. The two do not push each other apart until the
 -- unit is clear of it (see production.luau).
 local exiting: { [EntityId]: EntityId } = {}
+-- The way each plane on wings that is up against the edge of the map is sliding along it, kept for as long as it
+-- stays there so that it goes on one way while its heading turns past the edge's normal, rather than back and forth.
+local edge_slides: { [EntityId]: Vector3 } = {}
 
 local function begin_tick()
 	table.clear(goals)
@@ -96,7 +99,7 @@ local function is_mobile(entity: Entity): boolean
 	if entity.kind ~= "unit" then
 		return false
 	end
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	return def.max_speed ~= nil and def.acceleration ~= nil
 end
 
@@ -165,7 +168,7 @@ local function rebuild_grids()
 		then
 			continue
 		end
-		local radius = unit_defs.collider_radius(unit_defs.get(entity.def_name))
+		local radius = unit_defs.collider_radius(unit_defs.of(entity))
 		local position = entity.position
 		if is_mobile(entity) then
 			mover_slot[entity.id] = flat_grid.add(mover_grid, position.X, position.Z, radius)
@@ -277,11 +280,27 @@ local function fly(entity: Entity, def: types.EntityDef, aircraft: types.Aircraf
 	entity.position = Vector3.new(x, math.max(y, floor), z)
 end
 
+-- A plane on wings that is circling, or flying on past its goal to come round at it, looks this many of its turning
+-- circle's radii ahead, and if that is off the map it turns for the middle of the map instead, so that it has come
+-- round before it gets to the edge.
+local WINGS_EDGE_LOOKAHEAD = 1.5
+-- A plane on wings that reaches the edge of the map slides along it the way it is flying if at least this much of what
+-- it would fly in a tick is along the edge, and otherwise the way it is turning (see `tick`).
+local EDGE_GRAZE = 0.3
+
+-- Whether (x, z) is at least `margin` studs inside the edge of the map, which is centred on the origin.
+local function well_inside(x: number, z: number, margin: number): boolean
+	local hx, hz = heightmap.half_extents()
+	return math.abs(x) <= hx - margin and math.abs(z) <= hz - margin
+end
+
 -- The velocity an aircraft on `wings` flies at this tick. It only ever flies forward, along its heading, which it
 -- turns no faster than its turn rate toward `goal`, if it has one, or else circles. While it is `busy` it flies flat
 -- out; once it is not, it slows to a stop, which is what it does as it comes down to land. A goal behind it and
 -- nearer than its run-out is flown away from, straight, until it is not, as BAR's planes do, so that it comes
--- round at the goal from far enough out to line up on it.
+-- round at the goal from far enough out to line up on it. Circling, or flying away like that, it turns in from the
+-- edge of the map before it gets there (WINGS_EDGE_LOOKAHEAD); flying at a goal, it may reach the edge, and `tick` has
+-- it slide along it.
 local function steer_wings(
 	entity: Entity,
 	wings: types.Wings,
@@ -296,12 +315,22 @@ local function steer_wings(
 	local speed = if busy then max_speed else 0
 	local wanted_heading = heading
 	local offset = if goal ~= nil then geometry.flatten(goal.position - entity.position) else Vector3.zero
+	local making_room = false
 	if goal == nil or offset.Magnitude <= goal.stop_radius then
 		if busy then
 			wanted_heading = heading + math.pi / 2
+			making_room = true
 		end
 	elseif offset:Dot(forward) > 0 or offset.Magnitude >= wings.run_out then
 		wanted_heading = math.atan2(offset.X, offset.Z)
+	else
+		making_room = true
+	end
+	if making_room then
+		local ahead = entity.position + forward * (max_speed / wings.turn_rate * WINGS_EDGE_LOOKAHEAD)
+		if not well_inside(ahead.X, ahead.Z, 0) then
+			wanted_heading = math.atan2(-entity.position.X, -entity.position.Z)
+		end
 	end
 
 	local max_turn = wings.turn_rate * delta
@@ -323,7 +352,7 @@ local function tick(delta: number)
 			continue
 		end
 
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
 		local max_speed = def.max_speed :: number
 		local acceleration = def.acceleration :: number
 
@@ -333,6 +362,8 @@ local function tick(delta: number)
 		end
 
 		local desired_velocity = Vector3.zero
+		-- which way its goal draws it, if it has one that is drawing it anywhere
+		local drawn_toward: Vector3? = nil
 		local goal = goals[entity.id]
 		if goal ~= nil then
 			local offset = geometry.flatten(goal.position - entity.position)
@@ -347,6 +378,9 @@ local function tick(delta: number)
 				end
 			end
 			desired_velocity += goal.velocity
+			if desired_velocity.Magnitude > config.MOVEMENT_SETTLE_SPEED then
+				drawn_toward = desired_velocity.Unit
+			end
 		end
 
 		if air.is_aircraft(entity) == false then
@@ -362,8 +396,12 @@ local function tick(delta: number)
 		local wings = if aircraft ~= nil then aircraft.wings else nil
 		local busy = aircraft ~= nil and (goal ~= nil or #entity.orders > 0 or #state.cargo_of(entity.id) > 0)
 
+		-- which way a plane on wings is turning, for which way it slides along the edge of the map if it reaches it
+		local turning = 0
 		if wings ~= nil then
+			local facing_before = entity.facing
 			entity.velocity = steer_wings(entity, wings, goal, busy, max_speed, acceleration, delta)
+			turning = (entity.facing - facing_before + math.pi) % (2 * math.pi) - math.pi
 		else
 			local change = desired_velocity - entity.velocity
 			local max_change = acceleration * delta
@@ -376,7 +414,62 @@ local function tick(delta: number)
 		if entity.velocity.Magnitude > config.MOVEMENT_SETTLE_SPEED then
 			local next_position = entity.position + entity.velocity * delta
 			if heightmap.in_bounds(next_position.X, next_position.Z) then
-				entity.facing = math.atan2(entity.velocity.X, entity.velocity.Z)
+				-- It faces the way it goes when that is where its goal draws it. Going anywhere else it is being
+				-- pushed, by a building or the units round it, and gives way without turning: one held against
+				-- something in its way, or a builder at the edge of its reach that is pushed out and walks back
+				-- in by turns, would otherwise turn right round every tick.
+				if drawn_toward ~= nil and entity.velocity:Dot(drawn_toward) >= 0 then
+					entity.facing = math.atan2(entity.velocity.X, entity.velocity.Z)
+				end
+				edge_slides[entity.id] = nil
+			elseif wings ~= nil then
+				-- a plane cannot stop in the air: it is held at the edge but keeps its heading, which goes on turning away,
+				-- and its speed, sliding along the edge, or out of a corner toward the middle, as fast as it was flying
+				local hx, hz = heightmap.half_extents()
+				local here = entity.position
+				local distance = entity.velocity.Magnitude * delta
+				-- as much of where it is flying as the edge lets it go: along the edge, if it is flying along it at all
+				local clamped =
+					Vector3.new(math.clamp(next_position.X, -hx, hx), here.Y, math.clamp(next_position.Z, -hz, hz))
+				local grazing = geometry.flatten(clamped - here)
+				local slide: Vector3
+				if grazing.Magnitude >= EDGE_GRAZE * distance then
+					-- going along the edge as much as into it: it slides on the way it is going
+					slide = grazing
+				else
+					-- flying nearly straight into it: it slides the way it will be heading a quarter turn from now, so that
+					-- it slides on the way it is coming round and leaves the edge going on the same way, and keeps to
+					-- that way for as long as it is on the edge, while its heading turns past the edge's normal
+					local remembered = edge_slides[entity.id]
+					if remembered ~= nil then
+						slide = remembered
+					else
+						local toward = next_position
+						if turning ~= 0 then
+							local quarter = entity.facing + math.sign(turning) * math.pi / 2
+							toward = here + Vector3.new(math.sin(quarter), 0, math.cos(quarter))
+						end
+						slide = geometry.flatten(
+							Vector3.new(math.clamp(toward.X, -hx, hx), here.Y, math.clamp(toward.Z, -hz, hz)) - here
+						)
+						if slide.Magnitude < 1e-3 then
+							slide = geometry.flatten(-here)
+						end
+					end
+				end
+				edge_slides[entity.id] = slide
+				local function slid(way: Vector3): Vector3
+					local along = if way.Magnitude > 1e-3 then here + way.Unit * distance else here
+					return Vector3.new(math.clamp(along.X, -hx, hx), next_position.Y, math.clamp(along.Z, -hz, hz))
+				end
+				local moved = slid(slide)
+				if geometry.flatten(moved - here).Magnitude < distance / 2 then
+					-- slid into a corner: out of it toward the middle
+					slide = geometry.flatten(-here)
+					edge_slides[entity.id] = slide
+					moved = slid(slide)
+				end
+				next_position = moved
 			else
 				entity.velocity = Vector3.zero
 				next_position = entity.position
@@ -446,6 +539,7 @@ local function forget(entity_id: EntityId)
 	idle_for[entity_id] = nil
 	impulse_remaining[entity_id] = nil
 	exiting[entity_id] = nil
+	edge_slides[entity_id] = nil
 end
 
 return table.freeze({

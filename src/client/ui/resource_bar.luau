@@ -35,6 +35,19 @@ local EMPTY: TeamState = {
 	energy_expense = 0,
 }
 
+-- The server sends the team's resources from the moment the player joins, long before the bar is mounted (the map
+-- and the art load first, and the tutorial hides the bar for a while), so they are listened for as soon as this module
+-- is required, and the bar picks up the latest when it mounts. Otherwise they queue up unheard and are dropped.
+local latest: TeamState = EMPTY
+local listeners: { [(TeamState) -> ()]: true } = {}
+
+team_updated.OnClientEvent:Connect(function(next_state: TeamState)
+	latest = next_state
+	for listener in listeners do
+		listener(next_state)
+	end
+end)
+
 -- Under a few percent of storage the readout is called out as stalling, because that is the point
 -- where construction starts being throttled.
 local STALL_FRACTION = 0.02
@@ -135,17 +148,17 @@ local function Resource(props: {
 end
 
 local function ResourceBar()
-	local team, set_team = React.useState(EMPTY)
+	local team, set_team = React.useState(latest)
 	local ui_scale = use_viewport.use_ui_scale()
 	-- nil while the scavengers gamemode is off, when there is nothing more to show
 	local difficulty = scavenger_block.use_difficulty()
 
 	React.useEffect(function()
-		local connection = team_updated.OnClientEvent:Connect(function(next_state: TeamState)
-			set_team(next_state)
-		end)
+		-- in case it changed between the first render and this
+		set_team(latest)
+		listeners[set_team] = true
 		return function()
-			connection:Disconnect()
+			listeners[set_team] = nil
 		end
 	end, {})
 

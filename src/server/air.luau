@@ -35,7 +35,7 @@ end
 
 -- Whether it is an aircraft, in the air or not. A wreck is not: what an aircraft leaves behind is on the ground.
 local function is_aircraft(entity: Entity): boolean
-	return entity.kind == "unit" and unit_defs.is_air(unit_defs.get(entity.def_name))
+	return entity.kind == "unit" and unit_defs.is_air(unit_defs.of(entity))
 end
 
 -- Whether it is off the ground, which is what puts it out of the way of things that stand on it.
@@ -43,7 +43,7 @@ local function is_airborne(entity: Entity): boolean
 	if is_aircraft(entity) == false then
 		return false
 	end
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	return entity.position.Y > resting_height(def, entity.position.X, entity.position.Z) + AIRBORNE_MARGIN
 end
 

@@ -467,9 +467,11 @@ def build(generator_name, params, out_path, luau_out_path=None, render_out_path=
     if not objects:
         raise RuntimeError(f"generators.{generator_name}.generate() returned nothing")
 
+    # a generator for something that is not a unit (a UI icon, a one-off landmark) may set its own MAX_TRIANGLES
+    max_tris = getattr(module, "MAX_TRIANGLES", MAX_TRIANGLES_WARNING)
     tris = triangle_count(objects)
-    if tris > MAX_TRIANGLES_WARNING:
-        print(f"warning: {tris} triangles, above the {MAX_TRIANGLES_WARNING} a model may have")
+    if tris > max_tris:
+        print(f"warning: {tris} triangles, above the {max_tris} a model may have")
 
     bpy.ops.object.select_all(action="DESELECT")
     for obj in objects:
@@ -480,6 +482,8 @@ def build(generator_name, params, out_path, luau_out_path=None, render_out_path=
     # entity's model on its collider. The footprint is the first object a generator returns (its footing):
     # centring on everything would pull a model off its collider by half of whatever reaches out past it,
     # like a tower's barrel.
+    # A generator that places its own origin (a UI icon centred on its layout, a cursor on its tip) sets
+    # RECENTRE = False.
     corners = [objects[0].matrix_world @ mathutils.Vector(corner) for corner in objects[0].bound_box]
     min_x = min(c.x for c in corners)
     max_x = max(c.x for c in corners)
@@ -487,7 +491,7 @@ def build(generator_name, params, out_path, luau_out_path=None, render_out_path=
     max_y = max(c.y for c in corners)
     center_x = (min_x + max_x) / 2
     center_y = (min_y + max_y) / 2
-    if abs(center_x) > 1e-6 or abs(center_y) > 1e-6:
+    if getattr(module, "RECENTRE", True) and (abs(center_x) > 1e-6 or abs(center_y) > 1e-6):
         for obj in objects:
             obj.location.x -= center_x
             obj.location.y -= center_y

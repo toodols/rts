@@ -22,7 +22,7 @@ local function studs(elmos: number): number
 end
 
 -- BAR's blasts come out oversized here, so every weapon's area of effect is this fraction of its BAR radius.
-local AOE_SCALE = 1 / 5
+local AOE_SCALE = 1 / 4
 
 local function aoe(radius: number): number
 	return radius * AOE_SCALE

@@ -98,7 +98,7 @@ local function rebuild()
 		if entity.alive == false or entity.kind == "reclaimable" then
 			continue
 		end
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
 		local radius = unit_defs.collider_radius(def)
 		local half_height = unit_defs.collider_height(def) / 2
 		if entity.kind == "wreck" then
@@ -186,7 +186,7 @@ local function nearest_on_segment(
 end
 
 local function muzzle_of(shooter: Entity): Vector3
-	local height = unit_defs.collider_height(unit_defs.get(shooter.def_name))
+	local height = unit_defs.collider_height(unit_defs.of(shooter))
 	return shooter.position + Vector3.new(0, height * MUZZLE_FRACTION, 0)
 end
 

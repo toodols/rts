@@ -20,7 +20,6 @@ local defs: { [string]: EntityDef } = {
 	construction_aircraft = {
 		name = "construction_aircraft",
 		display_name = "Construction Aircraft",
-		subtitle = "Builder aircraft",
 		kind = "unit",
 		-- 34 x 18 x 46 elmos
 		collider = capsule(34, 18, 46),
@@ -40,6 +39,8 @@ local defs: { [string]: EntityDef } = {
 			"bot_lab",
 			"vehicle_lab",
 			"air_lab",
+			"advanced_air_lab",
+			"hovercraft_platform",
 			"shipyard",
 			"solar_collector",
 			"advanced_solar_collector",
@@ -52,6 +53,7 @@ local defs: { [string]: EntityDef } = {
 			"tidal_generator",
 			"construction_turret",
 			"guard",
+			"wall",
 			"thistle",
 			"twin_guard",
 			"warden",
@@ -155,8 +157,8 @@ local defs: { [string]: EntityDef } = {
 				reload = 6,
 				burst_count = 5,
 				burst_interval = 0.26667,
-				-- what it is drawn with; when a bomb is let go depends on where it would come down, not on this
-				range = studs(1280),
+				-- divergence from bar. Bar is 1280 range which makes no sense for the bomber
+				range = studs(100),
 				energy_per_shot = 0,
 				target_layer = "ground",
 				projectile = {

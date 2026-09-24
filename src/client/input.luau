@@ -23,6 +23,8 @@
 -- unload order: the units go there and drop what they carry. A move needs no mode of its own to find its way: the
 -- server works out a route for each unit round whatever it cannot cross, and gives it the waypoints of the way.
 -- G stops: every selected unit drops all its orders.
+-- T opens or closes the player list (see ui/player_list.luau), except while an economy building is being placed, when
+-- it places the epic energy converter. Escape closes it too.
 --   drag a line                   spread the selection evenly along the shape the drag traces
 --   shift                         queues the order instead of replacing the queue
 --   click while placing a building cancels placement
@@ -47,8 +49,10 @@ local selection = require(ReplicatedStorage.Client.selection)
 local build_mode = require(ReplicatedStorage.Client.build_mode)
 local markers = require(ReplicatedStorage.Client.markers)
 local routes = require(ReplicatedStorage.Client.routes)
+local unlocks = require(ReplicatedStorage.Client.unlocks)
 
 type EntityId = types.EntityId
+type EntityDef = types.EntityDef
 
 type DragRect = {
 	min: Vector2,
@@ -71,6 +75,9 @@ local target_mode: string? = nil
 local left_down_at: Vector2? = nil
 -- Set while a building is being dragged out with shift held: where the line or grid starts.
 local placing_from: Vector3? = nil
+-- Where the building being placed would go, set every frame while placing: under the cursor, or the last place of a
+-- line or grid being dragged out. Its range rings are drawn round it.
+local placing_at: Vector3? = nil
 local right_down_world: Vector3? = nil
 -- Where the left button went down in a location-based mode (attack, fight, path, unload): letting go on
 -- the same spot is the click, and letting go further off is a line of them.
@@ -87,6 +94,15 @@ local mode_listeners: { (mode: string?) -> () } = {}
 local hover_listeners: { (id: EntityId?) -> () } = {}
 local reported_hover: EntityId? = nil
 local reported_mode: string? = nil
+local player_list_open = false
+local player_list_listeners: { (open: boolean) -> () } = {}
+
+-- How something was just selected with the mouse, for whoever wants to know (the tutorial): by dragging a box or by
+-- clicking it. Told the ids the box or the click took, once the selection has them.
+export type SelectMethod = "box" | "click"
+local select_listeners: { (method: SelectMethod, ids: { EntityId }) -> () } = {}
+-- Every move order sent, with the ids and where each was sent, for the same.
+local move_listeners: { (ids: { EntityId }, positions: { Vector3 }) -> () } = {}
 
 local function subscribe_rect(listener: (rect: DragRect?) -> ()): () -> ()
 	table.insert(rect_listeners, listener)
@@ -119,6 +135,70 @@ local function subscribe_hover(listener: (id: EntityId?) -> ()): () -> ()
 		if index ~= nil then
 			table.remove(hover_listeners, index)
 		end
+	end
+end
+
+-- Keys that do nothing for now, whatever they would do otherwise, set by whoever is teaching the controls (the
+-- tutorial's camera step turns off W, A, S and D, so that trying to pan with them does not start their commands).
+local suppressed_keys: { [Enum.KeyCode]: boolean } = {}
+
+local function suppress_keys(keys: { Enum.KeyCode })
+	suppressed_keys = {}
+	for _, key in keys do
+		suppressed_keys[key] = true
+	end
+end
+
+-- Tells `listener` how, and what, the mouse selects each time it does (box-dragging or clicking).
+local function subscribe_select(listener: (method: SelectMethod, ids: { EntityId }) -> ()): () -> ()
+	table.insert(select_listeners, listener)
+	return function()
+		local index = table.find(select_listeners, listener)
+		if index ~= nil then
+			table.remove(select_listeners, index)
+		end
+	end
+end
+
+local function report_select(method: SelectMethod, ids: { EntityId })
+	for _, listener in table.clone(select_listeners) do
+		listener(method, ids)
+	end
+end
+
+-- Tells `listener` about every move order sent: the ids, and where each was sent.
+local function subscribe_move(listener: (ids: { EntityId }, positions: { Vector3 }) -> ()): () -> ()
+	table.insert(move_listeners, listener)
+	return function()
+		local index = table.find(move_listeners, listener)
+		if index ~= nil then
+			table.remove(move_listeners, index)
+		end
+	end
+end
+
+-- Tells `listener` whenever the player list is opened or closed.
+local function subscribe_player_list(listener: (open: boolean) -> ()): () -> ()
+	table.insert(player_list_listeners, listener)
+	return function()
+		local index = table.find(player_list_listeners, listener)
+		if index ~= nil then
+			table.remove(player_list_listeners, index)
+		end
+	end
+end
+
+local function is_player_list_open(): boolean
+	return player_list_open
+end
+
+local function set_player_list_open(open: boolean)
+	if player_list_open == open then
+		return
+	end
+	player_list_open = open
+	for _, listener in player_list_listeners do
+		listener(open)
 	end
 end
 
@@ -175,14 +255,14 @@ local function alt_held(): boolean
 end
 
 -- Where a waypoint at (x, z) sits for what is selected: on the water's surface if a selected unit that
--- moves floats there, and on the ground otherwise, so a ship's path is drawn on the sea and not on the sea
+-- moves rides it there, a ship or a hovercraft, and on the ground otherwise, so a ship's path is drawn on the sea and not on the sea
 -- floor beneath it.
 local function waypoint_ground(x: number, z: number): Vector3
 	for _, id in selection.get() do
 		local model = world.get(id)
 		local def_name = if model ~= nil then model:GetAttribute "def_name" else nil
 		local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
-		if def ~= nil and def.max_speed ~= nil and unit_defs.floats(def) then
+		if def ~= nil and def.max_speed ~= nil and unit_defs.rides_surface(def) then
 			return unit_defs.surface_position(def, x, z)
 		end
 	end
@@ -397,6 +477,9 @@ local function send_move(ids: { EntityId }, positions: { Vector3 }, queue: boole
 		queue = queue,
 		front = front,
 	})
+	for _, listener in table.clone(move_listeners) do
+		listener(ids, positions)
+	end
 end
 
 local function send_targeted(kind: string, ids: { EntityId }, target_id: EntityId, queue: boolean)
@@ -697,6 +780,10 @@ end
 -- Sends every selected builder to put `def_name` at each of `centers` that fits. They go out in order, or
 -- backwards when the orders go on the front of the queue, so the first place ends up first.
 local function send_placements(def_name: string, centers: { Vector3 })
+	-- the server refuses what is locked anyway; this keeps a stale placement from even asking
+	if unlocks.is_unlocked(def_name) == false then
+		return
+	end
 	local ids = {}
 	for _, entry in selected_with_def(false) do
 		if entry.def.build_options ~= nil and table.find(entry.def.build_options, def_name) ~= nil then
@@ -1208,6 +1295,7 @@ local function on_left_up()
 		else
 			selection.set(ids)
 		end
+		report_select("box", ids)
 		return
 	end
 
@@ -1233,6 +1321,7 @@ local function on_left_up()
 	else
 		selection.set({ id })
 	end
+	report_select("click", { id })
 end
 
 local function on_right_down()
@@ -1327,14 +1416,14 @@ type BuildCategory = {
 }
 
 -- Buildings are grouped into categories, each with a key of its own: Z economy, X offense, C utility, V
--- production. Its key places the category's main building, which is the advanced one for a construction_bot that
--- can build it, and Z does the same once something in the category is being placed. Once something from a category is being
--- placed, a few more keys pick other buildings in it, and they mean that instead of whatever they are
+-- production. Its key places the category's main building, which is the advanced one for a construction_bot that can
+-- build it, and Z does the same once in the category. While something from a category is being placed, a few more
+-- keys pick other buildings in it, and they mean that instead of whatever they are
 -- otherwise, so X is the guard on its own but the solar collector among the economy buildings, the
 -- twin guard among the offense ones and the vehicle lab among the production ones, where A is the
 -- construction turret, S the advanced lab (the bot one or the vehicle one, whichever the selection can
--- build), V the shipyard and C the air lab. Among the offense ones W is the agitator, C the warden, A the thistle, S the screamer, V the catalyst and E the apocalypse. Utility has nothing
--- in it yet.
+-- build), V the shipyard, C the air lab and D the hovercraft platform. Among the offense ones W is the agitator, C the warden, A the thistle, S the screamer, V the catalyst and E the apocalypse. Utility's
+-- own building is the wall, and Q there is the overseer.
 local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 	[Enum.KeyCode.Z] = {
 		name = "Economy",
@@ -1348,9 +1437,9 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 			[Enum.KeyCode.E] = { "epic_fusion_reactor" },
 			[Enum.KeyCode.T] = { "epic_energy_converter" },
 			[Enum.KeyCode.V] = { "advanced_solar_collector" },
-			[Enum.KeyCode.S] = { "tidal_generator" },
 			-- the geothermal plants, on a vent: the advanced one for whoever can build it, and its sidegrade
-			[Enum.KeyCode.D] = { "advanced_geothermal_powerplant", "geothermal_powerplant" },
+			[Enum.KeyCode.S] = { "advanced_geothermal_powerplant", "geothermal_powerplant" },
+			[Enum.KeyCode.D] = { "tidal_generator" },
 			[Enum.KeyCode.F] = { "rampart" },
 		},
 	},
@@ -1370,7 +1459,7 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 	},
 	[Enum.KeyCode.C] = {
 		name = "Utility",
-		primary = {},
+		primary = { "wall" },
 		options = {
 			[Enum.KeyCode.Q] = { "overseer" },
 		},
@@ -1382,9 +1471,10 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 			-- construction turret is A while advanced construction turret is C. This is intentional, copied from BAR.
 			[Enum.KeyCode.X] = { "vehicle_lab" },
 			[Enum.KeyCode.A] = { "construction_turret", "experimental_gantry" },
-			[Enum.KeyCode.S] = { "advanced_bot_lab", "advanced_vehicle_lab" },
+			[Enum.KeyCode.S] = { "advanced_bot_lab", "advanced_vehicle_lab", "advanced_air_lab" },
 			[Enum.KeyCode.V] = { "shipyard" },
 			[Enum.KeyCode.C] = { "air_lab", "advanced_construction_turret" },
+			[Enum.KeyCode.D] = { "hovercraft_platform" },
 		},
 	},
 }
@@ -1440,8 +1530,12 @@ local function category_of(def_name: string): BuildCategory?
 	return nil
 end
 
--- An unfinished builder counts: what it is told to build waits in its orders until it is done.
+-- An unfinished builder counts: what it is told to build waits in its orders until it is done. Nothing counts for
+-- something the player has not unlocked, so its key does nothing.
 local function selection_can_build(def_name: string): boolean
+	if unlocks.is_unlocked(def_name) == false then
+		return false
+	end
 	for _, entry in selected_with_def(false) do
 		local builds = entry.def.build_options
 		if entry.def.assisting and builds ~= nil and table.find(builds, def_name) ~= nil then
@@ -1451,8 +1545,6 @@ local function selection_can_build(def_name: string): boolean
 	return false
 end
 
--- The building a key places right now, if it places one. The category of whatever is being placed comes
--- first, whichever way placing it was started.
 -- The first of `candidates` the selection can build, or the first of them if it can build none.
 local function first_buildable(candidates: { string }): string?
 	for _, candidate in candidates do
@@ -1463,42 +1555,90 @@ local function first_buildable(candidates: { string }): string?
 	return candidates[1]
 end
 
-local function build_hotkey(key: Enum.KeyCode): string?
+-- The category the build keys are in: the one of whatever is being placed, whichever way placing it was started. The
+-- build menu shows the same one, and its first page while nothing is being placed.
+local function current_category(): BuildCategory?
 	local placing = build_mode.active()
-	local current = if placing ~= nil then category_of(placing) else nil
-	if current ~= nil and current.options[key] ~= nil then
-		return first_buildable(current.options[key])
-	end
-	-- Z is always the primary building of the category being placed, as it is the economy's own key
-	if current ~= nil and key == Enum.KeyCode.Z then
-		return first_buildable(current.primary)
-	end
-	local category = BUILD_CATEGORIES[key]
-	if category ~= nil then
-		return first_buildable(category.primary)
+	if placing ~= nil then
+		return category_of(placing)
 	end
 	return nil
 end
 
+-- What a category's own key places for the selection: its main building, or failing that the first building in it
+-- the selection can build, the same one the build menu's first page offers for it. Nil if it can build nothing there.
+local function category_entry(key: Enum.KeyCode): string?
+	local category = BUILD_CATEGORIES[key]
+	for _, def_name in category.primary do
+		if selection_can_build(def_name) then
+			return def_name
+		end
+	end
+	for _, tab in BUILD_TABS do
+		if tab.key == key.Name then
+			for _, def_name in tab.defs do
+				if selection_can_build(def_name) then
+					return def_name
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- Handles `key` if it is a build key right now, and says whether it was. Within the current category its keys pick
+-- the buildings the menu shows them against, ahead of anything they mean otherwise (Q selecting everything of a
+-- type, say). Outside one, a category's key places its main building, which takes the menu to its page.
+local function press_build_key(key: Enum.KeyCode): boolean
+	local category = current_category()
+	if category ~= nil then
+		local candidates = category.options[key]
+		-- Z is always the primary building of the category, as it is the economy's own key
+		if candidates == nil and key == Enum.KeyCode.Z then
+			candidates = category.primary
+		end
+		if candidates ~= nil then
+			target_mode = nil
+			local def_name = first_buildable(candidates)
+			if def_name ~= nil and selection_can_build(def_name) then
+				build_mode.enter(def_name)
+			end
+			return true
+		end
+	end
+	if BUILD_CATEGORIES[key] == nil then
+		return false
+	end
+	local def_name = category_entry(key)
+	if def_name == nil then
+		return false
+	end
+	target_mode = nil
+	build_mode.enter(def_name)
+	return true
+end
+
 local function on_input_began(input: InputObject, processed: boolean)
-	if processed then
+	-- O is taken by the guard action, which marks it processed; this is in case something ahead of that action takes
+	-- it first, as the key then still arrives here, processed. Starting guard mode twice does no harm.
+	if input.KeyCode == Enum.KeyCode.O and UserInputService:GetFocusedTextBox() == nil then
+		start_target_mode "guard"
+		return
+	end
+	if processed or suppressed_keys[input.KeyCode] == true then
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		on_left_down()
 	elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
 		on_right_down()
-	elseif build_hotkey(input.KeyCode) ~= nil then
-		target_mode = nil
-		local def_name = build_hotkey(input.KeyCode)
-		if def_name ~= nil and selection_can_build(def_name) then
-			build_mode.enter(def_name)
-		end
+	elseif press_build_key(input.KeyCode) then
+		return
 	elseif input.KeyCode == Enum.KeyCode.G then
 		target_mode = nil
 		send_stop()
 	elseif input.KeyCode == Enum.KeyCode.Q then
-		-- only reached when Q is not picking a building, which it does while an economy building is placed
+		-- only reached when Q is not picking a building, which it does while an economy or utility building is placed
 		select_same_type()
 	elseif input.KeyCode == Enum.KeyCode.D then
 		target_mode = nil
@@ -1521,7 +1661,11 @@ local function on_input_began(input: InputObject, processed: boolean)
 		build_mode.rotate(1)
 	elseif input.KeyCode == Enum.KeyCode.RightBracket then
 		build_mode.rotate(-1)
+	elseif input.KeyCode == Enum.KeyCode.T then
+		-- only reached when T is not picking a building, which it does while an economy building is placed
+		set_player_list_open(player_list_open == false)
 	elseif input.KeyCode == Enum.KeyCode.Escape then
+		set_player_list_open(false)
 		build_mode.exit()
 		stop_manual_aim()
 		target_mode = nil
@@ -1612,6 +1756,27 @@ local HOVER_RECLAIM_COLOR = Color3.fromRGB(236, 184, 68)
 local HOVER_RESURRECT_COLOR = Color3.fromRGB(176, 96, 240)
 local HOVER_ATTACK_COLOR = Color3.fromRGB(238, 88, 74)
 
+-- Shows how far something of `def` standing at `at` can build, how far it can shoot and how far out it shoots nukes
+-- down, whichever of them it can.
+local function show_ranges_of(def: EntityDef, at: Vector3)
+	-- a builder's reach is its own if it has one, and the usual build range otherwise
+	local build_range: number? = nil
+	if def.buildpower ~= nil and (def.assisting or def.repairing) then
+		build_range = if def.build_range ~= nil then def.build_range else config.BUILD_RANGE
+	end
+	local attack_range = unit_defs.display_range(def)
+	local intercept_range = unit_defs.intercept_range(def)
+	if build_range == nil and attack_range == nil and intercept_range == nil then
+		markers.hide_ranges()
+		return
+	end
+
+	-- shots leave from a quarter of its height above its middle, as the server has them (`sight.muzzle_of`)
+	local ground = heightmap.ground_position(at.X, at.Z)
+	local muzzle = ground + Vector3.new(0, unit_defs.collider_height(def) * 0.25, 0)
+	markers.show_ranges(ground, build_range, attack_range, def, muzzle, intercept_range)
+end
+
 local function update_hover()
 	-- whatever is under the cursor is lit, so it is plain what a click would land on. The colour follows
 	-- the mode: yellow for repairing, amber for reclaiming.
@@ -1634,7 +1799,19 @@ local function update_hover()
 	end
 	markers.show_hover(model, color)
 
-	if build_mode.active() ~= nil or manual_aiming or target_mode ~= nil or dragging then
+	-- what is being placed shows the ranges it would have where it would go
+	local placing = build_mode.active()
+	if placing ~= nil then
+		local at = placing_at
+		if at == nil then
+			markers.hide_ranges()
+		else
+			show_ranges_of(unit_defs.get(placing), at)
+		end
+		return
+	end
+
+	if manual_aiming or target_mode ~= nil or dragging then
 		markers.hide_ranges()
 		return
 	end
@@ -1647,21 +1824,7 @@ local function update_hover()
 		return
 	end
 
-	-- a builder's reach is its own if it has one, and the usual build range otherwise
-	local build_range: number? = nil
-	if def.buildpower ~= nil and (def.assisting or def.repairing) then
-		build_range = if def.build_range ~= nil then def.build_range else config.BUILD_RANGE
-	end
-	local attack_range = unit_defs.display_range(def)
-	if build_range == nil and attack_range == nil then
-		markers.hide_ranges()
-		return
-	end
-
-	-- shots leave from a quarter of its height above its middle, as the server has them (`sight.muzzle_of`)
-	local at = world.position_of(model)
-	local muzzle = at + Vector3.new(0, unit_defs.collider_height(def) * 0.25, 0)
-	markers.show_ranges(heightmap.ground_position(at.X, at.Z), build_range, attack_range, def, muzzle)
+	show_ranges_of(def, world.position_of(model))
 end
 
 -- Reports a change of what the cursor is over. It says nothing while a box is being dragged or an order is
@@ -1702,12 +1865,16 @@ end
 local function on_render()
 	report_mode()
 	report_hover()
+	placing_at = nil
 	if build_mode.active() ~= nil then
 		local def_name = build_mode.active() :: string
-		build_mode.update(ground_point(), primary_builder_id(def_name))
+		placing_at = build_mode.update(ground_point(), primary_builder_id(def_name))
 		local from = placing_from
 		if from ~= nil then
-			build_mode.show_layout(dragged_layout(def_name, from))
+			local centers = dragged_layout(def_name, from)
+			build_mode.show_layout(centers)
+			-- only the last place of a line or grid shows its ranges, or the rings would bury the ground
+			placing_at = centers[#centers]
 		end
 	else
 		placing_from = nil
@@ -1828,6 +1995,12 @@ return table.freeze({
 	subscribe_rect = subscribe_rect,
 	subscribe_mode = subscribe_mode,
 	subscribe_hover = subscribe_hover,
+	subscribe_player_list = subscribe_player_list,
+	subscribe_select = subscribe_select,
+	suppress_keys = suppress_keys,
+	subscribe_move = subscribe_move,
+	is_player_list_open = is_player_list_open,
+	set_player_list_open = set_player_list_open,
 	ground_point = ground_point,
 	entity_under_mouse = entity_under_mouse,
 })

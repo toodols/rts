@@ -1,6 +1,7 @@
 -- The commands the selected units can be given as modes, each with its key: Attack - A, Fight - F, and so
 -- on. It lists a command when at least one selected finished unit can use it, marks the one that is on,
--- and a click on a row does what pressing its key does.
+-- and a click on a row does what pressing its key does. In the tutorial, the command its step wants clicked
+-- (Client.tutorial's `command_target`) is lit and pointed at, until it is on.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -9,7 +10,12 @@ local React = require(ReplicatedStorage.Packages.react)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local input = require(ReplicatedStorage.Client.input)
+local tutorial = require(ReplicatedStorage.Client.tutorial)
+local tutorial_pointer = require(ReplicatedStorage.Client.ui.tutorial_pointer)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
+local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
+
+local TutorialPointer = tutorial_pointer.TutorialPointer
 
 local function CommandPanel()
 	local ids = use_entities.use_selection()
@@ -21,6 +27,12 @@ local function CommandPanel()
 			set_mode(next_mode)
 		end)
 	end, {})
+	-- only to re-render when the tutorial's step changes
+	use_tutorial.use_tutorial()
+	local target = tutorial.command_target()
+	if mode == target then
+		target = nil
+	end
 
 	local rows = {}
 	local any = false
@@ -42,8 +54,10 @@ local function CommandPanel()
 		end
 
 		any = true
+		local pointed = command.mode == target
+		local tag = if mode == command.mode then "command-row active" else "command-row"
 		rows[command.mode] = React.createElement("TextButton", {
-			[React.Tag] = if mode == command.mode then "command-row active" else "command-row",
+			[React.Tag] = if pointed then `{tag} tutorial-highlight` else tag,
 			LayoutOrder = index + 1,
 			Text = "",
 			[React.Event.Activated] = function()
@@ -60,6 +74,8 @@ local function CommandPanel()
 				LayoutOrder = 2,
 				Text = command.key,
 			}),
+			-- the panel is at the left of the screen, so the pointer stands off the row's right
+			Pointer = if pointed then React.createElement(TutorialPointer, { text = "CLICK", side = "right" }) else nil,
 		})
 	end
 	if any == false then

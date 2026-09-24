@@ -71,7 +71,7 @@ local function find_target(carrier: Entity, spec: types.Carrier, drone_def: type
 		end
 		if combat.is_enemy(carrier, other) and can_hit and other.kind ~= "wreck" then
 			local distance = geometry.distance_2d(carrier.position, other.position)
-			if distance <= best_distance then
+			if distance <= best_distance and combat.spots(other, distance) then
 				best = other
 				best_distance = distance
 			end
@@ -157,7 +157,7 @@ local function tick(delta: number)
 		then
 			continue
 		end
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
 		if def.carrier ~= nil then
 			serve(entity, def, def.carrier, delta)
 		end

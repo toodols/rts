@@ -15,6 +15,7 @@ local players = require(script.Parent.players)
 local placement = require(script.Parent.placement)
 local production = require(script.Parent.production)
 local godmode = require(script.Parent.godmode)
+local campaign = require(script.Parent.campaign)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -88,7 +89,7 @@ end
 -- and the last leg too for a move or a fight, which walk right up to where they go; otherwise the order is given
 -- without it. The leg from where the unit stands is not checked, since it has moved on since the client saw it.
 local function with_route(entity: Entity, order: Order, raw: unknown): { Order }
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	if typeof(raw) ~= "table" or def.max_speed == nil or def.air ~= nil then
 		return { order }
 	end
@@ -198,14 +199,14 @@ local function on_issue_order(player: Player, payload: unknown)
 			continue
 		end
 		-- a drone answers to its carrier alone
-		if unit_defs.get(entity.def_name).drone == true then
+		if unit_defs.of(entity).drone == true then
 			continue
 		end
 		-- a lab cannot carry out orders, but it keeps them in its queue like anything else, and each unit it makes
 		-- takes a copy (see production's rally_order)
-		local factory = unit_defs.is_factory(unit_defs.get(entity.def_name))
+		local factory = unit_defs.is_factory(unit_defs.of(entity))
 		-- an unfinished unit takes orders too: they wait in its queue until it is built
-		if factory == false and unit_defs.takes_orders(unit_defs.get(entity.def_name)) == false then
+		if factory == false and unit_defs.takes_orders(unit_defs.of(entity)) == false then
 			continue
 		end
 
@@ -221,7 +222,7 @@ local function on_issue_order(player: Player, payload: unknown)
 		end
 
 		-- only something with a manual weapon can be told to fire it; for anything else it would only clear its queue
-		if kind == "dgun" and unit_defs.get(entity.def_name).manual_weapon == nil then
+		if kind == "dgun" and unit_defs.of(entity).manual_weapon == nil then
 			continue
 		end
 
@@ -254,7 +255,7 @@ local function on_issue_order(player: Player, payload: unknown)
 				continue
 			end
 			-- a ship's waypoints are on the water's surface, and the rest are on the ground
-			order.position = unit_defs.surface_position(unit_defs.get(entity.def_name), raw.X, raw.Z)
+			order.position = unit_defs.surface_position(unit_defs.of(entity), raw.X, raw.Z)
 		end
 
 		-- a lab's orders are handed to each unit it makes, which finds its own way from where it is (see production's
@@ -350,11 +351,15 @@ local function on_place_blueprint(player: Player, payload: unknown)
 		if entity == nil then
 			continue
 		end
-		local builder_def = unit_defs.get(entity.def_name)
+		local builder_def = unit_defs.of(entity)
 		if builder_def.build_options == nil or table.find(builder_def.build_options, data.def_name) == nil then
 			continue
 		end
 		if builder_def.assisting == false then
+			continue
+		end
+		-- nor anything the builder's team has not unlocked in the campaign, whoever gives the order
+		if campaign.can_build(entity.team, data.def_name) == false then
 			continue
 		end
 		table.insert(builders, entity)

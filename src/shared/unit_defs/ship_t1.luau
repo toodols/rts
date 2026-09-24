@@ -20,7 +20,6 @@ local defs: { [string]: EntityDef } = {
 	construction_ship = {
 		name = "construction_ship",
 		display_name = "Construction Ship",
-		subtitle = "Builder ship",
 		kind = "unit",
 		-- 30 x 26 x 47 elmos
 		collider = capsule(30, 26, 47),

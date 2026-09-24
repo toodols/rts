@@ -47,6 +47,87 @@ and administration. Press `;` to open it, `help` lists commands. It is started b
 | `godmode` / `godmode true` / `godmode false` | toggle, enable or disable commanding every team; you can select and order any team's units and build with any team's builders |
 | `scavengers` / `scavengers true` / `scavengers false` | toggle, enable or disable the scavengers gamemode: whether beacons appear and make anything. What is already out there carries on |
 | `beacon` | put a scavenger beacon down now, wherever the rules would put one |
+| `skins` | list every skin: developers only or not, what it changes, who has it equipped and which teams wear it |
+| `equip` / `equip <skin>` / `equip <skin> <player>` | say what you have equipped, or equip a skin for yourself or a player, golden too; saved, as the lobby's Skins tab saves it. For debugging: players cannot change skins in a game |
+| `skin` / `skin <name>` / `skin <name> <team>` | say which skin your team wears, or put your team (or the one given) in a skin for now, without equipping or saving it |
+| `donut_pop` / `donut_flyoff` / `donut_float` / `donut_regen` (`<team>`) | pop donuts, throw them off, float them off to the water's surface, or put new ones on at once: on your selected units, or your team's with none selected, or the team given. Every player sees it |
+| `donut_status` (`<team>`) | how many units wear a donut, have it on, off, or are shaking it loose |
+
+## Skins
+
+A skin is another look for the same units (`src/shared/skins`, one module each). Each player equips one in the lobby's
+Skins tab (`lobby/client/ui/skins_tab.luau`, saved by `lobby/server/skins.luau`), and in every game they play after,
+their team wears it: everything it has and makes (the `skin` attribute on each model), so every player sees it. It
+cannot be changed once a game has started. What a player has equipped is kept in a DataStore (`shared/skin_store.luau`),
+which the game place reads as they arrive (`server/skins.luau`); until it is read, and for anyone who never equipped
+one, it is `DEFAULT_SKIN` in `shared/config.luau`: the plain `default` skin.
+Every special skin is opt in: nobody wears one they did not equip, and a team no player chose for (the scavengers,
+anything neutral) is plain. `shared/skins` refuses to start with a default that is anything but plain. A developer-only skin is only
+offered to, and only equippable by, developers (`shared/developers.luau`). A skin can swap a def's art for other art altogether (`art`), repaint it (`paint`), or hang things on it
+(`attachments`), all of which only the client draws (`client/art.luau`). A developer-only skin may also change the numbers
+(`stats`); the server reads every def through `unit_defs.of(entity)`, which applies them.
+
+| Skin | What it does |
+| --- | --- |
+| `pool` | every unit wears a pool float round its waist, as big as the unit (`client/donuts.luau`): a striped ring, an iced donut or a lifebuoy in its team's colour, or now and then a rubber ducky, picked by weight from its entity id so every player sees the same one (the models are `pool_donut`, `pool_donut_iced`, `pool_lifebuoy` and `rubber_ducky` in `tools/model_pipeline/generators`, uploaded). It pops when the unit is hit, shakes on a plane at speed and flies off after a few seconds of it, floats up off an amphibious unit or a diving submarine more than `submerge_depth` under the water to bob on the surface for `float_seconds`, and reinflates after `regen_seconds` (30) of nothing knocking it off and the unit out of the deep; all of it is set in `skins/pool.luau`. The server keeps each donut's state (`server/donuts.luau`, published as the `donut`, `donut_shake` and `donut_event` attributes), so every player sees the same |
+| `default` (the default) | units as they are |
+| `golden` | developers only: solid gold, with 2x health, 1.5x range and 1.5x damage |
+
+## Campaign
+
+Everything a player can build starts locked except the Bot Lab, Construction Bot, Grunt, Guard, Solar Collector and
+Metal Extractor (`shared/campaign.luau`), and missions unlock the rest. Only something that some def can build is ever locked, so a
+commander or the tutorial's boulder never is. Each player's progress is kept in the `campaign_progress_v1` DataStore
+(`shared/campaign_store.luau`) and published on their Player as the `campaign_unlocks` attribute, which the build menu
+reads: a locked option is greyed, shows a lock where its key would be and LOCKED where its cost would be, cannot be
+clicked or hotkeyed, and its tooltip says it is unlocked through the campaign. The server refuses it too
+(`server/campaign.luau`): placing it, queueing it in a factory, and any build order for it already queued. Teams with
+no player, like the scavengers or a mission's enemy, are never restricted. In Studio, where DataStores cannot be read,
+a player has the starting unlocks; the `unlock <def|all>`, `unlock_all [player]`, `relock` and `complete_mission <id>` commands
+change them, and `reset_data [player]` wipes what is saved for a player.
+
+The lobby's Campaign screen lists the missions and every lockable thing, dimmed while locked, and starts a mission for
+the player alone, as a match of the mission's `campaign_<id>` mode on its own map (`lobby/server/missions.luau`).
+Campaign modes and maps (a preset with `campaign_only`) are never offered to a lobby.
+
+The first mission is the tutorial, on the `tutorial` map: a small valley split north to south by a ridge nothing can
+climb, with one pass through it, the player to the west and an enemy (a Bot Lab, two Solar Collectors and four idle
+Grunts, with no AI) to the east. The pass is blocked by a boulder (`tutorial_boulder`, `server/missions.luau`) that
+belongs to nobody, cannot be reclaimed, and is hurt by nothing but the commander's disintegrator, which destroys it
+in one shot; while it stands, the ground under it is a wall to everything that walks
+(`server/obstacles.luau`). The commander goes down at the player's start with no start to choose. The HUD hides the
+resource bar until the player has built extractors and solar collectors, and cuts the selection panel down to name,
+team and health, and the tutorial walks through steps
+(`client/tutorial.luau`, drawn by `client/ui/tutorial.luau`), each a few cards of ways to do one thing; doing any one
+of them moves on 3 seconds later. Moving the camera shows WASD, crossed out, whose keys press in and turn the card
+red but do nothing, beside the arrow keys and a middle-mouse drag, either of which does it. Selecting the commander
+shows a box being dragged over it and a click on it. Moving asks for a right click on a marker beside a metal spot, and is done when the
+commander gets there. The
+keys, the mouse, the cursor and the tick and cross are 3D, made by the model pipeline into `shared/ui_art` and uploaded
+like any def's art. Then come the building steps, each a single card with a picture of what it asks for and a count of
+how far along it is: a Metal Extractor on each of the three metal spots on the player's side, each marked until a
+finished one stands there; three finished Solar Collectors, after which the metal and energy bar appears
+and the selection panel shows what things make and spend; a finished
+Bot Lab; three Grunts out of it, after which the selection panel shows what things fight with again; the boulder
+disintegrated, with a ring round it; and last, everything the enemy has destroyed. What is counted is what stands on
+the field, so something built early counts as soon as its step comes. The tutorial assumes the player clicks rather
+than uses keys. A building step's card says which buttons of the build menu get to what it asks for (worked out from
+the menu's own categories) and, while the builder it needs is not selected, says to select it first; the build menu
+lights the button to click and points at it: on the first page the category it is in, and inside the category the
+building itself (`build_target` in `client/tutorial.luau`). Once that building is being placed the menu stops pointing
+and the card says where to click instead: a marked metal spot, or open ground. The disintegrator step points at
+Disintegrator in the commands list the same way, and once it is on says to click the boulder.
+
+The enemy also has a Metal Extractor on each of its three metal spots. A mission is won when its enemy has nothing
+left, units or buildings (`server/missions.luau`): the game ends as the scavengers' does, in VICTORY, the mission is
+marked complete for its players and saved, and the end screen offers Back to lobby and Next mission (greyed while there
+is none). Both teleport to the lobby (`server/campaign_exit.luau`, over `CampaignChoice`); for the next mission the
+teleport carries its id, and the lobby starts it the way the campaign screen's Play does, if it is open to the player.
+A mission is lost, in DEFEAT, when the player has nothing left.
+
+To play the tutorial in Studio, set a string attribute `CampaignMission = "tutorial"` on the game place's Workspace and
+press Play. `{ test = "tutorial_boulder" }` checks the boulder (what does and does not hurt it, and that nothing gets
+past it until it is gone).
 
 ## Lobby
 
@@ -60,6 +141,10 @@ It shares `src/shared` and the game's SCSS partials with the game, and adds `src
 their rules, the cross-server list, and launching), `shared/` (the remotes and the protocol) and `client/` (the React
 screens). `build_stylesheets.bat` compiles its sheet, `src/lobby/client/stylesheets/lobby.scss`, alongside the game's.
 
+The lobby's screen has three tabs along its header: Play (the lobby list, the campaign and the lobby itself), Skins
+(where a player equips the skin their units wear in their games; see Skins above) and Microtransactions, which has
+nothing for sale yet.
+
 A player makes a lobby, or joins one from the list, which shows every open lobby on every lobby server: each server
 lists its own in a MemoryStore sorted map and reads everyone else's every 5 seconds. Joining a lobby on another server
 teleports the player to that server, where they are seated as they arrive. A lobby is public or friends only; a
@@ -71,13 +156,29 @@ their team by clicking one of its open places. Each map has a picture drawn on t
 theme, the same way the terrain is painted (`shared/ground_paint.luau`), at the map's true aspect ratio and with a grid
 of BAR map units (512 elmos, about 47 studs) over it, so maps can be compared by size.
 
-Starting reserves a server of the game place, leaves the match (mode, map, seed, who sits on which side) in a
-MemoryStore hash map under that server's PrivateServerId, and teleports everyone there. The game server reads it back
-as it starts (`server/match.luau`): each seated player gets a team, teams on a side are allied, and the scavengers are
-turned off or paced to the difficulty. Any other game server, and Studio, plays the usual game.
+Starting reserves a server of the game place and teleports everyone in the lobby into it as one party. The match
+(mode, map, seed, who sits on which side, who only watches) goes with them twice: in a MemoryStore hash map under that
+server's PrivateServerId, and as each player's teleport data. The game server reads it as it starts
+(`server/match.luau`), from the store first, since only a server can write it, and from the first arrival's teleport
+data if the store cannot be read. The match overrides what the game starts with when it is played straight from Studio
+(`MAP_PRESET` and `MAP_SEED` in `server/init.server.luau`, and the scavengers as config has them): each seated player
+gets a team, teams on a side are allied, and the scavengers are turned off or paced to the difficulty. The game's
+start-choosing phase then waits for everyone the lobby sent, showing who is still arriving, for up to 60 seconds. A
+player whose teleport fails is sent again, up to three times, and then put back in the browser.
 
 The place ids are in `shared/places.luau`. Teleports do not work in Studio, so starting a game or joining a lobby on
-another server can only be tried in a live server.
+another server can only be tried in a live server. What a started game does with its match can be tried in Studio by
+handing one to the game place's test harness the way a lobby would:
+
+```lua
+game:GetService("StudioTestService"):ExecuteRunModeAsync({
+	test = "match",
+	match = { mode = "2v2", preset = "hooked", seed = 1337, seats = {
+		{ user_id = 1, name = "A", side = 1 }, { user_id = 2, name = "B", side = 1 },
+		{ user_id = 3, name = "C", side = 2 }, { user_id = 4, name = "D", side = 0 },
+	} },
+})
+```
 
 ## How it fits together
 
@@ -195,42 +296,71 @@ scavengers are a team of their own (`config.SCAVENGER_TEAM`), so everything they
 player and `combat` needs no special case for them; they have no economy, and their weapons are never short of
 energy. All of it lives in `src/server/scavengers.luau`.
 
-Progress runs from 0 to 1 over `config.SCAVENGER_GAME_LENGTH` seconds, an hour, and it is all that decides
-when things happen. Once it reaches `SCAVENGER_FIRST_BEACON_PROGRESS` a beacon appears at a random empty spot far
-from every player and every other beacon, with room to move around it, and another follows every 3 to 5 minutes
-while fewer than `SCAVENGER_MAX_BEACONS` stand. Where there is water at the spot it is a sea beacon
-(`scavenger_sea_beacon`), which floats in water at least 12 studs deep and makes ships, and where there is not it is
-a land beacon on level ground, which makes everything else. Spots are drawn over the whole map, so how many of each
-a map gets follows how much of it is sea: a map of islands gets mostly sea beacons. A beacon has 20000 health and
-cannot be reclaimed, so it has to be destroyed; what it leaves is a wreck worth half its metal cost.
+Progress runs from 0 to 1 over `config.SCAVENGER_GAME_LENGTH` seconds, and it is all that decides when things
+happen. As the game begins (the first step anything of a player's stands) the scavengers take the start box no player
+was given that is furthest from the players, and their first beacon goes up in it. It makes nothing until progress reaches
+`SCAVENGER_SPAWN_PROGRESS` (0.05); from then on another beacon follows every 3 to 5 minutes while fewer than
+`SCAVENGER_MAX_BEACONS` stand, each between `SCAVENGER_BEACON_SPACING` and `SCAVENGER_BEACON_SPREAD` from one already
+standing, so they spread out from where they began. A new site still has to be well clear of every player, with
+room to move around it; with no beacon standing, or no room round any, one goes anywhere on the map. With every
+box taken the first beacon goes anywhere too. Where there is water at the spot it is a sea beacon
+(`scavenger_sea_beacon`), which floats in water at least 12 studs deep and makes ships, at half the rate, and where
+there is not it is a land beacon on level ground, which makes everything else. The first beacon, and any put down
+with none standing, is always a land one. A beacon starts at 20000 health and cannot be reclaimed, so it has to be
+destroyed; what it leaves is a wreck worth half its metal cost. Every standing beacon grows tougher with progress, to
+1 + `SCAVENGER_BEACON_HEALTH_GROWTH` (4) times the progress times that, so five times as much by the end.
 
-While a beacon stands it makes a unit every 10 seconds and a defence every 15, on separate clocks: a beacon
-with all the defences it will take (`SCAVENGER_MAX_DEFENSES_PER_BEACON`) goes on making units. What they can
-field is a budget in difficulty, which is a thing's metal plus its energy, over 60. The budget grows
-exponentially with progress from `SCAVENGER_BUDGET_START`, and how fast is worked out so that by
-`SCAVENGER_ROSTER_PROGRESS` (half way) it is `SCAVENGER_ROSTER_COPIES` times the hardest thing in the roster:
-everything the game has is on offer by then, and the budget only buys more of it after. A beacon makes only what
-fits in what is left of the budget after everything the scavengers already have out. Once `SCAVENGER_MAX_UNITS`
-are out, or a beacon has all the defences it will take, a new one takes the place of the easiest only if it is at
-least twice as hard, and never a unit that is attacking. These numbers are all in `config.luau` to be tuned.
+Destroying a beacon moves progress on by `SCAVENGER_BEACON_KILL_PROGRESS` (0.01), which is small beside what it
+buys: one beacon fewer making units. Destroying the last one standing brings the scavengers' boss at once, where it
+stood; so does progress reaching 1. The boss, the Scavenger Overlord (`scavenger_boss`, in
+`unit_defs/scavenger.luau`), is a Juggernaut half as big again with twice its health before the difficulty, and it
+walks the sea floor, so no island is safe. It comes once, and no new beacons come after it. Killing it wins the game
+for every team but the scavengers: the game phase becomes `ended`, with the winners and a line on how, and every
+player sees VICTORY or DEFEAT (`client/ui/victory_screen.luau`). That ending is not the scavengers' own, and is meant
+for any way a game ends.
+
+A match's difficulty (`game_modes.DIFFICULTIES`) sets two things: how long progress takes, from 80 minutes on Easy to
+64, 52 and 40 on Brutal, and what everything the scavengers field has in health, from their def's on Easy to twice,
+three and five times it. Beacons grow with progress instead. Beacons come every 3 to 5 minutes and make a unit every
+10 seconds on every difficulty, so a harder game is one where the scavengers get stronger sooner and take longer to
+kill, not one with more of them.
+
+While a beacon stands it makes a unit every 10 seconds and a defence every 15, on separate clocks. There is no limit
+on units: every beacon keeps making them, so how many come is how many beacons stand. (`SCAVENGER_UNIT_CEILING` is
+only a guard for the server.) A beacon keeps at most `SCAVENGER_MAX_DEFENSES_PER_BEACON` defences round it, and past
+that a new one takes the place of the easiest only if it is at least twice as hard. What they can make is set by a
+budget in difficulty, which is a thing's metal plus its energy, over 60: the hardest single thing a beacon may make
+now, and the difficulty the players see. It runs from `SCAVENGER_BUDGET_START` (20) to `SCAVENGER_BUDGET_END`
+(100,000) over the game, a little slower than exponentially: START * (END / START) ^ (progress ^
+`SCAVENGER_BUDGET_SHAPE`), where a shape of 1 would be exponential and 0.85 has it gain fastest early and ease off
+late. That puts it at about 40 at 5%, 2,300 half way, 23,000 at 80% and 100,000 at the end; the Juggernaut (10,733)
+comes in at about 70% and the Calamity (14,467), the hardest thing there is, at 74%. Anything under 12% of the hardest
+thing a beacon could make now is fodder, and is left out, so the easiest things drop away as the budget grows.
+These numbers are all in `config.luau` to be tuned.
 
 What they can make is everything a player can: `build_roster` takes every def that some builder or factory lists,
 that has a weapon or drones to fight with, and that is not itself a drone, so a new unit is in it without being
 added. Ships are made by sea beacons and the rest by land ones. A def's weight is 12 over the square root of its
-difficulty, so cheap things are common and dear ones rare. Because the budget is sized to the hardest thing in the
-roster, adding a much harder one, like the Calamity at over 14,000, steepens the whole curve; `SCAVENGER_ROSTER_COPIES`
-and `SCAVENGER_ROSTER_PROGRESS` set how much. Things that only shoot at aircraft (the Thistle, the Trasher, the
+difficulty, so cheap things are common and dear ones rare. The budget's curve does not depend on the roster, so a
+much harder new unit just comes in later in the game, or not at all past 100,000. Things that only shoot at aircraft (the Thistle, the Trasher, the
 Valiant) are made only while a player has something in the air. A bomber gets a plain attack order so that it flies its
 runs, and a carrier with nothing of its own to fire goes to its spot and lets its drones fight. Drones are their
-carrier's: the AI leaves them alone, and they count towards neither the budget nor the unit limit.
+carrier's: the AI leaves them alone, and they do not count towards the server's unit ceiling.
+
+A unit that gets nothing done for `SCAVENGER_FUTILE_SECONDS` (2 minutes) is taken away without a wreck, so that a
+map cut into islands cannot be made safe by leaving scavengers stranded on one. Getting something done is going after
+something it can reach, or getting `SCAVENGER_FUTILE_PROGRESS` studs nearer the nearest thing of a player's than it
+has been yet; with nothing of a player's it could turn on at all, nothing is held against it. Aircraft and the boss
+are never taken away. What it was worth, in difficulty, goes into a credit that is spent, one unit a second at a
+standing beacon, on things that can get across: aircraft, hovercraft and amphibious walkers, picked by weight as the
+beacons pick. Credit short of the cheapest of them (the Goon, at 26) waits for more.
 
 While the gamemode is on, the wreck of any unit comes back as a scavenger. Each gains resurrection progress, the
 same progress the purple bar over it shows and a Graverobber works on, at the rate that fills it in
 `SCAVENGER_REVIVE_SECONDS` (a minute), and then stands up on the scavengers' team with the health a raised unit
-has, at no cost to them. Only units come back, never a commander, and whatever takes the wreck apart first by
-reclaiming it wins. With as many scavenger units out as are allowed, a full wreck waits for room. What they raise
-counts towards the budget like anything else, so a field of wrecks left alone is a horde that the beacons then make
-less to add to.
+has, and the difficulty's multiple of it, at no cost to them. Only units come back, never a commander or the boss, and only within `SCAVENGER_REVIVE_RANGE` (300 studs)
+of a standing beacon: a wreck further out just lies there, keeping what progress it had, until a beacon goes up near
+it. Whatever takes the wreck apart first by reclaiming it wins.
 
 Units scatter. A new one first heads off away from its beacon, up to 60 degrees either side of straight out, and
 leaves hunting alone for a few seconds; after that, with nothing of a player's near, it seeks: it heads for
@@ -258,7 +388,7 @@ whose short wanders all fail, stranded behind water, asks for a route to somewhe
 where they are.
 
 While the gamemode is on the resource bar has one more block, beside the wind, showing the difficulty: the
-scavengers' budget, to two significant figures (`~840`, `~1.3k`). The server sends it as the
+scavengers' budget, the hardest thing they may make now, to two significant figures (`~840`, `~1.3k`). The server sends it as the
 `scavenger_difficulty` attribute of Workspace and clears it when the gamemode is turned off, which takes the
 block away and narrows the bar again. See `src/client/ui/scavenger_block.luau`.
 

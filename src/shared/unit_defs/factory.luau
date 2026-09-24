@@ -97,6 +97,32 @@ local defs: { [string]: EntityDef } = {
 		color = Color3.fromRGB(122, 134, 148),
 	},
 
+	-- corhp, Cortex's Hovercraft Platform: the lab for hovercraft. It stands on dry land, as BAR's does.
+	hovercraft_platform = {
+		name = "hovercraft_platform",
+		display_name = "Hovercraft Platform",
+		kind = "building",
+		-- 96 x 32 x 96 elmos, in whole grid cells
+		collider = { shape = "box", width = cells(3), height = cells(1), length = cells(3) },
+		metal_cost = 670,
+		energy_cost = 2000,
+		buildpower_cost = 8700,
+		health = 3750,
+		buildpower = 150,
+		metal_storage = 200,
+		energy_storage = 200,
+		acceleration = nil,
+		max_speed = nil,
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		build_options = { "construction_hovercraft", "goon", "birdeater", "halberd" },
+		weapons = nil,
+		color = Color3.fromRGB(122, 134, 148),
+	},
+
 	advanced_vehicle_lab = {
 		name = "advanced_vehicle_lab",
 		display_name = "Advanced Vehicle Lab",
@@ -151,7 +177,6 @@ local defs: { [string]: EntityDef } = {
 	shipyard = {
 		name = "shipyard",
 		display_name = "Shipyard",
-		subtitle = "Ship factory",
 		kind = "building",
 		-- 96 x 59 x 96 elmos
 		collider = { shape = "box", width = cells(2), height = cells(2), length = cells(2) },
@@ -167,7 +192,7 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = studs(9999),
-		min_water_depth = studs(30),
+		min_water_depth = studs(5),
 		build_options = { "construction_ship", "supporter", "riptide", "syracusia", "herring", "orca", "buccaneer" },
 		weapons = nil,
 		color = Color3.fromRGB(122, 134, 148),
@@ -179,7 +204,6 @@ local defs: { [string]: EntityDef } = {
 	air_lab = {
 		name = "air_lab",
 		display_name = "Air Lab",
-		subtitle = "Aircraft factory",
 		kind = "building",
 		collider = { shape = "box", width = cells(3), height = cells(1), length = cells(3) },
 		metal_cost = 630,
@@ -195,6 +219,40 @@ local defs: { [string]: EntityDef } = {
 		assisting = false,
 		max_water_depth = 0,
 		build_options = { "construction_aircraft", "valiant", "whirlwind", "hercules", "hephaestus" },
+		weapons = nil,
+		color = Color3.fromRGB(122, 134, 148),
+	},
+
+	-- The lab for the second tier of aircraft, which the first tier's Construction Aircraft builds. Its numbers are
+	-- the Advanced Vehicle Lab's, with less health, as the Air Lab has less than the Vehicle Lab.
+	advanced_air_lab = {
+		name = "advanced_air_lab",
+		display_name = "Advanced Air Lab",
+		subtitle = "Advanced aircraft factory",
+		kind = "building",
+		collider = { shape = "box", width = cells(3), height = cells(2), length = cells(3) },
+		metal_cost = 2600,
+		energy_cost = 15000,
+		buildpower_cost = 26000,
+		health = 3900,
+		buildpower = 600,
+		metal_storage = 200,
+		energy_storage = 200,
+		acceleration = nil,
+		max_speed = nil,
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		build_options = {
+			"advanced_construction_aircraft",
+			"nighthawk",
+			"hailstorm",
+			"liche",
+			"tyrannus",
+			"stronghold",
+		},
 		weapons = nil,
 		color = Color3.fromRGB(122, 134, 148),
 	},

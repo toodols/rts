@@ -58,6 +58,11 @@ defs whose meshes are all uploaded already. Only Studio can see which mesh asset
 `roblox/record_meshes.py <file>` to put them in `roblox/uploads.json`. The next build writes an uploaded mesh into
 its art module as `mesh = "rbxassetid://..."`; anything not uploaded keeps its vertices and is built as before.
 
+The reclaimables (`tree`, `shrub`, and `rock`, which every rock def shares) are not dressed by the client: the server
+clones their uploaded meshes into each one's model, stretched to its collider (`src/server/instances.luau`), so they
+must be uploaded, and their modules go to `src/shared/reclaimable_art/` (`-LuauOut`). See
+`generators/reclaimable_common.py`.
+
 The module holds the model's rigid pieces and one mesh per material of each piece. A generator puts an object in a
 moving piece with `common.art_group(obj, "turret_1", pivot=True, kind="turret", weapon=1)`: `kind="turret"` follows
 that weapon's aim (a weapon with a `turret` in its def turns in the sim and fires only once it faces its target),

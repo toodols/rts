@@ -23,6 +23,17 @@ local TORPEDO_DEPTH = 0.6
 local TORPEDO_CLEARANCE = 0.3
 -- How fast a torpedo drops into the water or changes the depth it runs at, in studs a second.
 local TORPEDO_DIVE_SPEED = 8
+-- A homing projectile aims this far along the way its target will have gone by the time it gets there, as a fraction
+-- of the whole way: BAR's MissileProjectile leads by 0.7. Leading at all is what stops it chasing the tail of something
+-- crossing in front of it and flying past; leading by less than all the way leaves it a little behind a target that
+-- turns hard at the last moment, so a hit is likely but never certain.
+local HOMING_LEAD = 0.7
+-- What a homing projectile falls under once its guidance runs out: Spring's map gravity, 130 elmos a second squared.
+local UNGUIDED_GRAVITY = 130 / config.ELMOS_PER_STUD
+-- A homing projectile with a limited `guidance_time` that comes within this many studs of what it is steering for and
+-- then finds itself getting further away has flown past it, and loses its lock: it falls away rather than coming round
+-- to try again.
+local LOCK_LOSS_RANGE = 6
 
 export type Flight = {
 	position: Vector3,
@@ -34,10 +45,12 @@ export type Flight = {
 	phase: ("climb" | "cruise" | "dive")?,
 	target: Vector3?,
 	ceiling: number?,
-	-- for homing projectiles: the current target position to home in on
-	homing_target: Vector3?,
 	-- a torpedo's speed through the water, kept apart from its velocity, which also has its rise and fall in it
 	speed: number?,
+	-- a homing projectile's: the nearest it has come to what it steers for, and whether it has flown past that and lost
+	-- its lock (see `home`)
+	nearest: number?,
+	lost_lock: boolean?,
 }
 
 -- A rocket is launched along `direction`; a missile ignores it and is launched straight up, toward `aim`. A rocket
@@ -183,6 +196,54 @@ local function step_missile(
 	flight.position += flight.velocity * delta
 end
 
+-- Turns a homing projectile's flight toward a target at `target_position` moving at `target_velocity`, for `delta`
+-- seconds, the way BAR's missiles steer: it aims HOMING_LEAD of the way ahead of the target, and turns toward that
+-- at its weapon's turn rate, a fixed number of radians a second however far off it is, straight onto it once it is
+-- within one step's turn. Its speed is left as it was. It steers for `params.aim_offset` off the target's middle,
+-- if the shot has one. Once its `guidance_time` is up, or it has flown past what it steers for and lost its lock, it no
+-- longer steers at all (`step` lets it fall).
+local function home(
+	flight: Flight,
+	params: ProjectileParams,
+	target_position: Vector3,
+	target_velocity: Vector3,
+	delta: number
+)
+	if flight.lost_lock == true or flight.age > (params.guidance_time or math.huge) then
+		return
+	end
+	local speed = flight.velocity.Magnitude
+	if speed < 1e-3 then
+		return
+	end
+	target_position += params.aim_offset or Vector3.zero
+	local distance = (target_position - flight.position).Magnitude
+	local nearest = flight.nearest or math.huge
+	if params.guidance_time ~= nil and nearest <= LOCK_LOSS_RANGE and distance > nearest then
+		flight.lost_lock = true
+		return
+	end
+	flight.nearest = math.min(nearest, distance)
+	local wanted = target_position + target_velocity * (distance / speed * HOMING_LEAD) - flight.position
+	if wanted.Magnitude < 1e-3 then
+		return
+	end
+	wanted = wanted.Unit
+	local heading = flight.velocity / speed
+	local off = math.acos(math.clamp(heading:Dot(wanted), -1, 1))
+	local most = (params.turn_rate or config.HOMING_TURN_RATE) * delta
+	if off <= most then
+		flight.velocity = wanted * speed
+		return
+	end
+	local axis = heading:Cross(wanted)
+	if axis.Magnitude < 1e-6 then
+		-- straight away from it: any way round will do
+		axis = heading:Cross(if math.abs(heading.Y) < 0.9 then Vector3.yAxis else Vector3.xAxis)
+	end
+	flight.velocity = CFrame.fromAxisAngle(axis.Unit, most):VectorToWorldSpace(heading) * speed
+end
+
 -- The depths a torpedo may run at at (x, z), shallowest and deepest. Where the water is too shallow to hold it the
 -- two are the same, and the sea floor is above them.
 local function torpedo_band(x: number, z: number): (number, number)
@@ -231,20 +292,6 @@ local function step(flight: Flight, params: ProjectileParams, delta: number)
 		return
 	end
 
-	-- Homing projectile logic
-	if params.homing and flight.homing_target ~= nil then
-		local to_target = flight.homing_target - flight.position
-		if to_target.Magnitude > 1e-3 then
-			-- Turn toward the target with a smooth turn rate similar to missiles
-			local desired = to_target.Unit
-			local turned = flight.velocity.Unit:Lerp(desired, math.min(1, config.MISSILE_TURN_RATE * delta))
-			flight.velocity = (if turned.Magnitude > 1e-3 then turned.Unit else desired) * params.speed
-		end
-		flight.age += delta
-		flight.position += flight.velocity * delta
-		return
-	end
-
 	flight.age += delta
 	if flight.age <= params.thrust_time then
 		local speed = flight.velocity.Magnitude
@@ -252,6 +299,9 @@ local function step(flight: Flight, params: ProjectileParams, delta: number)
 	else
 		local kept = math.max(0, 1 - params.drag * delta)
 		flight.velocity = flight.velocity * kept - Vector3.new(0, params.gravity * delta, 0)
+	end
+	if params.homing == true and (flight.lost_lock == true or flight.age > (params.guidance_time or math.huge)) then
+		flight.velocity -= Vector3.new(0, UNGUIDED_GRAVITY * delta, 0)
 	end
 	flight.position += flight.velocity * delta
 end
@@ -302,5 +352,6 @@ return table.freeze({
 	aim = aim,
 	time_to_reach = time_to_reach,
 	step = step,
+	home = home,
 	torpedo_runs_at = torpedo_runs_at,
 })

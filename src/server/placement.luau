@@ -26,7 +26,7 @@ local GRID_TOLERANCE = 0.01
 local TAKEN_RADIUS = 1
 
 local function half_extents_for(entity: Entity): Vector2
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	return geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), entity.facing)
 end
 
@@ -39,7 +39,7 @@ local function clearable(other: Entity, team: types.TeamId): boolean
 	return other.kind == "unit"
 		and other.state == "active"
 		and other.team == team
-		and unit_defs.get(other.def_name).max_speed ~= nil
+		and unit_defs.of(other).max_speed ~= nil
 end
 
 -- Whether `other` is what `def_name` is built over in place (`EntityDef.upgrades`), a T1 mex under a T2 one or a
@@ -149,7 +149,7 @@ local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string
 		if other.alive == false then
 			continue
 		end
-		if other.kind == "building" and spots.for_def(unit_defs.get(other.def_name)) ~= nil then
+		if other.kind == "building" and spots.for_def(unit_defs.of(other)) ~= nil then
 			-- a T2 mex may go on a spot a T1 mex already stands on (fix #4), and an advanced geothermal on a vent a
 			-- plain one does
 			if def_name ~= nil and is_upgrade_target(def_name, other) then
@@ -161,7 +161,7 @@ local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string
 		end
 		for _, order in other.orders do
 			local queued_def = if order.kind == "build" and order.def_name ~= nil
-				then unit_defs.get(order.def_name)
+				then unit_defs.of(order)
 				else nil
 			if queued_def ~= nil and spots.for_def(queued_def) ~= nil and order.position ~= nil then
 				-- Only ignore this queued mex if it's queued by the same builder (fix #10)

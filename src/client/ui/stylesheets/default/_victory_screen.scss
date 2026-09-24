@@ -1,0 +1,199 @@
+@use "sass:color";
+@use "theme" as *;
+@use "mixins" as *;
+
+// The end of the game: the whole screen dimmed, and a plate in the middle of it with the result, big, and how it was
+// won beneath. Its edge and title take the result's colour: green for a win, red for a loss, plain for a spectator.
+.victory-screen {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	background-color: veil($void, 0.55);
+	z-index: 100;
+}
+
+// What centres the plate, over anything else laid on the dimmed screen (an unlock reveal's vignette).
+.victory-layout {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 2;
+}
+
+.victory-plate {
+	@include plate;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(3);
+	min-width: 420px;
+	padding: space(8) space(12);
+}
+
+.victory-title {
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 56px;
+	color: var(--Text);
+	-webkit-text-stroke: 3px veil($void, 0.85);
+}
+
+.victory-reason {
+	font-size: 16px;
+	color: var(--TextDim);
+	text-align: center;
+}
+
+.victory-screen.victory .victory-title {
+	color: var(--Gain);
+}
+
+.victory-screen.defeat .victory-title {
+	color: var(--Danger);
+}
+
+// A campaign mission's way out, under the result: a row of console buttons, the one to press lit in the accent, and a
+// line beneath saying where the player is headed or why they are not.
+.victory-choices {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: space(3);
+	width: auto;
+	height: auto;
+}
+
+.victory-button {
+	@include cell;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	width: auto;
+	min-width: 180px;
+	height: 40px;
+	padding: 0 space(5);
+
+	&.primary {
+		background-color: color.adjust($accent, $lightness: -22%);
+		background-image: linear-gradient(180deg, veil(white, 0.18), veil(black, 0.25));
+		outline: 1px solid var(--Accent);
+
+		&:hover {
+			background-color: color.adjust($accent, $lightness: -12%);
+		}
+	}
+
+	&.disabled,
+	&:disabled {
+		opacity: 0.4;
+	}
+}
+
+// The button's words, a label of their own so that the gradient on its face leaves them alone.
+.victory-button-label {
+	width: auto;
+	height: 100%;
+	font-family: Michroma;
+	font-size: 12px;
+	font-weight: bold;
+	color: var(--Text);
+}
+
+.victory-button.disabled .victory-button-label {
+	color: var(--TextFaint);
+}
+
+// What every team did, between the result and the way out: a sunken table, a row a team under a row of headings, the
+// player's own row lit and a winner's name in the win's colour. The MVP is named beneath it.
+.victory-stats {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(2);
+	width: auto;
+	height: auto;
+	padding: space(2) 0;
+}
+
+.victory-stats-table {
+	display: flex;
+	flex-direction: column;
+	gap: space(1);
+	width: auto;
+	height: auto;
+	padding: space(2);
+	background-color: veil($void, 0.45);
+	outline: 1px solid $edge;
+}
+
+.victory-stats-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: space(3);
+	width: auto;
+	height: 28px;
+	padding: 0 space(3);
+
+	&.headings {
+		height: 22px;
+	}
+
+	&.own {
+		background-color: veil($accent, 0.14);
+		outline: 1px solid veil($accent, 0.5);
+	}
+}
+
+.victory-stat {
+	width: 88px;
+	height: 100%;
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 14px;
+	text-align: right;
+	color: var(--Text);
+
+	&.name {
+		width: 180px;
+		font-family: Source Sans Pro;
+		font-size: 16px;
+		text-align: left;
+	}
+}
+
+.victory-stats-row.headings .victory-stat {
+	font-family: Michroma;
+	font-size: 10px;
+	color: var(--TextFaint);
+}
+
+.victory-stats-row.won .victory-stat.name {
+	color: var(--Gain);
+}
+
+.victory-mvp {
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 14px;
+	color: var(--Caution);
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+.victory-status {
+	font-size: 14px;
+	color: var(--TextDim);
+	text-align: center;
+
+	&.failed {
+		color: var(--Caution);
+	}
+}

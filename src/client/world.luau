@@ -4,6 +4,10 @@
 --
 -- Models are indexed by entity id as they arrive, because selection pruning and the HUD look
 -- entities up many times a frame and scanning the folder each time does not scale.
+--
+-- A map can be strewn with thousands of reclaimables, rocks and trees that never move and almost never change, so
+-- they are kept out of `all()`, which what runs every frame walks: they are only looked up by id (`get`), and the few
+-- someone has started reclaiming are listed in `reclaimables_started()`, for the bars over them.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -15,7 +19,15 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 type EntityId = types.EntityId
 
 local by_id: { [EntityId]: Model } = {}
+local id_of_model: { [Model]: EntityId } = {}
+-- every model but the reclaimables, and where in the list each one is, so one leaves in a swap rather than a rebuild
 local models: { Model } = {}
+local index_of: { [Model]: number } = {}
+-- the reclaimables whose store has gone down from what they held, and where in the list each one is
+local started: { Model } = {}
+local started_index: { [Model]: number } = {}
+-- the reclaimables not started yet, each waiting for its store to go down
+local watching: { [Model]: RBXScriptConnection } = {}
 local folder: Folder? = nil
 
 local function container(): Folder
@@ -27,10 +39,58 @@ local function container(): Folder
 	return found
 end
 
-local function rebuild_list()
-	table.clear(models)
-	for _, model in by_id do
-		table.insert(models, model)
+local function add_to(list: { Model }, index: { [Model]: number }, model: Model)
+	if index[model] ~= nil then
+		return
+	end
+	table.insert(list, model)
+	index[model] = #list
+end
+
+local function remove_from(list: { Model }, index: { [Model]: number }, model: Model)
+	local at = index[model]
+	if at == nil then
+		return
+	end
+	local last = list[#list]
+	list[at] = last
+	index[last] = at
+	list[#list] = nil
+	index[model] = nil
+end
+
+-- A reclaimable joins `started` once what is left in it drops below what it held, and stays until it is gone.
+local function watch_reclaimable(model: Model)
+	local function check(): boolean
+		local left = model:GetAttribute "reclaim_left"
+		local total = model:GetAttribute "reclaim_total"
+		if typeof(left) == "number" and typeof(total) == "number" and left < total then
+			add_to(started, started_index, model)
+			return true
+		end
+		return false
+	end
+	if check() then
+		return
+	end
+	watching[model] = model:GetAttributeChangedSignal("reclaim_left"):Connect(function()
+		if check() then
+			local connection = watching[model]
+			if connection ~= nil then
+				connection:Disconnect()
+				watching[model] = nil
+			end
+		end
+	end)
+end
+
+local function add(model: Model, id: EntityId)
+	by_id[id] = model
+	id_of_model[model] = id
+	if model:GetAttribute "kind" == "reclaimable" then
+		watch_reclaimable(model)
+	else
+		add_to(models, index_of, model)
 	end
 end
 
@@ -41,8 +101,7 @@ local function track(child: Instance)
 	local model = child :: Model
 	local id = model:GetAttribute "entity_id"
 	if typeof(id) == "number" then
-		by_id[id] = model
-		rebuild_list()
+		add(model, id)
 		return
 	end
 	-- the model can replicate a frame before its attributes do
@@ -50,26 +109,41 @@ local function track(child: Instance)
 	connection = model:GetAttributeChangedSignal("entity_id"):Connect(function()
 		local late = model:GetAttribute "entity_id"
 		if typeof(late) == "number" then
-			by_id[late] = model
-			rebuild_list()
 			connection:Disconnect()
+			add(model, late)
 		end
 	end)
 end
 
 local function untrack(child: Instance)
-	for id, model in by_id do
-		if model == child then
+	if child:IsA "Model" == false then
+		return
+	end
+	local model = child :: Model
+	local id = id_of_model[model]
+	if id ~= nil then
+		id_of_model[model] = nil
+		if by_id[id] == model then
 			by_id[id] = nil
-			rebuild_list()
-			return
 		end
+	end
+	remove_from(models, index_of, model)
+	remove_from(started, started_index, model)
+	local connection = watching[model]
+	if connection ~= nil then
+		connection:Disconnect()
+		watching[model] = nil
 	end
 end
 
--- Every live entity model. The returned table is reused, so callers must not hold onto it.
+-- Every live entity model but the reclaimables. The returned table is reused, so callers must not hold onto it.
 local function all(): { Model }
 	return models
+end
+
+-- The reclaimables someone has started reclaiming. Reused like `all()`'s.
+local function reclaimables_started(): { Model }
+	return started
 end
 
 local function get(id: EntityId): Model?
@@ -78,8 +152,7 @@ local function get(id: EntityId): Model?
 		return nil
 	end
 	if model.Parent == nil then
-		by_id[id] = nil
-		rebuild_list()
+		untrack(model)
 		return nil
 	end
 	return model
@@ -143,6 +216,7 @@ return table.freeze({
 	init = init,
 	container = container,
 	all = all,
+	reclaimables_started = reclaimables_started,
 	get = get,
 	from_instance = from_instance,
 	id_of = id_of,

@@ -1,0 +1,315 @@
+@use "sass:color";
+@use "theme" as *;
+@use "mixins" as *;
+// `.roster-title` extends `.heading`, which _main.scss declares.
+@use "main" as *;
+
+// The player list (T): a plate docked to the right edge, halfway down, over the battlefield. Your side comes first as
+// cards with their banks, the enemy after as slimmer rows. Each card carries its team's colour down its left edge.
+.player-list {
+	position: absolute;
+	top: 50%;
+	right: space(4);
+	transform: translateY(-50%);
+	width: 360px;
+	height: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: space(2);
+	padding: 0 space(4) space(4);
+	z-index: 20;
+}
+
+.roster-header {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+	padding-top: space(2);
+}
+
+.roster-title {
+	@extend .heading;
+	flex-grow: 1;
+	font-size: 18px;
+}
+
+// The key that opens it, as a keycap.
+.roster-key {
+	width: 22px;
+	height: 22px;
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 12px;
+	color: var(--TextDim);
+	background-color: $steel-raised;
+	outline: 1px solid $edge;
+}
+
+// A section's name, how many are in it, and a hairline running out to the edge.
+.roster-section {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.roster-section-title {
+	@include caption;
+	font-family: Michroma;
+	font-size: 10px;
+	color: var(--TextFaint);
+}
+
+.roster-section-count {
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: var(--Accent);
+}
+
+.roster-section-seam {
+	@include seam;
+	flex-grow: 1;
+	width: auto;
+}
+
+// One team. The stripe is its colour, set inline from the team; the body stacks the head over the bars.
+.roster-card {
+	width: 100%;
+	height: auto;
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	background-color: veil($steel-raised, 0.85);
+	background-image: linear-gradient(90deg, veil(white, 0.05), transparent 60%);
+	outline: 1px solid color.adjust($edge, $lightness: -12%);
+	transition: background-color $fast $ease-out;
+
+	&:hover {
+		background-color: $steel-lit;
+	}
+
+	&.self {
+		outline: 1px solid veil($accent, 0.55);
+	}
+
+	&.enemy {
+		background-color: veil($steel, 0.9);
+		background-image: linear-gradient(90deg, veil($danger, 0.12), transparent 50%);
+	}
+}
+
+.roster-stripe {
+	width: 4px;
+	height: auto;
+	align-self: stretch;
+}
+
+.roster-body {
+	height: auto;
+	flex-grow: 1;
+	@include stack(column, space(2));
+	padding: space(2) space(3);
+}
+
+.roster-card.enemy .roster-body {
+	padding: space(1) space(3);
+}
+
+.roster-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+}
+
+// A square headshot on its team's colour, framed like a monitor. The colour and the image are set inline.
+.roster-avatar {
+	width: 32px;
+	height: 32px;
+	outline: 1px solid $edge;
+	overflow: hidden;
+}
+
+.roster-card.enemy .roster-avatar {
+	width: 24px;
+	height: 24px;
+}
+
+.roster-initial {
+	width: 100%;
+	height: 100%;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 14px;
+	color: var(--Text);
+	background-color: veil($void, 0.45);
+	-webkit-text-stroke: 1px veil($void, 0.8);
+}
+
+// No size of its own: like `.resource-name`, the row's flex layout gives it the room left over.
+.roster-name {
+	flex-grow: 1;
+	font-family: Source Sans Pro;
+	font-weight: 600;
+	font-size: 16px;
+	text-align: left;
+	color: var(--Text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.roster-card.enemy .roster-name {
+	font-size: 14px;
+	color: var(--TextDim);
+}
+
+.roster-badge {
+	width: auto;
+	height: 16px;
+	padding: 0 space(2);
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 10px;
+	color: var(--Gain);
+	background-color: veil($gain, 0.14);
+	outline: 1px solid veil($gain, 0.5);
+
+	&.self {
+		color: var(--Accent);
+		background-color: veil($accent, 0.14);
+		outline: 1px solid veil($accent, 0.5);
+	}
+
+	&.enemy {
+		color: var(--Danger);
+		background-color: veil($danger, 0.14);
+		outline: 1px solid veil($danger, 0.5);
+	}
+}
+
+// A bar: its name, the lane the bar and its handle run along, and what it holds (or what is being given).
+.roster-meter {
+	width: 100%;
+	height: 18px;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.roster-meter-label {
+	@include caption;
+	width: 72px;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 10px;
+}
+
+.roster-meter.low .roster-meter-label {
+	color: var(--Danger);
+	font-weight: bold;
+}
+
+// Not a flex container: the track and the handle are placed inside it by hand. It starts from no width and grows
+// into what the row leaves it; an automatic width would feed back from the 100%-wide track inside.
+.roster-lane {
+	width: 0;
+	height: 18px;
+	flex-grow: 1;
+}
+
+.roster-track {
+	@include track(8px);
+	position: absolute;
+	top: 50%;
+	left: 0;
+	transform: translateY(-50%);
+}
+
+.roster-meter.low .roster-track {
+	outline: 1px solid veil($danger, 0.7);
+}
+
+// The fill, the reach and the pending stretch are all positioned and sized inline, as `.resource-fill` is: Roblox's
+// Size covers both axes, so a height here would override the width set from code.
+.roster-fill {
+	@include meter($metal);
+
+	&.energy-fill {
+		@include meter($energy);
+	}
+}
+
+// How far the handle could be dragged: what you can spare, up to the room they have. Striped, so it reads as
+// something on offer rather than something held.
+.roster-reach {
+	background-image: repeating-linear-gradient(-45deg, veil($accent, 0.28) 0 10%, transparent 10% 20%);
+}
+
+// What the drag has measured off, lit hot so it reads as on its way.
+// A literal colour rather than var(--Accent): outlass can't flatten a translucent gradient onto a var() background,
+// and drops the colour, which left the stretch washed out.
+.roster-pending {
+	background-color: $accent;
+	background-image: linear-gradient(90deg, veil(white, 0.5), $accent);
+}
+
+// The grip at the end of the fill. It grows when hovered and while held.
+.roster-handle {
+	width: 8px;
+	height: 18px;
+	background-color: $text;
+	background-image: linear-gradient(180deg, white, $text-dim);
+	outline: 1px solid $void;
+	transition: width $fast $ease-snap, background-color $fast $ease-out;
+
+	&:hover {
+		width: 12px;
+		background-color: var(--Accent);
+	}
+
+	&.wanted {
+		background-color: var(--Accent);
+		background-image: linear-gradient(180deg, color.adjust($accent, $lightness: 20%), $accent);
+	}
+}
+
+.roster-meter.dragging .roster-handle {
+	width: 12px;
+	background-color: white;
+}
+
+.roster-readout {
+	width: 84px;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: right;
+	color: var(--TextDim);
+}
+
+.roster-meter.low .roster-readout {
+	color: var(--Danger);
+}
+
+.roster-meter.dragging .roster-readout {
+	color: var(--Accent);
+	font-weight: bold;
+	@priority 20;
+}
+
+.roster-meter.sent .roster-readout {
+	color: var(--Gain);
+	font-weight: bold;
+	@priority 20;
+}
+
+.roster-hint {
+	width: 100%;
+	height: auto;
+	font-size: 12px;
+	font-style: italic;
+	color: var(--TextFaint);
+	text-align: center;
+}

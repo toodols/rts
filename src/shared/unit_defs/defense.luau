@@ -545,6 +545,8 @@ local defs: { [string]: EntityDef } = {
 					aoe_radius = aoe(studs(400)),
 					edge_effectiveness = 0.2,
 					homing = true,
+					-- an interceptor turns harder than an anti-air missile: a nuke will not wait for it to come round
+					turn_rate = 8,
 				},
 			},
 		},
@@ -559,7 +561,7 @@ local defs: { [string]: EntityDef } = {
 	rampart = {
 		name = "rampart",
 		display_name = "Rampart",
-		subtitle = "Geothermal powerplant, anti-nuke and drone platform",
+		subtitle = "Geothermal fortress",
 		kind = "building",
 		-- 96 x 86 x 96 elmos on the geothermals' 5 x 5 footprint
 		collider = { shape = "box", width = cells(2), height = cells(2), length = cells(2) },
@@ -597,6 +599,7 @@ local defs: { [string]: EntityDef } = {
 					aoe_radius = aoe(studs(420)),
 					edge_effectiveness = 0.15,
 					homing = true,
+					turn_rate = 8,
 				},
 			},
 		},
@@ -730,6 +733,30 @@ local defs: { [string]: EntityDef } = {
 			starting_power = 2090,
 		},
 		color = Color3.fromRGB(96, 170, 214),
+	},
+
+	-- A wall section, after BAR's Dragon's Teeth (armdrag): cheap, tough and inert, put down in lines (shift-drag) to
+	-- block a path or soak up fire. It is the utility category's own building.
+	wall = {
+		name = "wall",
+		display_name = "Wall",
+		kind = "building",
+		collider = { shape = "box", width = cells(2), height = cells(1), length = cells(2) },
+		metal_cost = 10 * 4,
+		energy_cost = 0,
+		buildpower_cost = 1000 * 4,
+		health = 2800 * 2,
+		buildpower = nil,
+		acceleration = nil,
+		max_speed = nil,
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		build_options = nil,
+		weapons = nil,
+		color = Color3.fromRGB(128, 132, 138),
 	},
 
 	-- corerad, Cortex's Eradicator: a heavy anti-air battery that fires bursts of four fast homing missiles far out, so

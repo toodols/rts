@@ -2,34 +2,60 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local React = require(ReplicatedStorage.Packages.react)
 
+local config = require(ReplicatedStorage.Shared.config)
+local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local input = require(ReplicatedStorage.Client.input)
+local tutorial = require(ReplicatedStorage.Client.tutorial)
+local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
+local use_mission = require(ReplicatedStorage.Client.ui.use_mission)
+local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 
 type EntityView = use_entities.EntityView
+type FlowSource = use_entities.FlowSource
+type Gauge = use_entities.Gauge
+type Content = tooltip.Content
+
+local WithTooltip = tooltip.WithTooltip
 
 local cancel_production: RemoteEvent = ReplicatedStorage.Shared.CancelProduction
 
-local function Stat(props: { label: string, value: string, LayoutOrder: number, value_color: Color3? })
-	return React.createElement("Frame", {
-		[React.Tag] = "stat",
-		LayoutOrder = props.LayoutOrder,
-	}, {
-		Label = React.createElement("TextLabel", {
-			[React.Tag] = "stat-label",
-			LayoutOrder = 1,
-			-- Uppercased here because Roblox has no text-transform.
-			Text = string.upper(props.label),
-		}),
-		Value = React.createElement("TextLabel", {
-			[React.Tag] = "stat-value",
-			LayoutOrder = 2,
-			Text = props.value,
-			TextColor3 = props.value_color,
-		}),
-	})
+-- Past this many a gauge is drawn as a meter rather than one pip each.
+local MAX_PIPS = 12
+
+-- The gap between the shots of a burst for a weapon that does not give its own, as combat has it.
+local DEFAULT_BURST_INTERVAL = 0.1
+
+-- Rich text is on for every label, so user-made text such as a team name has to be escaped before it goes in.
+local function escape(text: string): string
+	return (
+		string.gsub(text, "[<>&\"']", {
+			["<"] = "&lt;",
+			[">"] = "&gt;",
+			["&"] = "&amp;",
+			['"'] = "&quot;",
+			["'"] = "&apos;",
+		})
+	)
+end
+
+-- A number as a readout: whole when it is big enough that the fraction would be noise, one place otherwise.
+local function figure(value: number): string
+	if math.abs(value) >= 100 or value == math.floor(value) then
+		return tostring(math.round(value))
+	end
+	return string.format("%.1f", value)
+end
+
+-- A time in seconds, to two places while it is short.
+local function seconds(value: number): string
+	if value >= 10 then
+		return `{math.round(value)}s`
+	end
+	return `{string.format("%.2f", value)}s`
 end
 
 -- A factory's pending items. Clicking one cancels it.
@@ -53,161 +79,915 @@ local function Queue(props: { view: EntityView, LayoutOrder: number })
 	}, chips)
 end
 
--- A rate in resource a second, signed: what is made is plus and what is spent is minus.
+-- A rate's magnitude, signed: what is made is plus and what is spent is minus.
 local function rate_text(rate: number): string
 	if rate > 0 then
-		return `+{string.format("%.1f", rate)}/s`
+		return `+{string.format("%.1f", rate)}`
 	elseif rate < 0 then
-		return `-{string.format("%.1f", -rate)}/s`
+		return `-{string.format("%.1f", -rate)}`
 	end
-	return "0/s"
+	return "0.0"
 end
 
--- Why something is not working at full rate, or nil if it is.
-local function stall_text(view: EntityView): string?
-	if view.stalled == "energy" or view.need_energy then
-		return "STALLED: low energy"
-	elseif view.stalled == "metal" then
-		return "STALLED: low metal"
-	elseif view.stalled == "storage" then
-		return "STALLED: metal storage full"
+-- What something has earned in battle, "3 KILLS · XP 0.25", or nil until it has earned any.
+local function veterancy_text(view: EntityView): string?
+	if view.state == "blueprint" or (view.kills == 0 and view.experience == 0) then
+		return nil
 	end
-	return nil
+	local kills = if view.kills == 1 then "1 KILL" else `{view.kills} KILLS`
+	return `{kills} · XP {string.format("%.2f", view.experience)}`
 end
 
-local function Single(props: { view: EntityView })
+-- Who it belongs to, at the end of the title: a swatch and the name, both in the team's colour.
+local function TeamTag(props: { view: EntityView, LayoutOrder: number })
 	local view = props.view
-	local def = unit_defs.get(view.def_name)
-	local is_blueprint = view.state == "blueprint"
-	local fraction = if is_blueprint
-		then math.clamp(view.build_progress / math.max(1, view.buildpower_cost), 0, 1)
-		else math.clamp(view.health / math.max(1, view.max_health), 0, 1)
-
-	local stats = {
-		Team = React.createElement(Stat, {
-			label = "Team",
-			value = if view.team_name ~= nil
-				then view.team_name
-				elseif view.team == 0 then "Neutral"
-				else `Team {view.team}`,
-			value_color = view.team_color,
-			LayoutOrder = 0,
+	local name = if view.team_name ~= nil then view.team_name else `Team {view.team}`
+	local color = view.team_color
+	return React.createElement("Frame", {
+		[React.Tag] = "team-tag",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		-- The swatch is white and tinted by a gradient, since a style rule's colour would win over one set here.
+		Swatch = React.createElement("Frame", {
+			[React.Tag] = if color ~= nil then "team-swatch" else "team-swatch team-swatch-neutral",
+			LayoutOrder = 1,
+		}, {
+			Tint = if color ~= nil
+				then React.createElement("UIGradient", { Color = ColorSequence.new(color) })
+				else nil,
 		}),
-		Health = React.createElement(Stat, {
-			label = "Health",
-			value = `{math.floor(view.health)} / {math.floor(view.max_health)}`,
+		Name = React.createElement("TextLabel", {
+			[React.Tag] = "team-name",
+			LayoutOrder = 2,
+			Text = if color ~= nil
+				then `<font color="#{color:ToHex()}">{escape(string.upper(name))}</font>`
+				else escape(string.upper(name)),
+		}),
+	})
+end
+
+-- The top line: the name, a badge for a state worth pointing out (a blueprint, a wreck; something simply up and
+-- running has none), and whose it is at the end. Hovering it shows `tooltip`, what there is to know about the thing
+-- that does not change as it goes about its business.
+local function Title(props: {
+	name: string,
+	badge: string?,
+	badge_tag: string?,
+	team: EntityView?,
+	tooltip: (() -> Content)?,
+	LayoutOrder: number,
+})
+	local children = {
+		Accent = React.createElement("Frame", {
+			[React.Tag] = "accent-bar",
 			LayoutOrder = 1,
 		}),
-		Metal = React.createElement(Stat, {
-			label = "Metal",
-			value = tostring(def.metal_cost),
+		Name = React.createElement("TextLabel", {
+			[React.Tag] = "selection-name",
+			LayoutOrder = 2,
+			Text = props.name,
+		}),
+		Badge = if props.badge ~= nil
+			then React.createElement("TextLabel", {
+				[React.Tag] = if props.badge_tag ~= nil then `badge {props.badge_tag}` else "badge",
+				LayoutOrder = 3,
+				Text = props.badge,
+			})
+			else nil,
+		Team = if props.team ~= nil then React.createElement(TeamTag, { view = props.team, LayoutOrder = 4 }) else nil,
+	}
+	if props.tooltip ~= nil then
+		return React.createElement(WithTooltip, {
+			tag = "selection-title",
+			LayoutOrder = props.LayoutOrder,
+			content = props.tooltip,
+		}, children)
+	end
+	return React.createElement("Frame", {
+		[React.Tag] = "selection-title",
+		LayoutOrder = props.LayoutOrder,
+	}, children)
+end
+
+-- The line under the title: what it is in plain words, and at the end what it has earned in battle, if anything.
+local function Subtitle(props: { text: string?, veterancy: string?, LayoutOrder: number })
+	if props.text == nil and props.veterancy == nil then
+		return nil
+	end
+	return React.createElement("Frame", {
+		[React.Tag] = "subtitle-row",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		Text = React.createElement("TextLabel", {
+			[React.Tag] = "selection-subtitle",
+			LayoutOrder = 1,
+			Text = props.text or "",
+		}),
+		Veterancy = if props.veterancy ~= nil
+			then React.createElement("TextLabel", {
+				[React.Tag] = "veterancy",
+				LayoutOrder = 2,
+				Text = props.veterancy,
+			})
+			else nil,
+	})
+end
+
+-- A thick bar with its numbers stamped on it. `tone` picks the fill's colour.
+local function Vitals(props: { fraction: number, tone: string, label: string, LayoutOrder: number })
+	return React.createElement("Frame", {
+		[React.Tag] = "vitals-track",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		Fill = React.createElement("Frame", {
+			[React.Tag] = `vitals-fill {props.tone}`,
+			Size = UDim2.new(math.clamp(props.fraction, 0, 1), 0, 1, 0),
+		}),
+		Label = React.createElement("TextLabel", {
+			[React.Tag] = "vitals-label",
+			Text = props.label,
+		}),
+	})
+end
+
+-- Health goes from green through amber to red as it runs down.
+local function health_tone(fraction: number): string
+	return if fraction > 0.6
+		then "vitals-fill-good"
+		elseif fraction > 0.3 then "vitals-fill-worn"
+		else "vitals-fill-critical"
+end
+
+-- One resource's tile: a figure in big type under the resource's name, with a line of small print under that. What
+-- holds something back lights its tile's edge in red with why.
+local function ResourceTile(props: {
+	resource: "metal" | "energy",
+	value: string,
+	unit: string?,
+	tone: string,
+	caption: string?,
+	stall: string?,
+	tooltip: (() -> Content)?,
+	LayoutOrder: number,
+})
+	local tag = if props.stall ~= nil
+		then `resource-tile {props.resource}-tile tile-stalled`
+		else `resource-tile {props.resource}-tile`
+	local children = {
+		Rail = React.createElement("Frame", {
+			[React.Tag] = `tile-rail {props.resource}-rail`,
+		}),
+		Head = React.createElement("Frame", {
+			[React.Tag] = "tile-head",
+			LayoutOrder = 1,
+		}, {
+			Chip = React.createElement("Frame", {
+				[React.Tag] = `resource-chip {props.resource}-chip`,
+				LayoutOrder = 1,
+			}),
+			Name = React.createElement("TextLabel", {
+				[React.Tag] = `tile-name {props.resource}`,
+				LayoutOrder = 2,
+				Text = string.upper(props.resource),
+			}),
+			Stall = if props.stall ~= nil
+				then React.createElement("TextLabel", {
+					[React.Tag] = "tile-stall",
+					LayoutOrder = 3,
+					Text = props.stall,
+				})
+				else nil,
+		}),
+		Rate = React.createElement("Frame", {
+			[React.Tag] = "tile-rate",
+			LayoutOrder = 2,
+		}, {
+			Value = React.createElement("TextLabel", {
+				[React.Tag] = `tile-rate-value {props.tone}`,
+				LayoutOrder = 1,
+				Text = props.value,
+			}),
+			Unit = if props.unit ~= nil
+				then React.createElement("TextLabel", {
+					[React.Tag] = `tile-rate-unit {props.tone}`,
+					LayoutOrder = 2,
+					Text = props.unit,
+				})
+				else nil,
+		}),
+		Caption = if props.caption ~= nil
+			then React.createElement("TextLabel", {
+				[React.Tag] = "tile-cost",
+				LayoutOrder = 3,
+				Text = props.caption,
+			})
+			else nil,
+	}
+	if props.tooltip ~= nil then
+		return React.createElement(WithTooltip, {
+			tag = tag,
+			LayoutOrder = props.LayoutOrder,
+			content = props.tooltip,
+		}, children)
+	end
+	return React.createElement("Frame", {
+		[React.Tag] = tag,
+		LayoutOrder = props.LayoutOrder,
+	}, children)
+end
+
+local function rate_tone(rate: number): string
+	return if math.abs(rate) < 0.05 then "tile-rate-idle" elseif rate > 0 then "tile-rate-gain" else "tile-rate-loss"
+end
+
+-- What a resource tile says when it is hovered: where its rate comes from, a row a source, and what, if anything, is
+-- holding it back.
+local function rate_tooltip(
+	resource: "metal" | "energy",
+	rate: number?,
+	stall: string?,
+	sources: { FlowSource }
+): Content
+	local rows: { tooltip.Row } = {}
+	for _, source in sources do
+		local amount = if resource == "metal" then source.metal else source.energy
+		if math.abs(amount) >= 0.05 then
+			table.insert(rows, {
+				label = source.label,
+				value = `{rate_text(amount)}/s`,
+				tag = if amount > 0 then "gain" else "loss",
+			})
+		end
+	end
+	if #rows > 1 and rate ~= nil then
+		table.insert(rows, {
+			label = "Net",
+			value = `{rate_text(rate)}/s`,
+			tag = if rate >= 0 then "gain" else "loss",
+			divider = true,
+		})
+	end
+	local text = if #rows > 0 then nil elseif rate == nil or math.abs(rate) < 0.05 then "Idle" else `{rate_text(rate)}/s`
+	local notes = {}
+	if stall == "FULL" then
+		table.insert(notes, "Storage full")
+	elseif stall ~= nil then
+		table.insert(notes, `Low {resource}: slowed`)
+	end
+	return {
+		kicker = "ECONOMY",
+		title = string.upper(resource),
+		tone = if stall ~= nil then "danger" else resource,
+		text = text,
+		rows = rows,
+		notes = notes,
+	}
+end
+
+-- What it is making or spending right now, a tile for each resource it is, and none for one it is not. Nil when it
+-- is doing neither, and then there is nothing to show.
+local function Economy(props: { view: EntityView, LayoutOrder: number })
+	local view = props.view
+	local metal_stall = if view.stalled == "metal" then "SHORT" elseif view.stalled == "storage" then "FULL" else nil
+	local energy_stall = if view.stalled == "energy" or view.need_energy then "SHORT" else nil
+	local metal = view.metal_rate
+	local energy = view.energy_rate
+	local show_metal = metal ~= nil or metal_stall ~= nil
+	local show_energy = energy ~= nil or energy_stall ~= nil
+	if not show_metal and not show_energy then
+		return nil
+	end
+
+	return React.createElement("Frame", {
+		[React.Tag] = "economy-row",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		Metal = if show_metal
+			then React.createElement(ResourceTile, {
+				resource = "metal",
+				value = if metal ~= nil then rate_text(metal) else "0.0",
+				unit = "/s",
+				tone = rate_tone(metal or 0),
+				stall = metal_stall,
+				tooltip = function()
+					return rate_tooltip("metal", metal, metal_stall, view.flow_sources)
+				end,
+				LayoutOrder = 1,
+			})
+			else nil,
+		Energy = if show_energy
+			then React.createElement(ResourceTile, {
+				resource = "energy",
+				value = if energy ~= nil then rate_text(energy) else "0.0",
+				unit = "/s",
+				tone = rate_tone(energy or 0),
+				stall = energy_stall,
+				tooltip = function()
+					return rate_tooltip("energy", energy, energy_stall, view.flow_sources)
+				end,
+				LayoutOrder = 2,
+			})
+			else nil,
+	})
+end
+
+-- A distance in studs, the world's unit.
+local function studs(value: number): string
+	return `{figure(value)} studs`
+end
+
+-- What there is to know about a unit or building that does not change as it goes: what it costs, how tough and how
+-- quick it is. Shown over its title.
+local function unit_tooltip(view: EntityView, def: types.EntityDef): Content
+	local rows: { tooltip.Row } = {
+		{ label = "Health", value = tostring(math.floor(view.max_health)) },
+		{ label = "Metal cost", value = tostring(def.metal_cost), tag = "metal" },
+		{ label = "Energy cost", value = tostring(def.energy_cost), tag = "energy" },
+		{ label = "Buildpower cost", value = tostring(def.buildpower_cost), tag = "buildpower" },
+	}
+	if def.max_speed ~= nil and def.max_speed > 0 then
+		table.insert(rows, { label = "Speed", value = `{studs(def.max_speed)}/s` })
+	end
+	if def.transport ~= nil then
+		table.insert(rows, { label = "Carries", value = `{def.transport.capacity} {def.transport.carries}` })
+	end
+	if view.order_count > 0 then
+		table.insert(rows, { label = "Orders queued", value = tostring(view.order_count) })
+	end
+	return {
+		kicker = if def.kind == "building" then "BUILDING" else "UNIT",
+		title = string.upper(def.display_name),
+		tone = "plain",
+		text = def.subtitle,
+		rows = rows,
+	}
+end
+
+-- A labelled gauge: a pip for each of a few, a meter for more, and the count on the right.
+local function GaugeRow(props: { label: string, gauge: Gauge, tone: string, LayoutOrder: number })
+	local gauge = props.gauge
+	local body
+	if gauge.most <= MAX_PIPS then
+		local pips = {}
+		for index = 1, gauge.most do
+			pips[`Pip{index}`] = React.createElement("Frame", {
+				[React.Tag] = if index <= gauge.value then `pip pip-full {props.tone}-pip` else "pip",
+				LayoutOrder = index,
+			})
+		end
+		body = React.createElement("Frame", {
+			[React.Tag] = "pip-row",
+			LayoutOrder = 2,
+		}, pips)
+	else
+		body = React.createElement("Frame", {
+			[React.Tag] = "gauge-track",
+			LayoutOrder = 2,
+		}, {
+			Fill = React.createElement("Frame", {
+				[React.Tag] = `gauge-fill {props.tone}-fill`,
+				Size = UDim2.new(math.clamp(gauge.value / math.max(1, gauge.most), 0, 1), 0, 1, 0),
+			}),
+		})
+	end
+
+	return React.createElement("Frame", {
+		[React.Tag] = "gauge-row",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		Label = React.createElement("TextLabel", {
+			[React.Tag] = "gauge-label",
+			LayoutOrder = 1,
+			Text = props.label,
+		}),
+		Body = body,
+		Value = React.createElement("TextLabel", {
+			[React.Tag] = "gauge-value",
+			LayoutOrder = 3,
+			Text = `{math.floor(gauge.value)}/{math.floor(gauge.most)}`,
+		}),
+	})
+end
+
+-- One row of what something carries: a slot with a short code for what it is, its name, and its headline figure on
+-- the right. The rest is in the tooltip it shows when hovered.
+local function LoadoutRow(props: {
+	tone: "weapon" | "build" | "manual",
+	slot: string,
+	name: string,
+	value: string,
+	unit: string,
+	tooltip: () -> Content,
+	LayoutOrder: number,
+})
+	return React.createElement(WithTooltip, {
+		tag = `loadout-row loadout-{props.tone}`,
+		LayoutOrder = props.LayoutOrder,
+		content = props.tooltip,
+	}, {
+		Slot = React.createElement("TextLabel", {
+			[React.Tag] = `loadout-slot slot-{props.tone}`,
+			LayoutOrder = 1,
+			Text = props.slot,
+		}),
+		Name = React.createElement("TextLabel", {
+			[React.Tag] = "loadout-name",
+			LayoutOrder = 2,
+			Text = props.name,
+		}),
+		Figure = React.createElement("Frame", {
+			[React.Tag] = "loadout-figure",
+			LayoutOrder = 3,
+		}, {
+			Value = React.createElement("TextLabel", {
+				[React.Tag] = `loadout-value value-{props.tone}`,
+				LayoutOrder = 1,
+				Text = props.value,
+			}),
+			Unit = React.createElement("TextLabel", {
+				[React.Tag] = "loadout-unit",
+				LayoutOrder = 2,
+				Text = props.unit,
+			}),
+		}),
+	})
+end
+
+-- A caption over a group of loadout rows, with a rule running out after it in the group's colour.
+local function LoadoutHeading(props: { text: string, tone: string, LayoutOrder: number })
+	return React.createElement("Frame", {
+		[React.Tag] = "loadout-heading",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		Text = React.createElement("TextLabel", {
+			[React.Tag] = `loadout-heading-text heading-{props.tone}`,
+			LayoutOrder = 1,
+			Text = props.text,
+		}),
+		Rule = React.createElement("Frame", {
+			[React.Tag] = `loadout-rule rule-{props.tone}`,
 			LayoutOrder = 2,
 		}),
-		Energy = React.createElement(Stat, {
-			label = "Energy",
-			value = tostring(def.energy_cost),
-			LayoutOrder = 3,
-		}),
-		Build = React.createElement(Stat, {
-			label = "Buildpower",
-			value = if def.buildpower ~= nil then tostring(def.buildpower) else "-",
-			LayoutOrder = 4,
-		}),
-		Orders = React.createElement(Stat, {
-			label = "Orders",
-			value = tostring(view.order_count),
-			LayoutOrder = 5,
-		}),
-		MetalRate = if view.metal_rate ~= nil
-			then React.createElement(Stat, {
-				label = "Metal / s",
-				value = rate_text(view.metal_rate),
-				LayoutOrder = 8,
-			})
-			else nil,
-		EnergyRate = if view.energy_rate ~= nil
-			then React.createElement(Stat, {
-				label = "Energy / s",
-				value = rate_text(view.energy_rate),
-				LayoutOrder = 9,
-			})
-			else nil,
+	})
+end
+
+-- A weapon's name, from what it is, since a def's weapons have none of their own, and the short code on its slot.
+local function weapon_kind(weapon: types.Weapon): (string, string)
+	local projectile = weapon.projectile
+	local name, slot
+	if weapon.anti_nuke then
+		name, slot = "ANTI-NUKE", "ABM"
+	elseif projectile ~= nil and projectile.nuclear then
+		name, slot = "NUCLEAR MISSILE", "NUK"
+	elseif projectile ~= nil and projectile.torpedo then
+		name, slot = "TORPEDO", "TRP"
+	elseif projectile ~= nil and projectile.dropped then
+		name, slot = "BOMBS", "BMB"
+	elseif weapon.beam_time ~= nil then
+		name, slot = "LASER", "LSR"
+	elseif projectile ~= nil and projectile.plasma then
+		name, slot = "PLASMA CANNON", "PLS"
+	elseif projectile ~= nil and (projectile.missile ~= nil or projectile.homing) then
+		name, slot = "MISSILES", "MSL"
+	elseif projectile ~= nil then
+		name, slot = "ROCKETS", "RKT"
+	else
+		name, slot = "GUN", "GUN"
+	end
+	if weapon.anti_air and not weapon.anti_nuke then
+		return `AA {name}`, "AA"
+	end
+	return name, slot
+end
+
+-- A weapon's damage a second while it keeps firing: a whole burst, the gaps within it and the reload after it.
+local function weapon_dps(weapon: types.Weapon): number
+	local shots = math.max(1, weapon.burst_count or 1)
+	local cycle = weapon.reload + (shots - 1) * (weapon.burst_interval or DEFAULT_BURST_INTERVAL)
+	return weapon.damage * shots / math.max(cycle, 1e-3)
+end
+
+-- What a weapon can shoot at, in a word or two.
+local function targets_text(weapon: types.Weapon): string
+	if weapon.anti_nuke then
+		return "Nuclear missiles"
+	elseif weapon.target_layer == "air" then
+		return "Air"
+	elseif weapon.target_layer == "ground" then
+		return "Ground"
+	end
+	return "Ground and air"
+end
+
+-- Everything about a weapon, for its tooltip.
+local function weapon_tooltip(weapon: types.Weapon, index: number, count: number): Content
+	local name = weapon_kind(weapon)
+	local rows: { tooltip.Row } = {
+		{ label = "Damage a second", value = figure(weapon_dps(weapon)), tag = "weapon" },
+		{ label = "Damage a shot", value = figure(weapon.damage) },
+	}
+	local burst = weapon.burst_count
+	if burst ~= nil and burst > 1 then
+		table.insert(rows, {
+			label = "Burst",
+			value = `{burst} shots, {seconds(weapon.burst_interval or DEFAULT_BURST_INTERVAL)} apart`,
+		})
+	end
+	table.insert(rows, { label = "Reload", value = seconds(weapon.reload) })
+	table.insert(rows, { label = "Range", value = studs(weapon.range) })
+	local projectile = weapon.projectile
+	if projectile ~= nil and projectile.aoe_radius > 0 then
+		table.insert(rows, { label = "Blast radius", value = studs(projectile.aoe_radius) })
+	end
+	if projectile ~= nil and projectile.speed > 0 then
+		table.insert(rows, { label = "Shot speed", value = `{studs(projectile.speed)}/s` })
+	end
+	if weapon.energy_per_shot > 0 then
+		table.insert(rows, { label = "Energy a shot", value = figure(weapon.energy_per_shot), tag = "energy" })
+	end
+	table.insert(rows, { label = "Targets", value = targets_text(weapon) })
+	if not weapon.anti_air and not weapon.anti_nuke and weapon.target_layer ~= "ground" then
+		table.insert(rows, { label = "Vs air", value = `{math.round(config.NON_AA_AIR_DAMAGE_FRACTION * 100)}%` })
+	end
+	local stockpile = weapon.stockpile
+	if stockpile ~= nil then
+		table.insert(rows, { label = "Holds", value = `{stockpile.limit}, one every {seconds(stockpile.build_time)}` })
+		table.insert(rows, { label = "Each costs", value = `{stockpile.metal} M · {stockpile.energy} E` })
+	end
+
+	local notes = {}
+	if weapon.manual_fire then
+		table.insert(notes, "Manual fire")
+	end
+	if weapon.weapon_group ~= nil then
+		table.insert(notes, "Shared reload")
+	end
+	return {
+		kicker = if count > 1 then `WEAPON {index} OF {count}` else "WEAPON",
+		title = name,
+		tone = "weapon",
+		rows = rows,
+		notes = notes,
+	}
+end
+
+-- What building takes and what it reaches, and which of a builder's jobs it does, for its tooltip.
+local function build_tooltip(def: types.EntityDef): Content
+	local rows: { tooltip.Row } = {
+		{ label = "Buildpower", value = `{def.buildpower}/s`, tag = "buildpower" },
+	}
+	if def.build_range ~= nil then
+		table.insert(rows, { label = "Build range", value = studs(def.build_range) })
+	end
+	local jobs = {}
+	if def.build_options ~= nil and #def.build_options > 0 then
+		table.insert(jobs, "Build")
+	end
+	if def.assisting then
+		table.insert(jobs, "Assist")
+	end
+	if def.repairing then
+		table.insert(jobs, "Repair")
+	end
+	if def.reclaiming then
+		table.insert(jobs, "Reclaim")
+	end
+	if def.resurrecting then
+		table.insert(jobs, "Resurrect")
+	end
+	if #jobs > 0 then
+		table.insert(rows, { label = "Can", value = table.concat(jobs, ", ") })
+	end
+	return {
+		kicker = "BUILDER",
+		title = "BUILDPOWER",
+		tone = "build",
+		rows = rows,
+	}
+end
+
+-- What it builds with and what it fights with: a row each, the detail in their tooltips.
+local function Loadout(props: { def: types.EntityDef, LayoutOrder: number })
+	local def = props.def
+	local weapons = def.weapons or {}
+	local manual = def.manual_weapon
+	if def.buildpower == nil and #weapons == 0 and manual == nil then
+		return nil
+	end
+
+	local rows = {}
+	local order = 0
+	local function next_order(): number
+		order += 1
+		return order
+	end
+
+	local buildpower = def.buildpower
+	if buildpower ~= nil then
+		rows.Build = React.createElement(LoadoutRow, {
+			tone = "build",
+			slot = "BLD",
+			name = "BUILDPOWER",
+			value = tostring(buildpower),
+			unit = "PER SEC",
+			tooltip = function()
+				return build_tooltip(def)
+			end,
+			LayoutOrder = next_order(),
+		})
+	end
+
+	if #weapons > 0 or manual ~= nil then
+		rows.WeaponsHeading = React.createElement(LoadoutHeading, {
+			text = "WEAPONS",
+			tone = "weapon",
+			LayoutOrder = next_order(),
+		})
+	end
+	for index, weapon in weapons do
+		local name, slot = weapon_kind(weapon)
+		rows[`Weapon{index}`] = React.createElement(LoadoutRow, {
+			tone = "weapon",
+			slot = slot,
+			name = name,
+			value = figure(weapon_dps(weapon)),
+			unit = "DPS",
+			tooltip = function()
+				return weapon_tooltip(weapon, index, #weapons)
+			end,
+			LayoutOrder = next_order(),
+		})
+	end
+	if manual ~= nil then
+		rows.Manual = React.createElement(LoadoutRow, {
+			tone = "manual",
+			slot = "DGN",
+			name = "DISINTEGRATOR",
+			value = figure(manual.energy_per_shot),
+			unit = "E/SHOT",
+			tooltip = function(): Content
+				return {
+					kicker = "MANUAL WEAPON",
+					title = "DISINTEGRATOR",
+					tone = "weapon",
+					text = "Destroys everything in its strip, allies too.",
+					rows = {
+						{ label = "Range", value = studs(manual.range) },
+						{ label = "Strip width", value = studs(manual.radius * 2) },
+						{ label = "Reload", value = seconds(manual.reload) },
+						{ label = "Energy a shot", value = figure(manual.energy_per_shot), tag = "energy" },
+					},
+				}
+			end,
+			LayoutOrder = next_order(),
+		})
+	end
+
+	return React.createElement("Frame", {
+		[React.Tag] = "loadout",
+		LayoutOrder = props.LayoutOrder,
+	}, rows)
+end
+
+-- Something alive: a unit or a building, finished or still a blueprint. A `simple` one (the tutorial's) shows only
+-- what it is called, whose it is, how healthy it is and what it is making, with `economy` what it makes and spends,
+-- and with `weapons` what it fights with.
+local function Live(props: {
+	view: EntityView,
+	def: types.EntityDef,
+	simple: boolean,
+	economy: boolean,
+	weapons: boolean,
+})
+	local view = props.view
+	local def = props.def
+	local is_blueprint = view.state == "blueprint"
+
+	local vitals_fraction = if is_blueprint
+		then view.build_progress / math.max(1, view.buildpower_cost)
+		else view.health / math.max(1, view.max_health)
+	local vitals = React.createElement(Vitals, {
+		fraction = vitals_fraction,
+		tone = if is_blueprint then "vitals-fill-blueprint" else health_tone(vitals_fraction),
+		label = if is_blueprint
+			then `BUILDING  {math.floor(math.clamp(vitals_fraction, 0, 1) * 100)}%`
+			else `{math.floor(view.health)} / {math.floor(view.max_health)}`,
+		LayoutOrder = 4,
+	})
+
+	if props.simple then
+		return React.createElement(React.Fragment, {}, {
+			Title = React.createElement(Title, {
+				name = view.display_name,
+				badge = if is_blueprint then "BLUEPRINT" else nil,
+				badge_tag = if is_blueprint then "badge-blueprint" else nil,
+				team = view,
+				LayoutOrder = 1,
+			}),
+			Vitals = vitals,
+			Economy = if props.economy then React.createElement(Economy, { view = view, LayoutOrder = 5 }) else nil,
+			Loadout = if props.weapons then React.createElement(Loadout, { def = def, LayoutOrder = 8 }) else nil,
+			-- what a factory is making is always shown: the tutorial has the player make units
+			Queue = if #view.queue > 0 then React.createElement(Queue, { view = view, LayoutOrder = 10 }) else nil,
+		})
+	end
+
+	local gauges = {
 		Shield = if view.shield ~= nil
-			then React.createElement(Stat, {
-				label = "Shield",
-				value = view.shield,
-				LayoutOrder = 11,
-			})
-			else nil,
-		Stall = if stall_text(view) ~= nil
-			then React.createElement(Stat, {
-				label = "Status",
-				value = stall_text(view) :: string,
-				LayoutOrder = 10,
-			})
-			else nil,
-		Cargo = if view.cargo ~= nil
-			then React.createElement(Stat, {
-				label = "Cargo",
-				value = view.cargo,
-				LayoutOrder = 6,
+			then React.createElement(GaugeRow, {
+				label = "SHIELD",
+				gauge = view.shield,
+				tone = "shield",
+				LayoutOrder = 1,
 			})
 			else nil,
 		Missiles = if view.missiles ~= nil
-			then React.createElement(Stat, {
-				label = "Missiles",
-				value = view.missiles,
-				LayoutOrder = 7,
+			then React.createElement(GaugeRow, {
+				label = "MISSILES",
+				gauge = view.missiles,
+				tone = "missile",
+				LayoutOrder = 2,
+			})
+			else nil,
+		Cargo = if view.cargo ~= nil
+			then React.createElement(GaugeRow, {
+				label = "CARGO",
+				gauge = view.cargo,
+				tone = "cargo",
+				LayoutOrder = 3,
 			})
 			else nil,
 	}
 
 	return React.createElement(React.Fragment, {}, {
-		Title = React.createElement("Frame", {
-			[React.Tag] = "selection-title",
+		Title = React.createElement(Title, {
+			name = view.display_name,
+			badge = if is_blueprint then "BLUEPRINT" else nil,
+			badge_tag = if is_blueprint then "badge-blueprint" else nil,
+			team = view,
+			tooltip = function()
+				return unit_tooltip(view, def)
+			end,
 			LayoutOrder = 1,
-		}, {
-			Accent = React.createElement("Frame", {
-				[React.Tag] = "accent-bar",
+		}),
+		Subtitle = React.createElement(Subtitle, {
+			text = view.subtitle,
+			veterancy = veterancy_text(view),
+			LayoutOrder = 2,
+		}),
+		Vitals = vitals,
+		Economy = React.createElement(Economy, { view = view, LayoutOrder = 5 }),
+		Gauges = if next(gauges) ~= nil
+			then React.createElement("Frame", {
+				[React.Tag] = "gauge-list",
+				LayoutOrder = 7,
+			}, gauges)
+			else nil,
+		Loadout = React.createElement(Loadout, { def = def, LayoutOrder = 8 }),
+		Queue = if #view.queue > 0 then React.createElement(Queue, { view = view, LayoutOrder = 10 }) else nil,
+	})
+end
+
+-- Something left lying about: a wreck or a rock or tree. Nobody's, doing nothing, and there to be reclaimed, so it
+-- shows what is left in it and how far reclaiming it has got, and for a wreck that can be raised, how far that has.
+-- A `simple` one (the tutorial's) shows only its name, and a wreck's health.
+local function Remnant(props: { view: EntityView, def: types.EntityDef, simple: boolean })
+	local view = props.view
+	local def = props.def
+	local is_wreck = view.kind == "wreck"
+	local raisable = is_wreck and def.kind == "unit"
+
+	local reclaim_total = view.reclaim_total or 0
+	local reclaimed = if reclaim_total > 0 then 1 - (view.reclaim_left or reclaim_total) / reclaim_total else 0
+	local metal = view.metal_left or 0
+	local energy = view.energy_left or 0
+	-- a wreck holds only metal, and a rock or tree whichever it holds; one that holds neither still says so in metal
+	local show_energy = energy > 0
+	local show_metal = metal > 0 or not show_energy
+	local resurrected = view.resurrect_progress or 0
+
+	if props.simple then
+		return React.createElement(React.Fragment, {}, {
+			Title = React.createElement(Title, {
+				name = if is_wreck then `{view.display_name} Wreck` else view.display_name,
+				badge = if is_wreck then "WRECK" else "FEATURE",
+				badge_tag = "badge-remnant",
 				LayoutOrder = 1,
 			}),
-			Name = React.createElement("TextLabel", {
-				[React.Tag] = "selection-name",
-				LayoutOrder = 2,
-				Text = view.display_name,
-			}),
-			State = React.createElement("TextLabel", {
-				[React.Tag] = if is_blueprint then "badge badge-blueprint" else "badge",
-				LayoutOrder = 3,
-				Text = if is_blueprint then "BLUEPRINT" else "ACTIVE",
-			}),
+			Vitals = if is_wreck
+				then React.createElement(Vitals, {
+					fraction = view.health / math.max(1, view.max_health),
+					tone = "vitals-fill-wreck",
+					label = `{math.floor(view.health)} / {math.floor(view.max_health)}`,
+					LayoutOrder = 3,
+				})
+				else nil,
+		})
+	end
+
+	return React.createElement(React.Fragment, {}, {
+		Title = React.createElement(Title, {
+			name = if is_wreck then `{view.display_name} Wreck` else view.display_name,
+			badge = if is_wreck then "WRECK" else "FEATURE",
+			badge_tag = "badge-remnant",
+			tooltip = function(): Content
+				local rows: { tooltip.Row } = {}
+				if metal > 0 then
+					table.insert(rows, { label = "Metal left", value = figure(metal), tag = "metal" })
+				end
+				if energy > 0 then
+					table.insert(rows, { label = "Energy left", value = figure(energy), tag = "energy" })
+				end
+				if view.reclaim_left ~= nil then
+					table.insert(rows, { label = "Buildpower to reclaim", value = figure(view.reclaim_left) })
+				end
+				if raisable then
+					table.insert(rows, { label = "Buildpower to resurrect", value = figure(def.buildpower_cost) })
+				end
+				return {
+					kicker = if is_wreck then "WRECK" else "FEATURE",
+					title = string.upper(if is_wreck then `{view.display_name} wreck` else view.display_name),
+					tone = "plain",
+					rows = rows,
+				}
+			end,
+			LayoutOrder = 1,
 		}),
-		Subtitle = if view.subtitle ~= nil
-			then React.createElement("TextLabel", {
-				[React.Tag] = "selection-subtitle",
-				LayoutOrder = 2,
-				Text = view.subtitle,
+		Subtitle = React.createElement(Subtitle, {
+			text = if raisable then "Reclaim or resurrect" elseif is_wreck then "Reclaim for metal" else view.subtitle,
+			LayoutOrder = 2,
+		}),
+		-- a wreck can be shot to pieces, so how much it has left matters; a rock or tree takes no harm
+		Vitals = if is_wreck
+			then React.createElement(Vitals, {
+				fraction = view.health / math.max(1, view.max_health),
+				tone = "vitals-fill-wreck",
+				label = `{math.floor(view.health)} / {math.floor(view.max_health)}`,
+				LayoutOrder = 3,
 			})
 			else nil,
-		Track = React.createElement("Frame", {
-			[React.Tag] = "progress-track",
-			LayoutOrder = 3,
-		}, {
-			Fill = React.createElement("Frame", {
-				[React.Tag] = if is_blueprint then "progress-fill blueprint-fill" else "progress-fill",
-				Size = UDim2.new(fraction, 0, 1, 0),
-			}),
-		}),
-		Stats = React.createElement("Frame", {
-			[React.Tag] = "stat-list",
+		Yield = React.createElement("Frame", {
+			[React.Tag] = "economy-row",
 			LayoutOrder = 4,
-		}, stats),
-		Queue = if #view.queue > 0 then React.createElement(Queue, { view = view, LayoutOrder = 5 }) else nil,
+		}, {
+			Metal = if show_metal
+				then React.createElement(ResourceTile, {
+					resource = "metal",
+					value = figure(metal),
+					tone = "tile-rate-metal",
+					caption = "TO RECLAIM",
+					LayoutOrder = 1,
+				})
+				else nil,
+			Energy = if show_energy
+				then React.createElement(ResourceTile, {
+					resource = "energy",
+					value = figure(energy),
+					tone = "tile-rate-energy",
+					caption = "TO RECLAIM",
+					LayoutOrder = 2,
+				})
+				else nil,
+		}),
+		Progress = React.createElement("Frame", {
+			[React.Tag] = "gauge-list",
+			LayoutOrder = 5,
+		}, {
+			Reclaimed = React.createElement(GaugeRow, {
+				label = "RECLAIMED",
+				gauge = { value = math.round(reclaimed * 100), most = 100 },
+				tone = "reclaim",
+				LayoutOrder = 1,
+			}),
+			Resurrected = if raisable and resurrected > 0
+				then React.createElement(GaugeRow, {
+					label = "RAISED",
+					gauge = { value = math.round(resurrected * 100), most = 100 },
+					tone = "resurrect",
+					LayoutOrder = 2,
+				})
+				else nil,
+		}),
+	})
+end
+
+local function Single(props: { view: EntityView, simple: boolean, economy: boolean, weapons: boolean })
+	local view = props.view
+	local def = unit_defs.get(view.def_name)
+	if view.kind == "wreck" or view.kind == "reclaimable" then
+		return React.createElement(Remnant, { view = view, def = def, simple = props.simple })
+	end
+	return React.createElement(Live, {
+		view = view,
+		def = def,
+		simple = props.simple,
+		economy = props.economy,
+		weapons = props.weapons,
 	})
 end
 
 local function Many(props: { views: { EntityView } })
-	-- collapse the selection into "3 x Grunt" style counts
+	-- collapse the selection into a tile per kind, with how many of it
 	local counts: { [string]: number } = {}
 	local order: { string } = {}
 	for _, view in props.views do
@@ -218,39 +998,36 @@ local function Many(props: { views: { EntityView } })
 		counts[view.display_name] += 1
 	end
 
-	local rows = {}
+	local tiles = {}
 	for index, name in order do
-		rows[`Row{index}`] = React.createElement(Stat, {
-			label = name,
-			value = `x{counts[name]}`,
+		tiles[`Tile{index}`] = React.createElement("Frame", {
+			[React.Tag] = "group-tile",
 			LayoutOrder = index,
+		}, {
+			Count = React.createElement("TextLabel", {
+				[React.Tag] = "group-count",
+				LayoutOrder = 1,
+				Text = `×{counts[name]}`,
+			}),
+			Name = React.createElement("TextLabel", {
+				[React.Tag] = "group-name",
+				LayoutOrder = 2,
+				Text = string.upper(name),
+			}),
 		})
 	end
 
 	return React.createElement(React.Fragment, {}, {
-		Title = React.createElement("Frame", {
-			[React.Tag] = "selection-title",
+		Title = React.createElement(Title, {
+			name = "SELECTION",
+			badge = tostring(#props.views),
+			badge_tag = "badge-count",
 			LayoutOrder = 1,
-		}, {
-			Accent = React.createElement("Frame", {
-				[React.Tag] = "accent-bar",
-				LayoutOrder = 1,
-			}),
-			Name = React.createElement("TextLabel", {
-				[React.Tag] = "selection-name",
-				LayoutOrder = 2,
-				Text = "SELECTION",
-			}),
-			Count = React.createElement("TextLabel", {
-				[React.Tag] = "badge badge-count",
-				LayoutOrder = 3,
-				Text = tostring(#props.views),
-			}),
 		}),
-		Rows = React.createElement("Frame", {
-			[React.Tag] = "stat-list",
+		Tiles = React.createElement("Frame", {
+			[React.Tag] = "group-grid",
 			LayoutOrder = 2,
-		}, rows),
+		}, tiles),
 	})
 end
 
@@ -268,6 +1045,9 @@ end
 local function SelectionPanel()
 	local selected = use_entities.use_selection()
 	local hovered = use_hovered()
+	-- What the panel showed when the cursor came onto it, held while the cursor stays there. The world is still under
+	-- the panel, and without this whatever stood behind it would take the panel over just as a section was clicked.
+	local held, set_held = React.useState(nil :: { number }?)
 	-- Whatever the cursor is over is what the panel describes, whoever it belongs to, so an enemy can be
 	-- identified without selecting it. It is only what is shown: the selection is untouched, and it is what
 	-- orders go to. With the cursor over nothing the panel goes back to the selection.
@@ -277,8 +1057,22 @@ local function SelectionPanel()
 		end
 		return selected
 	end, { hovered, selected })
-	local views = use_entities.use_views(ids)
+	local shown = held or ids
+	local views = use_entities.use_views(shown)
 	local ui_scale = use_viewport.use_ui_scale()
+	-- the tutorial pares the panel down to a name, a team and a health bar, and brings weapons back once it has had
+	-- units made
+	local simple = use_mission.use_mission() == "tutorial"
+	use_tutorial.use_tutorial()
+	local weapons = simple == false or tutorial.shown "weapons"
+	-- and what things make and spend, once the metal and energy bar is up
+	local economy = simple == false or tutorial.shown "economy"
+	-- what was held is gone, say it died, and with it the panel the cursor was on, which then never hears it leave
+	React.useEffect(function()
+		if held ~= nil and #views == 0 then
+			set_held(nil)
+		end
+	end, { held, #views } :: { any })
 
 	if #views == 0 then
 		return nil
@@ -287,13 +1081,19 @@ local function SelectionPanel()
 	return React.createElement("Frame", {
 		[React.Tag] = "selection-panel panel",
 		LayoutOrder = 1,
+		[React.Event.MouseEnter] = function()
+			set_held(shown)
+		end,
+		[React.Event.MouseLeave] = function()
+			set_held(nil)
+		end,
 	}, {
 		Scale = React.createElement("UIScale", { Scale = ui_scale }),
 		Rail = React.createElement("Frame", {
 			[React.Tag] = "rail",
 		}),
 		Content = if #views == 1
-			then React.createElement(Single, { view = views[1] })
+			then React.createElement(Single, { view = views[1], simple = simple, economy = economy, weapons = weapons })
 			else React.createElement(Many, { views = views }),
 	})
 end

@@ -47,7 +47,7 @@ end
 -- Finishing does not heal: max health lands on the def's full value and current health has already
 -- been carried up alongside it by the flat increments below, minus whatever damage it took.
 local function complete(entity: Entity)
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	entity.state = "active"
 	entity.build_progress = def.buildpower_cost
 	entity.metal_paid = def.metal_cost
@@ -66,7 +66,7 @@ local function complete(entity: Entity)
 				and table.find(def.upgrades, other.def_name) ~= nil
 				and geometry.distance_2d(entity.position, other.position) < 1
 			then
-				local other_def = unit_defs.get(other.def_name)
+				local other_def = unit_defs.of(other)
 				economy.add_metal(other.team, other_def.metal_cost)
 				state.mark_dead(other)
 				break
@@ -78,7 +78,7 @@ end
 -- Registers `builder` as working on `target` for this tick. Does nothing if the builder has no
 -- buildpower or the target is already finished.
 local function request(builder: Entity, target: Entity)
-	local builder_def = unit_defs.get(builder.def_name)
+	local builder_def = unit_defs.of(builder)
 	local buildpower = builder_def.buildpower
 	if buildpower == nil then
 		return
@@ -93,7 +93,7 @@ local function request(builder: Entity, target: Entity)
 		return
 	end
 
-	local target_def = unit_defs.get(target.def_name)
+	local target_def = unit_defs.of(target)
 	local cost = target_def.buildpower_cost
 	if cost <= 0 then
 		return
@@ -129,7 +129,7 @@ end
 -- Repairing puts buildpower into something finished and damaged. Each point applied restores
 -- max_health / buildpower_cost of its health. It costs nothing but the buildpower.
 local function repair(builder: Entity, target: Entity, delta: number)
-	local builder_def = unit_defs.get(builder.def_name)
+	local builder_def = unit_defs.of(builder)
 	local buildpower = builder_def.buildpower
 	if buildpower == nil or builder_def.repairing == false then
 		return
@@ -140,7 +140,7 @@ local function repair(builder: Entity, target: Entity, delta: number)
 	if target.health >= target.max_health then
 		return
 	end
-	local target_def = unit_defs.get(target.def_name)
+	local target_def = unit_defs.of(target)
 	if target_def.buildpower_cost <= 0 then
 		return
 	end
@@ -223,7 +223,7 @@ local function resolve(delta: number)
 			flows.stall(drain.entity_id, short_of[drain.team])
 		end
 
-		local target_def = unit_defs.get(target.def_name)
+		local target_def = unit_defs.of(target)
 		local applied = drain.buildpower * delta * scale[drain.team]
 		-- never overshoot the blueprint's remaining cost
 		applied = math.min(applied, target_def.buildpower_cost - target.build_progress)
@@ -233,7 +233,7 @@ local function resolve(delta: number)
 
 		local metal = applied * drain.metal_per_buildpower
 		local energy = applied * drain.energy_per_buildpower
-		flows.add(drain.entity_id, -metal / delta, -energy / delta)
+		flows.add(drain.entity_id, `Building {target_def.display_name}`, -metal / delta, -energy / delta)
 
 		team.metal = math.max(0, team.metal - metal)
 		team.energy = math.max(0, team.energy - energy)
@@ -273,7 +273,7 @@ local function decay(delta: number)
 			continue
 		end
 
-		local def = unit_defs.get(entity.def_name)
+		local def = unit_defs.of(entity)
 		local lost = math.min(config.BLUEPRINT_DECAY_RATE * delta, entity.build_progress)
 		if lost > 0 and def.buildpower_cost > 0 then
 			local metal = lost * def.metal_cost / def.buildpower_cost

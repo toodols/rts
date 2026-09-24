@@ -30,10 +30,10 @@ local MARKER_DIAMETER = 7
 local MARKER_HEIGHT = 0.2
 local MARKER_LIFT = 0.25
 local MARKER_TRANSPARENCY = 0.45
--- A vent is wider, the size of what stands on it, and glows the colour of what comes up out of it.
-local VENT_COLOR = Color3.fromRGB(236, 120, 60)
+-- A vent is wider, the size of what stands on it, and green, as BAR draws its geothermal spots.
+local VENT_COLOR = Color3.fromRGB(72, 220, 96)
 local VENT_DIAMETER = 8
-local STEAM_COLOR = Color3.fromRGB(210, 206, 200)
+local STEAM_COLOR = Color3.fromRGB(170, 230, 180)
 -- An extractor snaps onto its spot, so anything this close is sitting on it.
 local OCCUPIED_RADIUS = 2
 

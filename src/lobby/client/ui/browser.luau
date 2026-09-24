@@ -1,4 +1,5 @@
--- The list of lobbies this player may join, across every lobby server, and the button to make one of their own.
+-- The list of lobbies this player may join, across every lobby server, and the button to make one of their own; and
+-- above them the way into the campaign, a card that is its own button (campaign_card.luau).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -12,6 +13,7 @@ local protocol = require(ReplicatedStorage.Lobby.protocol)
 local map_preview = require(ReplicatedStorage.LobbyClient.map_preview)
 local map_image = require(script.Parent.map_image)
 local controls = require(script.Parent.controls)
+local campaign_card = require(script.Parent.campaign_card)
 
 type Summary = protocol.Summary
 
@@ -30,6 +32,8 @@ local function LobbyRow(props: {
 	local mode = game_modes.get(summary.mode)
 	local known_map = map_presets.presets[summary.preset] ~= nil
 	local full = summary.players >= summary.capacity
+	-- a lobby whose seats are taken can still be joined to watch, while it has room for that
+	local watch_only = full and (summary.spectators or 0) < game_modes.SPECTATOR_CAPACITY
 
 	return React.createElement("Frame", {
 		[React.Tag] = "lobby-row",
@@ -62,7 +66,10 @@ local function LobbyRow(props: {
 		Mode = React.createElement("TextLabel", {
 			[React.Tag] = "lobby-cell mode readout",
 			LayoutOrder = 3,
-			Text = if mode ~= nil then mode.label else summary.mode,
+			Text = if mode == nil
+				then summary.mode
+				elseif mode.kind == "campaign" then `Co-op: {mode.label}`
+				else mode.label,
 		}),
 		Map = React.createElement("Frame", {
 			[React.Tag] = "lobby-cell map",
@@ -89,8 +96,8 @@ local function LobbyRow(props: {
 		Join = React.createElement(controls.Button, {
 			kind = "button",
 			tag = "join",
-			label = if full then "Full" else "Join",
-			locked = full,
+			label = if watch_only then "Watch" elseif full then "Full" else "Join",
+			locked = full and watch_only == false,
 			on_press = function()
 				props.act(ACTIONS.join, summary.key)
 			end,
@@ -103,6 +110,7 @@ local function Browser(props: {
 	lobbies: { Summary },
 	received: boolean,
 	act: (action: string, argument: any?) -> (),
+	open_campaign: () -> (),
 })
 	local rows: { [string]: any } = {}
 	for index, summary in props.lobbies do
@@ -115,9 +123,7 @@ local function Browser(props: {
 	if #props.lobbies == 0 then
 		rows.Empty = React.createElement("TextLabel", {
 			[React.Tag] = "empty",
-			Text = if props.received
-				then "No open lobbies right now. Make one and others can join it."
-				else "Looking for lobbies...",
+			Text = if props.received then "No open lobbies right now." else "Looking for lobbies...",
 		})
 	end
 
@@ -128,9 +134,13 @@ local function Browser(props: {
 			[React.Tag] = "rail",
 			LayoutOrder = 1,
 		}),
+		Campaign = React.createElement(campaign_card.CampaignCard, {
+			on_open = props.open_campaign,
+			LayoutOrder = 2,
+		}),
 		Title = React.createElement("Frame", {
 			[React.Tag] = "title-row",
-			LayoutOrder = 2,
+			LayoutOrder = 3,
 		}, {
 			Accent = React.createElement("Frame", {
 				[React.Tag] = "accent-bar",
@@ -162,7 +172,7 @@ local function Browser(props: {
 		}),
 		Columns = React.createElement("Frame", {
 			[React.Tag] = "lobby-columns",
-			LayoutOrder = 3,
+			LayoutOrder = 4,
 		}, {
 			Thumb = React.createElement("Frame", { [React.Tag] = "lobby-thumb blank", LayoutOrder = 1 }),
 			Host = React.createElement("TextLabel", {
@@ -190,7 +200,7 @@ local function Browser(props: {
 		}),
 		List = React.createElement("ScrollingFrame", {
 			[React.Tag] = "lobby-list",
-			LayoutOrder = 4,
+			LayoutOrder = 5,
 		}, rows),
 	})
 end

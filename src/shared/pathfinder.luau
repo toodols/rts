@@ -571,8 +571,10 @@ end
 
 -- The waypoints something of `def` at `from` walks through on its way to within `reach` of `to`, before the order that
 -- takes it there walks the rest: none when it can go straight, and otherwise the route round what is in the way, up to
--- where `to` comes into reach. The client works these out for every unit it gives an order to and sends them with it,
--- so that the way a unit goes is the line the player sees; the server only checks them (`commands`).
+-- where `to` comes into reach. None either when `to` is in reach already, or comes into reach on the straight way to it,
+-- however far round the way to `to` itself is: a builder at the foot of a cliff builds on top of it from where it
+-- stands, and does not walk round to the ramp. The client works these out for every unit it gives an order to and sends
+-- them with it, so that the way a unit goes is the line the player sees; the server only checks them (`commands`).
 local function waypoints_to(
 	def: EntityDef,
 	from: Vector3,
@@ -580,6 +582,18 @@ local function waypoints_to(
 	reach: number,
 	max_expansions: number?
 ): { Vector3 }
+	local offset = Vector2.new(from.X - to.X, from.Z - to.Z)
+	local distance = offset.Magnitude
+	if distance <= reach then
+		return {}
+	end
+	if reach > 0 then
+		-- where the order, walking straight at `to`, stops
+		local stop = offset * (reach / distance)
+		if has_straight_path(def, from, Vector3.new(to.X + stop.X, to.Y, to.Z + stop.Y)) then
+			return {}
+		end
+	end
 	local steps = route(def, from, to, max_expansions)
 	local points: { Vector3 } = {}
 	for _, step in steps do

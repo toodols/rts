@@ -1,0 +1,277 @@
+@use "sass:color";
+@use "theme" as *;
+@use "mixins" as *;
+
+// A campaign mission's unlocks revealed on the end screen (ui/unlock_reveal.luau): a heading and tally over a row of
+// cards, each dealt face down and burst open onto its def's model, framed in its tier's colour under a tier banner.
+// Only how things look at rest is here. Everything that moves (the cards' place, turn, size and scale, the glow, rays,
+// ring, sparks and flashes) is set from Luau every frame, so no rule here sizes, places or fades any of it.
+
+$card-width: 196px;
+$card-height: 284px;
+
+// Each tier's colour: its card's frame and its banner.
+$tiers: (
+	common: rgb(178, 190, 204),
+	uncommon: rgb(110, 222, 96),
+	rare: $accent,
+	epic: $resurrect,
+	legendary: rgb(255, 196, 64),
+	mythic: rgb(255, 98, 74),
+);
+
+// A shape of an effect: Luau gives it its size, place, colour and transparency, so this only keeps the default
+// automatic size from growing it and takes off the border Roblox draws.
+.unlock-fx {
+	AutomaticSize: Enum.AutomaticSize.None;
+	BorderSizePixel: 0;
+}
+
+// The darkened edges of the screen behind the reveal, under the plate.
+.unlock-vignette {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+}
+
+.unlock-reveal {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(2);
+	width: auto;
+	height: auto;
+	padding-top: space(2);
+}
+
+.unlock-header {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: space(3);
+	width: auto;
+	height: auto;
+}
+
+.unlock-title {
+	width: auto;
+	height: auto;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 22px;
+	color: var(--Energy);
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+// How many cards are open, which jumps as each one does.
+.unlock-tally {
+	width: auto;
+	height: auto;
+	padding: 2px space(2);
+	background-color: veil($gain, 0.18);
+	outline: 1px solid var(--Gain);
+	color: var(--Gain);
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 16px;
+}
+
+// The row of cards, with room round it for the banners over their tops.
+.unlock-cards {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: space(8);
+	width: auto;
+	height: auto;
+	padding: space(5) space(6);
+}
+
+// A card's place in the row. The card, and its glow, rays and sparks, are laid over it from its middle.
+.unlock-slot {
+	width: $card-width;
+	height: $card-height;
+}
+
+// The card itself, a button once it is open: its size is its flip and its place its deal and shake, both set from Luau.
+.unlock-card {
+	AutomaticSize: Enum.AutomaticSize.None;
+	background-color: transparent;
+}
+
+// Face down: dark metal with a hazard band across it, a question mark, and a meter along its foot that fills as it
+// charges.
+.unlock-card-back {
+	width: 100%;
+	height: 100%;
+	background-color: $steel;
+	background-image: linear-gradient(160deg, $steel-lit 0%, $steel 45%, $void 100%);
+	outline: 2px solid $edge;
+}
+
+.unlock-card-seal {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	width: 100%;
+	height: 44px;
+	transform: translateY(-50%);
+	background-image: hazard(color.adjust($caution, $lightness: -18%), $void);
+	z-index: 1;
+}
+
+.unlock-card-mark {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 76px;
+	height: 76px;
+	transform: translate(-50%, -50%);
+	background-color: $steel-raised;
+	outline: 2px solid var(--Accent);
+	color: var(--Accent);
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 44px;
+	-webkit-text-stroke: 2px veil($void, 0.85);
+	z-index: 2;
+}
+
+.unlock-card-sealed {
+	position: absolute;
+	top: space(4);
+	left: 0;
+	width: 100%;
+	height: 16px;
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 12px;
+	text-align: center;
+}
+
+.unlock-charge-track {
+	position: absolute;
+	left: 10%;
+	bottom: space(5);
+	width: 80%;
+	height: 6px;
+	background-color: $void;
+	outline: 1px solid $edge;
+}
+
+// Face up: the model over its name, what it is and what it is for, framed in the tier's colour.
+.unlock-card-face {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: space(1);
+	padding: space(3);
+	background-color: $steel;
+}
+
+.unlock-card-art {
+	width: 100%;
+	height: 124px;
+}
+
+.unlock-card-model {
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
+}
+
+// A def with no art shows its name in the model's place.
+.unlock-card-model.art-fallback {
+	font-family: Michroma;
+	font-size: 20px;
+	color: var(--Text);
+	text-wrap: wrap;
+}
+
+.unlock-card-name {
+	width: 100%;
+	height: auto;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 14px;
+	color: var(--Text);
+	text-align: center;
+}
+
+.unlock-card-kind {
+	width: 100%;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: var(--TextDim);
+	text-align: center;
+}
+
+.unlock-card-text {
+	width: 100%;
+	height: auto;
+	font-size: 12px;
+	color: var(--TextFaint);
+	text-align: center;
+	text-wrap: wrap;
+}
+
+// Stuck on the card's right edge once it is open, below the tier banner across its top so the banner doesn't cover it.
+.unlock-card-new {
+	position: absolute;
+	top: 28px;
+	right: -12px;
+	width: 52px;
+	height: 22px;
+	transform: rotate(12deg);
+	background-color: $gain;
+	color: $void;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 11px;
+	z-index: 6;
+}
+
+// The tier, across the card's top edge; Luau places, turns and scales it.
+.unlock-banner {
+	width: 150px;
+	height: 30px;
+	color: $void;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 15px;
+}
+
+@each $name, $tone in $tiers {
+	.unlock-card-face.#{$name} {
+		background-image: linear-gradient(180deg, color.mix($tone, $steel, 45%) 0%, $steel 50%, $void 100%);
+		outline: 3px solid $tone;
+	}
+
+	.unlock-banner.#{$name} {
+		background-color: $tone;
+		background-image: linear-gradient(
+			180deg,
+			color.adjust($tone, $lightness: 14%) 0%,
+			$tone 50%,
+			color.adjust($tone, $lightness: -14%) 100%
+		);
+		outline: 2px solid color.adjust($tone, $lightness: 24%);
+	}
+}
+
+// Under the cards until the last is open.
+.unlock-hint {
+	width: 240px;
+	height: 16px;
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: center;
+}

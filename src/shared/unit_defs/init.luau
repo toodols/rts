@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local types = require(ReplicatedStorage.Shared.types)
 local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local skins = require(ReplicatedStorage.Shared.skins)
 
 local factory = require(script.factory)
 local building = require(script.building)
@@ -10,11 +11,15 @@ local defense = require(script.defense)
 local bot_t1 = require(script.bot_t1)
 local vehicle_t1 = require(script.vehicle_t1)
 local air_t1 = require(script.air_t1)
+local air_t2 = require(script.air_t2)
 local ship_t1 = require(script.ship_t1)
+local hover_t1 = require(script.hover_t1)
 local bot_t2 = require(script.bot_t2)
 local t3 = require(script.t3)
 local vehicle_t2 = require(script.vehicle_t2)
 local reclaimable = require(script.reclaimable)
+local scavenger = require(script.scavenger)
+local campaign = require(script.campaign)
 
 type EntityDef = types.EntityDef
 
@@ -51,14 +56,17 @@ type EntityDef = types.EntityDef
 -- units/CorShips/corpt.lua (Herring), units/CorGantry/corshiva.lua (Shiva), units/CorShips/corsub.lua (Orca) and
 -- units/CorShips/T2/corcrus.lua (Buccaneer), units/CorBuildings/LandEconomy/corgeo.lua and corageo.lua (the
 -- geothermal powerplants) and, from Legion, units/Legion/Economy/legrampart.lua (Rampart) and
--- units/Legion/Air/T2 Air/legheavydrone.lua (its heavy drone). The reclaimables are BAR's map features; see reclaimable.luau.
+-- units/Legion/Air/T2 Air/legheavydrone.lua (its heavy drone), and Cortex's hovercraft, units/CorHovercraft/corsh.lua (Goon),
+-- corah.lua (Birdeater), corch.lua (construction hovercraft) and corhal.lua (Halberd), and the
+-- units/CorBuildings/LandFactories/corhp.lua that makes them. The reclaimables are BAR's map features; see reclaimable.luau.
 --
 -- The defs themselves are split by what they are, one module each, and all written in BAR's own numbers through
 -- `conversions`.
 
 -- Water depths follow BAR's movement classes, from gamedata/movedefs.lua, except that land units do not
 -- wade at all here: they and buildings stand only on dry ground, commanders and other amphibious things
--- go anywhere (BAR's 5000 elmos), and a ship has a minimum depth from its own file and no maximum.
+-- go anywhere (BAR's 5000 elmos), and a ship has a minimum depth from its own file and no maximum. A hovercraft
+-- has no limit either way: it rides over the water rather than going in it.
 
 -- BAR's `buildtime` is the buildpower a thing costs, and a builder's `workertime` is the buildpower
 -- it applies each second, so buildpower_cost / buildpower is the build time in seconds.
@@ -70,11 +78,15 @@ local GROUPS: { [string]: { [string]: EntityDef } } = {
 	bot_t1 = bot_t1,
 	vehicle_t1 = vehicle_t1,
 	air_t1 = air_t1,
+	air_t2 = air_t2,
 	ship_t1 = ship_t1,
+	hover_t1 = hover_t1,
 	bot_t2 = bot_t2,
 	t3 = t3,
 	vehicle_t2 = vehicle_t2,
 	reclaimable = reclaimable,
+	scavenger = scavenger,
+	campaign = campaign,
 }
 
 -- Every def of every group in one table, by name. Two groups that both define a name would have one silently
@@ -124,6 +136,40 @@ local function get(def_name: string): EntityDef
 	return def
 end
 
+-- Defs as a skin with `stats` makes them, by skin and def name, each made once, so that the same def is always the
+-- same table.
+local boosted: { [string]: { [string]: EntityDef } } = {}
+
+-- `def_name`'s def as something wearing the skin called `skin_name` has it. Most skins are only a look and leave the
+-- def as it is, the very same table; one with `stats` (a developer's) gets a copy with its numbers changed.
+local function skinned(def_name: string, skin_name: string?): EntityDef
+	local def = get(def_name)
+	if skin_name == nil then
+		return def
+	end
+	local stats = skins.get(skin_name).stats
+	if stats == nil then
+		return def
+	end
+	local by_def = boosted[skin_name]
+	if by_def == nil then
+		by_def = {}
+		boosted[skin_name] = by_def
+	end
+	local found = by_def[def_name]
+	if found == nil then
+		found = table.freeze(skins.boost(def, stats))
+		by_def[def_name] = found
+	end
+	return found
+end
+
+-- The def of `thing` (an entity, or anything else naming a def), as its skin has it. What wears no skin, like an
+-- order or a wreck, gets the def as it is. Everything the sim reads off an entity's def goes through this.
+local function of(thing: { def_name: string }): EntityDef
+	return skinned(thing.def_name, (thing :: any).skin)
+end
+
 -- The footprint a collider occupies on the ground, as a half-extent on each axis. Capsules are
 -- treated as their bounding square so that occupancy tests can share one code path with boxes.
 -- A building occupies whole cells of the building grid, so its footprint is its collider rounded up
@@ -171,15 +217,35 @@ local function order_reach(def: EntityDef, kind: string): number
 	return 0
 end
 
+-- The longest range any of `def`'s weapons shoots, counting only anti-nuke interceptors if `anti_nuke`, and
+-- only the rest if not, or nil if it has none of them.
+local function longest_range_of(def: EntityDef, anti_nuke: boolean): number?
+	local longest: number? = nil
+	if def.weapons ~= nil then
+		for _, weapon in def.weapons do
+			if (weapon.anti_nuke == true) == anti_nuke and (longest == nil or weapon.range > longest) then
+				longest = weapon.range
+			end
+		end
+	end
+	return longest
+end
+
 -- The range to draw round something: how far it shoots, or for a drone carrier how far out its drones go to
 -- fight, which is a range like a weapon's. Unlike `attack_range` it does not make the carrier armed: it has
--- nothing to aim, so it cannot be ordered to attack.
+-- nothing to aim, so it cannot be ordered to attack. An anti-nuke's interceptor is left out: what it covers
+-- is drawn as a ring of its own (`intercept_range`).
 local function display_range(def: EntityDef): number?
-	local range = attack_range(def)
+	local range = longest_range_of(def, false)
 	if range == nil and def.carrier ~= nil then
 		return def.carrier.engage_range
 	end
 	return range
+end
+
+-- How far out an anti-nuke shoots down nukes, or nil if it is not one.
+local function intercept_range(def: EntityDef): number?
+	return longest_range_of(def, true)
 end
 
 -- Whether something can be given orders at all: every unit can, and so can a building that works,
@@ -221,13 +287,20 @@ local function floats(def: EntityDef): boolean
 	return def.min_water_depth ~= nil
 end
 
+-- Whether it rides the water's surface where there is water: a ship or a submarine, which floats, or a hovercraft,
+-- which rides over it.
+local function rides_surface(def: EntityDef): boolean
+	return floats(def) or def.hover == true
+end
+
 -- The height its underside rests at at (x, z): the ground under it, or for something that floats, the
 -- water's surface where that is higher, so a ship or a shipyard sits on the sea while a building
 -- that is built underwater stands on the sea floor. A submarine rides its `waterline` under the surface
--- instead, and on the sea floor where the water is not that deep.
+-- instead, and on the sea floor where the water is not that deep. A hovercraft rides the surface like a ship where
+-- there is water, and the ground where there is not.
 local function surface_height(def: EntityDef, x: number, z: number): number
 	local ground = heightmap.height_at(x, z)
-	if floats(def) then
+	if rides_surface(def) then
 		return math.max(ground, config.WATER_LEVEL - (def.waterline or 0))
 	end
 	return ground
@@ -240,10 +313,9 @@ local IN_WATER_MARGIN = 0.1
 -- Whether something of `def` centred at `position` is in the water: a ship, whose hull sits in it, or a
 -- submarine, or anything whose underside is under the surface, like an amphibious unit walking the sea floor or
 -- a building built on it. It is what a torpedo can be aimed at, and nothing else. Being over the water is not
--- being in it: an aircraft never is, and nor is a hovercraft riding on top, so that is how to tell one apart when
--- there are hovercraft.
+-- being in it: an aircraft never is, and nor is a hovercraft riding on top.
 local function in_water(def: EntityDef, position: Vector3): boolean
-	if def.air ~= nil then
+	if def.air ~= nil or def.hover == true then
 		return false
 	end
 	if floats(def) then
@@ -256,7 +328,7 @@ end
 -- that has dived, or anything on the sea floor with the water over it. Only a torpedo can be aimed at it, and
 -- a laser does not reach it; what it takes from anything else is the blast of what goes off near it.
 local function submerged(def: EntityDef, position: Vector3): boolean
-	return def.air == nil and position.Y + def.collider.height / 2 <= config.WATER_LEVEL
+	return def.air == nil and def.hover ~= true and position.Y + def.collider.height / 2 <= config.WATER_LEVEL
 end
 
 -- The point at (x, z) that something of this def rests at: `surface_height` there. Waypoints for a ship
@@ -286,6 +358,12 @@ local function damage_against(anti_air: boolean, target: EntityDef, amount: numb
 		return amount * config.NON_AA_AIR_DAMAGE_FRACTION
 	end
 	return amount
+end
+
+-- What something of `def` is worth, as BAR reckons it: its metal cost plus a sixtieth of its energy cost. Targeting
+-- shoots first at what is most of this for the health it has left, and experience is earned by taking it off enemies.
+local function power(def: EntityDef): number
+	return def.metal_cost + def.energy_cost / 60
 end
 
 -- Whether a transport of `carrier` can pick up something of `cargo`, unit or static defence: the cargo has a
@@ -333,11 +411,14 @@ end
 return table.freeze({
 	defs = defs,
 	get = get,
+	of = of,
+	skinned = skinned,
 	footprint_half_extents = footprint_half_extents,
 	takes_orders = takes_orders,
 	is_factory = is_factory,
 	tolerates_water = tolerates_water,
 	floats = floats,
+	rides_surface = rides_surface,
 	surface_height = surface_height,
 	surface_position = surface_position,
 	in_water = in_water,
@@ -345,11 +426,13 @@ return table.freeze({
 	is_air = is_air,
 	turn_radius = turn_radius,
 	damage_against = damage_against,
+	power = power,
 	can_carry = can_carry,
 	transport_slots = transport_slots,
 	attack_range = attack_range,
 	order_reach = order_reach,
 	display_range = display_range,
+	intercept_range = intercept_range,
 	collider_height = collider_height,
 	collider_radius = collider_radius,
 })

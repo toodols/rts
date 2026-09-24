@@ -8,12 +8,14 @@
 -- (ReplicatedStorage.Shared.art) gets only an invisible hitbox the size of its collider, which the client dresses
 -- in meshes it builds itself, since those cannot replicate. Anything else is a box the size of its collider if it
 -- is a building, and a procedural stand-in that fits inside its collider if it is a unit (see unit_placeholder.luau).
--- A reclaimable is a rock or a tree made of a few parts, never painted for anything.
+-- A reclaimable is a rock or a tree, never painted for anything: a map can hold thousands, so each is one or two
+-- MeshParts of its low-poly art (Shared.reclaimable_art), built here rather than on the client, since it never moves.
 --
 -- Art and placeholder alike are moved with :PivotTo and measured with :GetPivot, so nothing here
 -- depends on a model having a PrimaryPart. A model with one pivots about it; a model without one
 -- pivots about its WorldPivot, which is set when the model is built.
 
+local AssetService = game:GetService "AssetService"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
@@ -35,6 +37,7 @@ local shields = require(script.Parent.shields)
 local transport = require(script.Parent.transport)
 local production = require(script.Parent.production)
 local unit_placeholder = require(script.Parent.unit_placeholder)
+local donuts = require(script.Parent.donuts)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -58,6 +61,9 @@ local originals: { [BasePart]: Original } = {}
 -- the model (GetDescendants included), which is real cost to pay every sync for every entity when
 -- what it looks like has, almost always, not changed since the tick before.
 local appearance_keys: { [EntityId]: string } = {}
+-- How much buildpower was left in each reclaimable when its model was last written. A map can have thousands of them and
+-- almost none is ever touched, so one whose store has not moved is passed over without so much as reading an attribute.
+local reclaimables_synced: { [EntityId]: number } = {}
 -- Where each model was last pivoted to, so a building or a unit standing still is not handed the
 -- same PivotTo it already has every single sync.
 local transforms: { [EntityId]: { position: Vector3, facing: number } } = {}
@@ -142,7 +148,7 @@ local function remember_appearance(model: Model)
 end
 
 local function build_from_template(entity: Entity, template: Model): Model
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	local model = template:Clone()
 	model.Name = `{entity.def_name}_{entity.id}`
 
@@ -166,7 +172,7 @@ end
 -- `unit_placeholder` makes of them (also for a unit's wreck). It is laid out around the origin and then
 -- pivoted into place like any other model. Its parts named "Team" take the team colour, as a real model's do.
 local function build_placeholder(entity: Entity): Model
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	local model = Instance.new "Model"
 	model.Name = `{entity.def_name}_{entity.id}`
 
@@ -198,12 +204,137 @@ local function build_placeholder(entity: Entity): Model
 	return model
 end
 
--- A reclaimable: a rock, a couple of stones filling its collider, or a tree, a fir of three tiers on a trunk. Nothing
--- in it is named "Team", so nobody's colour ever goes on it. It is laid out around the origin, like a placeholder.
+-- The art each reclaimable is drawn in (Shared.reclaimable_art). Every rock is the same one, stretched to its own
+-- collider, so that the thousands on a map are all one mesh.
+local RECLAIMABLE_ART: { [string]: string } = {
+	tree = "tree",
+	shrub = "shrub",
+	small_rock = "rock",
+	rock = "rock",
+	large_rock = "rock",
+}
+-- Art that casts no shadow: rocks and shrubs lie low, and thousands of shadows cost far more than they show.
+local SHADOWLESS: { [string]: boolean } = { rock = true, shrub = true }
+-- Roblox's importer turns an uploaded mesh half a turn about its vertical axis; see client/art.luau.
+local UPLOADED_TURN = CFrame.Angles(0, math.pi, 0)
+-- How long the server waits at start for the reclaimables' meshes before it gives up on any still loading.
+local PRELOAD_TIMEOUT = 20
+
+-- Each reclaimable art's meshes, as loaded once from their assets: a MeshPart at the art's own size, and where its
+-- middle is from the art's origin, the middle of its footprint on the ground.
+type ReclaimableMesh = { mesh: MeshPart, offset: Vector3 }
+local reclaimable_meshes: { [string]: { ReclaimableMesh } } = {}
+-- Each reclaimable def's pieces, those meshes stretched to fill its collider and placed about its middle, which
+-- every one of it is cloned from.
+type ReclaimablePiece = { mesh: MeshPart, frame: CFrame }
+local reclaimable_pieces: { [string]: { ReclaimablePiece } } = {}
+
+local function vector(values: { number }): Vector3
+	return Vector3.new(values[1], values[2], values[3])
+end
+
+-- Loads every reclaimable art's meshes, all at once, and returns once they are loaded, or have failed to, or
+-- PRELOAD_TIMEOUT seconds have gone by. It yields, so it is called as the server starts, before any is built; one
+-- whose meshes are not there is built from Parts instead.
+local function preload()
+	local folder = ReplicatedStorage.Shared:FindFirstChild "reclaimable_art"
+	if folder == nil then
+		return
+	end
+	local loading = 0
+	for _, module in folder:GetChildren() do
+		if module:IsA "ModuleScript" == false then
+			continue
+		end
+		local data = (require :: any)(module) :: art.Art
+		loading += 1
+		task.spawn(function()
+			local ok, result = pcall(function(): { ReclaimableMesh }
+				local meshes = {}
+				for _, part in data.parts do
+					if part.mesh == nil then
+						error "not uploaded (tools/model_pipeline/roblox/upload_art.py)"
+					end
+					local mesh = AssetService:CreateMeshPartAsync(
+						Content.fromUri(part.mesh),
+						{ CollisionFidelity = Enum.CollisionFidelity.Box }
+					)
+					mesh.Anchored = true
+					mesh.CanCollide = false
+					mesh.CanQuery = true
+					mesh.CanTouch = false
+					mesh.CastShadow = SHADOWLESS[module.Name] ~= true
+					mesh.Material = Enum.Material.SmoothPlastic
+					mesh.Color = Color3.new(part.color[1], part.color[2], part.color[3])
+					mesh.Size = vector(part.size)
+					local group = data.groups[part.group]
+					local pivot = if group ~= nil then vector(group.pivot) else Vector3.zero
+					table.insert(meshes, { mesh = mesh, offset = pivot + vector(part.offset) })
+				end
+				return meshes
+			end)
+			if ok then
+				reclaimable_meshes[module.Name] = result
+			else
+				warn(`reclaimable art {module.Name} did not load, so it is built from Parts: {result}`)
+			end
+			loading -= 1
+		end)
+	end
+	local deadline = os.clock() + PRELOAD_TIMEOUT
+	while loading > 0 and os.clock() < deadline do
+		task.wait()
+	end
+end
+
+-- The pieces `entity`'s def is built from, or nil if its art has no meshes loaded.
+local function reclaimable_pieces_of(entity: Entity): { ReclaimablePiece }?
+	local cached = reclaimable_pieces[entity.def_name]
+	if cached ~= nil then
+		return cached
+	end
+	local art_name = RECLAIMABLE_ART[entity.def_name]
+	local meshes = if art_name ~= nil then reclaimable_meshes[art_name] else nil
+	if meshes == nil then
+		return nil
+	end
+	local def = unit_defs.of(entity)
+	local radius = unit_defs.collider_radius(def)
+	local height = unit_defs.collider_height(def)
+	-- how far the art reaches either way across the ground, and how high, which is stretched to fill the collider
+	local reach = Vector3.zero
+	for _, loaded in meshes do
+		local far = loaded.offset:Abs() + loaded.mesh.Size / 2
+		reach = reach:Max(Vector3.new(far.X, loaded.offset.Y + loaded.mesh.Size.Y / 2, far.Z))
+	end
+	local scale = Vector3.new(radius / reach.X, height / reach.Y, radius / reach.Z)
+	local pieces = {}
+	for _, loaded in meshes do
+		local mesh = loaded.mesh:Clone()
+		mesh.Size = loaded.mesh.Size * scale
+		local offset = loaded.offset * scale
+		table.insert(pieces, {
+			mesh = mesh,
+			frame = CFrame.new(offset.X, offset.Y - height / 2, offset.Z) * UPLOADED_TURN,
+		})
+	end
+	reclaimable_pieces[entity.def_name] = pieces
+	return pieces
+end
+
+-- Where `entity` stands, facing its way; kept as its last transform, so the sync after it is built has nothing to move.
+local function place_once(entity: Entity, model: Model)
+	transforms[entity.id] = { position = entity.position, facing = entity.facing }
+	model:PivotTo(CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0))
+end
+
+-- A reclaimable whose art did not load: a rock, a couple of stones filling its collider, a tree, a fir of three tiers
+-- on a trunk, or a shrub, a couple of clumps of leaves. Nothing in it is named "Team", so nobody's colour ever goes on
+-- it. It is laid out around the origin, like a placeholder.
 local TRUNK_COLOR = Color3.fromRGB(92, 66, 44)
 
-local function build_reclaimable(entity: Entity): Model
-	local def = unit_defs.get(entity.def_name)
+local function build_reclaimable_parts(entity: Entity): Model
+	local def = unit_defs.of(entity)
 	local model = Instance.new "Model"
 	model.Name = `{entity.def_name}_{entity.id}`
 	local radius = unit_defs.collider_radius(def)
@@ -227,6 +358,19 @@ local function build_reclaimable(entity: Entity): Model
 			part.CFrame = CFrame.new(0, bottom + trunk_height + tier_height * (tier * 0.75 + 0.5), 0)
 				* CFrame.Angles(0, tier * math.pi / 4, 0)
 		end
+	elseif entity.def_name == "shrub" then
+		for clump = 0, 1 do
+			local part = make_part("Leaves", model)
+			part.Material = Enum.Material.LeafyGrass
+			part.Color = def.color:Lerp(Color3.new(0, 0, 0), clump * 0.12)
+			part.Size =
+				Vector3.new(radius * (1.8 - clump * 0.6), height * (1 - clump * 0.3), radius * (1.5 - clump * 0.5))
+			part.CFrame = CFrame.new(
+				clump * radius * 0.4,
+				bottom + height * (1 - clump * 0.3) / 2,
+				clump * radius * 0.3
+			) * CFrame.Angles(0, clump * 0.9, 0)
+		end
 	else
 		local stone = make_part("Stone", model)
 		stone.Material = Enum.Material.Slate
@@ -242,6 +386,26 @@ local function build_reclaimable(entity: Entity): Model
 
 	model.WorldPivot = CFrame.identity
 	remember_appearance(model)
+	model.Parent = get_container()
+	return model
+end
+
+-- A reclaimable: a clone of each of its def's pieces, put where it stands before it is parented, so it replicates
+-- once, whole and in place.
+local function build_reclaimable(entity: Entity): Model
+	local pieces = reclaimable_pieces_of(entity)
+	if pieces == nil then
+		return build_reclaimable_parts(entity)
+	end
+	local model = Instance.new "Model"
+	model.Name = `{entity.def_name}_{entity.id}`
+	for _, piece in pieces do
+		local mesh = piece.mesh:Clone()
+		mesh.CFrame = piece.frame
+		mesh.Parent = model
+	end
+	model.WorldPivot = CFrame.identity
+	place_once(entity, model)
 	model.Parent = get_container()
 	return model
 end
@@ -299,7 +463,7 @@ local function apply_appearance(entity: Entity, model: Model)
 	end
 	appearance_keys[entity.id] = key
 
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 
 	if entity.kind == "wreck" then
 		for _, part in all_parts(model) do
@@ -354,7 +518,7 @@ local function order_position(order: types.Order): Vector3?
 	return target.position
 end
 
--- The whole order queue as `kind,x,z,target,facing;...` (target and facing empty where they do not
+-- The whole order queue as `kind,x,z,target,facing,radius;...` (target, facing and radius empty where they do not
 -- apply), front of the queue first, so the client can draw a
 -- path through every waypoint of a selected unit. Whole studs are plenty for something that is only
 -- drawn, and every attribute write is a replication.
@@ -369,7 +533,12 @@ local function encode_path(entity: Entity): string
 				elseif order.target_id ~= nil then tostring(order.target_id)
 				else ""
 			local facing = if order.facing ~= nil then string.format("%.2f", order.facing) else ""
-			table.insert(steps, `{order.kind},{math.round(position.X)},{math.round(position.Z)},{target},{facing}`)
+			-- an area order's circle, in whole studs
+			local radius = if order.radius ~= nil then tostring(math.round(order.radius)) else ""
+			table.insert(
+				steps,
+				`{order.kind},{math.round(position.X)},{math.round(position.Z)},{target},{facing},{radius}`
+			)
 		end
 	end
 	return table.concat(steps, ";")
@@ -468,13 +637,21 @@ end
 
 -- Everything the client needs to know about an entity that is not its transform.
 local function apply_attributes(entity: Entity, model: Model)
-	local def = unit_defs.get(entity.def_name)
+	local def = unit_defs.of(entity)
 	set_attribute(model, "entity_id", entity.id)
 	set_attribute(model, "team", entity.team)
 	-- the same for every team in its alliance, so the client can tell an ally from an enemy without
 	-- knowing the alliance graph itself: two things are allied exactly when this matches
 	set_attribute(model, "ally_group", alliances.root_of(entity.team))
 	set_attribute(model, "def_name", entity.def_name)
+	-- the skin it wears, which the client dresses it in (client/art.luau, client/donuts.luau)
+	set_attribute(model, "skin", entity.skin)
+	-- the pool skin's donut, as the server keeps it (donuts.luau): on or off, how hard it shakes, and how it last came
+	-- off, which every client draws alike
+	local donut = donuts.published(entity)
+	set_attribute(model, "donut", if donut ~= nil then donut.on else nil)
+	set_attribute(model, "donut_shake", if donut ~= nil and donut.shake > 0 then donut.shake else nil)
+	set_attribute(model, "donut_event", if donut ~= nil then donut.event else nil)
 	set_attribute(model, "kind", entity.kind)
 	-- every entity carries its team's name and the colour to show it in, for the selection panel and a
 	-- commander's own nametag alike
@@ -497,6 +674,9 @@ local function apply_attributes(entity: Entity, model: Model)
 	)
 	set_attribute(model, "buildpower_cost", def.buildpower_cost)
 	set_attribute(model, "order_count", #entity.orders)
+	-- what it has earned in battle (`combat.credit`); experience to the hundredth, which is all that is shown of it
+	set_attribute(model, "kills", entity.kills)
+	set_attribute(model, "experience", math.floor(entity.experience * 100) / 100)
 	-- a weapon with an energy cost and no energy to fire it with
 	set_attribute(model, "need_energy", combat.short_of_energy(entity.id))
 	-- a lab whose next unit cannot be started for something standing where it goes
@@ -506,6 +686,7 @@ local function apply_attributes(entity: Entity, model: Model)
 	set_attribute(model, "metal_rate", if flow ~= nil then math.round(flow.metal * 10) / 10 else nil)
 	set_attribute(model, "energy_rate", if flow ~= nil then math.round(flow.energy * 10) / 10 else nil)
 	set_attribute(model, "stalled", if flow ~= nil then flow.stall else nil)
+	set_attribute(model, "flow_sources", flows.encode_sources(entity.id))
 	-- a plasma deflector's power, and the bubble drawn round it
 	if def.shield ~= nil then
 		local held, most = shields.level_of(entity)
@@ -631,6 +812,7 @@ local function destroy(id: EntityId)
 	models[id] = nil
 	appearance_keys[id] = nil
 	transforms[id] = nil
+	reclaimables_synced[id] = nil
 end
 
 -- What the client needs to know about a reclaimable, which is much less than about anything else: what it is, and
@@ -644,11 +826,10 @@ local function apply_reclaimable_attributes(entity: Entity, model: Model)
 	set_attribute(model, "state", entity.state)
 	local yield = entity.yield
 	if yield ~= nil then
-		local def = unit_defs.get(entity.def_name)
 		set_attribute(model, "metal_left", math.round(yield.metal_left))
 		set_attribute(model, "energy_left", math.round(yield.energy_left))
 		set_attribute(model, "reclaim_left", math.round(yield.buildpower_left))
-		set_attribute(model, "reclaim_total", math.round(def.buildpower_cost))
+		set_attribute(model, "reclaim_total", math.round(yield.buildpower_total))
 	end
 end
 
@@ -659,6 +840,12 @@ local function sync_entity(entity: Entity, carried: boolean)
 		models[entity.id] = model
 	end
 	if entity.kind == "reclaimable" then
+		-- it never moves and only ever changes by being reclaimed
+		local left = if entity.yield ~= nil then entity.yield.buildpower_left else 0
+		if reclaimables_synced[entity.id] == left then
+			return
+		end
+		reclaimables_synced[entity.id] = left
 		apply_transform(entity, model)
 		apply_reclaimable_attributes(entity, model)
 		return
@@ -704,5 +891,6 @@ return table.freeze({
 	sync = sync,
 	destroy = destroy,
 	get_model = get_model,
+	preload = preload,
 	team_color = team_color,
 })

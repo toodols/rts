@@ -7,6 +7,8 @@
 -- islands: islands in an ocean, one under every start, more scattered between, and at least one volcano,
 --   a cone far steeper than anything can be built on.
 -- koth: a mountain in the sea, in three terraces. The teams start on the lowest and the top is to be held.
+-- tutorial: the campaign's first mission, a small valley split by a ridge with one narrow pass through it.
+-- overlook: the campaign's second mission, a plateau whose cliff overlooks the low ground, with a ramp down at each end.
 -- supreme_isthmus, hooked, center_command, rifted, comet_catcher, altair_crossing, ancient_bastion, folsom_dam:
 --   Beyond All Reason's maps of those names, from their heightmaps, textures and metal maps (see bar_maps).
 
@@ -61,11 +63,32 @@ export type Theme = {
 	paint: ((seed: number) -> (x: number, z: number, height: number, too_steep: boolean) -> Enum.Material?)?,
 }
 
+-- A team's start box, its corners in world (x, z).
+export type StartBox = {
+	min: Vector2,
+	max: Vector2,
+}
+
+-- A square start box `half` studs out from `center` each way.
+local function box_around(center: Vector2, half: number): StartBox
+	return { min = center - Vector2.new(half, half), max = center + Vector2.new(half, half) }
+end
+
 -- A metal spot a map puts in a place of its own choosing, in world (x, z).
 export type FixedMetalSpot = {
 	position: Vector2,
 	-- nil for the ordinary amount
 	multiplier: number?,
+}
+
+-- A reclaimable a map puts in a place of its own choosing, in world (x, z), with what it holds (see scenery.luau).
+export type FixedReclaimable = {
+	def_name: string,
+	position: Vector2,
+	facing: number,
+	metal: number,
+	energy: number,
+	buildpower: number,
 }
 
 export type Preset = {
@@ -78,17 +101,28 @@ export type Preset = {
 	build: (seed: number) -> (x: number, z: number) -> number,
 	-- Where a team's start ideally is, as (x, z); nil puts them on a ring around the middle.
 	start_position: ((slot: number) -> Vector2)?,
-	-- How many different starts the map has, which players choose among; nil for config's START_SLOTS.
-	start_count: number?,
+	-- The box each team's players choose where to start within, one to a team, in world (x, z): BAR's own for a map
+	-- from BAR, and for any other laid over its starts by eye. More teams than boxes share them.
+	start_boxes: { StartBox },
 	-- The layers the middle spots are laid out in, each with its own count, in place of the usual scatter
 	-- over the whole map and the spots on the sea floor.
 	metal_layers: { MetalLayer }?,
 	-- Every metal spot on the map, where the map says, in place of any laid out from the seed; nil to lay them out.
 	metal_spots: { FixedMetalSpot }?,
+	-- Every geothermal vent on the map, in world (x, z), where the map says. A map with neither this nor `geo_at_starts`
+	-- has none: vents are as particular to a map as its metal is.
+	geo_spots: { Vector2 }?,
+	-- A vent beside every start, for a map that does not say where its vents are.
+	geo_at_starts: boolean?,
+	-- The reclaimables the map starts with, where the map says, in place of any laid out from the seed; nil to lay them
+	-- out. Read only when asked for, since only the server needs them and a map can have thousands.
+	reclaimables: (() -> { FixedReclaimable })?,
 	theme: Theme,
 	-- The least and most the wind blows, and how strong the tide is (see environment.luau); any left nil is config's
 	-- default.
 	conditions: environment.Conditions?,
+	-- Only played as a campaign mission's map, never offered in a lobby.
+	campaign_only: boolean?,
 }
 
 -- Themes ----------------------------------------------------------------------------------------------
@@ -502,6 +536,295 @@ local KOTH_METAL_LAYERS: { MetalLayer } = {
 	},
 }
 
+-- Tutorial --------------------------------------------------------------------------------------------
+
+-- The campaign's first mission (see shared/campaign.luau, whose TUTORIAL has to agree with the numbers here). A small
+-- green valley, cut in two from edge to edge by a rocky ridge running north to south, with the player's side to the west
+-- and the enemy's to the east. The ridge's faces are cliffs far steeper than anything walks (54 degrees is the most
+-- anything can; these are about 80), and the only way through it is one narrow pass across its middle at z = 0, which
+-- the tutorial's boulder fills (44 studs across, where the pass floor is 20 and its walls rise to the ridge within 6
+-- more each side). Gentle hills rise at the map's edges to frame it. It is all dry: the commander wades any water, so
+-- water would be no wall.
+local TUTORIAL_SIZE = Vector2.new(320, 208)
+local TUTORIAL_GROUND = 4
+local TUTORIAL_HILLS = 1.2
+local TUTORIAL_HILL_FREQUENCY = 0.025
+-- The ridge's top, how far its top reaches either side of x = 0, give or take its warp, and how far out from there its
+-- cliff falls to the valley floor.
+local TUTORIAL_RIDGE_TOP = 34
+local TUTORIAL_RIDGE_HALF = 26
+local TUTORIAL_RIDGE_WARP = 4
+local TUTORIAL_RIDGE_WARP_FREQUENCY = 0.035
+local TUTORIAL_CLIFF = 6
+local TUTORIAL_CRAGS = 5
+local TUTORIAL_CRAG_FREQUENCY = 0.09
+-- The pass: its floor is this far either side of z = 0, and its walls rise to the ridge's top over this much more.
+local TUTORIAL_PASS_HALF = 10
+local TUTORIAL_PASS_WALL = 6
+-- The hills round the edge: how far in from the edge they reach and how high they rise, gently enough to walk up.
+local TUTORIAL_RIM_REACH = 22
+local TUTORIAL_RIM_TOP = 14
+-- The starts, as campaign.TUTORIAL has them.
+local TUTORIAL_PLAYER_START = Vector2.new(-110, 0)
+local TUTORIAL_ENEMY_START = Vector2.new(110, 0)
+
+local function tutorial_build(seed: number): (number, number) -> number
+	local half_x = TUTORIAL_SIZE.X / 2
+	local half_z = TUTORIAL_SIZE.Y / 2
+	return function(x: number, z: number): number
+		local hills = math.noise(x * TUTORIAL_HILL_FREQUENCY, z * TUTORIAL_HILL_FREQUENCY, seed + 2.3) * TUTORIAL_HILLS
+		local from_edge = math.min(half_x - math.abs(x), half_z - math.abs(z))
+		local rim = smoothstep((TUTORIAL_RIM_REACH - from_edge) / TUTORIAL_RIM_REACH) * TUTORIAL_RIM_TOP
+		local floor = TUTORIAL_GROUND + hills + rim
+
+		local warp = math.noise(z * TUTORIAL_RIDGE_WARP_FREQUENCY, 0.5, seed + 8.8) * TUTORIAL_RIDGE_WARP
+		local ridge = smoothstep((TUTORIAL_RIDGE_HALF + warp + TUTORIAL_CLIFF - math.abs(x)) / TUTORIAL_CLIFF)
+		local pass = smoothstep((math.abs(z) - TUTORIAL_PASS_HALF) / TUTORIAL_PASS_WALL)
+		local crags = math.noise(x * TUTORIAL_CRAG_FREQUENCY, z * TUTORIAL_CRAG_FREQUENCY, seed + 4.1) * TUTORIAL_CRAGS
+		return floor + (TUTORIAL_RIDGE_TOP + crags - floor) * ridge * pass
+	end
+end
+
+-- A meadow: bright grass, bare rock on the ridge, and a dirt track through the pass.
+local MEADOW: Theme = {
+	ground = Enum.Material.Grass,
+	ground_patches = Enum.Material.LeafyGrass,
+	slope = Enum.Material.Ground,
+	cliff = Enum.Material.Slate,
+	shore = Enum.Material.Sand,
+	seabed = Enum.Material.Sand,
+	high_ground = Enum.Material.Rock,
+	high_from = TUTORIAL_GROUND + TUTORIAL_RIM_TOP + 2,
+	colors = {
+		[Enum.Material.Grass] = Color3.fromRGB(110, 150, 70),
+		[Enum.Material.LeafyGrass] = Color3.fromRGB(92, 134, 60),
+		[Enum.Material.Ground] = Color3.fromRGB(128, 108, 80),
+		[Enum.Material.Slate] = Color3.fromRGB(100, 98, 102),
+		[Enum.Material.Rock] = Color3.fromRGB(122, 118, 110),
+	},
+	water_color = DEFAULT_WATER,
+	paint = function(_seed: number): (number, number, number, boolean) -> Enum.Material?
+		return function(x: number, z: number, _height: number, too_steep: boolean): Enum.Material?
+			local through_pass = math.abs(x) < TUTORIAL_RIDGE_HALF + TUTORIAL_CLIFF + 10
+				and math.abs(z) < TUTORIAL_PASS_HALF - 1
+			if through_pass and too_steep == false then
+				return Enum.Material.Ground
+			end
+			return nil
+		end
+	end,
+}
+
+-- Every spot has its twin across the middle, so neither side has more.
+local TUTORIAL_METAL: { FixedMetalSpot } = {}
+for _, at in { Vector2.new(-124, -48), Vector2.new(-124, 48), Vector2.new(-72, -56) } do
+	table.insert(TUTORIAL_METAL, { position = at, multiplier = nil })
+	table.insert(TUTORIAL_METAL, { position = -at, multiplier = nil })
+end
+
+-- A few trees on the hills at the edge and some stones by the mouths of the pass, each with its twin across the middle,
+-- holding what their defs say.
+local function tutorial_reclaimables(): { FixedReclaimable }
+	local laid: { { def_name: string, at: Vector2 } } = {
+		{ def_name = "tree", at = Vector2.new(-146, -86) },
+		{ def_name = "tree", at = Vector2.new(-134, -92) },
+		{ def_name = "tree", at = Vector2.new(-150, -72) },
+		{ def_name = "tree", at = Vector2.new(-96, -92) },
+		{ def_name = "tree", at = Vector2.new(-148, 84) },
+		{ def_name = "tree", at = Vector2.new(-70, 92) },
+		{ def_name = "tree", at = Vector2.new(-58, 88) },
+		{ def_name = "shrub", at = Vector2.new(-90, 70) },
+		{ def_name = "shrub", at = Vector2.new(-150, 20) },
+		{ def_name = "small_rock", at = Vector2.new(-46, 26) },
+		{ def_name = "small_rock", at = Vector2.new(-52, -24) },
+		{ def_name = "rock", at = Vector2.new(-44, -36) },
+	}
+	local out: { FixedReclaimable } = {}
+	for index, each in laid do
+		for _, at in { each.at, -each.at } do
+			table.insert(out, {
+				def_name = each.def_name,
+				position = at,
+				facing = index * 1.3,
+				-- what the defs hold (unit_defs/reclaimable.luau)
+				metal = if each.def_name == "small_rock" then 13 elseif each.def_name == "rock" then 21 else 0,
+				energy = if each.def_name == "tree" then 250 elseif each.def_name == "shrub" then 50 else 0,
+				buildpower = if each.def_name == "small_rock"
+					then 78
+					elseif each.def_name == "rock" then 126
+					elseif each.def_name == "tree" then 1500
+					else 300,
+			})
+		end
+	end
+	return out
+end
+
+-- Overlook ---------------------------------------------------------------------------------------------
+
+-- The campaign's second mission (see shared/campaign.luau, whose OVERLOOK has to agree with the numbers here). The
+-- player's side, to the west, is a plateau about OVERLOOK_DROP studs above the low ground to the east, where the enemy's
+-- base is. Along most of its length the plateau ends in a cliff, which is what the player looks down on the base from:
+-- a shell fired from up there carries further than its range on the level (projectile.range_to), so a thug at the edge
+-- outshoots the guards below. Near the north and south edges of the map a ramp, gentle enough for any bot, winds down
+-- from the plateau to the low ground between steep sides. Hills rise unevenly at the map's edges to frame it. It is all
+-- dry.
+--
+-- The cliff is drawn so as not to look built: its edge wanders, crags stand out of its face, and its foot runs out into
+-- a skirt of scree, while the ground above and below rolls. The face is spread over OVERLOOK_FACE studs, so that it is
+-- drawn as a slope of voxels rather than one sheer wall of them, and still far steeper than anything walks (54 degrees
+-- is the most anything can; the face is about 75). None of it depends on the seed: the mission's enemy stands where it
+-- does against this one cliff.
+local OVERLOOK_SIZE = Vector2.new(256, 208)
+local OVERLOOK_GROUND = 4
+-- The noise every part of it is drawn from, in place of the seed.
+local OVERLOOK_NOISE = 41.7
+-- Rolling ground, above and below.
+local OVERLOOK_HILLS = 1.5
+local OVERLOOK_HILL_FREQUENCY = 0.03
+-- The plateau: how far above the low ground it stands, and the x its edge wanders about, by as much as
+-- OVERLOOK_EDGE_WANDER one way or the other over long stretches and a little more over short ones.
+local OVERLOOK_DROP = 28
+local OVERLOOK_EDGE_X = -30
+local OVERLOOK_EDGE_WANDER = 5
+local OVERLOOK_EDGE_WANDER_FREQUENCY = 0.025
+local OVERLOOK_EDGE_JITTER = 1.5
+local OVERLOOK_EDGE_JITTER_FREQUENCY = 0.09
+-- The face: how far out from the edge it falls, how much of the drop the scree at its foot takes, over how much more,
+-- and the crags, which push the face in and out by as much as OVERLOOK_CRAGS studs.
+local OVERLOOK_FACE = 10
+local OVERLOOK_SCREE = 0.12
+local OVERLOOK_SCREE_RUN = 10
+local OVERLOOK_CRAGS = 3
+local OVERLOOK_CRAG_FREQUENCY = 0.14
+-- The ramps, one each side of z = 0: the middle they wind about, how far either side of it they are a ramp and no
+-- less, and how far more their steep sides take to rise to the cliff. Each runs down from the edge over
+-- OVERLOOK_RAMP_RUN.
+local OVERLOOK_RAMP_Z = 72
+local OVERLOOK_RAMP_WIND = 5
+local OVERLOOK_RAMP_WIND_FREQUENCY = 0.035
+local OVERLOOK_RAMP_HALF = 8
+local OVERLOOK_RAMP_SIDE = 8
+local OVERLOOK_RAMP_RUN = 60
+-- The hills round the edge: how far in from the edge they reach, give or take, and how high they rise, gently enough
+-- to walk up.
+local OVERLOOK_RIM_REACH = 18
+local OVERLOOK_RIM_WANDER = 6
+local OVERLOOK_RIM_TOP = 10
+-- The starts, as campaign.OVERLOOK has them.
+local OVERLOOK_PLAYER_START = Vector2.new(-88, 0)
+local OVERLOOK_ENEMY_START = Vector2.new(70, 0)
+
+local function overlook_noise(x: number, z: number, frequency: number, offset: number): number
+	return math.noise(x * frequency, z * frequency, OVERLOOK_NOISE + offset)
+end
+
+-- The x the plateau's edge is at, at `z`, before the crags.
+local function overlook_edge(z: number): number
+	return OVERLOOK_EDGE_X
+		+ overlook_noise(0.5, z, OVERLOOK_EDGE_WANDER_FREQUENCY, 1.1) * OVERLOOK_EDGE_WANDER * 2
+		+ overlook_noise(0.5, z, OVERLOOK_EDGE_JITTER_FREQUENCY, 2.2) * OVERLOOK_EDGE_JITTER * 2
+end
+
+-- How much of the way up to the plateau the ground is at (x, z): 1 on it, 0 on the low ground.
+local function overlook_plateau(x: number, z: number): number
+	local edge = overlook_edge(z) + overlook_noise(x, z, OVERLOOK_CRAG_FREQUENCY, 3.3) * OVERLOOK_CRAGS
+	local face = smoothstep((edge + OVERLOOK_FACE - x) / OVERLOOK_FACE)
+	local scree = smoothstep((edge + OVERLOOK_FACE + OVERLOOK_SCREE_RUN - x) / (OVERLOOK_FACE + OVERLOOK_SCREE_RUN))
+	local cliff = face * (1 - OVERLOOK_SCREE) + scree * OVERLOOK_SCREE
+
+	local ramp = smoothstep((overlook_edge(z) + OVERLOOK_RAMP_RUN - x) / OVERLOOK_RAMP_RUN)
+	local middle = OVERLOOK_RAMP_Z + overlook_noise(x, 0.5, OVERLOOK_RAMP_WIND_FREQUENCY, 4.4) * OVERLOOK_RAMP_WIND * 2
+	local on_ramp =
+		smoothstep((OVERLOOK_RAMP_HALF + OVERLOOK_RAMP_SIDE - math.abs(math.abs(z) - middle)) / OVERLOOK_RAMP_SIDE)
+	-- a ramp only ever lifts the ground, so the plateau stays whole behind the edge
+	return math.max(cliff, ramp * on_ramp)
+end
+
+local function overlook_build(_seed: number): (number, number) -> number
+	local half_x = OVERLOOK_SIZE.X / 2
+	local half_z = OVERLOOK_SIZE.Y / 2
+	return function(x: number, z: number): number
+		local hills = overlook_noise(x, z, OVERLOOK_HILL_FREQUENCY, 5.5) * OVERLOOK_HILLS * 2
+		local from_edge = math.min(half_x - math.abs(x), half_z - math.abs(z))
+		local reach = OVERLOOK_RIM_REACH + overlook_noise(x, z, OVERLOOK_HILL_FREQUENCY, 6.6) * OVERLOOK_RIM_WANDER * 2
+		local rim = smoothstep((reach - from_edge) / reach) * OVERLOOK_RIM_TOP
+		return OVERLOOK_GROUND + hills + rim + OVERLOOK_DROP * overlook_plateau(x, z)
+	end
+end
+
+-- The meadow, with no rock on the plateau (it is high, but it is where the player builds), and a dirt track down each
+-- ramp so that the way down reads from above.
+local OVERLOOK_THEME: Theme = table.clone(MEADOW)
+OVERLOOK_THEME.high_ground = nil
+OVERLOOK_THEME.high_from = nil
+OVERLOOK_THEME.paint = function(_seed: number): (number, number, number, boolean) -> Enum.Material?
+	return function(x: number, z: number, _height: number, too_steep: boolean): Enum.Material?
+		local middle = OVERLOOK_RAMP_Z
+			+ overlook_noise(x, 0.5, OVERLOOK_RAMP_WIND_FREQUENCY, 4.4) * OVERLOOK_RAMP_WIND * 2
+		local down_ramp = x > overlook_edge(z) - 12
+			and x < overlook_edge(z) + OVERLOOK_RAMP_RUN + 8
+			and math.abs(math.abs(z) - middle) < OVERLOOK_RAMP_HALF - 1
+		if down_ramp and too_steep == false then
+			return Enum.Material.Ground
+		end
+		return nil
+	end
+end
+
+-- Four spots on the plateau for the player, and two in the enemy's base, which it has extractors on from the start.
+local OVERLOOK_METAL: { FixedMetalSpot } = {}
+for _, at in
+	{
+		Vector2.new(-100, -40),
+		Vector2.new(-100, 40),
+		Vector2.new(-66, -58),
+		Vector2.new(-66, 58),
+		Vector2.new(104, -48),
+		Vector2.new(104, 48),
+	}
+do
+	table.insert(OVERLOOK_METAL, { position = at, multiplier = nil })
+end
+
+-- Trees on the plateau, and stones fallen from the cliff at its foot and at the feet of the ramps, holding what their
+-- defs say.
+local function overlook_reclaimables(): { FixedReclaimable }
+	local laid: { { def_name: string, at: Vector2 } } = {
+		{ def_name = "tree", at = Vector2.new(-116, -82) },
+		{ def_name = "tree", at = Vector2.new(-106, -88) },
+		{ def_name = "tree", at = Vector2.new(-118, -64) },
+		{ def_name = "tree", at = Vector2.new(-114, 80) },
+		{ def_name = "tree", at = Vector2.new(-100, 86) },
+		{ def_name = "tree", at = Vector2.new(-118, 12) },
+		{ def_name = "shrub", at = Vector2.new(-108, -16) },
+		{ def_name = "shrub", at = Vector2.new(-54, -26) },
+		{ def_name = "shrub", at = Vector2.new(-50, 30) },
+		{ def_name = "small_rock", at = Vector2.new(-10, -22) },
+		{ def_name = "small_rock", at = Vector2.new(-8, 30) },
+		{ def_name = "rock", at = Vector2.new(-12, 4) },
+		{ def_name = "small_rock", at = Vector2.new(28, -86) },
+		{ def_name = "rock", at = Vector2.new(30, 88) },
+	}
+	local out: { FixedReclaimable } = {}
+	for index, each in laid do
+		table.insert(out, {
+			def_name = each.def_name,
+			position = each.at,
+			facing = index * 1.3,
+			-- what the defs hold (unit_defs/reclaimable.luau)
+			metal = if each.def_name == "small_rock" then 13 elseif each.def_name == "rock" then 21 else 0,
+			energy = if each.def_name == "tree" then 250 elseif each.def_name == "shrub" then 50 else 0,
+			buildpower = if each.def_name == "small_rock"
+				then 78
+				elseif each.def_name == "rock" then 126
+				elseif each.def_name == "tree" then 1500
+				else 300,
+		})
+	end
+	return out
+end
+
 local ISLANDS_THEME: Theme = table.clone(TROPICAL)
 ISLANDS_THEME.paint = islands_paint
 
@@ -565,6 +888,20 @@ local function bar_theme(map: BarMap): Theme
 	}
 end
 
+-- A BAR map's start boxes, in the world.
+local function bar_boxes(map: BarMap, fit: Fitted): { StartBox }
+	local boxes: { StartBox } = {}
+	for _, box in map.start_boxes do
+		local a = fit.to_world(box.min)
+		local b = fit.to_world(box.max)
+		table.insert(boxes, {
+			min = Vector2.new(math.min(a.X, b.X), math.min(a.Y, b.Y)),
+			max = Vector2.new(math.max(a.X, b.X), math.max(a.Y, b.Y)),
+		})
+	end
+	return boxes
+end
+
 local function bar_preset(map: BarMap): Preset
 	local fit = fitted(map)
 	local metal: { FixedMetalSpot } = {}
@@ -574,9 +911,29 @@ local function bar_preset(map: BarMap): Preset
 			multiplier = if spot.rich then BAR_RICH_MULTIPLIER else nil,
 		})
 	end
+	-- what the map has lying on it, from its own archive
+	local features = bar_maps.features_of(map.name)
+	local vents: { Vector2 } = {}
+	for _, at in features.geovents do
+		table.insert(vents, fit.to_world(at))
+	end
+	local function reclaimables(): { FixedReclaimable }
+		local out: { FixedReclaimable } = {}
+		for _, feature in bar_maps.read_features(features) do
+			table.insert(out, {
+				def_name = feature.def_name,
+				position = fit.to_world(feature.at),
+				facing = feature.heading,
+				metal = feature.metal,
+				energy = feature.energy,
+				buildpower = feature.buildpower,
+			})
+		end
+		return out
+	end
 	return {
 		name = map.name,
-		description = `{map.display_name}, from Beyond All Reason, as big as it is there`,
+		description = `By {bar_maps.rights.credit(map.name)}, from Beyond All Reason`,
 		size = fit.size,
 		build = function(_seed: number): (number, number) -> number
 			return fit.height_at
@@ -584,59 +941,136 @@ local function bar_preset(map: BarMap): Preset
 		start_position = function(slot: number): Vector2
 			return fit.to_world(map.starts[(slot - 1) % #map.starts + 1])
 		end,
-		start_count = #map.starts,
+		start_boxes = bar_boxes(map, fit),
 		metal_layers = nil,
 		metal_spots = metal,
+		geo_spots = vents,
+		reclaimables = reclaimables,
 		theme = bar_theme(map),
 		conditions = { min_wind = map.min_wind, max_wind = map.max_wind, tidal_strength = map.tidal_strength },
 	}
 end
 
+-- Start boxes for the maps made here, laid over their starts by eye. The ring the starts are on puts start 1 east, 2
+-- south, 3 west and 4 north, so where there are four boxes the second is the one across from the first, and a game of
+-- two starts on opposite sides.
+local RING_OPPOSITE_FIRST = { 1, 3, 2, 4 }
+
+local function ring_point(slot: number, radius: number): Vector2
+	local angle = (slot - 1) * (math.pi * 2 / config.START_SLOTS)
+	return Vector2.new(math.cos(angle), math.sin(angle)) * radius
+end
+
+-- A square around each of the four starts on a ring of `radius`, `half` studs out each way.
+local function ring_boxes(radius: number, half: number): { StartBox }
+	local boxes: { StartBox } = {}
+	for _, slot in RING_OPPOSITE_FIRST do
+		table.insert(boxes, box_around(ring_point(slot, radius), half))
+	end
+	return boxes
+end
+
+-- The highlands: a strip down each of the east and west sides, each taking in the start there, well clear of the
+-- middle.
+local HIGHLANDS_BOXES: { StartBox } = {
+	{ min = Vector2.new(140, -200), max = Vector2.new(HALF_X - 24, 200) },
+	{ min = Vector2.new(-(HALF_X - 24), -200), max = Vector2.new(-140, 200) },
+}
+
+-- The continents: the heart of each, far enough in from its coast that the whole box is dry.
+local CONTINENTS_BOXES: { StartBox } = {
+	{ min = Vector2.new(CONTINENT_CENTER_X - 100, -200), max = Vector2.new(CONTINENT_CENTER_X + 100, 200) },
+	{ min = Vector2.new(-CONTINENT_CENTER_X - 100, -200), max = Vector2.new(-CONTINENT_CENTER_X + 100, 200) },
+}
+
+-- The islands: the flat top of each start island, which is START_ISLAND_RADIUS across, so a square inside it.
+local ISLANDS_BOXES = ring_boxes(config.START_RING_RADIUS, 60)
+
+-- The mountain: each start's stretch of the lowest terrace, between the cliff up to the second and the shore.
+local KOTH_BOXES = ring_boxes(KOTH_START_RADIUS, 40)
+
 local presets: { [string]: Preset } = {
 	highlands = {
 		name = "highlands",
-		description = "Rolling hills, with basins that dip below the sea in places",
+		description = "Rolling hills and sunken basins",
 		build = highlands_build,
 		size = nil,
 		start_position = nil,
+		start_boxes = HIGHLANDS_BOXES,
 		metal_layers = nil,
 		metal_spots = nil,
 		theme = TEMPERATE,
 	},
 	islands = {
 		name = "islands",
-		description = "Islands in an ocean, one under every start and at least one steep volcano",
+		description = "Islands and a volcano",
 		build = islands_build,
 		size = nil,
 		start_position = nil,
+		start_boxes = ISLANDS_BOXES,
 		metal_layers = nil,
 		metal_spots = nil,
 		theme = ISLANDS_THEME,
 	},
 	continents = {
 		name = "continents",
-		description = "Two continents joined by two narrow land bridges, one team on each side, in a surrounding sea",
+		description = "Two continents, two land bridges",
 		build = continents_build,
 		size = nil,
 		start_position = function(slot: number): Vector2
 			return CONTINENT_STARTS[(slot - 1) % #CONTINENT_STARTS + 1]
 		end,
+		start_boxes = CONTINENTS_BOXES,
 		metal_layers = nil,
 		metal_spots = nil,
 		theme = TEMPERATE,
 	},
 	koth = {
 		name = "koth",
-		description = "A mountain in the sea, in three terraces joined by narrow ramps, with metal on every layer",
+		description = "A terraced mountain in the sea",
 		build = koth_build,
 		size = nil,
 		start_position = function(slot: number): Vector2
 			local angle = (slot - 1) * (math.pi * 2 / config.START_SLOTS)
 			return Vector2.new(math.cos(angle), math.sin(angle)) * KOTH_START_RADIUS
 		end,
+		start_boxes = KOTH_BOXES,
 		metal_layers = KOTH_METAL_LAYERS,
 		metal_spots = nil,
+		geo_at_starts = true,
 		theme = KOTH_THEME,
+	},
+	tutorial = {
+		name = "tutorial",
+		description = "A valley split by a ridge",
+		build = tutorial_build,
+		size = TUTORIAL_SIZE,
+		-- the player's side is the odd slots and the enemy's the even ones
+		start_position = function(slot: number): Vector2
+			return if slot % 2 == 1 then TUTORIAL_PLAYER_START else TUTORIAL_ENEMY_START
+		end,
+		start_boxes = { box_around(TUTORIAL_PLAYER_START, 36), box_around(TUTORIAL_ENEMY_START, 36) },
+		metal_layers = nil,
+		metal_spots = TUTORIAL_METAL,
+		reclaimables = tutorial_reclaimables,
+		theme = MEADOW,
+		campaign_only = true,
+	},
+	overlook = {
+		name = "overlook",
+		description = "A plateau over the low ground",
+		build = overlook_build,
+		size = OVERLOOK_SIZE,
+		-- the player's side is the odd slots and the enemy's the even ones
+		start_position = function(slot: number): Vector2
+			return if slot % 2 == 1 then OVERLOOK_PLAYER_START else OVERLOOK_ENEMY_START
+		end,
+		start_boxes = { box_around(OVERLOOK_PLAYER_START, 36), box_around(OVERLOOK_ENEMY_START, 36) },
+		metal_layers = nil,
+		metal_spots = OVERLOOK_METAL,
+		reclaimables = overlook_reclaimables,
+		theme = OVERLOOK_THEME,
+		campaign_only = true,
 	},
 }
 

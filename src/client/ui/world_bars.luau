@@ -135,7 +135,8 @@ local function Bar(props: { id: EntityId, model: Model, lit: boolean })
 		-- a rock or a tree has no health, only what is left of it to reclaim, shown once someone has started
 		local total = math.max(1, number_of(model, "reclaim_total", 1))
 		fraction = math.clamp(number_of(model, "reclaim_left", total) / total, 0, 1)
-		fill_tags = "bar-fill reclaim"
+		-- one that still has energy in it, a tree rather than a rock, fills in yellow
+		fill_tags = if number_of(model, "energy_left", 0) > 0 then "bar-fill reclaim energy" else "bar-fill reclaim"
 		show_track = fraction < 1
 	elseif is_wreck then
 		local total = math.max(1, number_of(model, "reclaim_total", 1))
@@ -416,8 +417,11 @@ local function WorldBars()
 			accumulator = 0
 			sample_history()
 			set_lit(math.floor(os.clock() * FLASHES_PER_SECOND) % 2 == 0)
-			-- a fresh table each time, which is what has the bars re-read their entities
-			set_models(table.clone(world.all()))
+			-- a fresh table each time, which is what has the bars re-read their entities, and of the rocks and trees
+			-- only those someone has started on: the rest, nearly all of them, have nothing to show
+			local shown = table.clone(world.all())
+			table.move(world.reclaimables_started(), 1, #world.reclaimables_started(), #shown + 1, shown)
+			set_models(shown)
 		end)
 		return function()
 			connection:Disconnect()

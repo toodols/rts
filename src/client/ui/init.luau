@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local React = require(ReplicatedStorage.Packages.react)
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 
+local tutorial_steps = require(ReplicatedStorage.Client.tutorial)
 local stylesheets = require(ReplicatedStorage.Client.ui.stylesheets)
 local resource_bar = require(ReplicatedStorage.Client.ui.resource_bar)
 local selection_panel = require(ReplicatedStorage.Client.ui.selection_panel)
@@ -12,6 +13,13 @@ local command_panel = require(ReplicatedStorage.Client.ui.command_panel)
 local selection_box = require(ReplicatedStorage.Client.ui.selection_box)
 local world_bars = require(ReplicatedStorage.Client.ui.world_bars)
 local lobby_panel = require(ReplicatedStorage.Client.ui.lobby_panel)
+local victory_screen = require(ReplicatedStorage.Client.ui.victory_screen)
+local pause_overlay = require(ReplicatedStorage.Client.ui.pause_overlay)
+local player_list = require(ReplicatedStorage.Client.ui.player_list)
+local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
+local tutorial = require(ReplicatedStorage.Client.ui.tutorial)
+local use_mission = require(ReplicatedStorage.Client.ui.use_mission)
+local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 
 local ResourceBar = resource_bar.ResourceBar
 local SelectionPanel = selection_panel.SelectionPanel
@@ -19,11 +27,17 @@ local BuildMenu = build_menu.BuildMenu
 local CommandPanel = command_panel.CommandPanel
 local SelectionBox = selection_box.SelectionBox
 local PlacementHint = selection_box.PlacementHint
+local PlacementProblem = selection_box.PlacementProblem
 local ModeHint = selection_box.ModeHint
 
 local player = Players.LocalPlayer
 
 local function Main()
+	-- The tutorial pares the HUD down to what it teaches: no economy readout (nor the wind or scavengers beside it)
+	-- until it has had the player build extractors and solar collectors, and its own cards across the top.
+	local in_tutorial = use_mission.use_mission() == "tutorial"
+	local tutorial_state = use_tutorial.use_tutorial()
+	local economy_shown = in_tutorial == false or (tutorial_state.active and tutorial_steps.shown "economy")
 	return React.createElement(React.Fragment, {}, {
 		StyleLink = React.createElement("StyleLink", {
 			StyleSheet = stylesheets.default_stylesheet,
@@ -40,11 +54,17 @@ local function Main()
 			CommandPanel = React.createElement(CommandPanel),
 		}),
 		BuildMenu = React.createElement(BuildMenu),
-		ResourceBar = React.createElement(ResourceBar),
+		ResourceBar = if economy_shown then React.createElement(ResourceBar) else nil,
+		-- the tutorial's cards, or the suggestions of another mission that makes them
+		Tutorial = if tutorial_state.active then React.createElement(tutorial.Tutorial) else nil,
 		SelectionBox = React.createElement(SelectionBox),
 		PlacementHint = React.createElement(PlacementHint),
+		PlacementProblem = React.createElement(PlacementProblem),
 		ModeHint = React.createElement(ModeHint),
+		PlayerList = React.createElement(player_list.PlayerList),
 		LobbyPanel = React.createElement(lobby_panel.LobbyPanel),
+		PauseOverlay = React.createElement(pause_overlay.PauseOverlay),
+		VictoryScreen = React.createElement(victory_screen.VictoryScreen),
 	})
 end
 
@@ -72,7 +92,10 @@ local function init_ui()
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild "PlayerGui"
 
-	ReactRoblox.createRoot(gui):render(React.createElement(Main))
+	-- tooltips are portalled into this GUI, above everything in it
+	ReactRoblox.createRoot(gui):render(React.createElement(tooltip.Layer.Provider, { value = gui }, {
+		Main = React.createElement(Main),
+	}))
 
 	local overlay = Instance.new "ScreenGui"
 	overlay.Name = "World"

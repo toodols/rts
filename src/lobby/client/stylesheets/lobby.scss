@@ -58,7 +58,6 @@ ImageLabel {
 	font-family: RobotoMono;
 	font-size: 10px;
 	font-weight: bold;
-	letter-spacing: 0.08em;
 
 	&.friends,
 	&.you {
@@ -70,37 +69,86 @@ ImageLabel {
 		color: var(--Energy);
 		outline: 1px solid var(--Energy);
 	}
+
+	&.ready {
+		color: var(--Gain);
+		outline: 1px solid var(--Gain);
+	}
 }
 
 .seam {
 	@include seam;
 }
 
+// Lit, for :hover, and for .selected, which ui/controls.luau sets while a gamepad has the button selected: the face
+// brightens, the edge and the words take the accent, and the rail runs out along the bottom from the middle.
+@mixin button-lit {
+	background-color: $steel-lit;
+	background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.18));
+	outline: 1px solid $accent;
+
+	.button-label {
+		color: $accent;
+	}
+
+	.button-rail {
+		width: 100%;
+	}
+}
+
 // A command button. The primary one is filled with the accent, the way the lit rail is. Its words are in a label
-// inside it (see ui/controls.luau for why).
+// inside it (see ui/controls.luau for why), and the label sizes it: the button has no layout, so the rail and the sheen
+// inside it can sit over the label rather than be laid out beside it.
+//
+// Every lit face below is written out whole, gradient and all: outlass bakes the gradient together with the
+// background-color of the rule it is declared in, so a rule changing only background-color shows nothing. Edges are lit
+// with the Sass colour, since outlass drops the colour of `outline: ... var(--Accent)`.
 .button {
 	width: auto;
 	height: 36px;
-	padding: 0 space(5);
 	@include cell;
-	@include stack(row, 0);
-	justify-content: center;
-	align-items: center;
+	overflow: hidden;
+
+	&:hover,
+	&.selected {
+		@include button-lit;
+	}
+
+	&:active {
+		background-color: $steel;
+		background-image: linear-gradient(180deg, veil(black, 0.1), veil(white, 0.04));
+		outline: 1px solid $accent;
+	}
 
 	&.primary {
 		background-color: color.adjust($accent, $lightness: -22%);
 		background-image: linear-gradient(180deg, veil(white, 0.18), veil(black, 0.25));
-		outline: 1px solid var(--Accent);
+		outline: 1px solid $accent;
 
-		&:hover {
-			background-color: color.adjust($accent, $lightness: -12%);
+		&:hover,
+		&.selected {
+			background-color: color.adjust($accent, $lightness: -10%);
+			background-image: linear-gradient(180deg, veil(white, 0.3), veil(black, 0.2));
+			outline: 1px solid color.adjust($accent, $lightness: 18%);
+
+			.button-label {
+				color: white;
+			}
+
+			.button-rail {
+				background-color: white;
+			}
+		}
+
+		&:active {
+			background-color: color.adjust($accent, $lightness: -30%);
+			background-image: linear-gradient(180deg, veil(black, 0.15), veil(white, 0.1));
 		}
 	}
 
 	&.locked,
 	&:disabled {
 		opacity: 0.4;
-		cursor: not-allowed;
 	}
 
 	// the join button on each row of the browser, as wide as its column
@@ -109,12 +157,47 @@ ImageLabel {
 	}
 }
 
+// As tall as the button, so its words sit in the middle; a fixed-width button's label spans it too.
 .button-label {
+	width: auto;
+	height: 100%;
+	padding: 0 space(5);
 	font-family: Michroma;
 	font-size: 12px;
 	font-weight: bold;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
+	transition: color $fast $ease-out;
+
+	.button.join > &,
+	.button.play > & {
+		width: 100%;
+	}
+}
+
+// The lit line along the bottom of a lit button, run out from the middle.
+.button-rail {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 0;
+	height: 2px;
+	z-index: 2;
+	background-color: $accent;
+	pointer-events: none;
+	transition: width $medium $ease-out;
+}
+
+// A band of light across the button, swept over it once each time it lights: ui/controls.luau moves the band by the
+// offset of a gradient of its own, so the frame itself stays put over the button.
+.button-sheen {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	background-color: white;
+	pointer-events: none;
 }
 
 // One choice among several. The one in effect is lit; a locked one (anyone but the host) does not light on hover.
@@ -133,7 +216,30 @@ ImageLabel {
 	&.active {
 		background-color: color.adjust($accent, $lightness: -30%);
 		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
-		outline: 1px solid var(--Accent);
+		outline: 1px solid $accent;
+	}
+
+	// Lit, written out whole for the same reason as .active's (and the edge in the Sass colour; see .button).
+	&:hover {
+		background-color: $steel-lit;
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.18));
+		outline: 1px solid $accent;
+
+		> .chip-label {
+			color: var(--Text);
+		}
+	}
+
+	&.active:hover {
+		background-color: color.adjust($accent, $lightness: -20%);
+		background-image: linear-gradient(180deg, veil(white, 0.22), veil(black, 0.18));
+		outline: 1px solid color.adjust($accent, $lightness: 18%);
+	}
+
+	&:active {
+		background-color: $steel;
+		background-image: linear-gradient(180deg, veil(black, 0.1), veil(white, 0.04));
+		outline: 1px solid $accent;
 	}
 
 	&.locked:hover {
@@ -144,7 +250,7 @@ ImageLabel {
 	&.locked.active:hover {
 		background-color: color.adjust($accent, $lightness: -30%);
 		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
-		outline: 1px solid var(--Accent);
+		outline: 1px solid $accent;
 	}
 }
 
@@ -152,6 +258,7 @@ ImageLabel {
 	color: var(--TextDim);
 	font-size: 13px;
 	font-weight: bold;
+	transition: color $fast $ease-out;
 }
 
 .chip.active > .chip-label {
@@ -160,14 +267,37 @@ ImageLabel {
 
 // Screen -------------------------------------------------------------------------------------------------
 
-// Behind everything: the void, lifting toward the middle, with a lit rail along the top edge.
+// Between the scene and the menus: the scene is left clear on the right, where the commander stands, and shaded
+// toward the left, under the list, so the text there reads against anything the camera passes over. In a lobby the
+// panels cover the whole width, so the scene is only a setting and is shaded evenly.
 .backdrop {
 	position: absolute;
 	inset: 0;
 	width: 100%;
 	height: 100%;
-	background-color: $void;
-	background-image: radial-gradient(ellipse at center, $steel 0%, $void 70%);
+	background-color: transparent;
+	background-image: linear-gradient(
+		90deg,
+		veil($void, 0.88) 0%,
+		veil($void, 0.7) 45%,
+		veil($void, 0.1) 72%,
+		transparent 100%
+	);
+	pointer-events: none;
+
+	&.room-view {
+		background-color: veil($void, 0.55);
+		background-image: none;
+	}
+}
+
+// The edges of the screen darkened, as a lens does, so the eye settles in the middle.
+.vignette {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
 }
 
 .backdrop-rail {
@@ -190,43 +320,53 @@ ImageLabel {
 	@include stack(column, space(3));
 }
 
+// Browsing, the list keeps to the left and leaves the right of the screen to the scene.
+.shell.browsing > .body > .browser {
+	width: 800px;
+}
+
+// The title, straight over the scene rather than on a plate, the way a game's menu is lettered.
 .header {
 	width: 100%;
-	height: 64px;
-	@include stack(row, space(3));
+	height: 72px;
+	@include stack(row, space(4));
 	align-items: center;
-	padding: space(3) space(4);
+	padding: 0 space(1);
 }
 
 .header-titles {
 	height: auto;
-	@include stack(column, 0);
+	@include stack(column, space(1));
 }
 
 .header-title {
 	width: 100%;
-	height: 22px;
+	height: 40px;
 	font-family: Michroma;
 	font-weight: bold;
-	font-size: 18px;
-	letter-spacing: 0.2em;
+	font-size: 34px;
 	text-align: left;
-	-webkit-text-stroke: 2px veil($void, 0.85);
+	-webkit-text-stroke: 3px veil($void, 0.9);
 }
 
 .header-subtitle {
 	@include caption;
 	width: 100%;
-	height: 16px;
-	font-size: 12px;
+	height: 18px;
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 13px;
+	-webkit-text-stroke: 2px veil($void, 0.8);
 }
 
-.header-player {
-	width: auto;
-	height: auto;
-	color: var(--Accent);
-	font-size: 14px;
-	text-align: right;
+// The lobby's plates are glass rather than steel: the scene shows through them, dimmed, so the menus are part of the
+// world instead of a page in front of it.
+.panel {
+	// no colour under the gradient: the image is painted over it, so any colour there would only thicken the glass
+	background-color: transparent;
+	background-image: linear-gradient(180deg, veil($steel-lit, 0.75) 0%, veil($steel, 0.62) 6%, veil($void, 0.78) 100%);
+	opacity: 1;
+	outline: 1px solid veil($edge, 0.6);
 }
 
 // Takes the rest of the column. `height: 0` is only there for outlass: the idiomatic `flex: 1; min-height: 0` (or a
@@ -275,7 +415,6 @@ ImageLabel {
 	@include caption;
 	font-family: RobotoMono;
 	font-size: 10px;
-	letter-spacing: 0.1em;
 }
 
 // The header's stand-in for the join buttons, so the columns above line up with the rows below.
@@ -298,13 +437,20 @@ ImageLabel {
 	@include stack(row, space(3));
 	align-items: center;
 	padding: 0 space(2);
-	background-color: $steel-raised;
-	background-image: linear-gradient(180deg, veil(white, 0.04), veil(black, 0.2));
-	outline: 1px solid $edge;
+	background-color: veil($steel-raised, 0.8);
+	background-image: linear-gradient(90deg, veil(white, 0.06), veil(black, 0.2));
+	outline: 1px solid veil($edge, 0.7);
 	transition: outline-color $fast $ease-out;
 
+	// lit, face and all (see .button)
 	&:hover {
-		outline: 1px solid var(--Accent);
+		background-color: veil($steel-lit, 0.85);
+		background-image: linear-gradient(90deg, veil($accent, 0.14), veil(black, 0.15));
+		outline: 1px solid $accent;
+
+		.lobby-host {
+			color: $accent;
+		}
 	}
 }
 
@@ -357,6 +503,7 @@ ImageLabel {
 	font-size: 15px;
 	font-weight: bold;
 	text-align: left;
+	transition: color $fast $ease-out;
 }
 
 .lobby-map-name,
@@ -371,12 +518,15 @@ ImageLabel {
 	font-size: 11px;
 }
 
+// Nothing to join: a wide empty bay, the way an empty seat is drawn, so it reads as room for a lobby.
 .empty {
 	width: 100%;
-	height: 120px;
-	color: var(--TextFaint);
-	font-size: 15px;
-	font-style: italic;
+	height: 160px;
+	background-color: veil($void, 0.4);
+	outline: 1px solid veil($edge, 0.8);
+	color: var(--TextDim);
+	font-family: Michroma;
+	font-size: 14px;
 }
 
 // Room -----------------------------------------------------------------------------------------------------
@@ -426,8 +576,6 @@ ImageLabel {
 	z-index: 1;
 	width: 100%;
 	height: 100%;
-	object-fit: fill;
-	image-rendering: auto;
 }
 
 .map-drawing {
@@ -484,7 +632,6 @@ ImageLabel {
 	height: 14px;
 	font-family: RobotoMono;
 	font-size: 10px;
-	letter-spacing: 0.1em;
 }
 
 .fact-value {
@@ -530,19 +677,43 @@ ImageLabel {
 	align-items: center;
 	padding: space(1) + 2px;
 
-	&.active {
+	// Faces written out whole and edges in the Sass colour, as .button's are.
+	&:hover {
 		background-color: $steel-lit;
-		outline: 2px solid var(--Accent);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.18));
+		outline: 1px solid $accent;
+
+		.map-card-name {
+			color: $accent;
+		}
+	}
+
+	&.active {
+		background-color: color.adjust($accent, $lightness: -38%);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
+		outline: 2px solid $accent;
+	}
+
+	&.active:hover {
+		background-color: color.adjust($accent, $lightness: -32%);
+		background-image: linear-gradient(180deg, veil(white, 0.18), veil(black, 0.18));
+		outline: 2px solid color.adjust($accent, $lightness: 18%);
 	}
 
 	&.locked:hover {
 		background-color: $steel-raised;
+		background-image: linear-gradient(180deg, veil(white, 0.06), veil(black, 0.2));
 		outline: 1px solid $edge;
+
+		.map-card-name {
+			color: var(--Text);
+		}
 	}
 
 	&.locked.active:hover {
-		background-color: $steel-lit;
-		outline: 2px solid var(--Accent);
+		background-color: color.adjust($accent, $lightness: -38%);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
+		outline: 2px solid $accent;
 	}
 }
 
@@ -558,6 +729,7 @@ ImageLabel {
 	font-size: 13px;
 	font-weight: bold;
 	text-overflow: ellipsis;
+	transition: color $fast $ease-out;
 }
 
 .map-card-size {
@@ -593,7 +765,6 @@ ImageLabel {
 	height: 14px;
 	font-family: RobotoMono;
 	font-size: 10px;
-	letter-spacing: 0.1em;
 }
 
 .chips {
@@ -618,10 +789,17 @@ ImageLabel {
 	// grows into the rest of the column; see .body
 	height: 0;
 	flex: 1;
-	@include stack(column, space(2));
+	@include stack(column, space(4));
 
 	// clear of the scrollbar, which is drawn over the content
 	padding-right: space(3);
+}
+
+// The players' sides, above the spectators: one list, or the teams side by side.
+.teams {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(2));
 
 	&.split {
 		flex-direction: row;
@@ -637,7 +815,7 @@ ImageLabel {
 
 // Side by side, the teams share the width evenly. `width: 0` stands in for `flex-basis: 0`, which outlass has no
 // equivalent for.
-.sides.split > .side {
+.teams.split > .side {
 	width: 0;
 	flex: 1 1 0;
 }
@@ -647,6 +825,14 @@ ImageLabel {
 	height: auto;
 	@include stack(row, space(2));
 	align-items: center;
+
+	// the label takes what the count leaves, rather than the whole row: at `.group-label`'s full width it pushed the
+	// count out past the side's edge, over the next team's label
+	> .group-label {
+		width: 0;
+		flex: 1 1 0;
+		text-overflow: ellipsis;
+	}
 }
 
 .side-count {
@@ -663,17 +849,17 @@ ImageLabel {
 	@include stack(row, space(2));
 	align-items: center;
 	padding: 0 space(2);
-	background-color: $steel-raised;
+	background-color: veil($steel-raised, 0.85);
 	outline: 1px solid color.adjust($edge, $lightness: -15%);
 
 	&.you {
-		outline: 1px solid var(--Accent);
+		outline: 1px solid $accent;
 	}
 
-	// An empty place: a dashed outline and faint text, so it reads as room rather than as someone.
+	// An empty place: a dim outline and faint text, so it reads as room rather than as someone.
 	&.open {
 		background-color: veil($void, 0.5);
-		outline: 1px dashed color.adjust($edge, $lightness: -10%);
+		outline: 1px solid color.adjust($edge, $lightness: -10%);
 		color: var(--TextFaint);
 		font-size: 12px;
 		font-style: italic;
@@ -681,8 +867,8 @@ ImageLabel {
 
 	&.movable:hover {
 		background-color: $steel-lit;
-		outline: 1px solid var(--Accent);
-		color: var(--Text);
+		outline: 1px solid $accent;
+		color: $accent;
 	}
 }
 
@@ -691,6 +877,42 @@ ImageLabel {
 	font-size: 14px;
 	text-align: left;
 	text-overflow: ellipsis;
+}
+
+// A player's resource bonus: a developer's small stepper, a step down and up either side of the value, or the value alone
+// for everyone else. Green above none and red below it, so a handicap reads at a glance.
+.bonus {
+	width: auto;
+	height: auto;
+	@include stack(row, space(1));
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.chip.step {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+}
+
+.bonus-value {
+	width: auto;
+	min-width: 44px;
+	height: 14px;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+	text-align: center;
+	white-space: nowrap;
+
+	&.up {
+		color: $gain;
+	}
+
+	&.down {
+		color: $danger;
+	}
 }
 
 // Actions -----------------------------------------------------------------------------------------------------
@@ -711,4 +933,625 @@ ImageLabel {
 	&.warning {
 		color: $caution;
 	}
+}
+
+// Campaign -----------------------------------------------------------------------------------------------------
+
+// The way into the campaign, over the list of lobbies: a lit card rather than a row, so it reads as its own thing, and
+// the whole card is the button (ui/campaign_card.luau), with an arrow at its right end. Lit (hovered, or selected with
+// a gamepad) it brightens, its edge glows, a sheen sweeps across it, the title steps in and the arrow walks out with a
+// second chevron trailing it; pressed it dips; let go, the arrow shoots off before the campaign opens. The strip is
+// only the card's slot in the browser's column: the card is centred on it, so it scales about its middle.
+.campaign-strip {
+	width: 100%;
+	height: 64px;
+}
+
+// Everything the card does when lit, for :hover, and for .selected, which the card sets itself while a gamepad has
+// it selected (Roblox has no :focus-visible).
+@mixin campaign-card-lit {
+	background-color: veil($steel-lit, 0.9);
+	// written out again: outlass bakes the gradient together with the rule's background-color (see .chip)
+	background-image: linear-gradient(90deg, veil($accent, 0.34) 0%, veil($accent, 0.08) 65%, transparent 100%);
+	// outlass drops the colour of `outline: 1px solid var(--Accent)` (the stroke keeps its old colour and alpha), so
+	// the edge is lit with the Sass colour instead
+	outline: 1px solid $accent;
+
+	.campaign-card-glow {
+		opacity: 0.4;
+	}
+
+	.campaign-strip-title {
+		color: var(--Accent);
+	}
+
+	.campaign-strip-texts {
+		padding-left: space(1);
+	}
+
+	.campaign-card-chevron.lead {
+		transform: translateX(8px) translateY(-50%) rotate(45deg);
+	}
+
+	.campaign-card-chevron.trail {
+		opacity: 1;
+		transform: translateX(8px) translateY(-50%) rotate(45deg);
+
+		.campaign-card-chevron-bar {
+			background-color: veil($accent, 0.5);
+		}
+	}
+}
+
+.campaign-card {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 100%;
+	height: 100%;
+	transform: translate(-50%, -50%);
+	overflow: hidden;
+	background-color: veil($steel-raised, 0.85);
+	background-image: linear-gradient(90deg, veil($accent, 0.22) 0%, veil($accent, 0.04) 60%, transparent 100%);
+	outline: 1px solid veil($accent, 0.5);
+	// .campaign-card-edge draws the lit left edge, and .campaign-card-glow the glow off it
+	transition:
+		background-color $medium $ease-out,
+		outline-color $medium $ease-out,
+		transform $fast $ease-out;
+
+	// :active too: in CSS a pressed card is still hovered, but a Roblox button is in one GuiState at a time, and Press
+	// alone would drop everything the hover lit (the arrow would snap back under the finger)
+	&:hover,
+	&:active {
+		@include campaign-card-lit;
+	}
+
+	&.selected {
+		@include campaign-card-lit;
+	}
+
+	&:active {
+		background-color: veil($steel-raised, 0.95);
+		background-image: linear-gradient(90deg, veil($accent, 0.28) 0%, veil($accent, 0.06) 60%, transparent 100%);
+		transform: translate(-50%, -50%) scale(0.97);
+	}
+
+	// pressed and let go: the arrow shoots off to the right before the campaign screen replaces the browser
+	&.launching {
+		.campaign-card-chevron.lead,
+		.campaign-card-chevron.trail {
+			transform: translateX(56px) translateY(-50%) rotate(45deg);
+		}
+	}
+}
+
+// The layers inside the card, back to front: the glow off the lit edge, the edge, what the card says, the sheen.
+.campaign-card-glow {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 45%;
+	height: 100%;
+	z-index: 1;
+	background-image: linear-gradient(90deg, $accent, transparent);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity $medium $ease-out;
+}
+
+.campaign-card-edge {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 3px;
+	height: 100%;
+	z-index: 2;
+	background-color: var(--Accent);
+}
+
+.campaign-card-content {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(2) 0 space(4);
+}
+
+// A band of light, parked off the card's right edge: ui/campaign_card.luau sweeps it across the card once each time the
+// card lights, and the card clips it. Its position is left out here because the component owns it.
+.campaign-card-sheen {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	z-index: 4;
+	background-image: linear-gradient(
+		105deg,
+		transparent 0%,
+		transparent 40%,
+		veil(white, 0.22) 50%,
+		transparent 60%,
+		transparent 100%
+	);
+	pointer-events: none;
+}
+
+// The arrow: a chevron, and a second one that trails in behind it when the card lights.
+.campaign-card-arrow {
+	position: relative;
+	width: 48px;
+	height: 100%;
+	overflow: hidden;
+}
+
+// A square turned 45 degrees with its top and right edges drawn as bars inside it (.campaign-card-chevron-bar), which
+// turn with it.
+.campaign-card-chevron {
+	position: absolute;
+	top: 50%;
+	width: 12px;
+	height: 12px;
+	transform: translateY(-50%) rotate(45deg);
+	transition:
+		transform $medium $ease-snap,
+		opacity $medium $ease-out;
+
+	&.lead {
+		left: 16px;
+	}
+
+	&.trail {
+		left: 4px;
+		// kept for the web; a Frame's own transparency doesn't reach its children, so the bars fade themselves
+		opacity: 0;
+
+		.campaign-card-chevron-bar {
+			background-color: veil($accent, 0);
+		}
+	}
+}
+
+.campaign-card-chevron-bar {
+	position: absolute;
+	top: 0;
+	right: 0;
+	background-color: var(--Accent);
+	transition: background-color $medium $ease-out;
+
+	&.top {
+		width: 100%;
+		height: 3px;
+	}
+
+	&.side {
+		width: 3px;
+		height: 100%;
+	}
+}
+
+.campaign-strip-texts {
+	height: auto;
+	@include stack(column, space(1));
+	transition: padding $medium $ease-snap;
+}
+
+.campaign-strip-title {
+	width: 100%;
+	height: 20px;
+	font-size: 16px;
+	transition:
+		color $medium $ease-out,
+		transform $medium $ease-snap;
+}
+
+.campaign-strip-progress {
+	@include caption;
+	width: 100%;
+	height: 16px;
+	font-family: RobotoMono;
+	font-size: 12px;
+}
+
+// The screen itself: the missions on the left, what they unlock on the right.
+.campaign {
+	width: 100%;
+	height: 100%;
+	@include stack(row, space(3));
+}
+
+.missions {
+	width: 460px;
+	height: 100%;
+	@include stack(column, space(3));
+}
+
+.mission-list {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+	padding: 1px;
+}
+
+// A mission: its number large down the left, and what it is and the button to play it beside. The number and the
+// status tag are coloured by how it stands: accent, green when finished, grey when not yet open.
+.mission-card {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: flex-start;
+	padding: space(3);
+	background-color: veil($steel-raised, 0.8);
+	background-image: linear-gradient(90deg, veil(white, 0.06), veil(black, 0.2));
+	outline: 1px solid veil($edge, 0.7);
+
+	// not played yet, and not playable until the one before it is finished
+	&.closed {
+		opacity: 0.55;
+	}
+}
+
+.mission-card.closed .mission-title,
+.mission-card.closed .mission-number {
+	color: var(--TextFaint);
+}
+
+.mission-number {
+	width: 44px;
+	height: 36px;
+	color: var(--Accent);
+	font-size: 28px;
+	text-align: left;
+
+	.mission-card.completed > & {
+		color: var(--Gain);
+	}
+}
+
+.mission-details {
+	width: 0;
+	flex: 1 1 0;
+	height: auto;
+	@include stack(column, space(2));
+	align-items: flex-start;
+}
+
+.mission-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.mission-title {
+	width: auto;
+	height: 20px;
+	font-size: 16px;
+}
+
+.tag {
+	&.done {
+		color: var(--Gain);
+		outline: 1px solid var(--Gain);
+	}
+
+	&.fresh {
+		color: var(--Accent);
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.mission-description {
+	width: 100%;
+	height: auto;
+	color: var(--TextDim);
+	font-size: 14px;
+	line-height: 1.35;
+	text-align: left;
+	white-space: normal;
+}
+
+.mission-unlocks {
+	width: 100%;
+	height: auto;
+	color: var(--Energy);
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: left;
+	white-space: normal;
+}
+
+.button.play {
+	width: 140px;
+}
+
+// Play, and beside it Co-op for a mission that can be played together.
+.mission-buttons {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.campaign-actions {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+	padding-top: space(3);
+}
+
+// How the mission being started is going, or why it wasn't. Long (the Studio note is two sentences), so it wraps.
+.campaign-status {
+	height: auto;
+	min-height: 36px;
+	color: var(--TextDim);
+	font-size: 13px;
+	text-align: left;
+	white-space: normal;
+
+	&.warning {
+		color: $caution;
+	}
+}
+
+.unlocks {
+	width: 0;
+	flex: 1 1 0;
+	height: 100%;
+	@include stack(column, space(3));
+}
+
+.unlocks-note {
+	@include caption;
+	width: 100%;
+	height: 16px;
+	font-size: 13px;
+}
+
+.unlock-groups {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(4));
+	// clear of the scrollbar, which is drawn over the content
+	padding: 1px space(3) 1px 1px;
+}
+
+.unlock-group {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(2));
+}
+
+// Everything in a group as tiles, as many across as fit.
+.unlock-grid {
+	width: 100%;
+	height: auto;
+	display: grid;
+	// The idiomatic `repeat(auto-fill, minmax(160px, 1fr))` has no outlass equivalent (a Roblox grid needs a number of
+	// cells of a fixed size), and without it every tile fell back to 100px wide and cut its name short. So the columns
+	// are written out: four tiles and three gaps across the unlocks panel, clear of the scrollbar.
+	// grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	grid-template-columns: repeat(4, 170px);
+	grid-auto-rows: 44px;
+	gap: space(2);
+}
+
+// Unlocked: lit. Locked: dimmed, with the lock stamped on it. The two differ by their face, their text and the lock.
+.unlock {
+	width: 100%;
+	height: 44px;
+	@include stack(row, space(2));
+	align-items: center;
+	padding: 0 space(2);
+	background-color: veil($steel-raised, 0.9);
+	background-image: linear-gradient(180deg, veil(white, 0.08), veil(black, 0.2));
+	outline: 1px solid veil($edge, 0.8);
+
+	&.locked {
+		background-color: veil($void, 0.6);
+		background-image: none;
+		outline: 1px solid veil($edge, 0.5);
+		// `opacity` only fades a CanvasGroup's contents, not a Frame's children; the text inside is dimmed by its own
+		// rules below
+		opacity: 0.5;
+	}
+}
+
+.unlock.locked .unlock-name {
+	color: var(--TextFaint);
+}
+
+.unlock.locked .unlock-subtitle {
+	color: color.adjust($text-faint, $lightness: -25%);
+}
+
+.unlock-names {
+	width: 0;
+	flex: 1 1 0;
+	height: auto;
+	@include stack(column, 0);
+}
+
+.unlock-name {
+	width: 100%;
+	height: 17px;
+	font-size: 13px;
+	font-weight: bold;
+	text-align: left;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.unlock-subtitle {
+	width: 100%;
+	height: 13px;
+	color: var(--TextFaint);
+	font-size: 11px;
+	text-align: left;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.unlock-lock {
+	width: auto;
+	height: 14px;
+	padding: 0 space(1);
+	outline: 1px solid var(--TextFaint);
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 9px;
+	font-weight: bold;
+	flex-shrink: 0;
+}
+
+// Tabs -------------------------------------------------------------------------------------------------------
+
+// The tabs, at the right of the header: Play, Skins, Microtransactions. The open one is lit as a chosen chip is.
+.tabs {
+	width: auto;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.chip.tab {
+	height: 34px;
+	padding: 0 space(4);
+
+	> .chip-label {
+		font-family: Michroma;
+		font-size: 12px;
+		letter-spacing: 0.12em;
+	}
+}
+
+// Skins ------------------------------------------------------------------------------------------------------
+
+// The skins this player may wear, as cards two to a row, under a line on what a skin is. The cards are laid out by a
+// UIGridLayout set in skins_tab.luau (a CSS grid, `grid-template-columns: 1fr 1fr`, is what this would be).
+.skins-tab {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(3));
+	padding: space(4);
+}
+
+.skins-hint {
+	width: 100%;
+	height: auto;
+	font-size: 14px;
+	text-align: left;
+	color: var(--TextDim);
+	white-space: normal;
+}
+
+.skins-cards {
+	width: 100%;
+	height: 0;
+	flex: 1;
+	background-color: transparent;
+	scrollbar-width: thin;
+}
+
+// One skin: its name and stamps, what it is, what floats it comes with, and the button to equip it. The equipped one is
+// lit with the accent down its left edge.
+.skin-card {
+	@include cell;
+	@include stack(column, space(2));
+	padding: space(3) space(4);
+	border-left: 3px solid transparent;
+
+	&.equipped {
+		background-color: color.adjust($accent, $lightness: -38%);
+		background-image: linear-gradient(90deg, veil($accent, 0.2), transparent 70%);
+		outline: 1px solid $accent;
+		border-left: 3px solid $accent;
+	}
+}
+
+.skin-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+// Takes what the row leaves; it starts from no width, as `.roster-lane` does, so the flex layout decides it.
+.skin-name {
+	width: 0;
+	flex-grow: 1;
+	height: 20px;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 16px;
+	letter-spacing: 0.1em;
+	text-align: left;
+	color: var(--Text);
+}
+
+.tag.developer {
+	color: var(--Caution);
+	outline: 1px solid var(--Caution);
+}
+
+.skin-description {
+	width: 100%;
+	height: auto;
+	font-size: 13px;
+	line-height: 1.3;
+	text-align: left;
+	color: var(--TextDim);
+	white-space: normal;
+}
+
+.skin-extras {
+	width: 100%;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: left;
+	color: var(--Accent);
+	white-space: normal;
+}
+
+.button.equip {
+	margin-top: auto;
+	align-self: flex-end;
+}
+
+// Microtransactions ------------------------------------------------------------------------------------------
+
+// Nothing for sale yet: a plate saying so, in the middle of the tab.
+.microtransactions-tab {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(2));
+	align-items: center;
+	justify-content: center;
+}
+
+.microtransactions-title {
+	width: auto;
+	height: auto;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 24px;
+	letter-spacing: 0.14em;
+	color: var(--TextDim);
+}
+
+.microtransactions-hint {
+	width: auto;
+	height: auto;
+	font-size: 14px;
+	color: var(--TextFaint);
 }

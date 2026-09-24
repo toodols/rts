@@ -15,6 +15,8 @@ local map_state = require(ReplicatedStorage.Shared.map_state)
 local passability = require(ReplicatedStorage.Shared.passability)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local environment = require(ReplicatedStorage.Shared.environment)
+local campaign = require(ReplicatedStorage.Shared.campaign)
+local game_phase = require(ReplicatedStorage.Shared.game_phase)
 
 local state = require(script.Parent.state)
 local terrain = require(script.Parent.terrain)
@@ -25,7 +27,11 @@ local reaper = require(script.Parent.reaper)
 local players = require(script.Parent.players)
 local spawning = require(script.Parent.spawning)
 local wind = require(script.Parent.wind)
+local lobby = require(script.Parent.lobby)
 local scenery = require(script.Parent.scenery)
+local ai = require(script.Parent.ai)
+local match_stats = require(script.Parent.match_stats)
+local missions = require(script.Parent.missions)
 
 local loading = false
 
@@ -72,12 +78,15 @@ local function load(preset: string, seed: number?): (boolean, string?)
 	local current = map_state.get()
 	local ok, err = pcall(build, if seed ~= nil then seed elseif current ~= nil then current.seed else 0, preset)
 	if ok then
+		lobby.restart_on_new_map()
 		for _, player in Players:GetPlayers() do
 			local team_id = players.team_of(player)
 			if team_id ~= nil then
 				spawning.give_starting_force(team_id)
 			end
 		end
+		-- and the AI's teams start over too, at the starts left
+		ai.restart_on_new_map()
 	end
 	-- only now that the new commanders stand, since while the world was empty its stores were gone and the stockpile
 	-- was cut down to what the teams could hold without them
@@ -86,11 +95,37 @@ local function load(preset: string, seed: number?): (boolean, string?)
 			state.reset_team(id)
 		end
 	end
+	match_stats.reset()
 	loading = false
 	return ok, if ok then nil else tostring(err)
+end
+
+-- Plays the campaign mission `mission_id` here, as though it had been started from the campaign screen: its map is
+-- loaded as `load` does, with every player starting where the mission says, and what it starts with is put down.
+-- Whatever was being played is cleared off, and a game that has ended starts again. Yields as `load` does.
+local function load_mission(mission_id: string): (boolean, string?)
+	local mission = campaign.get(mission_id)
+	if mission == nil then
+		return false, `there is no mission "{mission_id}"`
+	end
+	if loading then
+		return false, "a map is already loading"
+	end
+	-- before the map, so that the players start where the mission says
+	missions.begin(mission_id)
+	local ok, err = load(mission.preset)
+	if ok == false then
+		return false, err
+	end
+	missions.setup()
+	if game_phase.phase() == "ended" then
+		game_phase.set_phase("playing", nil)
+	end
+	return true, nil
 end
 
 return table.freeze({
 	build = build,
 	load = load,
+	load_mission = load_mission,
 })
