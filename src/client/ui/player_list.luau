@@ -5,6 +5,9 @@
 -- off what to give them, in their own storage's scale, as far as the faint stretch ahead of it shows: no more than you
 -- have, and no more than they have room for. Letting go sends it. A bar that has fallen low is called out, and its
 -- handle glows, since that is the ally who needs it.
+--
+-- With an ally to ask, your own metal bar carries a handle too. Dragging it out measures off what you want, as far as
+-- the room in your storage, and letting go asks your allies for it (server/notifications.luau).
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -43,6 +46,7 @@ type Drag = {
 
 local roster_updated: RemoteEvent = ReplicatedStorage.Shared.RosterUpdated
 local share_resources: RemoteEvent = ReplicatedStorage.Shared.ShareResources
+local request_metal: RemoteEvent = ReplicatedStorage.Shared.RequestMetal
 
 local local_player = Players.LocalPlayer
 
@@ -120,18 +124,23 @@ local function Avatar(props: { entry: RosterEntry, LayoutOrder: number })
 end
 
 -- One of a team's two bars. `giver` is what you have of the resource to give, or nil when this bar takes nothing
--- from you: it is your own, or you are watching.
+-- from you: it is your own, or you are watching. `asking` is set on your own metal bar when you have an ally to ask.
 local function Meter(props: {
 	team_id: number,
 	resource: Resource,
 	bank: Bank,
 	giver: number?,
+	asking: boolean?,
 	LayoutOrder: number,
 })
 	local amount = amount_of(props.bank, props.resource)
 	local capacity = capacity_of(props.bank, props.resource)
 	local fraction = math.clamp(amount / capacity, 0, 1)
-	local reach = if props.giver ~= nil then math.max(0, math.min(props.giver, capacity - amount)) else 0
+	local asking = props.asking == true
+	local reach = if asking
+		then math.max(0, capacity - amount)
+		elseif props.giver ~= nil then math.max(0, math.min(props.giver, capacity - amount))
+		else 0
 	local can_give = reach >= 1
 	local low = fraction <= LOW_FRACTION
 
@@ -173,7 +182,11 @@ local function Meter(props: {
 			pending_ref.current = nil
 			set_pending(nil)
 			if given >= 1 then
-				share_resources:FireServer(props.team_id, props.resource, given)
+				if asking then
+					request_metal:FireServer(given)
+				else
+					share_resources:FireServer(props.team_id, props.resource, given)
+				end
 				set_sent(given)
 			end
 		end)
@@ -181,7 +194,7 @@ local function Meter(props: {
 			moved:Disconnect()
 			released:Disconnect()
 		end
-	end, { props.team_id, props.resource } :: { any })
+	end, { props.team_id, props.resource, asking } :: { any })
 
 	-- the note of what was sent clears itself, unless something newer has replaced it by then
 	React.useEffect(function()
@@ -200,7 +213,7 @@ local function Meter(props: {
 	end, { sent })
 
 	local dragging = pending ~= nil
-	local wanted = low and can_give and dragging == false
+	local wanted = low and can_give and dragging == false and asking == false
 
 	React.useEffect(function()
 		local scale = beckon_ref.current
@@ -228,7 +241,7 @@ local function Meter(props: {
 	local head = fraction + (pending or 0) / capacity
 	local readout = if dragging
 		then `+{format_amount(pending :: number)}`
-		elseif sent ~= nil then `SENT {format_amount(sent)}`
+		elseif sent ~= nil then `{if asking then "ASKED" else "SENT"} {format_amount(sent)}`
 		else `{format_amount(amount)}/{format_amount(capacity)}`
 
 	local tags = `roster-meter {props.resource}`
@@ -308,7 +321,8 @@ local BADGES: { [Relation]: string } = {
 }
 
 -- A team: a stripe of its colour, its player's face and name, and for one whose bank is known, its two bars.
-local function Card(props: { entry: RosterEntry, mine: Bank?, LayoutOrder: number })
+-- `can_ask` is whether you have an ally to ask for metal, from your own card.
+local function Card(props: { entry: RosterEntry, mine: Bank?, can_ask: boolean, LayoutOrder: number })
 	local entry = props.entry
 	local bank = entry.bank
 	-- only an ally takes from your bank; your own bars and a watched team's are only read
@@ -351,6 +365,7 @@ local function Card(props: { entry: RosterEntry, mine: Bank?, LayoutOrder: numbe
 					resource = "metal",
 					bank = bank,
 					giver = if mine ~= nil then mine.metal else nil,
+					asking = entry.relation == "self" and props.can_ask,
 					LayoutOrder = 2,
 				})
 				else nil,
@@ -412,6 +427,7 @@ local function PlayerList()
 		end
 	end
 	local watching = local_player:GetAttribute "spectator" == true
+	local can_ask = #friends > 1 and watching == false
 
 	local children: { [string]: any } = {
 		Scale = React.createElement("UIScale", { Scale = ui_scale }),
@@ -444,7 +460,8 @@ local function PlayerList()
 	})
 	for index, entry in friends do
 		order += 1
-		children[`Friend{index}`] = React.createElement(Card, { entry = entry, mine = mine, LayoutOrder = order })
+		children[`Friend{index}`] =
+			React.createElement(Card, { entry = entry, mine = mine, can_ask = can_ask, LayoutOrder = order })
 	end
 	if #enemies > 0 then
 		order += 1
@@ -455,16 +472,17 @@ local function PlayerList()
 		})
 		for index, entry in enemies do
 			order += 1
-			children[`Enemy{index}`] = React.createElement(Card, { entry = entry, mine = nil, LayoutOrder = order })
+			children[`Enemy{index}`] =
+				React.createElement(Card, { entry = entry, mine = nil, can_ask = false, LayoutOrder = order })
 		end
 	end
 	-- only worth saying when there is someone to give to
-	if #friends > 1 and watching == false then
+	if can_ask then
 		order += 1
 		children.Hint = React.createElement("TextLabel", {
 			[React.Tag] = "roster-hint",
 			LayoutOrder = order,
-			Text = "Drag an ally's bar to share",
+			Text = "Drag an ally's bar to share, your metal to ask",
 		})
 	end
 

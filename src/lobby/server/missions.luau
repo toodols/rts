@@ -2,7 +2,7 @@
 -- the campaign screen can show it, and the missions they are being sent to play.
 --
 -- Progress is kept by the game server, which is where missions are finished (see shared/campaign_store.luau); the
--- lobby only reads it. What a player has unlocked is published as campaign.UNLOCKS_ATTRIBUTE, the way the game does,
+-- lobby only reads it, but for pow's campaign commands (`complete`, `reset`), which save it here too. What a player has unlocked is published as campaign.UNLOCKS_ATTRIBUTE, the way the game does,
 -- and what they have finished as protocol.COMPLETED_ATTRIBUTE. A player whose progress cannot be read is shown a new
 -- player's, so the screen still says what they start with.
 --
@@ -23,6 +23,8 @@ type MissionView = protocol.MissionView
 
 -- each player's progress, once it has been read (or given up on and started afresh)
 local progress_by_player: { [Player]: Progress } = {}
+-- the players whose progress was read, whose progress may be saved
+local may_save: { [Player]: boolean } = {}
 -- the mission each player is being sent to, or could not be
 local missions_by_player: { [Player]: MissionView } = {}
 
@@ -45,6 +47,7 @@ local function load(player: Player): string?
 		progress = campaign.new_progress()
 	end
 	progress_by_player[player] = progress :: Progress
+	may_save[player] = reason == nil
 	publish(player, progress :: Progress)
 	return reason
 end
@@ -52,6 +55,46 @@ end
 -- What `player` has done in the campaign, as far as this server knows: a new player's until it has been read.
 local function progress_of(player: Player): Progress
 	return progress_by_player[player] or campaign.new_progress()
+end
+
+-- What `player` has done in the campaign, for reading only, and whether it was read from the store (and so may be saved).
+local function status(player: Player): (Progress, boolean)
+	return progress_of(player), may_save[player] == true
+end
+
+-- Publishes `player`'s progress, now `progress`, and saves it if it was read. Returns whether it was saved. Yields while
+-- it saves.
+local function commit(player: Player, progress: Progress): boolean
+	progress_by_player[player] = progress
+	publish(player, progress)
+	if may_save[player] ~= true then
+		return false
+	end
+	local ok, reason = campaign_store.save(player.UserId, progress)
+	if ok == false then
+		warn(`could not save {player.Name}'s campaign progress: {reason}`)
+	end
+	return ok
+end
+
+-- `player` has finished the mission `mission_id`, as winning it would have them: it is marked done and what it unlocks
+-- is theirs. Returns whether there is such a mission, and whether it was saved. Yields while it saves.
+local function complete(player: Player, mission_id: string): (boolean, boolean)
+	local mission = campaign.get(mission_id)
+	if mission == nil then
+		return false, false
+	end
+	local progress = progress_of(player)
+	progress.completed[mission_id] = true
+	for _, name in mission.unlocks do
+		progress.unlocks[name] = true
+	end
+	return true, commit(player, progress)
+end
+
+-- Takes `player` back to a new player's progress. Returns whether it was saved. Yields while it saves.
+local function reset(player: Player): boolean
+	return commit(player, campaign.new_progress())
 end
 
 local function mission_of(player: Player): MissionView?
@@ -85,6 +128,7 @@ local function begin(player: Player, mission_id: string): (Match?, string?)
 		seats = { { user_id = player.UserId, name = player.DisplayName, side = 1 } },
 		bonuses = {},
 		ally_griefing = false,
+		end_mode = game_modes.DEFAULT_END_MODE,
 	},
 		nil
 end
@@ -108,12 +152,16 @@ end
 
 local function forget(player: Player)
 	progress_by_player[player] = nil
+	may_save[player] = nil
 	missions_by_player[player] = nil
 end
 
 return table.freeze({
 	load = load,
 	progress_of = progress_of,
+	status = status,
+	complete = complete,
+	reset = reset,
 	mission_of = mission_of,
 	is_busy = is_busy,
 	begin = begin,

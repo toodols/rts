@@ -25,6 +25,7 @@ local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local appearance = require(ReplicatedStorage.Shared.appearance)
 local art = require(ReplicatedStorage.Shared.art)
+local piloting = require(ReplicatedStorage.Shared.piloting)
 
 local state = require(script.Parent.state)
 local construction = require(script.Parent.construction)
@@ -38,6 +39,9 @@ local transport = require(script.Parent.transport)
 local production = require(script.Parent.production)
 local unit_placeholder = require(script.Parent.unit_placeholder)
 local donuts = require(script.Parent.donuts)
+local pilots = require(script.Parent.pilots)
+local self_destruct = require(script.Parent.self_destruct)
+local emp = require(script.Parent.emp)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -511,7 +515,7 @@ local function order_position(order: types.Order): Vector3?
 	if target_id == nil then
 		return nil
 	end
-	local target = state.get(target_id)
+	local target = state.find(target_id)
 	if target == nil then
 		return nil
 	end
@@ -665,6 +669,15 @@ local function apply_attributes(entity: Entity, model: Model)
 	set_attribute(model, "state", entity.state)
 	set_attribute(model, "health", math.round(entity.health))
 	set_attribute(model, "max_health", math.round(entity.max_health))
+	-- its EMP, in whole percent of its max health, and while that has it stunned, whole seconds until it is not,
+	-- rounded up; both nil when there is none
+	set_attribute(
+		model,
+		"emp",
+		if entity.emp > 0 then math.max(1, math.floor(entity.emp / math.max(entity.max_health, 1) * 100)) else nil
+	)
+	local stun_left = emp.seconds_left(entity)
+	set_attribute(model, "stun", if stun_left ~= nil then math.max(1, math.ceil(stun_left)) else nil)
 	set_attribute(model, "build_progress", math.round(entity.build_progress))
 	-- a blueprint nobody has built on for long enough is losing progress, which the client shows
 	set_attribute(
@@ -674,6 +687,9 @@ local function apply_attributes(entity: Entity, model: Model)
 	)
 	set_attribute(model, "buildpower_cost", def.buildpower_cost)
 	set_attribute(model, "order_count", #entity.orders)
+	-- whole seconds until it destroys itself, rounded up; nil unless it is counting down
+	local self_destruct_left = self_destruct.seconds_left(entity.id)
+	set_attribute(model, "self_destruct", if self_destruct_left ~= nil then math.ceil(self_destruct_left) else nil)
 	-- what it has earned in battle (`combat.credit`); experience to the hundredth, which is all that is shown of it
 	set_attribute(model, "kills", entity.kills)
 	set_attribute(model, "experience", math.floor(entity.experience * 100) / 100)
@@ -696,6 +712,57 @@ local function apply_attributes(entity: Entity, model: Model)
 	end
 	if def.manual_weapon ~= nil then
 		set_attribute(model, "manual_ready", entity.manual_reload_remaining <= 0)
+	end
+	-- who pilots it, and for them, how long its manual weapon has left to reload, to a tenth of a second
+	local pilot = pilots.get(entity.id)
+	set_attribute(model, piloting.MODEL_ATTRIBUTE, if pilot ~= nil then pilot.player.UserId else nil)
+	set_attribute(
+		model,
+		piloting.COOLDOWN_ATTRIBUTE,
+		if pilot ~= nil and def.manual_weapon ~= nil then math.ceil(entity.manual_reload_remaining * 10) / 10 else nil
+	)
+	-- for a transport, whether its pilot can pick something up or set what it carries down right now
+	local piloted_transport = pilot ~= nil and def.transport ~= nil
+	set_attribute(
+		model,
+		piloting.LOAD_ATTRIBUTE,
+		if piloted_transport and pilot ~= nil then pilot.loadable ~= nil else nil
+	)
+	set_attribute(
+		model,
+		piloting.UNLOAD_ATTRIBUTE,
+		if piloted_transport and pilot ~= nil then pilot.can_unload else nil
+	)
+	-- for something that can be carried, whether its pilot can call a transport over to pick it up
+	set_attribute(
+		model,
+		piloting.CALL_ATTRIBUTE,
+		if pilot ~= nil and def.transport == nil and def.weight_class ~= nil then pilot.transporter ~= nil else nil
+	)
+	-- and whether a transport it called is on its way, or was lost on the way a moment ago
+	local call_state: string? = nil
+	if pilot ~= nil and pilot.called ~= nil then
+		call_state = "coming"
+	elseif
+		pilot ~= nil
+		and pilot.call_lost_at ~= nil
+		and os.clock() - pilot.call_lost_at < piloting.CALL_LOST_SECONDS
+	then
+		call_state = "lost"
+	end
+	set_attribute(model, piloting.CALL_STATE_ATTRIBUTE, call_state)
+	-- and how far each of its weapons is through its reload, to a hundredth, which its pilot's keys show
+	if def.weapons ~= nil then
+		for index, weapon in def.weapons do
+			local charge: number? = nil
+			if pilot ~= nil then
+				local remaining = entity.weapon_reloads[index] or 0
+				charge = if weapon.reload > 0
+					then math.floor(math.clamp(1 - remaining / weapon.reload, 0, 1) * 100) / 100
+					else 1
+			end
+			set_attribute(model, piloting.charge_attribute(index), charge)
+		end
 	end
 	-- how many missiles a launcher holds ready, the most it can hold, and how far along its next one is;
 	-- a unit with several stockpiling weapons shows its first. A carrier shows its drones in reserve the same way.

@@ -24,6 +24,12 @@ export type Rights = {
 }
 
 local RIGHTS: { [string]: Rights } = {
+	acidic_quarry = {
+		authors = { "BasiC", "[teh]Beherith (mysterme@gmail.com)", "IceXuick" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
 	altair_crossing = {
 		authors = { "[teh]Beherith (mysterme@gmail.com)" },
 		original_authors = { "Quanto" },
@@ -36,9 +42,39 @@ local RIGHTS: { [string]: Rights } = {
 		status = "unlicensed",
 		evidence = nil,
 	},
+	aurelia = {
+		authors = { "Johannes" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
+	boulder_beach = {
+		authors = { "[teh]Beherith (mysterme@gmail.com)" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
+	canis_river = {
+		authors = { "Phalange" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
 	center_command = {
 		authors = { "Nikuksis" },
 		original_authors = { "Vampiro" },
+		status = "unlicensed",
+		evidence = nil,
+	},
+	charlie_in_the_hills = {
+		authors = { "Nikuksis" },
+		original_authors = { "Enetheru", "LathanStanley", "Ralphie" },
+		status = "unlicensed",
+		evidence = nil,
+	},
+	coast_to_coast = {
+		authors = { "Nikuksis" },
+		original_authors = {},
 		status = "unlicensed",
 		evidence = nil,
 	},
@@ -48,14 +84,50 @@ local RIGHTS: { [string]: Rights } = {
 		status = "unlicensed",
 		evidence = nil,
 	},
+	devils_postpiles = {
+		authors = { "AidanNaut" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
+	faster_than_light = {
+		authors = { "ShaunJS" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
 	folsom_dam = {
 		authors = { "IceXuick", "SirArtturi (V4 deluxe)" },
 		original_authors = {},
 		status = "unlicensed",
 		evidence = nil,
 	},
+	gasbag_grabens = {
+		authors = { "AidanNaut" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
+	great_divide = {
+		authors = { "NOiZE" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
+	greenest_fields = {
+		authors = { "IceXuick" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
 	hooked = {
 		authors = { "Raghna (timothyverbruggen@gmail.com)" },
+		original_authors = {},
+		status = "unlicensed",
+		evidence = nil,
+	},
+	pinewood_derby = {
+		authors = { "[teh]Beherith (mysterme@gmail.com)" },
 		original_authors = {},
 		status = "unlicensed",
 		evidence = nil,

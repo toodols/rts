@@ -27,7 +27,8 @@ export type CapsuleCollider = {
 
 export type Collider = BoxCollider | CapsuleCollider
 
--- `guard` follows a friendly entity, and a builder guarding one works on whatever it is working on.
+-- `guard` follows a friendly entity, its own team's or an ally's, and a builder guarding one works on whatever it
+-- is working on.
 -- `build` walks to a spot and starts a blueprint there when it arrives, which is why it carries the
 -- def, position and facing it will build with instead of a blueprint to help. `attack_ground` keeps shooting
 -- at a point on the ground, with no target, until it is given something else to do. A transport's `load`
@@ -77,12 +78,14 @@ export type ProjectileParams = {
 	acceleration: number,
 	thrust_time: number,
 	gravity: number,
+	-- once its thrust is spent, how hard the air slows it, per stud: it loses `drag` times its speed squared a second
 	drag: number,
 	aoe_radius: number,
 	-- what is left of the blast's damage at its very edge, as a fraction of the damage at its centre
 	edge_effectiveness: number?,
 	arc: ("high" | "medium" | "low" | "auto")?,
-	-- half the angle, in radians, of the cone a lobbed shell may stray within from its aim
+	-- half the angle, in radians, of the cone a lobbed shell or a straight shot may stray within from its aim; a bomb
+	-- or a homing missile does not stray
 	inaccuracy: number?,
 	-- a bomb: it is let go rather than fired, so it leaves its launcher with no launch speed of its own, carried
 	-- on by the launcher's velocity, and gravity does the rest
@@ -115,6 +118,10 @@ export type ProjectileParams = {
 	-- weapon that can be aimed at something wholly under the water, and it can be aimed at nothing that is not in
 	-- the water (`unit_defs.in_water`). Land in its way stops it.
 	torpedo: boolean?,
+	-- goes through what it strikes rather than going off on it, as BAR's `noexplode` gauss ball does: for every
+	-- thirtieth of a second it spends inside something it goes off again, blast and all, and it flies on until it
+	-- comes down on the ground, where it goes off one last time
+	pierce: boolean?,
 	-- how it is drawn, in flight and when it goes off; nil for the look its kind has by default. Only how it looks.
 	look: ProjectileLook?,
 }
@@ -136,8 +143,9 @@ export type ProjectileLook = {
 	-- a light it casts on what it flies over
 	light: { color: Color3, range: number, brightness: number }?,
 	-- how it goes off: "fireball", the default, or "nuclear", a blinding flash, a fireball, a mushroom cloud rising
-	-- over it and shockwaves racing out along the ground, lighting up the whole view for a moment
-	explosion: ("fireball" | "nuclear")?,
+	-- over it and shockwaves racing out along the ground, lighting up the whole view for a moment, or "emp", a pale
+	-- turquoise pulse thrown through with lightning
+	explosion: ("fireball" | "nuclear" | "emp")?,
 }
 
 -- A weapon's turret: it turns about its owner's up axis at `turn_rate` radians a second toward whatever the weapon
@@ -162,11 +170,17 @@ export type Missile = {
 -- is on the ground.
 export type TargetLayer = "ground" | "air"
 
+-- What a weapon is, where nothing else about it says: only what the HUD calls it and the icon it shows. A weapon with
+-- no kind is named from what it does (a beam is a laser, a shell that is not plasma a cannon, ...).
+export type WeaponKind = "heat_ray" | "flamethrower" | "shotgun" | "sniper" | "machine_gun" | "depth_charge" | "flak"
+
 export type Weapon = {
 	damage: number,
 	reload: number,
 	range: number,
 	energy_per_shot: number,
+	-- what it is, for the HUD, when that cannot be told from the rest (WeaponKind). Only how it is shown.
+	kind: WeaponKind?,
 	-- where its shots come from, in the entity's own frame: x to its right, y up, z ahead. Nil for a
 	-- weapon that fires from the usual spot just above an entity's middle, like a single-weapon unit's
 	-- always did before every weapon lived in one list.
@@ -190,15 +204,30 @@ export type Weapon = {
 	-- for a laser, how wide its beam is drawn, in studs, and what colour; without a colour it is its team's
 	beam_thickness: number?,
 	beam_color: Color3?,
+	-- for a laser, whether it is drawn as a heavy charged beam: its muzzle glows brighter as it reloads, and its shot
+	-- has a hot core, a throbbing sheath, rings and flashes (client/charged_beam.luau). Only how it looks.
+	charged_beam: boolean?,
 	-- a weapon that fires from a stockpile of missiles that it builds up over time, rather than from a
 	-- reload alone
 	stockpile: Stockpile?,
 	-- a weapon that fires only at what an attack or ground attack order names, never at what happens to come within
 	-- its range, like the nuclear silo's
 	manual_fire: boolean?,
+	-- a weapon on an aircraft that fires only while it is in the air, never while it sits on the ground
+	airborne_only: boolean?,
 	-- a weapon on a turret of its own, which has to turn to face what it shoots before it can fire; nil for one
 	-- that fires wherever its target is, whichever way its owner faces
 	turret: Turret?,
+	-- for a weapon fixed facing forward, like a submarine's torpedo tubes: half the angle, in radians, of the cone
+	-- ahead of its owner that it fires into. Nothing outside it is shot at; the owner has to turn onto it first. Nil
+	-- for one that fires whichever way its target is.
+	fire_arc: number?,
+	-- where the middle of that cone points, in radians off straight ahead, measured the way `Entity.facing` is: a
+	-- weapon mounted on its owner's flank, like the Thor's EMP lasers. Nil for straight ahead.
+	fire_direction: number?,
+	-- a lightning gun: it strikes the first solid thing on its line as a laser does, and sparks jump from where it
+	-- strikes to what is around it (`Lightning`)
+	lightning: Lightning?,
 	-- a weapon that fires multiple shots in quick succession before reloading: `burst_count` shots,
 	-- each `burst_interval` seconds apart (a short default when this is not given), and only once the
 	-- whole burst is out does the full `reload` apply before the next one starts. A weapon whose projectile
@@ -207,6 +236,20 @@ export type Weapon = {
 	-- of the line, and the rest follow the first whatever they will come down on.
 	burst_count: number?,
 	burst_interval: number?,
+	-- an EMP weapon, BAR's `paralyzer`: its damage, from a hit or a blast, goes into the EMP of what it reaches
+	-- instead of its health (server/emp.luau), and it stuns for no longer than this many seconds (BAR's
+	-- `paralyzetime`). Nil for a weapon that does real damage.
+	paralyze_time: number?,
+}
+
+-- What a lightning gun's sparks do, as BAR's lightning splash gadget has them (unit_lightning_splash_dmg.lua): where
+-- the bolt ends, up to `forks` other things within `range` studs, nearest first, each take `fork_damage` times the
+-- bolt's damage, friend or foe. What the bolt struck is left out, and so is anything armed with a lightning gun of its
+-- own, and anything under the water.
+export type Lightning = {
+	forks: number,
+	range: number,
+	fork_damage: number,
 }
 
 -- What building up missiles takes: every `build_time` seconds one more is finished, at the price of `metal` and
@@ -318,6 +361,10 @@ export type Carrier = {
 -- How heavy a unit is to a transport. A unit with no weight class cannot be carried at all.
 export type WeightClass = "light" | "heavy"
 
+-- The tiers of how rare something is made to look on an unlock's card and in the lobby's encyclopedia, plainest first
+-- (unlock_reveal's TIERS, by their tags). Not a tech tier: a T1 unit can be rare.
+export type TierTag = "common" | "uncommon" | "rare" | "epic" | "legendary" | "mythic"
+
 -- What a transport can carry: `capacity` is in slots, and a unit takes as many as
 -- `unit_defs.transport_slots` says. A transport that carries "light" takes light units only, and one that
 -- carries "heavy" takes light and heavy ones.
@@ -395,7 +442,13 @@ export type EntityDef = {
 	stealth: boolean?,
 	-- health it mends by itself every second, whatever it is doing, without a builder or any cost; nil if it does not
 	autoheal: number?,
+	-- how much of the EMP that reaches it it shrugs off, from 0 to 1: 1 is never stunned, and no EMP weapon aims at it.
+	-- BAR's `paralyzemultiplier` is 1 minus this. Nil for 0.
+	emp_resistance: number?,
 	death_explosion: DeathExplosion?,
+	-- BAR's selfdestructcountdown: how long it counts down once told to destroy itself (see server/self_destruct.luau);
+	-- nil for BAR's usual 5
+	self_destruct_countdown: number?,
 	-- turns energy into metal while it is standing and finished; nil if it converts none
 	energy_conversion: EnergyConversion?,
 	-- energy this generates every second while it is standing and finished; nil if it makes none
@@ -423,6 +476,8 @@ export type EntityDef = {
 	-- false for something that cannot be reclaimed while it stands, and can only be destroyed; its wreck can
 	-- still be reclaimed. nil means it can.
 	reclaimable: boolean?,
+	-- how rare it is made to look, over the tier its cost would give it (unlock_reveal's `tier_of`); nil for that tier
+	tier: TierTag?,
 	color: Color3,
 }
 
@@ -482,23 +537,39 @@ export type DonutVariant = {
 	weight: number,
 }
 
--- A pool donut, an inflatable swim ring worn round the waist (client/donuts.luau). Which of `variants` a unit wears
--- is its own, from its entity id, and the same for every player. It pops when what wears it is hit, and on an
--- aircraft it shakes above `shake_speed` (a fraction of its top speed) and flies off after `fly_off_seconds` of that.
--- On something under the water, deeper than `submerge_depth` studs, it comes off and floats up to lie on the surface
--- for `float_seconds`. Once nothing has knocked it off for `regen_seconds`, and what wears it is out of the water, a
--- new one inflates. It is only a look: none of it touches the sim.
+-- A pool donut, an inflatable swim ring worn round the waist (client/donuts.luau); an aircraft wears it round its
+-- fuselage, its hole facing the nose, and a ship hangs a row of small ones down each side of its hull instead. Which
+-- of `variants` a unit wears is its own, from its entity id, and the same for every player. It pops when what wears it
+-- is hit, and on an aircraft it shakes above `shake_speed` (a fraction of its top speed) and flies off after
+-- `fly_off_seconds` of that. On something that has been under the water, deeper than `submerge_depth` studs, for
+-- `submerge_seconds`, it comes off and floats up to lie on the surface for `float_seconds`. Once nothing has knocked it
+-- off for `regen_seconds`, and what wears it is out of the water, a new one inflates. It is only a look: none of it
+-- touches the sim.
 export type DonutSettings = {
 	regen_seconds: number,
 	shake_speed: number,
 	fly_off_seconds: number,
 	submerge_depth: number,
+	submerge_seconds: number,
 	float_seconds: number,
 	variants: { DonutVariant },
 	-- how wide its hole is against the radius of what wears it (its collider), so it is as big as the unit is
 	hug: number,
 	-- how far up the body it is worn, from the bottom of the body (0) to its top (1): its waist
 	waist: number,
+	-- on an aircraft: how wide its hole is against the fuselage's half thickness, and how far along the fuselage it is
+	-- worn, from its tail (0) to its nose (1)
+	fuselage_hug: number,
+	nose: number,
+	-- on a ship: how wide each one's hole is against the hull's width, how far up the body they hang (as `waist`) and
+	-- then how many of their own widths lower than that (though never with their middles under its bottom, the
+	-- waterline), how far apart their middles are against how wide each is, and how much of the hull's length is room
+	-- for more of them
+	side_hole: number,
+	side_height: number,
+	side_drop: number,
+	side_spacing: number,
+	side_span: number,
 }
 
 -- Something a skin hangs on what wears it, for the kinds of entity listed in `kinds`.
@@ -573,6 +644,9 @@ export type Entity = {
 	damage_dealt: number,
 	score_dealt: number,
 	experience: number,
+	-- EMP it has taken, BAR's paralyze damage, in health points: it is stunned while this is at least its max health,
+	-- and it drains away steadily (server/emp.luau)
+	emp: number,
 	alive: boolean,
 }
 

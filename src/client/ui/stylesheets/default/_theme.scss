@@ -29,6 +29,8 @@ $caution: rgb(236, 184, 68);
 $accent: rgb(96, 210, 242);
 $resurrect: rgb(176, 96, 240);
 $fight: rgb(255, 138, 64);
+// EMP: a light turquoise, far nearer blue than green
+$emp: rgb(130, 215, 255);
 
 // Spacing scale. `space(3)` is 12px; `_main.scss` turns the same scale into .gap-N utilities.
 $unit: 4px;
@@ -89,4 +91,5 @@ $medium: 0.2s;
 	--Accent: #{$accent};
 	--Resurrect: #{$resurrect};
 	--Fight: #{$fight};
+	--Emp: #{$emp};
 }

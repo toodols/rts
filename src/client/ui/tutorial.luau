@@ -211,6 +211,7 @@ local BUILD_PICTURES: { [string]: string } = {
 	dgun = "commander",
 	destroy = "grunt",
 	edge_thugs = "thug",
+	metal = "metal_extractor",
 	energy = "solar_collector",
 }
 
@@ -442,6 +443,38 @@ local function Mark(props: { mark: "check" | "cross", done: boolean })
 	})
 end
 
+-- How far a card with a `rate` has got: the income a second, as the resource bar writes it, over a meter in the
+-- resource's colour that fills to the goal, and the goal at its end.
+local function RateMeter(props: { rate: { resource: string, goal: number }, progress: string?, done: boolean })
+	local have = tonumber(props.progress or "") or 0
+	local fraction = math.clamp(have / props.rate.goal, 0, 1)
+	return React.createElement("Frame", {
+		[React.Tag] = "tutorial-rate",
+		LayoutOrder = 4,
+	}, {
+		Have = React.createElement("TextLabel", {
+			[React.Tag] = if props.done then "tutorial-rate-have done" else `tutorial-rate-have {props.rate.resource}`,
+			LayoutOrder = 1,
+			Text = string.format("+%.0f/s", have),
+		}),
+		Track = React.createElement("Frame", {
+			[React.Tag] = "tutorial-rate-track",
+			LayoutOrder = 2,
+		}, {
+			Fill = React.createElement("Frame", {
+				[React.Tag] = `resource-fill {props.rate.resource}-fill`,
+				-- set inline rather than in SCSS, as the resource bar's are
+				Size = UDim2.new(fraction, 0, 1, 0),
+			}),
+		}),
+		Goal = React.createElement("TextLabel", {
+			[React.Tag] = "tutorial-rate-goal",
+			LayoutOrder = 3,
+			Text = `{props.rate.goal}/s`,
+		}),
+	})
+end
+
 local function CardView(
 	props: {
 		card: Card,
@@ -522,9 +555,10 @@ local function CardView(
 			LayoutOrder = 3,
 			Text = card.caption,
 		}),
-		-- how far along a card that counts is, like 2/3
-		Progress = if props.progress ~= nil
-			then React.createElement("TextLabel", {
+		-- how far along a card that counts is, like 2/3, or an income against its goal
+		Progress = if card.rate ~= nil
+			then React.createElement(RateMeter, { rate = card.rate, progress = props.progress, done = props.done })
+			elseif props.progress ~= nil then React.createElement("TextLabel", {
 				[React.Tag] = if props.done then "tutorial-progress done" else "tutorial-progress",
 				LayoutOrder = 4,
 				Text = props.progress,

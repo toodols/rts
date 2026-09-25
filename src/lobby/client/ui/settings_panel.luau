@@ -1,5 +1,6 @@
--- The lobby's game mode, who may join it and whether allies' weapons hurt each other. The host changes them; everyone
--- else sees them. A co-op lobby's mode is its campaign mission, and it and ally griefing stay as the mission has them.
+-- The lobby's game mode, who may join it, whether allies' weapons hurt each other and, for a team game or a free for
+-- all, how it is won. The host changes them; everyone else sees them. A co-op lobby's mode is its campaign mission, and
+-- it and ally griefing stay as the mission has them.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -54,6 +55,7 @@ local function SettingsPanel(props: {
 	mode: string,
 	visibility: string,
 	ally_griefing: boolean,
+	end_mode: string,
 	is_host: boolean,
 	act: (action: string, argument: any?) -> (),
 })
@@ -79,6 +81,21 @@ local function SettingsPanel(props: {
 			locked = locked,
 			on_pick = function()
 				props.act(ACTIONS.set_mode, mode.id)
+			end,
+			LayoutOrder = index,
+		})
+	end
+	-- only a team game or a free for all is won by putting the other sides out; the scavengers and a mission end their
+	-- own ways
+	local elimination = current ~= nil and (current.kind == "teams" or current.kind == "ffa")
+	local end_modes: { [string]: any } = {}
+	for index, option in game_modes.END_MODES do
+		end_modes[option.id] = React.createElement(Chip, {
+			label = option.label,
+			active = option.id == props.end_mode,
+			locked = game_locked,
+			on_pick = function()
+				props.act(ACTIONS.set_end_mode, option.id)
 			end,
 			LayoutOrder = index,
 		})
@@ -189,6 +206,12 @@ local function SettingsPanel(props: {
 				LayoutOrder = 2,
 			}),
 		}),
+		Ends = if elimination
+			then React.createElement(Group, {
+				label = "GAME ENDS",
+				LayoutOrder = 9,
+			}, end_modes)
+			else nil,
 	})
 end
 

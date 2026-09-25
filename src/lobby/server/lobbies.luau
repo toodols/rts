@@ -14,15 +14,16 @@
 -- may also play a map from BAR, which nobody else is offered.
 --
 -- Every player but the host marks themselves ready, and the host can start only once they all have. Anything that
--- changes the game they agreed to - the mode, the map, ally griefing, a bonus - takes everyone's back, and moving to
--- another side takes the mover's.
+-- changes the game they agreed to - the mode, the map, ally griefing, the end mode, a bonus - takes everyone's back,
+-- and moving to another side takes the mover's.
 --
 -- The host also picks whether allies' weapons hurt each other's things (game_modes.Match's `ally_griefing`); a new lobby
--- has it off.
+-- has it off. And how a team game or a free for all is won (its `end_mode`); a new lobby has BAR's default, a side is
+-- out once its commanders are dead. A scavenger game ignores it.
 --
 -- A co-op lobby (`create_mission`) plays a campaign mission together: its mode is the mission's campaign mode, which
 -- seats everyone on one side, and its map the mission's. Neither can be changed, and nor can ally griefing, which the
--- mission leaves off. Everything else about it, who may join, who watches, being ready, is as in any lobby.
+-- mission leaves off, or the end mode, which a mission has its own of. Everything else about it, who may join, who watches, being ready, is as in any lobby.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -49,6 +50,7 @@ export type Lobby = {
 	-- the players who have said they are ready, by user id
 	ready: { [number]: boolean },
 	ally_griefing: boolean,
+	end_mode: game_modes.EndMode,
 	-- in the order they joined
 	seats: { Seat },
 	-- set once the game is being started, after which nothing about the lobby can change
@@ -195,6 +197,7 @@ local function create(host: number, host_name: string, developer: boolean, missi
 		bonuses = {},
 		ready = {},
 		ally_griefing = false,
+		end_mode = game_modes.DEFAULT_END_MODE,
 		seats = { { user_id = host, name = host_name, side = 1 } },
 		starting = false,
 		teleporting = false,
@@ -378,6 +381,23 @@ local function set_ally_griefing(user_id: number, enabled: boolean): (boolean, s
 	return true, nil
 end
 
+-- `value` has to be one of game_modes.END_MODES.
+local function set_end_mode(user_id: number, value: string): (boolean, string?)
+	local lobby, err = hosted_game(user_id)
+	if lobby == nil then
+		return false, err
+	end
+	local chosen = game_modes.end_mode(value)
+	if chosen == nil then
+		return false, "There is no such end mode"
+	end
+	if lobby.end_mode ~= chosen then
+		lobby.end_mode = chosen
+		table.clear(lobby.ready)
+	end
+	return true, nil
+end
+
 -- Moves `user_id` to `side`, if it has room: to watching (`game_modes.SPECTATOR_SIDE`), to a team of a team game, or
 -- in any other game from watching to a free seat, whichever `side` is asked for. Anyone may move themselves.
 local function move(user_id: number, side: number): (boolean, string?)
@@ -476,6 +496,7 @@ local function to_match(lobby: Lobby): Match
 		seats = seats,
 		bonuses = table.clone(lobby.bonuses),
 		ally_griefing = lobby.ally_griefing,
+		end_mode = lobby.end_mode,
 	}
 end
 
@@ -498,6 +519,7 @@ return table.freeze({
 	set_bonus = set_bonus,
 	set_ready = set_ready,
 	set_ally_griefing = set_ally_griefing,
+	set_end_mode = set_end_mode,
 	move = move,
 	can_start = can_start,
 	begin_start = begin_start,

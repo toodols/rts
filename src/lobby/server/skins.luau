@@ -23,12 +23,13 @@ local function publish(player: Player, skin_name: string)
 	player:SetAttribute(ATTRIBUTE, skin_name)
 end
 
--- Equips the skin called `skin_name` for `player`, for their games from now on: `(ok, why not)`. Yields while it saves.
-local function equip(player: Player, skin_name: string): (boolean, string?)
+-- Equips the skin called `skin_name` for `player`, for their games from now on: `(ok, why not)`. `anyway` equips even a
+-- developer's skin on someone who is not one, for pow's `equip`. Yields while it saves.
+local function equip(player: Player, skin_name: string, anyway: boolean?): (boolean, string?)
 	if skins.exists(skin_name) == false then
 		return false, "There is no such skin"
 	end
-	if skins.may_wear(skin_name, developers.is_developer(player)) == false then
+	if anyway ~= true and skins.may_wear(skin_name, developers.is_developer(player)) == false then
 		return false, "Only a developer can wear that skin"
 	end
 	if may_save[player] ~= true then
@@ -41,6 +42,12 @@ local function equip(player: Player, skin_name: string): (boolean, string?)
 	end
 	publish(player, skin_name)
 	return true, nil
+end
+
+-- What `player` has equipped, as the tab shows it.
+local function equipped_by(player: Player): string
+	local skin_name = player:GetAttribute(ATTRIBUTE)
+	return if typeof(skin_name) == "string" then skin_name else config.DEFAULT_SKIN
 end
 
 -- Reads what `player` has equipped and publishes it. Yields. A developer's skin is shown only to a developer, so call
@@ -76,4 +83,5 @@ return table.freeze({
 	player_added = player_added,
 	load = load,
 	equip = equip,
+	equipped_by = equipped_by,
 })

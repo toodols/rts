@@ -191,7 +191,8 @@ local function step_missile(
 	end
 
 	flight.age += delta
-	local turned = flight.velocity.Unit:Lerp(desired, math.min(1, config.MISSILE_TURN_RATE * delta))
+	local rate = math.max(config.MISSILE_TURN_RATE, params.speed / config.MISSILE_TURN_RADIUS)
+	local turned = flight.velocity.Unit:Lerp(desired, math.min(1, rate * delta))
 	flight.velocity = (if turned.Magnitude > 1e-3 then turned.Unit else desired) * params.speed
 	flight.position += flight.velocity * delta
 end
@@ -297,7 +298,10 @@ local function step(flight: Flight, params: ProjectileParams, delta: number)
 		local speed = flight.velocity.Magnitude
 		flight.velocity = flight.velocity.Unit * (speed + params.acceleration * delta)
 	else
-		local kept = math.max(0, 1 - params.drag * delta)
+		-- drag slows it by `drag` times its speed squared, as air does anything fast: hard while it is quick, hardly at
+		-- all once it is slow, so it bleeds its speed off over a stretch rather than all at once, and falls nearly
+		-- freely, never faster than sqrt(gravity / drag). This is that slowing solved exactly over the step.
+		local kept = 1 / (1 + params.drag * flight.velocity.Magnitude * delta)
 		flight.velocity = flight.velocity * kept - Vector3.new(0, params.gravity * delta, 0)
 	end
 	if params.homing == true and (flight.lost_lock == true or flight.age > (params.guidance_time or math.huge)) then

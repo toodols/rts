@@ -6,6 +6,7 @@
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
+local Workspace = game:GetService "Workspace"
 
 local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
@@ -14,8 +15,11 @@ local environment = require(ReplicatedStorage.Shared.environment)
 local shared_skins = require(ReplicatedStorage.Shared.skins)
 local campaign_defs = require(ReplicatedStorage.Shared.campaign)
 local developers = require(ReplicatedStorage.Shared.developers)
+local game_modes = require(ReplicatedStorage.Shared.game_modes)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local map_state = require(ReplicatedStorage.Shared.map_state)
+local starts = require(ReplicatedStorage.Shared.starts)
+local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 
 local ai = require(ServerScriptService.Server.ai)
 local alliances = require(ServerScriptService.Server.alliances)
@@ -24,11 +28,14 @@ local campaign = require(ServerScriptService.Server.campaign)
 local economy = require(ServerScriptService.Server.economy)
 local match_stats = require(ServerScriptService.Server.match_stats)
 local godmode = require(ServerScriptService.Server.godmode)
+local lobby = require(ServerScriptService.Server.lobby)
 local maps = require(ServerScriptService.Server.maps)
+local match = require(ServerScriptService.Server.match)
 local missions = require(ServerScriptService.Server.missions)
 local nocost = require(ServerScriptService.Server.nocost)
 local pause = require(ServerScriptService.Server.pause)
 local players = require(ServerScriptService.Server.players)
+local possession = require(ServerScriptService.Server.possession)
 local profiler = require(ServerScriptService.Server.profiler)
 local scavengers = require(ServerScriptService.Server.scavengers)
 local skins = require(ServerScriptService.Server.skins)
@@ -493,6 +500,31 @@ return function(extras: { commands: { [string]: any } })
 		end,
 	}
 
+	commands.unally = {
+		description = "Takes a team out of whatever alliance it is in. The teams it leaves stay allied with each other.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = { { name = "Team", type = "number" } } },
+		},
+		server_run = function(context: any)
+			local team_id = context.args[1]
+			if state.get_team(team_id) == nil then
+				context:log({ type = "error", value = `There is no team {team_id}` })
+				return
+			end
+			local former = alliances.group_of(team_id, state.all_teams())
+			if alliances.leave(team_id) == false then
+				context:log({ type = "info", value = `Team {team_id} is allied with nobody` })
+				return
+			end
+			table.remove(former, table.find(former, team_id) :: number)
+			context:log({
+				type = "info",
+				value = `Team {team_id} is allied with nobody; teams {table.concat(former, ", ")} are still allied`,
+			})
+		end,
+	}
+
 	commands.scavengers = {
 		description = "Turns the scavengers gamemode on or off: whether beacons appear and make anything. With no argument it toggles.",
 		permissions = { "admin" },
@@ -685,22 +717,205 @@ return function(extras: { commands: { [string]: any } })
 		end,
 	}
 
-	commands.ai_add = {
-		description = "Adds a computer opponent: a new team with its commander at the start furthest from everyone, "
-			.. "played by the AI.",
+	commands.team_join = {
+		description = "Puts you, or the player given, on a team, to share it with whoever is on it: they command "
+			.. "everything it has and spend from one bank. The team they leave keeps what it has. Before the game "
+			.. "starts they take the team's start; once it is playing, a team with nothing yet gets a commander.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = { { name = "Team", type = "number" } } },
+			{ returns = "nil", args = { { name = "Player", type = "player" }, { name = "Team", type = "number" } } },
+		},
+		server_run = function(context: any)
+			local target: Player = if context.args[2] ~= nil then context.args[1] else context.executor
+			local team_id: number = if context.args[2] ~= nil then context.args[2] else context.args[1]
+			-- the neutral team and the scavengers are nobody's to play
+			if team_id == 0 or team_id == config.SCAVENGER_TEAM or state.get_team(team_id) == nil then
+				context:log({ type = "error", value = `There is no team {team_id} to join` })
+				return
+			end
+			if players.team_of(target) == team_id then
+				context:log({ type = "info", value = `{target.Name} is already on team {team_id}` })
+				return
+			end
+			possession.release_player(target)
+			target:SetAttribute("spectator", nil)
+			players.move(target, team_id)
+			lobby.team_changed(target)
+			local team = state.get_team(team_id) :: any
+			context:log({ type = "info", value = `{target.Name} is on team {team_id} "{team.name}"` })
+		end,
+	}
+
+	commands.team_split = {
+		description = "Takes you, or the player given, off a shared team onto a new one of their own. The team they "
+			.. "leave keeps what it has; once the game is playing, the new team gets a commander.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
-			{ returns = "nil", args = { { name = "Name", type = "string" } } },
+			{ returns = "nil", args = { { name = "Player", type = "player" } } },
 		},
 		server_run = function(context: any)
-			local team_id = ai.spawn_opponent(context.args[1])
-			context:log({
-				type = if team_id ~= nil then "info" else "error",
-				value = if team_id ~= nil
-					then `Team {team_id} is played by the AI`
-					else "There was no room for the AI's commander",
-			})
+			local target: Player = if context.args[1] ~= nil then context.args[1] else context.executor
+			possession.release_player(target)
+			target:SetAttribute("spectator", nil)
+			local team_id = players.split(target)
+			skins.set_team(team_id, skins.equipped_by(target))
+			lobby.team_changed(target)
+			context:log({ type = "info", value = `{target.Name} is on a team of their own, team {team_id}` })
+		end,
+	}
+
+	-- ai_add's arguments come in this order, each overload taking one more: where it starts is either a start box
+	-- (Start, 0 for the free start furthest from everyone) or a spot (X, Z), and the two are told apart by what comes
+	-- fourth, a number only for a spot.
+	local AI_NAME = { name = "Name", type = "string" }
+	local AI_COUNT = { name = "Count", type = "number" }
+	local AI_START = { name = "Start", type = "number" }
+	local AI_X = { name = "X", type = "number" }
+	local AI_Z = { name = "Z", type = "number" }
+	local AI_SIDE = { name = "Side", type = "ai_side" }
+	local AI_TEAM = { name = "Team", type = "number" }
+	local AI_LINE = { name = "Line", type = "ai_line" }
+	local AI_PROFILE = { name = "Profile", type = "ai_profile" }
+
+	commands.ai_add = {
+		description = "Adds AI players, by default one enemy at the free start furthest from everyone. Start: a box, 0 "
+			.. "for the furthest. Side: enemy, ally (of Team) or join (plays Team). Line: bot, vehicle or any. "
+			.. "Profile: how it plays (default, raider, swarm, turtle).",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { AI_NAME } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_START } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_X, AI_Z } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_START, AI_SIDE, AI_TEAM } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_X, AI_Z, AI_SIDE, AI_TEAM } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_START, AI_SIDE, AI_TEAM, AI_LINE } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_X, AI_Z, AI_SIDE, AI_TEAM, AI_LINE } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_START, AI_SIDE, AI_TEAM, AI_LINE, AI_PROFILE } },
+			{ returns = "nil", args = { AI_NAME, AI_COUNT, AI_X, AI_Z, AI_SIDE, AI_TEAM, AI_LINE, AI_PROFILE } },
+		},
+		server_run = function(context: any)
+			local args = context.args
+			local name: string? = args[1]
+			local count: number = if args[2] ~= nil then math.floor(args[2]) else 1
+			local at: Vector2? = nil
+			local box: number? = nil
+			local next_arg = 4
+			if typeof(args[4]) == "number" then
+				if heightmap.in_bounds(args[3], args[4]) == false then
+					context:log({ type = "error", value = `({args[3]}, {args[4]}) is off the map` })
+					return
+				end
+				at = Vector2.new(args[3], args[4])
+				next_arg = 5
+			elseif args[3] ~= nil and args[3] ~= 0 then
+				box = math.floor(args[3])
+				if box < 1 or box > starts.box_count() then
+					context:log({
+						type = "error",
+						value = `There is no start {box}; there are 1 to {starts.box_count()}`,
+					})
+					return
+				end
+			end
+			local side: string = args[next_arg] or "enemy"
+			local team: number = args[next_arg + 1] or 0
+			local line: string? = args[next_arg + 2]
+			-- "any" leaves the line to the profile, or to the AI
+			if line == "any" then
+				line = nil
+			end
+			local profile_name: string = args[next_arg + 3] or "default"
+			local profile = ai_profiles.get(profile_name)
+			if profile == nil then
+				context:log({ type = "error", value = `There is no AI profile {profile_name}` })
+				return
+			end
+
+			if count < 1 then
+				context:log({ type = "error", value = "Count must be at least 1" })
+				return
+			end
+			if side ~= "enemy" and (team == 0 or team == config.SCAVENGER_TEAM or state.get_team(team) == nil) then
+				context:log({ type = "error", value = `There is no team {team} to {side}` })
+				return
+			end
+
+			-- Where the next commander goes, worked out afresh for each so that each keeps clear of the last, or why
+			-- there is nowhere.
+			local function start(): (Vector2?, string?)
+				if at ~= nil then
+					return at, nil
+				elseif box ~= nil then
+					local spot = ai.box_start(box)
+					return spot,
+						if spot == nil
+							then `Start {box} has no ground left {ai.MIN_START_SPACING} studs from everyone`
+							else nil
+				end
+				local spot = ai.free_start()
+				return spot,
+					if spot == nil
+						then `Nowhere on the map is {ai.MIN_START_SPACING} studs from everyone; give a start or X Z`
+						else nil
+			end
+
+			-- joining plays a team that is already there, so there is only ever the one
+			if side == "join" then
+				local team_id = team
+				local spot: Vector2? = nil
+				if spawning.owns_anything(team_id) == false then
+					local reason
+					spot, reason = start()
+					if spot == nil then
+						context:log({ type = "error", value = reason })
+						return
+					end
+				end
+				local placed = ai.take_over(team_id, spot, profile)
+				if placed and line ~= nil then
+					ai.set_line(team_id, line :: any)
+				end
+				context:log({
+					type = if placed then "info" else "error",
+					value = if placed
+						then `Team {team_id} is played by the AI`
+						else "There was no room for the AI's commander",
+				})
+				return
+			end
+
+			-- every AI is put down before anything is said, so that a log that fails cannot leave the rest undone
+			local lines: { string } = {}
+			local failed = false
+			for index = 1, count do
+				local spot, reason = start()
+				if spot == nil then
+					table.insert(lines, reason :: string)
+					failed = true
+					break
+				end
+				local team_name = if name ~= nil and count > 1 then `{name} {index}` else name
+				local team_id = ai.spawn_opponent(team_name, spot, if side == "ally" then team else nil, profile)
+				if team_id == nil then
+					table.insert(lines, "There was no room for the AI's commander")
+					failed = true
+					break
+				end
+				if line ~= nil then
+					ai.set_line(team_id, line :: any)
+				end
+				table.insert(
+					lines,
+					if side == "ally"
+						then `Team {team_id} is played by the AI, allied with team {team}`
+						else `Team {team_id} is played by the AI`
+				)
+			end
+			context:log({ type = if failed then "error" else "info", value = table.concat(lines, "\n") })
 		end,
 	}
 
@@ -731,6 +946,27 @@ return function(extras: { commands: { [string]: any } })
 				type = "info",
 				value = if enabled then `Team {team_id} is played by the AI` else `The AI lets team {team_id} go`,
 			})
+		end,
+	}
+
+	commands.ai_profile = {
+		description = "Makes the AI playing Team play by Profile from now on (default, raider, swarm, turtle).",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = { { name = "Team", type = "number" }, AI_PROFILE } },
+		},
+		server_run = function(context: any)
+			local team_id = context.args[1]
+			local profile = ai_profiles.get(context.args[2])
+			if profile == nil then
+				context:log({ type = "error", value = `There is no AI profile {context.args[2]}` })
+				return
+			end
+			if ai.set_profile(team_id, profile) == false then
+				context:log({ type = "error", value = `The AI does not play team {team_id}` })
+				return
+			end
+			context:log({ type = "info", value = `Team {team_id}'s AI plays as {profile.name}` })
 		end,
 	}
 
@@ -1195,6 +1431,60 @@ return function(extras: { commands: { [string]: any } })
 				`wind {one_decimal(wind.speed())} ({environment.min_wind()} to {environment.max_wind()}),`
 					.. ` tidal {environment.tidal_strength()}`,
 				`on: {list_or(switches, "nothing")}`,
+			}
+			context:log({ type = "info", value = table.concat(lines, "\n") })
+		end,
+	}
+
+	commands.gameconfig = {
+		description = "Shows how this game is set up: the match (mode, map, seed, ally griefing), the scavengers' "
+			.. "progress, difficulty, pace, health multiplier and spawn rate, and the simulation's rate and switches.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+		},
+		server_run = function(context: any)
+			local current = match.get()
+			local mode = if current ~= nil then game_modes.get(current.mode) else nil
+			local map = map_state.get()
+			local scav = scavengers.settings()
+			local rate = config.SCAVENGER_SPAWN_RATE
+			local switches: { string } = {}
+			if godmode.is_enabled() then
+				table.insert(switches, "godmode")
+			end
+			if nocost.is_enabled() then
+				table.insert(switches, "nocost")
+			end
+			if pause.is_paused() then
+				table.insert(switches, "paused")
+			end
+			if warp.is_warping() then
+				table.insert(switches, "warping")
+			end
+			local lines = {
+				`match: {if mode ~= nil then mode.label else "none"} | map: {if map ~= nil then map.preset else "none"} | seed: {if map
+						~= nil
+					then tostring(map.seed)
+					else "-"}`
+					.. ` | ally griefing: {if current ~= nil and current.ally_griefing then "on" else "off"}`
+					.. ` | ends: {if current ~= nil then current.end_mode else "-"}`,
+				`scavengers: {if scav.enabled then "on" else "off"} | progress {string.format("%.3f", scav.progress)}`
+					.. ` (spawning from {config.SCAVENGER_SPAWN_PROGRESS}) | difficulty {string.format(
+						"%.0f",
+						scav.budget
+					)} | boss: {if scav.boss then "out" else "not yet"}`,
+				`  pace x{one_decimal(scav.pace)} ({math.floor(scav.game_length)} s to full progress) | health`
+					.. ` x{one_decimal(scav.health_multiplier)}`,
+				`  spawn rate x{one_decimal(rate)}: units every {one_decimal(config.SCAVENGER_SPAWN_INTERVAL / rate)} s, defences every {one_decimal(
+					config.SCAVENGER_DEFENSE_SPAWN_INTERVAL / rate
+				)} s` .. ` (sea x{config.SCAVENGER_SEA_SPAWN_MULTIPLIER} slower)`,
+				`  beacons {scav.beacons}/{config.SCAVENGER_MAX_BEACONS}{if scav.next_beacon_in ~= nil
+					then ` (next in {math.floor(scav.next_beacon_in)} s)`
+					else ""} | units {scav.units}/{config.SCAVENGER_UNIT_CEILING} | reroll credit`
+					.. ` {math.floor(scavengers.pending_reroll())}`,
+				`sim: {config.TICK_RATE} ticks/s | rate x{one_decimal(Workspace:GetAttribute "sim_rate" or 1)}`
+					.. ` | on: {list_or(switches, "nothing")}`,
 			}
 			context:log({ type = "info", value = table.concat(lines, "\n") })
 		end,

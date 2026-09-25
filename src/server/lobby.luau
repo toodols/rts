@@ -1,13 +1,17 @@
 -- Getting the game started (see shared/game_phase.luau). While it is waiting nothing steps: each player's client
--- says when it has loaded, and each player chooses where to start, anywhere in their team's start box (`starts`) that
--- a team can start on. With every player loaded and a start chosen it counts down, and when the countdown is out every
--- team's commander is put where its player chose and the game is playing. Someone arriving, or leaving the rest all
--- ready, is taken account of whenever it happens; during the countdown, anyone not ready sends it back to waiting. A
--- player arriving once the game is playing starts in their box at once, where the box's usual start is.
+-- says when it has loaded, and each player chooses where to start by clicking in their team's start box (`starts`),
+-- which puts them on the nearest ground there that a team can start on. With every player loaded and a start chosen
+-- it counts down, and when the countdown is out every team's commander is put where its player chose and the game is
+-- playing. Someone arriving, or leaving the rest all ready, is taken account of whenever it happens; during the
+-- countdown, anyone not ready sends it back to waiting. A player arriving once the game is playing starts in their box
+-- at once, where the box's usual start is.
 --
 -- A team's box is its side's: allied teams share one, as BAR's ally teams do, and the sides take the boxes in order of
 -- their lowest team, so a match's first side (see match.luau) has the first box. A player's box can change while the
 -- game is waiting, as others arrive and leave; a start chosen in the old box is dropped, to be chosen again.
+--
+-- Players who share a team (pow's team_join) share its start too: whichever of them chooses chooses for all of them,
+-- and the team gets one commander there.
 --
 -- In a campaign mission there is nothing to choose: the player's start is the mission's (missions.player_start), set
 -- as they arrive, so the game waits only for their client to load.
@@ -82,11 +86,11 @@ local function assign_boxes(leaving: Player?)
 	end
 end
 
--- Puts `player`'s team's commander where they chose to start.
+-- Puts `player`'s team's commander where they chose to start, unless a teammate's already stands.
 local function spawn(player: Player)
 	local team_id = players.team_of(player)
 	local chosen = game_phase.start_of(player)
-	if team_id == nil or chosen == nil then
+	if team_id == nil or chosen == nil or spawning.owns_anything(team_id) then
 		return
 	end
 	spawning.set_start(team_id, Vector2.new(chosen.X, chosen.Z))
@@ -128,7 +132,7 @@ local function evaluate(leaving: Player?)
 	end
 end
 
--- A start is taken if it is in the player's own box, on the map, and somewhere a team can start.
+-- A click in the player's own box starts them at the ground nearest it there that a team can start on.
 local function on_choose(player: Player, position: unknown)
 	if game_phase.has_begun() or typeof(position) ~= "Vector3" then
 		return
@@ -138,16 +142,17 @@ local function on_choose(player: Player, position: unknown)
 		return
 	end
 	local index = game_phase.box_of(player)
-	if index == nil or heightmap.in_bounds(position.X, position.Z) == false then
+	if index == nil or starts.in_box(index, position.X, position.Z) == false then
 		return
 	end
-	if
-		starts.in_box(index, position.X, position.Z) == false
-		or starts.can_start_at(position.X, position.Z) == false
-	then
+	local spot = starts.nearest_start(index, position.X, position.Z)
+	if spot == nil then
 		return
 	end
-	game_phase.set_start(player, heightmap.ground_position(position.X, position.Z))
+	local start = heightmap.ground_position(spot.X, spot.Y)
+	for _, teammate in players.players_on_team(players.team_of(player) :: TeamId) do
+		game_phase.set_start(teammate, start)
+	end
 	evaluate()
 end
 
@@ -160,6 +165,36 @@ local function join_late(player: Player)
 		game_phase.set_start(player, heightmap.ground_position(spot.X, spot.Y))
 	end
 	spawn(player)
+end
+
+-- Where a teammate of `player`'s has chosen to start, if any has.
+local function teammate_start(player: Player): Vector3?
+	local team_id = players.team_of(player)
+	if team_id == nil then
+		return nil
+	end
+	for _, teammate in players.players_on_team(team_id) do
+		local chosen = game_phase.start_of(teammate)
+		if teammate ~= player and chosen ~= nil then
+			return chosen
+		end
+	end
+	return nil
+end
+
+-- Called once `player` has been moved to another team: they take its start, or choose one if nobody on it has. Once
+-- the game is playing, a team that has nothing yet gets its commander where its box's usual start is.
+local function team_changed(player: Player)
+	if game_phase.phase() == "ended" then
+		return
+	end
+	game_phase.set_start(player, teammate_start(player))
+	if game_phase.is_playing() then
+		join_late(player)
+		return
+	end
+	assign_boxes()
+	evaluate()
 end
 
 -- A new map, while the game is playing: nobody has chosen anywhere on it, so every player starts where their box's usual
@@ -240,5 +275,6 @@ return table.freeze({
 	tick = tick,
 	player_added = player_added,
 	player_removing = player_removing,
+	team_changed = team_changed,
 	restart_on_new_map = restart_on_new_map,
 })

@@ -21,9 +21,12 @@ local appearance = require(ReplicatedStorage.Shared.appearance)
 local skins = require(ReplicatedStorage.Shared.skins)
 local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local charged_beam = require(ReplicatedStorage.Client.charged_beam)
 local donuts = require(ReplicatedStorage.Client.donuts)
 local world = require(ReplicatedStorage.Client.world)
 
+type DonutSettings = types.DonutSettings
+type EntityDef = types.EntityDef
 type Skin = types.Skin
 type SkinAttachment = types.SkinAttachment
 
@@ -54,6 +57,14 @@ local GAIT_BLEND = 0.2
 local DEFAULT_WHEEL_RADIUS = 0.5
 local HATCH_HOLD = 1.5
 local HATCH_RATE = math.rad(240)
+-- A pool donut's turn from lying flat (its hole facing up) to its hole facing the nose (+Z), as round a fuselage, or
+-- facing out of a side, as hung on a ship's: port is +X, looking to the nose.
+local NOSE_UP = CFrame.Angles(math.pi / 2, 0, 0)
+local PORT_UP = CFrame.Angles(0, 0, -math.pi / 2)
+local STARBOARD_UP = CFrame.Angles(0, 0, math.pi / 2)
+-- How few and how many a ship hangs down each side.
+local SIDE_FLOATS_LEAST = 2
+local SIDE_FLOATS_MOST = 4
 
 -- One mesh of a def's art, built once: a MeshPart to copy for each entity, and where it sits in its piece.
 type TemplatePart = {
@@ -68,12 +79,24 @@ type TemplatePart = {
 }
 
 -- The body of a def's art, which what a skin hangs on it is worn round: the piece it belongs to, the middle of its
--- bulk across the ground in that piece's own frame, and the heights of its bottom and its top there.
+-- bulk across the ground in that piece's own frame, the heights of its bottom and its top there, the box round all
+-- of it, and its fuselage, if it has one.
 type Body = {
 	group: string,
 	middle: Vector3,
 	bottom: number,
 	top: number,
+	low: Vector3,
+	high: Vector3,
+	fuselage: Fuselage?,
+}
+
+-- The long, thin run of a body from tail to nose (+Z), which on a plane is its fuselage: the middle of it, how long it
+-- is, and how far it reaches out from its middle across, at the most.
+type Fuselage = {
+	middle: Vector3,
+	length: number,
+	radius: number,
 }
 
 type Template = {
@@ -131,6 +154,15 @@ type Dressing = {
 	gait: number,
 	-- whether its pieces have already been flung apart (`shatter`), so that they are not twice
 	shattered: boolean,
+	-- its turrets whose weapon is a charged beam, whose muzzles glow (client/charged_beam.luau), and where on each
+	-- the muzzle is
+	charged: { ChargedMuzzle },
+}
+
+type ChargedMuzzle = {
+	group: Group,
+	weapon: types.Weapon,
+	muzzle: CFrame,
 }
 
 -- How long, in seconds, the dressing of a model that has gone is kept for `shatter`, which the server's word that it
@@ -237,7 +269,32 @@ local function find_body(data: art.Art): Body?
 	end
 	local box = boxes[found]
 	local middle = if box.volume > 0 then box.bulk / box.volume else (box.low + box.high) / 2
-	return { group = found, middle = Vector3.new(middle.X, 0, middle.Z), bottom = box.low.Y, top = box.high.Y }
+	-- its fuselage: the piece of it longest from tail to nose against how thick it is across, and long for that too.
+	-- Pieces are merged by colour, so a wing may share one with the fuselage's paint; it is wide for how long it is.
+	-- A flat panel has no thickness and is no fuselage.
+	local fuselage: Fuselage? = nil
+	local best = 0
+	for _, part in data.parts do
+		local size = vector(part.size)
+		local across = math.max(size.X, size.Y)
+		if part.group ~= found or math.min(size.X, size.Y) <= 0 then
+			continue
+		end
+		local score = size.Z * size.Z / across
+		if score > best then
+			best = score
+			fuselage = { middle = vector(part.offset), length = size.Z, radius = across / 2 }
+		end
+	end
+	return {
+		group = found,
+		middle = Vector3.new(middle.X, 0, middle.Z),
+		bottom = box.low.Y,
+		top = box.high.Y,
+		low = box.low,
+		high = box.high,
+		fuselage = fuselage,
+	}
 end
 
 -- Builds the meshes of the art called `def_name` (a def's own, or one a skin draws instead), once. It yields, so it
@@ -345,6 +402,19 @@ local function dress(model: Model, def_name: string, art_name: string, skin: Ski
 		table.insert(by_name[source.group].pieces, { part = part, source = source })
 	end
 
+	local charged: { ChargedMuzzle } = {}
+	for _, group in groups do
+		local index, muzzle = group.def.weapon, group.def.muzzle
+		local weapon = if group.def.kind == "turret"
+				and index ~= nil
+				and def.weapons ~= nil
+			then def.weapons[index]
+			else nil
+		if weapon ~= nil and weapon.charged_beam == true and muzzle ~= nil then
+			table.insert(charged, { group = group, weapon = weapon, muzzle = CFrame.new(vector(muzzle)) })
+		end
+	end
+
 	folder.Parent = model
 	local body = template.body
 	dressings[model] = {
@@ -362,6 +432,7 @@ local function dress(model: Model, def_name: string, art_name: string, skin: Ski
 		walk_speed = 0,
 		gait = 0,
 		shattered = false,
+		charged = charged,
 	}
 end
 
@@ -429,6 +500,12 @@ end
 -- Where each moving piece of an entity's art should be turned to this frame.
 local function animate(dressing: Dressing, origin: CFrame, dt: number)
 	local model = dressing.model
+	-- something being carried is inactive: everything on it holds still where it was, and being flown about is not
+	-- walking, so its legs do not take up a stride when it is set down
+	if model:GetAttribute "carried" == true then
+		dressing.walk_speed = 0
+		return
+	end
 	-- how far it has walked forward since the last frame, which is what turns wheels; nothing for a jump no walk
 	-- would make, like the first frame or being set down by a transport, which the legs ignore too
 	local driven = 0
@@ -543,6 +620,7 @@ local function undress(model: Model)
 	end
 	dressings[model] = nil
 	donuts.forget(model)
+	charged_beam.forget(model)
 	dressing.folder:Destroy()
 end
 
@@ -556,7 +634,50 @@ local function donut_of(skin: Skin, kind: unknown): SkinAttachment?
 	return nil
 end
 
--- What `dressing`'s skin hangs on it, kept round its waist for this frame.
+-- Where the rings of `settings`' donut go on `model`, of `def`, with its body `body` in `frame`, and how wide each
+-- one's hole is, in studs. An aircraft wears one round its fuselage, its hole facing the nose; a ship (not a
+-- submarine, which wears one round its waist to lose when it dives) hangs a row of small ones flat against each side
+-- of its hull; anything else wears one round its waist.
+local function mounts_of(
+	model: Model,
+	def: EntityDef,
+	body: Body,
+	frame: CFrame,
+	settings: DonutSettings
+): ({ CFrame }, number)
+	local fuselage = body.fuselage
+	if unit_defs.is_air(def) and fuselage ~= nil then
+		local along = fuselage.middle.Z + fuselage.length * (settings.nose - 0.5)
+		local at = CFrame.new(fuselage.middle.X, fuselage.middle.Y, along)
+		-- its up, the way its hole faces, turned from straight up to the nose (+Z)
+		return { frame * at * NOSE_UP }, settings.fuselage_hug * fuselage.radius
+	end
+	if unit_defs.floats(def) and def.waterline == nil then
+		local width = body.high.X - body.low.X
+		local hole = settings.side_hole * width
+		local reach = donuts.tube(model, settings, hole)
+		local across = width / 2 + reach
+		local span = (body.high.Z - body.low.Z) * settings.side_span
+		local wide = 2 * (hole + 2 * reach)
+		local apart = settings.side_spacing * wide
+		local count = math.clamp(math.floor(span / apart) + 1, SIDE_FLOATS_LEAST, SIDE_FLOATS_MOST)
+		local height = math.max(
+			body.bottom,
+			body.bottom + (body.top - body.bottom) * settings.side_height - settings.side_drop * wide
+		)
+		local mounts = table.create(count * 2)
+		for index = 1, count do
+			local along = body.middle.Z + (index - (count + 1) / 2) * apart
+			table.insert(mounts, frame * CFrame.new(body.middle.X + across, height, along) * PORT_UP)
+			table.insert(mounts, frame * CFrame.new(body.middle.X - across, height, along) * STARBOARD_UP)
+		end
+		return mounts, hole
+	end
+	local height = body.bottom + (body.top - body.bottom) * settings.waist
+	return { frame * CFrame.new(body.middle.X, height, body.middle.Z) }, settings.hug * unit_defs.collider_radius(def)
+end
+
+-- What `dressing`'s skin hangs on it, kept on it for this frame.
 local function attach(dressing: Dressing, dt: number)
 	local model = dressing.model
 	local group, body = dressing.body_group, dressing.body
@@ -567,19 +688,28 @@ local function attach(dressing: Dressing, dt: number)
 	local attachment = donut_of(dressing.skin, kind)
 	local settings = if attachment ~= nil then attachment.donut else nil
 	local wearing = model:GetAttribute "state" ~= "blueprint" and kind ~= "wreck"
-	-- round its waist: that far up its body
-	local waist = if settings ~= nil then settings.waist else 0.5
-	local height = body.bottom + (body.top - body.bottom) * waist
-	local def = unit_defs.get(dressing.def_name)
-	donuts.step(
-		model,
-		group.frame * CFrame.new(body.middle.X, height, body.middle.Z),
-		unit_defs.collider_radius(def),
-		settings,
-		wearing,
-		dressing.folder,
-		dt
-	)
+	local mounts: { CFrame }, hole = {}, 0
+	if settings ~= nil then
+		mounts, hole = mounts_of(model, unit_defs.get(dressing.def_name), body, group.frame, settings)
+	end
+	donuts.step(model, mounts, hole, settings, wearing, dressing.folder, dt)
+end
+
+-- Places the glow on the muzzle of each of its charged beams, facing along the barrel (the art's +Z).
+local function glow(dressing: Dressing, dt: number)
+	if #dressing.charged == 0 then
+		return
+	end
+	local model = dressing.model
+	local showing = model:GetAttribute "state" ~= "blueprint"
+		and model:GetAttribute "kind" ~= "wreck"
+		and model:GetAttribute "carried" ~= true
+	for _, charged in dressing.charged do
+		local frame = charged.group.frame
+		local at = (frame * charged.muzzle).Position
+		local facing = CFrame.lookAt(at, at + frame:VectorToWorldSpace(Vector3.zAxis))
+		charged_beam.step_muzzle(model, charged.weapon, facing, showing, dressing.folder, dt)
+	end
 end
 
 local function step(dt: number)
@@ -627,6 +757,7 @@ local function step(dt: number)
 		animate(ready, origin, dt)
 		place(ready, origin)
 		attach(ready, dt)
+		glow(ready, dt)
 	end
 end
 
@@ -639,6 +770,7 @@ local function forget(child: Instance)
 		end
 		dressings[child :: Model] = nil
 		donuts.forget(child :: Model)
+		charged_beam.forget(child :: Model)
 	end
 end
 
@@ -650,6 +782,17 @@ local function shatter(id: number): ({ MeshPart }?, Vector3?)
 	local model = world.get(id)
 	if model ~= nil then
 		dressing = dressings[model]
+	end
+	-- the server takes the model away in the same frame it says the thing shattered, and the model can already be
+	-- unparented when that word is handled while `forget` has not yet heard it go, so it is neither in the world nor
+	-- among the departed
+	if dressing == nil then
+		for dressed, candidate in dressings do
+			if dressed:GetAttribute "entity_id" == id then
+				dressing = candidate
+				break
+			end
+		end
 	end
 	if dressing == nil then
 		local gone = departed[id]

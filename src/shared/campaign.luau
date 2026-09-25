@@ -73,9 +73,41 @@ export type OverlookLayout = {
 	-- how many thugs the mission's guide asks to be put at the edge, and how far back from it one may stand and count
 	edge_thugs: number,
 	edge_depth: number,
-	-- the energy a second the guide asks for before the thugs
+	-- the metal and the energy a second the guide asks for before the thugs, as the resource bar shows them: the metal
+	-- is what the commander and an extractor on each of the player's four spots make together
+	metal: number,
 	energy: number,
 }
+
+-- The third mission's, played on the overlook's map just after the second (so campaign.OVERLOOK's numbers hold for it
+-- too), in world (x, z). The enemy's base below the cliff is wrecks now, and the player holds the plateau with what they
+-- took it with; after `prep_seconds` the enemy's reinforcements start to arrive in waves at the far, east end of the
+-- map, half of each at each of `arrivals`, and make for the player's base up the ramps. The way to hold is to raise the
+-- old base's guards with rezbots before they come, and turn them on the waves.
+export type CounterattackLayout = {
+	-- where the waves come in: the north one's make for the north ramp, and the south one's for the south
+	arrivals: { Vector2 },
+	-- The west edge of the enemy zone, the strip of the map's east end the waves arrive in: whatever the player has east
+	-- of it is destroyed when a wave arrives, and they are warned of that as they build there. All of the old base lies
+	-- west of it, so that whatever is raised of it stays.
+	zone_x: number,
+	-- how long the player has to prepare before the first wave, in seconds
+	prep_seconds: number,
+	-- how many guards' wrecks the old base leaves, which the mission's guide asks to be raised
+	old_guards: number,
+}
+
+-- The Workspace attributes the server publishes the third mission's state in (server/counterattack.luau), for the HUD:
+-- the enemy zone's west edge (a number, set as the mission is set up), how many waves have arrived (0 while the player
+-- prepares) and how many there are, the whole seconds until the next arrives (none once the last has), and how many of
+-- the enemy's things are left standing.
+local COUNTERATTACK_ATTRIBUTES = table.freeze({
+	zone_x = "campaign_zone_x",
+	wave = "campaign_wave",
+	waves = "campaign_waves",
+	wave_in = "campaign_wave_in",
+	enemies_left = "campaign_enemies_left",
+})
 
 local STARTING_UNLOCKS: { string } =
 	{ "bot_lab", "construction_bot", "grunt", "guard", "solar_collector", "metal_extractor" }
@@ -96,12 +128,19 @@ local TUTORIAL: TutorialLayout = table.freeze({
 })
 
 local OVERLOOK: OverlookLayout = table.freeze({
-	player_start = Vector2.new(-88, 0),
-	enemy_start = Vector2.new(70, 0),
-	edge_x = -30,
+	player_start = Vector2.new(-53, 0),
+	enemy_start = Vector2.new(42, 0),
+	edge_x = -18,
 	edge_thugs = 4,
 	edge_depth = 8,
+	metal = 10,
 	energy = 60,
+})
+local COUNTERATTACK: CounterattackLayout = table.freeze({
+	arrivals = table.freeze({ Vector2.new(68, 26), Vector2.new(68, -26) }),
+	zone_x = 60,
+	prep_seconds = 300,
+	old_guards = 8,
 })
 -- Going east, the overlook's cliff edge is where the ground first falls more steeply than this (rise over run, about 40
 -- degrees), looked for every EDGE_STEP studs.
@@ -120,9 +159,17 @@ local MISSIONS: { Mission } = {
 	{
 		id = "overlook",
 		label = "The Overlook",
-		description = "Destroy a fortified base on the heights.",
+		description = "Destroy a fortified base from the heights.",
 		preset = "overlook",
-		unlocks = { "tick", "graverobber", "twin_guard" },
+		unlocks = { "graverobber", "thistle", "twin_guard", "warden" },
+		coop = 4,
+	},
+	{
+		id = "counterattack",
+		label = "Counterattack",
+		description = "Raise the old base's guards. Hold the heights.",
+		preset = "overlook",
+		unlocks = { "vehicle_lab", "incisor", "brute", "tick", "rascal" },
 		coop = 4,
 	},
 }
@@ -265,6 +312,8 @@ return table.freeze({
 	PROGRESS_STORE = PROGRESS_STORE,
 	TUTORIAL = TUTORIAL,
 	OVERLOOK = OVERLOOK,
+	COUNTERATTACK = COUNTERATTACK,
+	COUNTERATTACK_ATTRIBUTES = COUNTERATTACK_ATTRIBUTES,
 	get = get,
 	next_mission = next_mission,
 	is_lockable = is_lockable,

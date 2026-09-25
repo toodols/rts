@@ -22,7 +22,10 @@
 		},
 		"ServerScriptService": {
 			"LobbyServer": {
-				"$path": "src/lobby/server"
+				"$path": "src/lobby/server",
+				"pow": {
+					"$path": "pow/package.project.json"
+				}
 			}
 		},
 		"Workspace": {

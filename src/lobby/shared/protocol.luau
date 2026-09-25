@@ -48,6 +48,8 @@ export type LobbyView = {
 	bonuses: { [string]: number },
 	-- whether allies' weapons hurt each other's things
 	ally_griefing: boolean,
+	-- how a team game or a free for all is won, a game_modes.EndMode
+	end_mode: string,
 	seats: { SeatView },
 	-- the user ids of the players who have said they are ready to start
 	ready: { number },
@@ -99,6 +101,8 @@ local ACTIONS = table.freeze({
 	set_ready = "set_ready",
 	-- a boolean: whether allies' weapons hurt each other's things
 	set_ally_griefing = "set_ally_griefing",
+	-- an end mode's id, from game_modes.END_MODES: how a team game or a free for all is won
+	set_end_mode = "set_end_mode",
 	-- a side, from 1, or game_modes.SPECTATOR_SIDE to watch; outside a team game any side takes whichever seat is free
 	move = "move",
 	-- no argument

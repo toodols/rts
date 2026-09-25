@@ -1,6 +1,8 @@
 -- Pings: double click the middle mouse button to mark the spot under the cursor for yourself and your allies. The
 -- server passes it on to everyone allied with you (server/pings.luau), and each of them sees a column of light in your
--- team's colour stand there for a few seconds, with flat pulses of light spreading out from its foot.
+-- team's colour stand there for a few seconds, with flat pulses of light spreading out from its foot, and hears a
+-- chirp. The pinging team's name floats over the column, or while it is off screen marks the edge of the screen the
+-- way to it (ui/ping_markers.luau, which reads `active`).
 --
 -- The middle button also drags the camera about (camera.luau), so a press only counts as a click if the cursor
 -- stays put while it is down, and two only make a double click if they land close together.
@@ -13,6 +15,8 @@ local Workspace = game:GetService "Workspace"
 local types = require(ReplicatedStorage.Shared.types)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local appearance = require(ReplicatedStorage.Shared.appearance)
+
+local sounds = require(ReplicatedStorage.Client.sounds)
 
 local ping: RemoteEvent = ReplicatedStorage.Shared.Ping
 
@@ -32,6 +36,51 @@ local RING_GAP = 0.5
 local RING_SECONDS = 1.2
 local RING_RADIUS = 10
 local RING_THICKNESS = 0.2
+
+export type Ping = {
+	at: Vector3,
+	team: types.TeamId,
+	name: string,
+	-- os.clock() when it is gone
+	ends: number,
+}
+
+-- The pings standing now, oldest first, and those told when one comes or goes.
+local active: { Ping } = {}
+local listeners: { () -> () } = {}
+
+local function announce()
+	for _, listener in listeners do
+		listener()
+	end
+end
+
+local function add(ping_info: Ping)
+	table.insert(active, ping_info)
+	announce()
+	task.delay(PING_SECONDS, function()
+		local index = table.find(active, ping_info)
+		if index ~= nil then
+			table.remove(active, index)
+			announce()
+		end
+	end)
+end
+
+-- Calls `listener` whenever a ping comes or goes. Returns a function that stops it.
+local function subscribe(listener: () -> ()): () -> ()
+	table.insert(listeners, listener)
+	return function()
+		local index = table.find(listeners, listener)
+		if index ~= nil then
+			table.remove(listeners, index)
+		end
+	end
+end
+
+local function all_active(): { Ping }
+	return active
+end
 
 local press_location: Vector2? = nil
 local last_click_time = -math.huge
@@ -140,11 +189,17 @@ end
 local function init()
 	UserInputService.InputBegan:Connect(on_input_began)
 	UserInputService.InputEnded:Connect(on_input_ended)
-	ping.OnClientEvent:Connect(function(message: { at: Vector3, team: types.TeamId })
+	ping.OnClientEvent:Connect(function(message: { at: Vector3, team: types.TeamId, name: string })
 		draw(message.at, message.team)
+		add({ at = message.at, team = message.team, name = message.name, ends = os.clock() + PING_SECONDS })
+		sounds.play_ui "notify"
 	end)
 end
 
 return table.freeze({
 	init = init,
+	subscribe = subscribe,
+	active = all_active,
+	-- how tall a ping's column stands, so its label can float over it
+	BEAM_HEIGHT = BEAM_HEIGHT,
 })

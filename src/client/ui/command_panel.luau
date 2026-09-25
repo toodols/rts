@@ -1,5 +1,5 @@
--- The commands the selected units can be given as modes, each with its key: Attack - A, Fight - F, and so
--- on. It lists a command when at least one selected finished unit can use it, marks the one that is on,
+-- The commands the selected units can be given as modes, each with its icon and its key: Attack - A, Fight - F, and
+-- so on. It lists a command when at least one selected finished unit can use it, marks the one that is on,
 -- and a click on a row does what pressing its key does. In the tutorial, the command its step wants clicked
 -- (Client.tutorial's `command_target`) is lit and pointed at, until it is on.
 
@@ -11,11 +11,23 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local input = require(ReplicatedStorage.Client.input)
 local tutorial = require(ReplicatedStorage.Client.tutorial)
+local art_icon = require(ReplicatedStorage.Client.ui.art_icon)
 local tutorial_pointer = require(ReplicatedStorage.Client.ui.tutorial_pointer)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 
+local ArtIcon = art_icon.ArtIcon
 local TutorialPointer = tutorial_pointer.TutorialPointer
+
+-- Each command's icon (Shared.ui_art); a command with none keeps the space empty, so every name lines up.
+local ICONS: { [string]: string } = {
+	attack = "icon_attack",
+	fight = "icon_fight",
+	reclaim = "icon_reclaim",
+	repair = "icon_repair",
+	guard = "icon_guard",
+	disintegrator = "icon_disintegrator",
+}
 
 local function CommandPanel()
 	local ids = use_entities.use_selection()
@@ -64,6 +76,18 @@ local function CommandPanel()
 				input.toggle_mode(command.mode)
 			end,
 		}, {
+			Icon = if ICONS[command.mode] ~= nil
+				then React.createElement(ArtIcon, {
+					name = ICONS[command.mode],
+					view = "front",
+					flat = true,
+					tag = "command-icon",
+					LayoutOrder = 0,
+				})
+				else React.createElement("Frame", {
+					[React.Tag] = "command-icon",
+					LayoutOrder = 0,
+				}),
 			Name = React.createElement("TextLabel", {
 				[React.Tag] = "command-name grow",
 				LayoutOrder = 1,

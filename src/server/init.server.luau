@@ -23,8 +23,10 @@ local production = require(script.production)
 local drones = require(script.drones)
 local drowning = require(script.drowning)
 local autoheal = require(script.autoheal)
+local emp = require(script.emp)
 local movement = require(script.movement)
 local combat = require(script.combat)
+local self_destruct = require(script.self_destruct)
 local shields = require(script.shields)
 local transport = require(script.transport)
 local projectiles = require(script.projectiles)
@@ -32,6 +34,7 @@ local deformation = require(script.deformation)
 local orders = require(script.orders)
 local instances = require(script.instances)
 local commands = require(script.commands)
+local possession = require(script.possession)
 local pings = require(script.pings)
 local players = require(script.players)
 local replication = require(script.replication)
@@ -47,12 +50,15 @@ local reaper = require(script.reaper)
 local match = require(script.match)
 local lobby = require(script.lobby)
 local sharing = require(script.sharing)
+local notifications = require(script.notifications)
 local campaign = require(script.campaign)
 local skins = require(script.skins)
 local donuts = require(script.donuts)
 local missions = require(script.missions)
 local campaign_exit = require(script.campaign_exit)
 local match_stats = require(script.match_stats)
+local conquest = require(script.conquest)
+local ratings = require(script.ratings)
 
 type TeamId = types.TeamId
 
@@ -60,8 +66,7 @@ local team_updated: RemoteEvent = ReplicatedStorage.Shared.TeamUpdated
 
 local MAP_SEED = 1337
 -- What the ground is like: a name from shared/map_presets.luau, like "highlands", "koth" or one of the BAR maps
--- ("supreme_isthmus", "hooked", "center_command", "rifted", "comet_catcher", "altair_crossing",
--- "ancient_bastion", "folsom_dam").
+-- ("supreme_isthmus", "folsom_dam", "greenest_fields" and the rest in shared/bar_maps).
 local MAP_PRESET = "highlands"
 local RESOURCE_BROADCAST_INTERVAL = 0.2
 
@@ -185,6 +190,8 @@ local function step(delta: number)
 	drones.tick(delta)
 	profiler.mark "orders"
 	orders.tick(delta)
+	-- what the developers piloting units ask of them that no order does, their manual weapons fired within the step
+	possession.tick()
 
 	profiler.mark "construction"
 	construction.resolve(delta)
@@ -201,11 +208,17 @@ local function step(delta: number)
 	-- whatever mends itself does
 	profiler.mark "autoheal"
 	autoheal.tick(delta)
+	-- EMP drains away, and what it stunned comes round
+	profiler.mark "emp"
+	emp.tick(delta)
 	-- what a transport carries hangs from it where it has moved to
 	profiler.mark "transport"
 	transport.tick()
 	profiler.mark "combat"
 	combat.tick(delta)
+	-- what was told to destroy itself and has counted down does
+	profiler.mark "self_destruct"
+	self_destruct.tick(delta)
 	profiler.mark "shields"
 	shields.tick(delta)
 	profiler.mark "projectiles"
@@ -222,9 +235,15 @@ local function step(delta: number)
 	-- entities created during this step join the world now that nothing is iterating it
 	profiler.mark "flush"
 	state.flush()
+	-- what a side should be told of that the step brought, enemy aircraft among it
+	profiler.mark "notifications"
+	notifications.tick(delta)
 	-- a campaign mission ends once a side has nothing left
 	profiler.mark "missions"
 	missions.tick(delta)
+	-- and a game between players once one side is left
+	profiler.mark "conquest"
+	conquest.tick(delta)
 	profiler.mark "entity_count"
 	profiler.sample_entities()
 	profiler.mark(nil)
@@ -264,11 +283,14 @@ local function init()
 	missions.setup()
 
 	commands.init()
+	possession.init()
 	pings.init()
 	sharing.init()
+	notifications.init()
 	skins.init()
 	campaign_exit.init()
 	match_stats.init()
+	ratings.init()
 	scavengers.init()
 
 	-- A session a Studio plugin started to run a test runs that, and nothing else below that would get in its way
@@ -306,6 +328,8 @@ local function init()
 		lobby.player_removing(player)
 		campaign.player_removing(player)
 		players.forget(player)
+		match.left(player.UserId)
+		conquest.player_removing(player)
 	end)
 	for _, player in Players:GetPlayers() do
 		on_player_added(player)
@@ -318,7 +342,9 @@ local function init()
 		end
 		-- nothing steps until every player is ready and the countdown is out
 		lobby.tick()
-		if game_phase.is_playing() == false then
+		-- and once it is over it keeps going, for anyone who would rather play on than look at the end screen (see
+		-- client/ui/victory_screen.luau)
+		if game_phase.has_begun() == false then
 			publish_sim_rate(0)
 			return
 		end

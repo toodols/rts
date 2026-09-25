@@ -52,6 +52,18 @@ MAPS = {
     "altair_crossing": "Altair_Crossing_V4.1",
     "ancient_bastion": "Ancient Bastion Remake 0.5",
     "folsom_dam": "FolsomDamR 1.17",
+    "pinewood_derby": "Pinewood_Derby_V1",
+    "acidic_quarry": "AcidicQuarry 5.17",
+    "aurelia": "Aurelia v4.1",
+    "canis_river": "Canis River v1.4",
+    "boulder_beach": "Boulder_Beach_V1",
+    "charlie_in_the_hills": "Charlie In The Hills Remake v1.1.1",
+    "coast_to_coast": "Coast To Coast BAR v1.0",
+    "devils_postpiles": "Devil's Postpiles 1.1.1",
+    "faster_than_light": "Faster Than Light 1.1",
+    "gasbag_grabens": "Gasbag Grabens 1.1.1",
+    "great_divide": "Great Divide V1",
+    "greenest_fields": "Greenest Fields 1.3.1",
 }
 
 # How what a feature holds decides which of the game's reclaimables it is drawn as (unit_defs/reclaimable.luau): metal

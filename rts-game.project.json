@@ -23,6 +23,9 @@
 				"$path": "src/server",
 				"pow": {
 					"$path": "pow/package.project.json"
+				},
+				"openskill": {
+					"$path": "openskill/src"
 				}
 			}
 		},

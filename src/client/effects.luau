@@ -15,6 +15,8 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local projectile_mod = require(ReplicatedStorage.Shared.projectile)
 
 local world = require(ReplicatedStorage.Client.world)
+local charged_beam = require(ReplicatedStorage.Client.charged_beam)
+local sounds = require(ReplicatedStorage.Client.sounds)
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
 
@@ -36,6 +38,8 @@ type FlyingProjectile = {
 	homing_target_id: EntityId?,
 	-- where that entity was last frame: the server knows how fast it is going, and the client works it out from this
 	homing_target_last: Vector3?,
+	-- for an anti-nuke's interceptor, the id of the nuke it chases, which it steers toward the same way
+	homing_projectile_id: number?,
 }
 
 -- How long a beam stays up when its weapon does not say, and how see-through it has become by the end.
@@ -47,8 +51,8 @@ local BLAST_COLOR = Color3.fromRGB(238, 60, 48)
 local BLAST_HEIGHT = 3
 -- A projectile the server has not reported back on is dropped after this long, in case its impact was lost.
 local PROJECTILE_MAX_AGE = 35
--- Plasma is drawn glowing. Everything else that flies, rockets, missiles and bombs, is a casing of metal: plastic, and
--- a dull grey that does not light up.
+-- Plasma is drawn glowing. Everything else that flies, rockets, missiles and bombs, is a casing of metal, a dull grey
+-- that does not light up, with smooth faces rather than the studs a new part comes with.
 local PLASMA_COLOR = Color3.fromRGB(255, 196, 96)
 local CASING_COLOR = Color3.fromRGB(148, 154, 164)
 -- A projectile that says how thick a line it is (`line_thickness`), an anti-air missile, is instead a purple
@@ -65,17 +69,22 @@ local EXPLOSION_LIFETIME = 1
 local EXPLOSION_REFERENCE_RADIUS = 24
 local EXPLOSION_MIN_LIFETIME = 0.35
 local EXPLOSION_MAX_LIFETIME = 12
+-- An explosion drawn at least this big is heard as a big one; a smaller one is heard louder the bigger it is, within
+-- these bounds of its sound's own volume. A nuke is the big sound played slow and loud.
+local LARGE_EXPLOSION_RADIUS = 40
+local SMALL_EXPLOSION_QUIETEST = 0.5
+local SMALL_EXPLOSION_LOUDEST = 1.3
+local NUKE_SOUND_PITCH = 0.5
+local NUKE_SOUND_VOLUME = 2
+-- a missile's launch is the cannon's sound pitched up into more of a whoosh
+local MISSILE_SOUND_PITCH = 1.5
+-- a lightning bolt has no sound of its own yet, and is the laser's pitched down into a crack
+local LIGHTNING_SOUND_PITCH = 0.55
 
 local function dissipation_time(radius: number): number
 	local lifetime = EXPLOSION_LIFETIME * (radius / EXPLOSION_REFERENCE_RADIUS) ^ 2
 	return math.clamp(lifetime, EXPLOSION_MIN_LIFETIME, EXPLOSION_MAX_LIFETIME)
 end
-
-local TEAM_BEAM_COLORS: { [number]: Color3 } = {
-	[1] = Color3.fromRGB(140, 200, 255),
-	[2] = Color3.fromRGB(255, 150, 130),
-	[config.SCAVENGER_TEAM] = Color3.fromRGB(206, 130, 255),
-}
 
 local function effects_folder(): Instance
 	local folder = Workspace:FindFirstChild "Effects"
@@ -129,7 +138,8 @@ local function draw_blast(from: Vector3, to: Vector3, half_width: number)
 	slab.Transparency = 0.15
 	-- tall enough that hills in the way do not swallow it
 	slab.Size = Vector3.new(half_width * 2, BLAST_HEIGHT, length)
-	slab.CFrame = CFrame.lookAt((from + to) / 2, Vector3.new(to.X, (from.Y + to.Y) / 2, to.Z))
+	-- tilted along the shot, level from side to side
+	slab.CFrame = CFrame.lookAt((from + to) / 2, to)
 	slab.Parent = effects_folder()
 
 	TweenService:Create(slab, TweenInfo.new(BLAST_LIFETIME), { Transparency = 1 }):Play()
@@ -301,6 +311,87 @@ local function dress(part: Part, look: types.ProjectileLook?): ({ ParticleEmitte
 	return emitters, trail, light, linger
 end
 
+-- An EMP blast of `radius`: a pale turquoise pulse that swells to the edge of the blast and fades, a white flash at its
+-- heart, and arcs of lightning thrown out along the ground.
+local EMP_COLOR = Color3.fromRGB(130, 215, 255)
+local EMP_ARCS = 7
+local emp_arc_roll = Random.new()
+local function draw_emp(at: Vector3, radius: number)
+	local lifetime = dissipation_time(radius)
+	local centre = at + Vector3.new(0, radius * 0.2, 0)
+
+	local pulse = effect_part("EmpPulse", EMP_COLOR, Enum.Material.Neon)
+	pulse.Shape = Enum.PartType.Ball
+	pulse.Transparency = 0.35
+	pulse.Size = Vector3.one * radius * 0.3
+	pulse.Position = centre
+	pulse.Parent = effects_folder()
+	tween(pulse, lifetime, { Size = Vector3.one * radius * 2, Transparency = 1 }, Enum.EasingStyle.Quad)
+	Debris:AddItem(pulse, lifetime)
+
+	local flash = effect_part("EmpFlash", Color3.new(1, 1, 1), Enum.Material.Neon)
+	flash.Shape = Enum.PartType.Ball
+	flash.Size = Vector3.one * radius * 0.25
+	flash.Position = centre
+	flash.Parent = effects_folder()
+	tween(flash, lifetime * 0.3, { Size = Vector3.one * radius * 0.6, Transparency = 1 }, Enum.EasingStyle.Quad)
+	Debris:AddItem(flash, lifetime * 0.3)
+
+	for _ = 1, EMP_ARCS do
+		local angle = emp_arc_roll:NextNumber() * 2 * math.pi
+		local reach = radius * emp_arc_roll:NextNumber(0.5, 1)
+		local tip = at + Vector3.new(math.cos(angle) * reach, 0, math.sin(angle) * reach)
+		tip = Vector3.new(tip.X, heightmap.height_at(tip.X, tip.Z) + 0.3, tip.Z)
+		local arc = effect_part("EmpArc", EMP_COLOR, Enum.Material.Neon)
+		arc.Size = Vector3.new(0.25, 0.25, (tip - centre).Magnitude)
+		arc.CFrame = CFrame.lookAt((centre + tip) / 2, tip)
+		arc.Parent = effects_folder()
+		tween(arc, lifetime * 0.5, { Transparency = 1 }, Enum.EasingStyle.Quad)
+		Debris:AddItem(arc, lifetime * 0.5)
+	end
+end
+
+-- A lightning gun's bolt: a jagged line from `from` to `to`, kinked every LIGHTNING_SEGMENT studs or so, each kink
+-- thrown off the straight line at random, that flickers out almost at once. Its sparks are thinner bolts of the same.
+-- The colour is BAR's `rgbcolor` for the Thor's, 0.5 0.5 1.
+local LIGHTNING_COLOR = Color3.fromRGB(128, 128, 255)
+local LIGHTNING_LIFETIME = 0.15
+local LIGHTNING_SEGMENT = 4
+local LIGHTNING_MOST_SEGMENTS = 20
+-- how far a kink may be thrown off the line, as a fraction of the length of a segment
+local LIGHTNING_JITTER = 0.4
+local LIGHTNING_THICKNESS = 0.4
+-- a spark is this much as thick as its bolt
+local SPARK_THICKNESS = 0.5
+local lightning_roll = Random.new()
+local function draw_bolt(from: Vector3, to: Vector3, thickness: number)
+	local offset = to - from
+	local length = offset.Magnitude
+	if length < 1e-3 then
+		return
+	end
+	local count = math.clamp(math.ceil(length / LIGHTNING_SEGMENT), 2, LIGHTNING_MOST_SEGMENTS)
+	local direction = offset.Unit
+	local side = direction:Cross(Vector3.yAxis)
+	side = if side.Magnitude < 1e-3 then Vector3.xAxis else side.Unit
+	local up = side:Cross(direction)
+	local spread = length / count * LIGHTNING_JITTER
+	local previous = from
+	for index = 1, count do
+		local point = from + offset * (index / count)
+		if index < count then
+			point += side * lightning_roll:NextNumber(-spread, spread) + up * lightning_roll:NextNumber(-spread, spread)
+		end
+		local segment = effect_part("Lightning", LIGHTNING_COLOR, Enum.Material.Neon)
+		segment.Size = Vector3.new(thickness, thickness, (point - previous).Magnitude)
+		segment.CFrame = CFrame.lookAt((previous + point) / 2, point)
+		segment.Parent = effects_folder()
+		tween(segment, LIGHTNING_LIFETIME, { Transparency = 1 }, Enum.EasingStyle.Quad)
+		Debris:AddItem(segment, LIGHTNING_LIFETIME)
+		previous = point
+	end
+end
+
 -- The blast radius the timings of a nuclear explosion below are for, the Apocalypse's. A bigger one lasts longer by
 -- the square of how much bigger it is, as any explosion does (`dissipation_time`), within NUKE_SLOWEST.
 local NUKE_REFERENCE_RADIUS = 35
@@ -445,6 +536,65 @@ local function draw_nuclear(at: Vector3, radius: number)
 	Debris:AddItem(scorch, gone + 10 * slow)
 end
 
+-- A nuke caught by an interceptor going off where it was, up in the air: the flash and the fireball, a shockwave
+-- swelling out all round, and a ball of smoke left to thin away. Nothing rises from the ground and nothing scorches it.
+local function draw_airburst(at: Vector3, radius: number)
+	local slow = math.clamp((radius / NUKE_REFERENCE_RADIUS) ^ 2, 1 / NUKE_SLOWEST, NUKE_SLOWEST)
+	local folder = effects_folder()
+	local fire = Color3.fromRGB(255, 150, 60)
+
+	local correction = Instance.new "ColorCorrectionEffect"
+	correction.Name = "NuclearFlash"
+	correction.Brightness = 0.5
+	correction.Contrast = 0.2
+	correction.TintColor = Color3.fromRGB(255, 236, 210)
+	correction.Parent = Lighting
+	tween(correction, 2 * slow, { Brightness = 0, Contrast = 0, TintColor = Color3.new(1, 1, 1) })
+	Debris:AddItem(correction, 2 * slow)
+
+	local flash = effect_part("NuclearFlash", Color3.fromRGB(255, 252, 240), Enum.Material.Neon)
+	flash.Shape = Enum.PartType.Ball
+	flash.Size = Vector3.one * radius * 0.3
+	flash.Position = at
+	flash.Parent = folder
+	tween(flash, 0.6, { Size = Vector3.one * radius * 2.5, Transparency = 1 })
+	Debris:AddItem(flash, 0.6)
+
+	local fireball = effect_part("NuclearFireball", fire, Enum.Material.Neon)
+	fireball.Shape = Enum.PartType.Ball
+	fireball.Size = Vector3.one * radius * 0.4
+	fireball.Position = at
+	fireball.Parent = folder
+	tween(fireball, 1.5 * slow, { Size = Vector3.one * radius * 1.4 })
+	tween(fireball, 2 * slow, { Transparency = 1, Color = Color3.fromRGB(255, 90, 30) }, nil, 1.5 * slow)
+	local heat = Instance.new "PointLight"
+	heat.Color = fire
+	heat.Range = 60
+	heat.Brightness = 10
+	heat.Parent = fireball
+	tween(heat, 3 * slow, { Brightness = 0 })
+	Debris:AddItem(fireball, 3.5 * slow)
+
+	local wave = effect_part("NuclearShockwave", Color3.fromRGB(255, 226, 180), Enum.Material.Neon)
+	wave.Shape = Enum.PartType.Ball
+	wave.Transparency = 0.6
+	wave.Size = Vector3.one * radius
+	wave.Position = at
+	wave.Parent = folder
+	tween(wave, 1.4 * slow, { Size = Vector3.one * radius * 5, Transparency = 1 }, Enum.EasingStyle.Quart)
+	Debris:AddItem(wave, 1.4 * slow)
+
+	local smoke = effect_part("NuclearSmoke", Color3.fromRGB(120, 108, 100), Enum.Material.SmoothPlastic)
+	smoke.Shape = Enum.PartType.Ball
+	smoke.Transparency = 1
+	smoke.Size = Vector3.one * radius
+	smoke.Position = at
+	smoke.Parent = folder
+	tween(smoke, 1.5 * slow, { Transparency = 0.35, Size = Vector3.one * radius * 1.6 }, nil, slow)
+	tween(smoke, 6 * slow, { Transparency = 1, Size = Vector3.one * radius * 2.2 }, nil, 2.5 * slow)
+	Debris:AddItem(smoke, 8.5 * slow)
+end
+
 local projectiles: { [number]: FlyingProjectile } = {}
 
 -- Puts a projectile's part where its flight is: a casing is centred on it, and a streak trails back from it.
@@ -469,7 +619,8 @@ local function launch_projectile(
 	aim: Vector3?,
 	inherited: Vector3?,
 	late: number?,
-	homing_target_id: EntityId?
+	homing_target_id: EntityId?,
+	homing_projectile_id: number?
 )
 	local part = Instance.new "Part"
 	part.Name = "Projectile"
@@ -478,6 +629,8 @@ local function launch_projectile(
 	part.CanQuery = false
 	part.CanTouch = false
 	part.CastShadow = false
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
 	if params.line_thickness ~= nil then
 		part.Material = Enum.Material.Neon
 		part.Color = STREAK_COLOR
@@ -485,7 +638,7 @@ local function launch_projectile(
 		part.Material = Enum.Material.Neon
 		part.Color = PLASMA_COLOR
 	else
-		part.Material = Enum.Material.Plastic
+		part.Material = Enum.Material.Metal
 		part.Color = CASING_COLOR
 	end
 	-- a missile is bigger, and is drawn as it leaves, pointing up
@@ -514,6 +667,7 @@ local function launch_projectile(
 		params = params,
 		homing_target_id = homing_target_id,
 		homing_target_last = nil,
+		homing_projectile_id = homing_projectile_id,
 	}
 	projectiles[id] = projectile
 	if params.line_thickness ~= nil then
@@ -578,10 +732,21 @@ local function fly_projectiles(real_delta: number)
 			end
 			projectile.homing_target_last = target_position
 		end
+		local nuke = if projectile.homing_projectile_id ~= nil
+			then projectiles[projectile.homing_projectile_id]
+			else nil
 		for _ = 1, steps do
 			-- the server steers it the same way (projectile.home), so the drawn missile curves in step with the one that hits
 			if target ~= nil then
 				projectile_mod.home(projectile.flight, projectile.params, target_position, target_velocity, delta)
+			elseif nuke ~= nil then
+				projectile_mod.home(
+					projectile.flight,
+					projectile.params,
+					nuke.flight.position,
+					nuke.flight.velocity,
+					delta
+				)
 			end
 			projectile_mod.step(projectile.flight, projectile.params, delta)
 		end
@@ -595,8 +760,20 @@ local function fly_projectiles(real_delta: number)
 	end
 end
 
+-- The sound of an explosion drawn `radius` across at `at`.
+local function explosion_sound(at: Vector3, radius: number)
+	if radius >= LARGE_EXPLOSION_RADIUS then
+		sounds.play_at("explosion_large", at)
+	else
+		local loudness =
+			math.clamp(radius / EXPLOSION_REFERENCE_RADIUS, SMALL_EXPLOSION_QUIETEST, SMALL_EXPLOSION_LOUDEST)
+		sounds.play_at("explosion_small", at, loudness)
+	end
+end
+
 local function init()
 	RunService.Heartbeat:Connect(fly_projectiles)
+	-- `lightning` is set for a lightning gun's bolt: where each of its sparks jumped to from where it struck
 	weapon_fired.OnClientEvent:Connect(function(shot: {
 		from: Vector3,
 		to: Vector3,
@@ -606,6 +783,8 @@ local function init()
 		beam_time: number?,
 		beam_thickness: number?,
 		beam_color: Color3?,
+		charged: boolean?,
+		lightning: { Vector3 }?,
 		projectile: {
 			id: number,
 			from: Vector3,
@@ -615,8 +794,9 @@ local function init()
 			inherited: Vector3?,
 			late: number?,
 			homing_target_id: EntityId?,
+			homing_projectile_id: number?,
 		}?,
-		impact: { id: number, at: Vector3, radius: number }?,
+		impact: { id: number, at: Vector3, radius: number, airburst: boolean?, through: boolean? }?,
 	})
 		if shot.projectile ~= nil then
 			launch_projectile(
@@ -627,32 +807,68 @@ local function init()
 				shot.projectile.aim,
 				shot.projectile.inherited,
 				shot.projectile.late,
-				shot.projectile.homing_target_id
+				shot.projectile.homing_target_id,
+				shot.projectile.homing_projectile_id
 			)
+			local params = shot.projectile.params
+			-- anti-air is what is drawn as a streak
+			if params.line_thickness ~= nil then
+				sounds.play_at("anti_air", shot.projectile.from)
+			else
+				local pitch = if params.missile ~= nil then MISSILE_SOUND_PITCH else 1
+				sounds.play_at("cannon", shot.projectile.from, 1, pitch)
+			end
+			return
+		end
+		-- a piercing shot going off inside what it is going through flies on, and is not heard for every time it does
+		if shot.impact ~= nil and shot.impact.through == true then
+			draw_explosion(shot.impact.at, shot.impact.radius * 2)
 			return
 		end
 		if shot.impact ~= nil then
 			local look = remove_projectile(shot.impact.id)
-			if look ~= nil and look.explosion == "nuclear" then
+			if shot.impact.airburst == true then
+				draw_airburst(shot.impact.at, shot.impact.radius)
+				explosion_sound(shot.impact.at, shot.impact.radius)
+			elseif look ~= nil and look.explosion == "nuclear" then
 				draw_nuclear(shot.impact.at, shot.impact.radius)
+				sounds.play_at("explosion_large", shot.impact.at, NUKE_SOUND_VOLUME, NUKE_SOUND_PITCH)
+			elseif look ~= nil and look.explosion == "emp" then
+				draw_emp(shot.impact.at, shot.impact.radius)
+				explosion_sound(shot.impact.at, shot.impact.radius)
 			else
 				draw_explosion(shot.impact.at, shot.impact.radius * 2)
+				explosion_sound(shot.impact.at, shot.impact.radius * 2)
 			end
 			return
 		end
 		if shot.explosion ~= nil then
 			draw_explosion(shot.to, shot.explosion)
+			explosion_sound(shot.to, shot.explosion)
 			return
 		end
 		if shot.radius ~= nil then
 			draw_blast(shot.from, shot.to, shot.radius)
+			sounds.play_at("dgun", shot.from)
 			return
 		end
-		local color = shot.beam_color or TEAM_BEAM_COLORS[shot.team]
-		if color == nil then
-			color = Color3.fromRGB(255, 255, 255)
+		if shot.lightning ~= nil then
+			local thickness = shot.beam_thickness or LIGHTNING_THICKNESS
+			draw_bolt(shot.from, shot.to, thickness)
+			for _, tip in shot.lightning do
+				draw_bolt(shot.to, tip, thickness * SPARK_THICKNESS)
+			end
+			sounds.play_at("laser", shot.from, 1, LIGHTNING_SOUND_PITCH)
+			return
 		end
-		draw_beam(shot.from, shot.to, color, shot.beam_thickness or BEAM_THICKNESS, shot.beam_time or BEAM_LIFETIME)
+		local color = charged_beam.color_of(shot.beam_color, shot.team)
+		local thickness, lifetime = shot.beam_thickness or BEAM_THICKNESS, shot.beam_time or BEAM_LIFETIME
+		if shot.charged == true then
+			charged_beam.draw(shot.from, shot.to, color, thickness, lifetime)
+		else
+			draw_beam(shot.from, shot.to, color, thickness, lifetime)
+		end
+		sounds.play_at("laser", shot.from)
 	end)
 end
 

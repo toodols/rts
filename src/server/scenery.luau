@@ -127,9 +127,24 @@ local function put(def_name: string, x: number, z: number, facing: number)
 	state.create_reclaimable(def_name, position, facing)
 end
 
--- Lays out the reclaimables of the map as it is now. Must be called once the map is built, on an empty world.
+-- The wrecks the map starts with (`Preset.wrecks`), each standing where the unit it is the wreck of would.
+local function lay_wrecks(preset: map_presets.Preset)
+	if preset.wrecks == nil then
+		return
+	end
+	for _, fixed in preset.wrecks() do
+		local def = unit_defs.get(fixed.def_name)
+		local x, z = fixed.position.X, fixed.position.Y
+		local position = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
+		state.create_wreck({ def_name = fixed.def_name, position = position, facing = fixed.facing } :: any)
+	end
+end
+
+-- Lays out the reclaimables of the map as it is now, and its wrecks. Must be called once the map is built, on an empty
+-- world.
 local function scatter()
 	local preset = map_presets.get(heightmap.get_preset())
+	lay_wrecks(preset)
 	-- a map that says what lies on it has exactly that, each holding what it holds there
 	if preset.reclaimables ~= nil then
 		for _, fixed in preset.reclaimables() do
@@ -199,11 +214,11 @@ local function scatter()
 	end
 end
 
--- Takes every reclaimable off the map, for a test that wants the world to hold only what it makes.
+-- Takes every reclaimable and wreck off the map, for a test that wants the world to hold only what it makes.
 local function clear()
 	state.flush()
 	for _, entity in state.all() do
-		if entity.kind == "reclaimable" then
+		if entity.kind == "reclaimable" or entity.kind == "wreck" then
 			state.mark_dead(entity)
 		end
 	end

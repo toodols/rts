@@ -6,76 +6,29 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
+local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local pow_types = require(ReplicatedStorage.Shared.pow_types)
 local skins = require(ReplicatedStorage.Shared.skins)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
--- Every map there is, by name, in order.
-local function map_names(): { string }
-	local names = {}
-	for name in map_presets.presets do
-		table.insert(names, name)
-	end
-	table.sort(names)
-	return names
-end
-
 return function(extras: { types: { [string]: any }, commands: { [string]: any } })
-	local names = map_names()
-
-	local function as_map(name: string): { ok: string?, err: string? }
-		if map_presets.presets[name] ~= nil then
-			return { ok = name }
-		end
-		return { err = `there is no map "{name}"; there are {table.concat(names, ", ")}` }
+	local map_names: { string } = {}
+	for name in map_presets.presets do
+		table.insert(map_names, name)
 	end
 
 	-- One of map_presets' maps, by name.
-	extras.types.map = {
-		name = "map",
-		description = "A map, by name",
-		autocomplete_simple = names,
-		coerce_expression = function(expression: any): { ok: string?, err: string? }
-			if expression.type == "string" then
-				return as_map(expression.value)
-			end
-			return { err = `cannot coerce {expression.type} to map` }
-		end,
-		coerce_value = function(value: any): { ok: string?, err: string? }
-			if typeof(value) == "string" then
-				return as_map(value)
-			end
-			return { err = `cannot coerce {typeof(value)} to map` }
-		end,
-	}
-
-	local skin_names = skins.names()
-
-	local function as_skin(name: string): { ok: string?, err: string? }
-		if skins.exists(name) then
-			return { ok = name }
-		end
-		return { err = `there is no skin "{name}"; there are {table.concat(skin_names, ", ")}` }
-	end
-
+	extras.types.map = pow_types.named("map", "A map, by name", map_names)
 	-- One of shared/skins' skins, by name.
-	extras.types.skin = {
-		name = "skin",
-		description = "A skin, by name",
-		autocomplete_simple = skin_names,
-		coerce_expression = function(expression: any): { ok: string?, err: string? }
-			if expression.type == "string" then
-				return as_skin(expression.value)
-			end
-			return { err = `cannot coerce {expression.type} to skin` }
-		end,
-		coerce_value = function(value: any): { ok: string?, err: string? }
-			if typeof(value) == "string" then
-				return as_skin(value)
-			end
-			return { err = `cannot coerce {typeof(value)} to skin` }
-		end,
-	}
+	extras.types.skin = pow_types.named("skin", "A skin, by name", skins.names())
+	-- Whose side an AI that ai_add puts down is on: a team of its own, a new team allied with the team given, or the
+	-- team given itself.
+	extras.types.ai_side = pow_types.named("ai_side", "enemy, ally or join", { "enemy", "ally", "join" })
+	-- Which labs an AI builds its army from; "any" leaves it to the AI's profile, or to the AI.
+	extras.types.ai_line = pow_types.named("ai_line", "bot, vehicle or any labs", { "bot", "vehicle", "any" })
+	-- One of shared/ai_profiles' profiles, by name: how an AI plays.
+	extras.types.ai_profile = pow_types.named("ai_profile", "An AI profile, by name", ai_profiles.names())
 
 	local def_names: { string } = {}
 	for name in unit_defs.defs do

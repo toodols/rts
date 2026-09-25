@@ -48,7 +48,6 @@ local defs: { [string]: EntityDef } = {
 			"scorpion",
 			"pulsar",
 			"persecutor",
-			"eradicator",
 			"catalyst",
 			"apocalypse",
 			"prevailer",
@@ -148,9 +147,11 @@ local defs: { [string]: EntityDef } = {
 				range = studs(900),
 				turret = { turn_rate = math.rad(200) },
 				energy_per_shot = 500,
+				kind = "sniper",
 				beam_time = 0.2,
 				beam_thickness = 0.12,
 				beam_color = Color3.fromRGB(255, 255, 0),
+				charged_beam = true,
 			},
 		},
 		color = Color3.fromRGB(120, 150, 196),
@@ -344,6 +345,8 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = 0,
+		-- armsptk's `paralyzemultiplier` 0.2
+		emp_resistance = 0.8,
 		build_options = nil,
 		weapons = {
 			{
@@ -359,7 +362,7 @@ local defs: { [string]: EntityDef } = {
 					acceleration = studs(70),
 					thrust_time = 3.2,
 					gravity = 12,
-					drag = 1.5,
+					drag = 0.02,
 					aoe_radius = aoe(studs(90)),
 					edge_effectiveness = 0.65,
 				},

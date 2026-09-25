@@ -20,20 +20,21 @@ local UserInputService = game:GetService "UserInputService"
 local React = require(ReplicatedStorage.Packages.react)
 
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local unit_descriptions = require(ReplicatedStorage.Shared.unit_descriptions)
 
-local art = require(ReplicatedStorage.Client.art)
 local build_mode = require(ReplicatedStorage.Client.build_mode)
 local input = require(ReplicatedStorage.Client.input)
 local tutorial = require(ReplicatedStorage.Client.tutorial)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
-local unit_descriptions = require(ReplicatedStorage.Client.ui.unit_descriptions)
 local unlocks = require(ReplicatedStorage.Client.unlocks)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local tutorial_pointer = require(ReplicatedStorage.Client.ui.tutorial_pointer)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
+local unit_icon = require(ReplicatedStorage.Client.ui.unit_icon)
 
 local TutorialPointer = tutorial_pointer.TutorialPointer
+local UnitIcon = unit_icon.UnitIcon
 
 type EntityView = use_entities.EntityView
 type Content = tooltip.Content
@@ -43,22 +44,8 @@ local queue_production: RemoteEvent = ReplicatedStorage.Shared.QueueProduction
 -- Holding shift when clicking a factory option adds a batch instead of a single unit.
 local SHIFT_BATCH = 5
 
--- How an icon looks at its model: from ahead and to the right, a little from above, through a narrow lens so it
--- is not distorted. The model's bounding sphere is fitted to `ICON_FIT` of the frame's height, and lifted by
--- `ICON_LIFT` of its radius to leave the bottom of the cell to the name and cost written over it.
-local ICON_FOV = 30
-local ICON_YAW = math.rad(35)
-local ICON_PITCH = math.rad(28)
-local ICON_FIT = 0.85
-local ICON_LIFT = 0.3
--- A locked option's picture: its colours drained to grey and darkened by this much.
-local LOCKED_SHADE = 0.55
-
--- `color` as a grey of the same brightness, darkened.
-local function drained(color: Color3): Color3
-	local luminance = (0.299 * color.R + 0.587 * color.G + 0.114 * color.B) * LOCKED_SHADE
-	return Color3.new(luminance, luminance, luminance)
-end
+-- How much of an option's cell, at the bottom, its picture leaves to the name and cost written over it.
+local OPTION_FOOT = 0.3
 
 -- What a locked option says when it is hovered.
 local function locked_tooltip(def_name: string): Content
@@ -82,73 +69,6 @@ local function use_unlocks(): number
 		end)
 	end, {})
 	return version
-end
-
--- A picture of `def_name`'s own art, in `team`'s colours, drawn in a ViewportFrame from the meshes the client
--- already built for it (Client.art). A ViewportFrame only redraws when what it holds changes, and nothing in it
--- moves, so these cost nothing once they are up. Art still being built shows once it is. A `locked` one is grey.
-local function Icon(props: { def_name: string, team: Color3?, locked: boolean?, tag: string?, LayoutOrder: number? })
-	local frame_ref = React.useRef(nil :: ViewportFrame?)
-	local built, set_built = React.useState(0)
-
-	React.useEffect(function(): (() -> ())?
-		local viewport = frame_ref.current
-		if viewport == nil then
-			return nil
-		end
-		local model = art.ghost(props.def_name, props.team)
-		if model == nil then
-			if art.pending(props.def_name) then
-				return art.when_built(props.def_name, function()
-					set_built(function(count: number)
-						return count + 1
-					end)
-				end)
-			end
-			return nil
-		end
-		if props.locked == true then
-			for _, part in model:GetDescendants() do
-				if part:IsA "BasePart" then
-					part.Color = drained(part.Color)
-					part.Material = Enum.Material.SmoothPlastic
-				end
-			end
-		end
-
-		local box, size = model:GetBoundingBox()
-		local center = box.Position
-		local radius = size.Magnitude / 2
-		local distance = radius / math.sin(math.rad(ICON_FOV) / 2) * ICON_FIT
-		local direction = Vector3.new(
-			math.sin(ICON_YAW) * math.cos(ICON_PITCH),
-			math.sin(ICON_PITCH),
-			math.cos(ICON_YAW) * math.cos(ICON_PITCH)
-		)
-		local camera = Instance.new "Camera"
-		camera.FieldOfView = ICON_FOV
-		-- moving the camera down in its own frame moves the model up in the picture
-		camera.CFrame = CFrame.lookAt(center + direction * distance, center) * CFrame.new(0, -radius * ICON_LIFT, 0)
-		camera.Parent = viewport
-		viewport.CurrentCamera = camera
-		model.Parent = viewport
-
-		return function()
-			model:Destroy()
-			camera:Destroy()
-		end
-	end, { props.def_name, props.team, props.locked, built } :: { any })
-
-	local tag = props.tag or "build-option-icon"
-	return React.createElement("ViewportFrame", {
-		[React.Tag] = if props.locked == true then `{tag} locked-icon` else tag,
-		LayoutOrder = props.LayoutOrder,
-		ref = frame_ref,
-		-- lit from ahead and above, the same side it is seen from, with enough ambient that the far side reads
-		Ambient = Color3.fromRGB(150, 150, 160),
-		LightColor = Color3.fromRGB(255, 250, 240),
-		LightDirection = Vector3.new(-0.5, -1, -0.7),
-	})
 end
 
 local function whole(value: number): string
@@ -325,7 +245,7 @@ local function CategoryRow(
 			[React.Tag] = "build-category-body",
 			LayoutOrder = 2,
 		}, {
-			Icon = React.createElement(Icon, {
+			Icon = React.createElement(UnitIcon, {
 				def_name = props.def_name,
 				team = props.team,
 				locked = props.locked,
@@ -387,7 +307,13 @@ local function Option(props: {
 			else nil,
 		-- the icon and the key sit over the cell where they like, so they are kept out of the body, whose list
 		-- layout would stack them with the text
-		Icon = React.createElement(Icon, { def_name = props.def_name, team = props.team, locked = props.locked }),
+		Icon = React.createElement(UnitIcon, {
+			def_name = props.def_name,
+			team = props.team,
+			locked = props.locked,
+			foot = OPTION_FOOT,
+			tag = "build-option-icon",
+		}),
 		-- a locked option's key does nothing, so it shows the lock where the key would be
 		Key = if props.locked
 			then React.createElement(LockBadge, { tag = "build-option-lock" })

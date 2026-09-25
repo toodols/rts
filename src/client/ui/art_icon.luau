@@ -6,6 +6,7 @@
 -- red (`shake`: bumped each time it should, when what was pressed does not work). Only the bright parts of a piece
 -- light or glow: a key's dark glyph stays dark on its lit cap, so it can still be read. Nothing in it moves but for a
 -- shake, so it costs nothing once up.
+-- A `flat` picture (the "vector" icons, icon_*) is unlit, so each part shows exactly its own colour.
 -- While its art is missing it shows `fallback` as text instead.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -99,6 +100,7 @@ local function ArtIcon(props: {
 	glow: boolean?,
 	shake: number?,
 	fallback: string?,
+	flat: boolean?,
 	tag: string,
 	LayoutOrder: number?,
 	children: any?,
@@ -254,9 +256,10 @@ local function ArtIcon(props: {
 		[React.Tag] = props.tag,
 		LayoutOrder = props.LayoutOrder,
 		ref = frame_ref,
-		-- lit from ahead and above, the side it is seen from, with enough ambient that the keys' sides read
-		Ambient = Color3.fromRGB(150, 150, 160),
-		LightColor = Color3.fromRGB(255, 250, 240),
+		-- lit from ahead and above, the side it is seen from, with enough ambient that the keys' sides read; a flat
+		-- picture has only ambient light, at full, so no face is shaded
+		Ambient = if props.flat == true then Color3.new(1, 1, 1) else Color3.fromRGB(150, 150, 160),
+		LightColor = if props.flat == true then Color3.new(0, 0, 0) else Color3.fromRGB(255, 250, 240),
 		LightDirection = Vector3.new(-0.3, -1, -0.6),
 	}, props.children)
 end

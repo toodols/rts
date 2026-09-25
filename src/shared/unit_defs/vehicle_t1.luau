@@ -144,7 +144,7 @@ local defs: { [string]: EntityDef } = {
 					acceleration = studs(110),
 					thrust_time = 1.7,
 					gravity = 12,
-					drag = 1.5,
+					drag = 0.02,
 					aoe_radius = aoe(studs(48) / 3),
 					leads = true,
 				},

@@ -70,6 +70,17 @@ that weapon's aim (a weapon with a `turret` in its def turns in the sim and fire
 it does not put in a piece is part of the static `base`. Materials with "accent" in their name take the team's
 colour. The first object a generator returns is its footprint, which the model is centred on.
 
+## HUD icons
+
+The order and weapon icons (`generators/icon_*.py`, drawn with `icon_common`) are flat vector pictures: flat fills with
+a dark outline, every one in the same fill colour (`icon_common.PALETTE`; the build refuses any other). They are
+built into `src/shared/ui_art/` (`-LuauOut src/shared/ui_art/icon_<name>.luau`) and shown with
+`ArtIcon { flat = true, view = "front" }`, which draws them unlit. To look them over without Blender or Studio:
+
+```powershell
+python tools/model_pipeline/icon_sheet.py [names...]   # -> build/icons_sheet.png, big and at 48/32/24 px
+```
+
 ## Getting the .glb into Roblox Studio
 
 For a model to be uploaded for good, two ways, pick whichever fits:

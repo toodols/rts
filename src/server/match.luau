@@ -55,6 +55,8 @@ local current: Match? = nil
 local team_by_user: { [number]: TeamId } = {}
 -- seated players who have been here, even if they have left since
 local arrived_users: { [number]: boolean } = {}
+-- seated players who have been here and left, until they come back
+local left_users: { [number]: boolean } = {}
 local arrival_deadline = 0
 -- who came only to watch, by user id
 local spectating: { [number]: boolean } = {}
@@ -214,6 +216,7 @@ local function studio_match(mission_id: string): Match?
 		seats = table.freeze({}),
 		bonuses = table.freeze({}),
 		ally_griefing = false,
+		end_mode = game_modes.DEFAULT_END_MODE,
 	})
 end
 
@@ -278,11 +281,34 @@ local function seated_count(): number
 	return math.max(game_modes.player_count(match.seats), if #match.seats == 0 then 1 else 0)
 end
 
+-- Called as the seated player `user_id` arrives. A Studio test, which nobody plays, calls it for the seats it hands in.
+local function arrived_user(user_id: number)
+	if team_by_user[user_id] ~= nil then
+		arrived_users[user_id] = true
+		left_users[user_id] = nil
+	end
+end
+
 -- Called as each player arrives.
 local function arrived(player: Player)
-	if team_by_user[player.UserId] ~= nil then
-		arrived_users[player.UserId] = true
+	arrived_user(player.UserId)
+end
+
+-- Called as the player `user_id` leaves.
+local function left(user_id: number)
+	if arrived_users[user_id] == true then
+		left_users[user_id] = true
 	end
+end
+
+-- Whether the seated player `user_id` has been here at all this game.
+local function has_arrived(user_id: number): boolean
+	return arrived_users[user_id] == true
+end
+
+-- Whether the seated player `user_id` is here now: arrived, and not left since.
+local function is_here(user_id: number): boolean
+	return arrived_users[user_id] == true and left_users[user_id] ~= true
 end
 
 -- The seated players still being waited for: not arrived yet, and not given up on. Spectators are not waited for.
@@ -328,6 +354,10 @@ return table.freeze({
 	is_spectator = is_spectator,
 	seated_count = seated_count,
 	arrived = arrived,
+	arrived_user = arrived_user,
+	left = left,
+	has_arrived = has_arrived,
+	is_here = is_here,
 	is_awaiting = is_awaiting,
 	update = update,
 	get = get,

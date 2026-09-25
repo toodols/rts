@@ -31,6 +31,13 @@
 	}
 }
 
+// Its icon, or the empty space of one for a command that has none.
+.command-icon {
+	width: 20px;
+	height: 20px;
+	background-color: transparent;
+}
+
 .command-name {
 	color: var(--Text);
 	font-size: 13px;

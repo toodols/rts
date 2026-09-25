@@ -7,7 +7,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local config = require(ReplicatedStorage.Shared.config)
 local types = require(ReplicatedStorage.Shared.types)
 
-local BLUEPRINT_TRANSPARENCY = 0.4
+local BLUEPRINT_TRANSPARENCY = 0
 local BLUEPRINT_MATERIAL = Enum.Material.ForceField
 local WRECK_COLOR = Color3.fromRGB(96, 88, 80)
 local WRECK_TRANSPARENCY = 0.15

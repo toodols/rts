@@ -20,9 +20,12 @@ local entities: { [EntityId]: Entity } = {}
 -- They are still reachable by id immediately, which is what construction needs within the tick.
 local spawning: { [EntityId]: Entity } = {}
 -- What each transport is carrying, by transport id. Something carried is inactive: it is in neither table
--- above, so nothing in the simulation sees it, shoots it, orders it or moves it, and it does nothing until it
--- is set down again. It is still drawn, hanging from its transport (`instances` reads it from here).
+-- above, so it does nothing, takes no orders and is not moved until it is set down again. It is still drawn,
+-- hanging from its transport (`instances` reads it from here), and it can still be shot at and reclaimed, which
+-- is why `find` looks in here as `get` does not.
 local holds: { [EntityId]: { Entity } } = {}
+-- The transport each carried thing is in, by the carried thing's id.
+local carriers: { [EntityId]: EntityId } = {}
 local teams: { [TeamId]: Team } = {}
 local next_entity_id = 1
 
@@ -139,6 +142,7 @@ local function create_entity(
 		damage_dealt = 0,
 		score_dealt = 0,
 		experience = 0,
+		emp = 0,
 		alive = true,
 	}
 
@@ -199,6 +203,7 @@ local function create_wreck(source: Entity): Entity
 		damage_dealt = 0,
 		score_dealt = 0,
 		experience = 0,
+		emp = 0,
 		alive = true,
 	}
 
@@ -257,6 +262,7 @@ local function create_reclaimable(def_name: string, position: Vector3, facing: n
 		damage_dealt = 0,
 		score_dealt = 0,
 		experience = 0,
+		emp = 0,
 		alive = true,
 	}
 
@@ -305,6 +311,31 @@ local function stow(transport_id: EntityId, cargo: Entity)
 		holds[transport_id] = hold
 	end
 	table.insert(hold, cargo)
+	carriers[cargo.id] = transport_id
+end
+
+-- The transport `id` is being carried in, if it is being carried.
+local function carrier_of(id: EntityId): EntityId?
+	return carriers[id]
+end
+
+-- `get`, or failing that the living thing `id` in a transport's hold: what something can be shot at or reclaimed
+-- by, which a thing being carried still can be.
+local function find(id: EntityId): Entity?
+	local entity = get(id)
+	if entity ~= nil then
+		return entity
+	end
+	local transport_id = carriers[id]
+	if transport_id == nil then
+		return nil
+	end
+	for _, cargo in holds[transport_id] do
+		if cargo.id == id then
+			return if cargo.alive then cargo else nil
+		end
+	end
+	return nil
 end
 
 -- What the transport `transport_id` is carrying.
@@ -327,6 +358,7 @@ local function unstow(transport_id: EntityId, cargo: Entity, position: Vector3)
 		return
 	end
 	table.remove(hold, index)
+	carriers[cargo.id] = nil
 	cargo.position = position
 	cargo.velocity = Vector3.zero
 	spawning[cargo.id] = cargo
@@ -345,13 +377,25 @@ end
 
 -- A transport that is gone takes whatever it was carrying with it.
 local function drop_hold(transport_id: EntityId)
+	local hold = holds[transport_id]
+	if hold == nil then
+		return
+	end
+	for _, cargo in hold do
+		carriers[cargo.id] = nil
+	end
 	holds[transport_id] = nil
 end
 
 -- Entities are flagged rather than deleted mid-tick so that iteration in progress stays valid;
--- `reap` clears them out at the end of the tick.
+-- `reap` clears them out at the end of the tick. Something that dies in a hold is taken out of it where it hangs,
+-- so that `reap` finds it as it does anything else.
 local function mark_dead(entity: Entity)
 	entity.alive = false
+	local transport_id = carriers[entity.id]
+	if transport_id ~= nil then
+		unstow(transport_id, entity, entity.position)
+	end
 end
 
 local function reap(): { EntityId }
@@ -381,6 +425,8 @@ return table.freeze({
 	create_wreck = create_wreck,
 	create_reclaimable = create_reclaimable,
 	get = get,
+	find = find,
+	carrier_of = carrier_of,
 	all = all,
 	flush = flush,
 	stow = stow,

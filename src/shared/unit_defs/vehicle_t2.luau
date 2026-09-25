@@ -47,7 +47,6 @@ local defs: { [string]: EntityDef } = {
 			"scorpion",
 			"pulsar",
 			"persecutor",
-			"eradicator",
 			"catalyst",
 			"prevailer",
 			"apocalypse",
@@ -132,7 +131,8 @@ local defs: { [string]: EntityDef } = {
 		assisting = false,
 		max_water_depth = studs(9999),
 		build_options = nil,
-		air = { altitude = 7, climb_speed = 20 },
+		-- legdrone's `cruisealtitude` 78
+		air = { altitude = studs(78), climb_speed = 20 },
 		weapons = {
 			{
 				damage = 24,
@@ -310,6 +310,8 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = studs(5000),
+		-- corparrow's `paralyzemultiplier` 0.2
+		emp_resistance = 0.8,
 		build_options = nil,
 		weapons = {
 			{
@@ -332,6 +334,53 @@ local defs: { [string]: EntityDef } = {
 			},
 		},
 		color = Color3.fromRGB(150, 176, 120),
+	},
+
+	-- armmanni, Armada's Starlight: a slow tank carrying a long-range tachyon beam that hits very hard and costs a
+	-- thousand energy a shot. Its gun fires only into the half ahead of it (BAR's maxangledif 180 about maindir
+	-- 0 0 1), and it goes up in BAR's "penetrator" blast when it dies. BAR's 1000 damage to commanders is not
+	-- modelled: every target takes the default 2500. Everything else here is BAR's.
+	starlight = {
+		name = "starlight",
+		slope_class = "HTANK4",
+		vehicle = true,
+		weight_class = "heavy",
+		display_name = "Starlight",
+		subtitle = "Mobile tachyon weapon",
+		kind = "unit",
+		-- 39 x 49 x 39 elmos
+		collider = capsule(39, 49, 39),
+		metal_cost = 1200,
+		energy_cost = 18500,
+		buildpower_cost = 33000,
+		health = 2800,
+		buildpower = nil,
+		acceleration = studs_per_second_squared(0.00715),
+		max_speed = studs(42),
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		build_options = nil,
+		weapons = {
+			{
+				damage = 2500,
+				reload = 4.7,
+				range = studs(950),
+				energy_per_shot = 1000,
+				turret = { turn_rate = math.rad(50) },
+				-- the forward half: BAR's maxangledif is the whole cone, this is half of it
+				fire_arc = math.rad(90),
+				target_layer = "ground",
+				beam_time = 0.3,
+				beam_thickness = 1,
+				beam_color = Color3.fromRGB(0, 0, 255),
+				charged_beam = true,
+			},
+		},
+		death_explosion = { radius = studs(420), damage = 980 },
+		color = Color3.fromRGB(120, 150, 196),
 	},
 }
 

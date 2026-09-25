@@ -37,6 +37,8 @@ local defs: { [string]: EntityDef } = {
 		assisting = true,
 		build_range = studs(145),
 		max_water_depth = studs(5000),
+		-- armcom's `paralyzemultiplier` 0
+		emp_resistance = 1,
 		build_options = {
 			"bot_lab",
 			"vehicle_lab",
@@ -286,7 +288,7 @@ local defs: { [string]: EntityDef } = {
 					acceleration = studs(120),
 					thrust_time = 2,
 					gravity = 12,
-					drag = 1.5,
+					drag = 0.02,
 					aoe_radius = aoe(studs(48) / 3),
 				},
 			},
@@ -334,7 +336,7 @@ local defs: { [string]: EntityDef } = {
 					acceleration = studs(141),
 					thrust_time = 1.75,
 					gravity = 12,
-					drag = 1.5,
+					drag = 0.02,
 					aoe_radius = aoe(studs(48) / 3),
 					line_thickness = 0.3,
 					homing = true,

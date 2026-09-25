@@ -1,4 +1,5 @@
--- The HUD's own 3D pictures: keys, a mouse, a cursor, a tick and a cross, for the tutorial's cards. Their art is
+-- The HUD's own 3D pictures: keys, a mouse, a cursor, a tick and a cross, for the tutorial's cards (tutorial_*), and
+-- flat icons for orders and weapon kinds (icon_attack, icon_laser, ...). Their art is
 -- made by tools/model_pipeline like any def's, one module each in Shared.ui_art in the same format as Shared.art's,
 -- but belongs to no def: each is built here once, the first time it is asked for, and every picture of it is a copy.
 -- Each MeshPart is named after its art group (a key, a mouse button), so a picture can light the part it means.
@@ -110,16 +111,17 @@ local function when_built(name: string, callback: () -> ()): () -> ()
 	end
 end
 
--- Builds every picture there is and returns once they are all built or failed, or `timeout` seconds have gone by. A
--- game that shows them (the tutorial) calls it before anything else builds meshes, since the client's EditableMesh
--- memory is shared, and what is built last is what runs out of it.
+-- Builds every one of the tutorial's pictures and returns once they are all built or failed, or `timeout` seconds
+-- have gone by. The tutorial calls it before anything else builds meshes, since the client's EditableMesh memory is
+-- shared, and what is built last is what runs out of it. The icons are left to be built when first asked for, so
+-- they cannot crowd the tutorial's pictures out of that memory.
 local function preload(timeout: number)
 	local folder = ReplicatedStorage.Shared:FindFirstChild "ui_art"
 	if folder == nil then
 		return
 	end
 	for _, module in folder:GetChildren() do
-		if module:IsA "ModuleScript" then
+		if module:IsA "ModuleScript" and string.sub(module.Name, 1, 9) == "tutorial_" then
 			build(module.Name)
 		end
 	end

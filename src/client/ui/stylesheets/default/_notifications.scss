@@ -1,0 +1,74 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// The notifications: toasts stacked down the top left, each a plate with a stripe of its tone down its left edge.
+// An ally's request or gift has the ally's colour on the stripe instead, set inline.
+.toasts {
+	position: absolute;
+	top: space(4);
+	left: space(4);
+	width: 300px;
+	height: auto;
+	@include stack(column, space(2));
+	align-items: stretch;
+	z-index: 30;
+}
+
+.toast {
+	width: 100%;
+	height: auto;
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	@include plate;
+	outline: 1px solid $edge;
+	transition: background-color $fast $ease-out;
+
+	&:hover {
+		background-color: $steel-lit;
+	}
+
+	&.danger {
+		outline: 1px solid veil($danger, 0.7);
+	}
+
+	&.caution {
+		outline: 1px solid veil($caution, 0.7);
+	}
+}
+
+.toast-stripe {
+	width: 4px;
+	height: auto;
+	align-self: stretch;
+}
+
+.toast.danger .toast-stripe {
+	background-color: var(--Danger);
+}
+
+.toast.caution .toast-stripe {
+	background-color: var(--Caution);
+}
+
+.toast-text {
+	height: auto;
+	flex-grow: 1;
+	padding: space(2) space(3);
+	font-family: Source Sans Pro;
+	font-weight: 600;
+	font-size: 15px;
+	text-align: left;
+	color: var(--Text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.toast.danger .toast-text {
+	color: var(--Danger);
+}
+
+.toast.caution .toast-text {
+	color: var(--Caution);
+}

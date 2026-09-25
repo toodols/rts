@@ -1,15 +1,18 @@
 -- Transports. A transport picks something up, carries it hanging beneath it, and sets it down where it is
 -- told to. It can pick up its own side's units and the enemy's, and static defences as well as units, so long
--- as the thing has a weight class the transport can lift. What it carries is kept by `state`, in a hold.
+-- as the thing has a weight class the transport can lift, with the one exception of an enemy commander. What it
+-- carries is kept by `state`, in a hold.
 --
--- Something being carried is inactive: it is out of the simulation, so it cannot act and nothing acts on it.
--- It is still drawn, dangling from the transport on a rope, swinging as the transport turns and accelerates.
+-- Something being carried is inactive: it is out of the simulation, so it cannot act. It is still drawn, dangling
+-- on a rope straight beneath the transport, and it can still be shot at where it hangs and reclaimed from under it
+-- (`state.find`); what kills it there drops its wreck to the ground under it.
 --
 -- Picking something up is delicate. The transport has to come down to it until they are effectively touching,
 -- and be very nearly still beside it, so a thing that moves about is harder to catch, an enemy that moves
 -- harder still, and a tower that cannot move as easy as anything. A hold has a capacity in slots, and what goes
 -- in takes as many as `unit_defs.transport_slots` says. A light transport takes only light things where a
--- heavy one takes light and heavy. A transport that is destroyed takes what it carries down with it.
+-- heavy one takes light and heavy. A transport that is lost kills what it carries (combat.lose_cargo), which
+-- falls to the ground where it hung; a commander always leaves its wreck there.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -23,6 +26,7 @@ local placement = require(script.Parent.placement)
 local combat = require(script.Parent.combat)
 local movement = require(script.Parent.movement)
 local air = require(script.Parent.air)
+local alliances = require(script.Parent.alliances)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -59,7 +63,8 @@ local function slots_used(transport_id: EntityId): number
 	return used
 end
 
--- Whether `transport` can pick `cargo` up at all, if it were in reach. Whose it is does not matter.
+-- Whether `transport` can pick `cargo` up at all, if it were in reach. Whose it is does not matter, except that
+-- an enemy commander can never be carried off.
 local function can_load(transport: Entity, cargo: Entity): boolean
 	if transport.alive == false or transport.state ~= "active" or cargo.alive == false or cargo.state ~= "active" then
 		return false
@@ -67,7 +72,14 @@ local function can_load(transport: Entity, cargo: Entity): boolean
 	if transport.id == cargo.id or cargo.kind == "wreck" or cargo.kind == "reclaimable" then
 		return false
 	end
+	-- what is already in a hold is not taken out of it by another transport
+	if state.carrier_of(cargo.id) ~= nil then
+		return false
+	end
 	local cargo_def = unit_defs.of(cargo)
+	if cargo_def.nametag == true and alliances.are_allied(transport.team, cargo.team) == false then
+		return false
+	end
 	if unit_defs.can_carry(unit_defs.of(transport), cargo_def) == false then
 		return false
 	end
@@ -119,7 +131,9 @@ end
 -- touching it, or as near as the ground lets it come and within a rope's length, and moving so little relative
 -- to it that the hook can catch. It is stricter for the enemy's
 -- things, which makes any of them that are moving hard to get hold of, and easy for a tower, which never moves.
-local function in_grasp(transport: Entity, cargo: Entity): boolean
+-- Whether `cargo` is within the reach of `transport`'s hook, however they are moving: the first half of `in_grasp`, and
+-- all a pilot has to manage (see server/possession.luau).
+local function in_reach(transport: Entity, cargo: Entity): boolean
 	if geometry.distance_2d(transport.position, cargo.position) > config.TRANSPORT_LOAD_RANGE then
 		return false
 	end
@@ -132,7 +146,11 @@ local function in_grasp(transport: Entity, cargo: Entity): boolean
 	if position.Y <= air.resting_height(transport_def, position.X, position.Z) + config.TRANSPORT_LOAD_HEIGHT then
 		reach += config.TRANSPORT_ROPE
 	end
-	if underside - top > reach then
+	return underside - top <= reach
+end
+
+local function in_grasp(transport: Entity, cargo: Entity): boolean
+	if in_reach(transport, cargo) == false then
 		return false
 	end
 	local limit = if cargo.team == transport.team
@@ -149,8 +167,9 @@ local function load(transport: Entity, cargo: Entity)
 	state.stow(transport.id, cargo)
 end
 
--- Where the cargo at `index` of `count` hangs from `transport`: on a rope below it, spread round its middle if
--- there is more than one thing, and swung back against the way the transport is moving.
+-- Where the cargo at `index` of `count` hangs from `transport`: on a rope straight below it, spread round its
+-- middle if there is more than one thing. Never offset by the transport's velocity: that trails the cargo behind
+-- it for as long as it flies, which reads as lag, not swing.
 local function dangle_position(transport: Entity, cargo: Entity, index: number, count: number): Vector3
 	local transport_def = unit_defs.of(transport)
 	local cargo_def = unit_defs.of(cargo)
@@ -163,10 +182,9 @@ local function dangle_position(transport: Entity, cargo: Entity, index: number, 
 		local angle = (index - 1) / count * math.pi * 2
 		spread = Vector3.new(math.cos(angle), 0, math.sin(angle)) * config.TRANSPORT_CARGO_SPREAD
 	end
-	local sway = geometry.flatten(transport.velocity) * -config.TRANSPORT_SWAY
 
-	local x = transport.position.X + spread.X + sway.X
-	local z = transport.position.Z + spread.Z + sway.Z
+	local x = transport.position.X + spread.X
+	local z = transport.position.Z + spread.Z
 	-- it can be lowered no further than the ground
 	local y = math.max(transport.position.Y - drop, air.resting_height(cargo_def, x, z))
 	return Vector3.new(x, y, z)
@@ -189,11 +207,15 @@ local function set_down_height(transport: Entity): number
 	return height
 end
 
+-- Whether `transport` is low enough to let go of what it carries.
+local function low_enough(transport: Entity): boolean
+	return transport.position.Y <= set_down_height(transport) + config.TRANSPORT_LOAD_HEIGHT
+end
+
 -- Brings `transport` down to set what it carries down, and returns whether it is low enough to let go of it.
 local function lower(transport: Entity): boolean
-	local height = set_down_height(transport)
-	movement.set_hover(transport, height)
-	return transport.position.Y <= height + config.TRANSPORT_LOAD_HEIGHT
+	movement.set_hover(transport, set_down_height(transport))
+	return low_enough(transport)
 end
 
 -- Hangs everything a transport carries from it. Run once a step, after everything has moved.
@@ -275,8 +297,10 @@ return table.freeze({
 	can_load = can_load,
 	reach_for = reach_for,
 	in_grasp = in_grasp,
+	in_reach = in_reach,
 	load = load,
 	lower = lower,
+	low_enough = low_enough,
 	tick = tick,
 	unload = unload,
 })

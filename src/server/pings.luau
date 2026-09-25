@@ -1,6 +1,6 @@
 -- Pings: a player marks a spot on the map (a double click of the middle mouse button, see client/pings.luau), and it
--- is shown to them and to everyone on a team allied with theirs, and to nobody else. A player on no team, one only
--- watching, cannot ping.
+-- is shown to them and to everyone on a team allied with theirs, and to nobody else, with the name of the team that
+-- pinged. A player on no team, one only watching, cannot ping.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -10,6 +10,7 @@ local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
 local players = require(script.Parent.players)
+local state = require(script.Parent.state)
 local alliances = require(script.Parent.alliances)
 
 type TeamId = types.TeamId
@@ -31,7 +32,8 @@ local function on_ping(player: Player, point: unknown)
 		return
 	end
 	local team = players.team_of(player)
-	if team == nil then
+	local owner = if team ~= nil then state.get_team(team) else nil
+	if team == nil or owner == nil then
 		return
 	end
 	local now = os.clock()
@@ -45,7 +47,7 @@ local function on_ping(player: Player, point: unknown)
 	for _, other in Players:GetPlayers() do
 		local other_team = players.team_of(other)
 		if other_team ~= nil and alliances.are_allied(other_team, team) then
-			ping:FireClient(other, { at = at, team = team :: TeamId })
+			ping:FireClient(other, { at = at, team = team :: TeamId, name = owner.name })
 		end
 	end
 end

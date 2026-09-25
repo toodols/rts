@@ -89,7 +89,8 @@ local function info(preset_name: string): MapInfo
 		description = preset.description,
 		size = size,
 		units = size / UNIT_STUDS,
-		starts = if bar ~= nil then #bar.starts else config.START_SLOTS,
+		-- a map drawn with more start boxes than the usual starts, like pinwheel's or prairie's eight, seats one to each
+		starts = if bar ~= nil then #bar.starts else math.max(config.START_SLOTS, #preset.start_boxes),
 		from_bar = bar ~= nil,
 	})
 	info_by_preset[preset_name] = made

@@ -11,9 +11,10 @@ import math
 
 from . import common
 from . import defense_b_common as d
+from . import tachyon_common as t
 
 KEY = "pulsar"
-GLOW = (0.2, 0.8, 1.0, 1.0)  # tachyon cyan
+GLOW = t.GLOW  # tachyon cyan
 
 
 def accent(o):
@@ -28,20 +29,8 @@ def _head(swivel):
     sx, sy, sz = swivel
     housing = accent(d.block("housing", 5.0, 5.2, 2.7, origin=(sx, sy + 0.4, sz), top=(3.8, 3.0), top_offset=(0.0, 0.6)))
 
-    bz = sz + 1.25
-    breech = (sx, sy - 1.6, bz)
-    barrel = d.trim(d.prism("barrel", 0.55, 7.6, 6, origin=breech, cap_top=False))
-    d.forward([barrel], breech)
-    lit = []
-    for y in (-3.3, -5.6):
-        at = (sx, sy + y, bz)
-        coil = d.block("coil", 1.35, 1.35, 0.7, origin=at, cap_bottom=True)
-        coil.rotation_euler = (0.0, 0.0, math.radians(45.0))
-        lit.append(d.forward([coil], at)[0])
-    at = (sx, sy - 9.2, bz)
-    lit.append(d.forward([d.pyramid("tip", 1.0, 1.0, 0.9, origin=at)], at)[0])
-    for o in lit:
-        glow(o)
+    # the tachyon accelerator barrel, shared with the Starlight (tachyon_common)
+    barrel, lit = t.barrel((sx, sy - 1.6, sz + 1.25), trim=d.trim, glow=glow)
 
     head = d.merged("head", [housing], origin=swivel)
     dark = d.merged("head_dark", [barrel], origin=swivel)

@@ -1,12 +1,13 @@
 -- The pool skin's pool donuts (shared/skins/pool.luau): inflatable floats worn round the waist of every unit that wears
--- the skin, as big as the unit is. Each unit wears one of the skin's floats (a striped ring, an iced donut, a
+-- the skin, as big as the unit is; round an aircraft's fuselage, facing its nose; and on a ship, a row of small ones
+-- hung down each side of its hull, all of which come and go together. Each unit wears one of the skin's floats (a striped ring, an iced donut, a
 -- lifebuoy, now and then a rubber ducky), picked by weight from its entity id, so the same one for every player. It is
 -- only drawn, and nothing of it touches the sim.
 --
 -- What happens to a donut is the server's to say (server/donuts.luau), so that every player sees the same: when it
 -- pops (a hit), how hard it shakes and when it flies off (a fast aircraft), when it floats off (deep under the water),
 -- and when a new one goes on. art.luau says, each frame, where the waist of each dressed unit is, how big the unit is,
--- and whether its skin puts a donut on it, and this keeps the donut there and plays what the server says: a pop is a
+-- and whether its skin puts a donut on it (where each of its rings goes and how big its hole is), and this keeps the donut there and plays what the server says: a pop is a
 -- puff and a flutter of torn vinyl, flying off is the donut tumbling away to lie on the ground a while, floating off
 -- is the donut rising to bob on the surface for `float_seconds`, and a new one inflates.
 --
@@ -37,8 +38,10 @@ local MATERIAL = Enum.Material.SmoothPlastic
 local REFLECTANCE = 0.12
 -- The colour a team-coloured stripe has before its team is known.
 local NO_TEAM = Color3.fromRGB(230, 60, 50)
--- How wide the donut's art is, in its own units: 2 * (1 + its tube).
-local ART_WIDTH = 2.84
+-- How far the donut's tube reaches either way from its ring, and so how wide its art is, in its own units: every
+-- float is a ring 1 out (tools/model_pipeline/generators/pool_float_common).
+local ART_TUBE = 0.42
+local ART_WIDTH = 2 * (1 + ART_TUBE)
 -- Inflating: how many seconds it takes, and how far past full size it swells before it settles.
 local GROW_TIME = 0.45
 local GROW_OVERSHOOT = 0.15
@@ -68,6 +71,8 @@ local LOOSE_LIFETIME = 8
 -- speed the air takes each second (a lot: they flutter), how fast they twist, and how long they last. The puff is a
 -- white burst of air that swells and fades in `POP_TIME`.
 local SCRAPS = 10
+-- the fewest scraps each ring of a donut of several rings (a ship's) tears into; they share `SCRAPS` otherwise
+local SCRAPS_LEAST = 4
 local SCRAP_SIZE = 0.2
 local SCRAP_SPEED = 12
 local SCRAP_UP = 8
@@ -117,13 +122,14 @@ type Donut = {
 	variant: DonutVariant,
 	shape: Shape,
 	folder: Folder,
-	parts: { MeshPart },
+	-- the parts of each of its rings, one for each place it is worn
+	rings: { { MeshPart } },
 	status: Status,
 	-- seconds it has been inflating, while it is
 	grown: number,
 	-- the server's word on how it last came off (`donut_event`), to see a new one by
 	event: string?,
-	-- where its waist was last frame, and how fast it is going, smoothed
+	-- where its first ring was last frame, and how fast it is going, smoothed
 	last_position: Vector3?,
 	velocity: Vector3,
 	-- how big it is drawn against its art, and what its parts were last sized at (that times how inflated it is)
@@ -313,9 +319,32 @@ local function show(donut: Donut, shown: boolean)
 		return
 	end
 	donut.shown = shown
-	for _, part in donut.parts do
-		part.Transparency = if shown then 0 else 1
+	for _, parts in donut.rings do
+		for _, part in parts do
+			part.Transparency = if shown then 0 else 1
+		end
 	end
+end
+
+-- Gives `donut` new rings to reinflate, once its old ones have gone loose.
+local function renew(donut: Donut)
+	for index in donut.rings do
+		donut.rings[index] = copy_parts(donut.shape, donut.folder)
+	end
+	donut.sized = nil
+	donut.painted = nil
+	donut.shown = false
+	donut.status = "off"
+end
+
+-- Lets go of `parts`, which are loose now, for `step_loose` to move.
+local function loosen(parts: { MeshPart }): { BasePart }
+	local loosened: { BasePart } = {}
+	for _, part in parts do
+		part.Parent = debris()
+		table.insert(loosened, part)
+	end
+	return loosened
 end
 
 local function effect_part(name: string, color: Color3): Part
@@ -332,11 +361,17 @@ local function effect_part(name: string, color: Color3): Part
 	return part
 end
 
--- Pops the donut worn at `frame`: it is gone, and in its place a puff of air and scraps of vinyl fluttering off.
-local function pop(donut: Donut, frame: CFrame)
-	local width = ART_WIDTH * donut.scale
+-- One ring of a pop, worn at `frame`, `width` across: a puff of air, and `scraps` scraps of vinyl `scrap` long in the
+-- first `stripes` of `colors`, torn from all round it.
+local function pop_ring(
+	frame: CFrame,
+	width: number,
+	colors: { Color3 },
+	stripes: number,
+	scrap: number,
+	scraps: number
+)
 	local center = frame.Position
-
 	local puff = effect_part("DonutPop", POP_COLOR)
 	puff.Shape = Enum.PartType.Ball
 	puff.Material = Enum.Material.Neon
@@ -364,15 +399,8 @@ local function pop(donut: Donut, frame: CFrame)
 		seed = nil,
 	})
 
-	-- scraps in the donut's two stripe colours, torn from all round the ring
-	local colors = {}
-	for _, part in donut.parts do
-		table.insert(colors, part.Color)
-	end
-	local stripes = math.min(2, #colors)
-	local scrap = width * SCRAP_SIZE
-	for index = 1, SCRAPS do
-		local angle = (index - 1 + random:NextNumber(0, 0.6)) / SCRAPS * TAU
+	for index = 1, scraps do
+		local angle = (index - 1 + random:NextNumber(0, 0.6)) / scraps * TAU
 		local out = frame:VectorToWorldSpace(Vector3.new(math.cos(angle), 0, math.sin(angle)))
 		local part = effect_part("DonutScrap", colors[(index - 1) % stripes + 1])
 		part.Size = Vector3.new(scrap * random:NextNumber(0.7, 1.3), scrap * 0.12, scrap * random:NextNumber(0.4, 0.8))
@@ -401,95 +429,97 @@ local function pop(donut: Donut, frame: CFrame)
 			seed = nil,
 		})
 	end
+end
+
+-- Pops the donut's rings, worn at `frames`: they are gone, and in the place of each a puff of air and scraps of vinyl
+-- fluttering off.
+local function pop(donut: Donut, frames: { CFrame })
+	local width = ART_WIDTH * donut.scale
+	-- scraps in the donut's two stripe colours
+	local colors = {}
+	for _, part in donut.rings[1] do
+		table.insert(colors, part.Color)
+	end
+	local stripes = math.min(2, #colors)
+	local scrap = width * SCRAP_SIZE
+	local scraps = math.max(SCRAPS_LEAST, math.ceil(SCRAPS / #frames))
+	for _, frame in frames do
+		pop_ring(frame, width, colors, stripes, scrap, scraps)
+	end
 
 	show(donut, false)
 	donut.status = "off"
 end
 
--- Lets the donut worn at `frame` go under the water: its parts go loose and float up to lie on the surface a while,
--- and it gets new ones to reinflate.
-local function float_away(donut: Donut, frame: CFrame)
+-- Lets the donut's rings, worn at `frames`, go under the water: their parts go loose and float up to lie on the
+-- surface a while, and it gets new ones to reinflate.
+local function float_away(donut: Donut, frames: { CFrame })
 	local shape = donut.shape
-	local offsets = size_parts(donut.parts, shape, donut.scale)
-	local parts: { BasePart } = {}
-	for _, part in donut.parts do
-		part.Parent = debris()
-		table.insert(parts, part)
-	end
 	local half_height = shape.half_height * donut.scale
 	local float_seconds = donut.settings.float_seconds
 	local drift = donut.velocity * FLOAT_KEEP
-	table.insert(loose, {
-		parts = parts,
-		offsets = offsets,
-		position = frame.Position,
-		rotation = frame.Rotation,
-		velocity = Vector3.new(drift.X, 0, drift.Z),
-		drag = 0,
-		spin_axis = Vector3.yAxis,
-		spin = FLOAT_TURN * (if random:NextNumber() < 0.5 then -1 else 1),
-		half_height = nil,
-		age = 0,
-		lifetime = FLOAT_MAX_RISE + float_seconds + LOOSE_FADE,
-		resting = nil,
-		fade_at = FLOAT_MAX_RISE + float_seconds,
-		fade_time = LOOSE_FADE,
-		grow_from = nil,
-		grow_to = nil,
-		-- the water's surface, or the ground where there is none over it (floated off by pow's `donut_float`)
-		surface = math.max(config.WATER_LEVEL, heightmap.height_at(frame.Position.X, frame.Position.Z))
-			+ half_height * FLOAT_RIDE,
-		size = ART_WIDTH * donut.scale,
-		float_seconds = float_seconds,
-		seed = random:NextNumber(0, TAU),
-	})
-
-	donut.parts = copy_parts(shape, donut.folder)
-	donut.sized = nil
-	donut.painted = nil
-	donut.shown = false
-	donut.status = "off"
+	for index, parts in donut.rings do
+		local frame = frames[index]
+		table.insert(loose, {
+			offsets = size_parts(parts, shape, donut.scale),
+			parts = loosen(parts),
+			position = frame.Position,
+			rotation = frame.Rotation,
+			velocity = Vector3.new(drift.X, 0, drift.Z),
+			drag = 0,
+			spin_axis = Vector3.yAxis,
+			spin = FLOAT_TURN * (if random:NextNumber() < 0.5 then -1 else 1),
+			half_height = nil,
+			age = 0,
+			lifetime = FLOAT_MAX_RISE + float_seconds + LOOSE_FADE,
+			resting = nil,
+			fade_at = FLOAT_MAX_RISE + float_seconds,
+			fade_time = LOOSE_FADE,
+			grow_from = nil,
+			grow_to = nil,
+			-- the water's surface, or the ground where there is none over it (floated off by pow's `donut_float`)
+			surface = math.max(config.WATER_LEVEL, heightmap.height_at(frame.Position.X, frame.Position.Z))
+				+ half_height * FLOAT_RIDE,
+			size = ART_WIDTH * donut.scale,
+			float_seconds = float_seconds,
+			seed = random:NextNumber(0, TAU),
+		})
+	end
+	renew(donut)
 end
 
--- Throws the donut worn at `frame` off its aircraft: its parts go loose, and it gets new ones to reinflate.
-local function fly_off(donut: Donut, frame: CFrame)
+-- Throws the donut's rings, worn at `frames`, off its aircraft: their parts go loose, and it gets new ones to
+-- reinflate.
+local function fly_off(donut: Donut, frames: { CFrame })
 	local shape = donut.shape
-	local offsets = size_parts(donut.parts, shape, donut.scale)
-	local parts: { BasePart } = {}
-	for _, part in donut.parts do
-		part.Parent = debris()
-		table.insert(parts, part)
+	for index, parts in donut.rings do
+		local frame = frames[index]
+		local side = frame:VectorToWorldSpace(Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1)))
+		local axis = random:NextUnitVector()
+		table.insert(loose, {
+			offsets = size_parts(parts, shape, donut.scale),
+			parts = loosen(parts),
+			position = frame.Position,
+			rotation = frame.Rotation,
+			velocity = donut.velocity * LOOSE_KEEP + Vector3.yAxis * LOOSE_THROW_UP + side * LOOSE_THROW_SIDE,
+			drag = LOOSE_DRAG,
+			spin_axis = axis,
+			spin = LOOSE_SPIN * random:NextNumber(0.6, 1.2),
+			half_height = shape.half_height * donut.scale,
+			age = 0,
+			lifetime = LOOSE_LIFETIME,
+			resting = nil,
+			fade_at = LOOSE_LIFETIME - LOOSE_FADE,
+			fade_time = LOOSE_FADE,
+			grow_from = nil,
+			grow_to = nil,
+			surface = nil,
+			size = nil,
+			float_seconds = nil,
+			seed = nil,
+		})
 	end
-	local side = frame:VectorToWorldSpace(Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1)))
-	local axis = random:NextUnitVector()
-	table.insert(loose, {
-		parts = parts,
-		offsets = offsets,
-		position = frame.Position,
-		rotation = frame.Rotation,
-		velocity = donut.velocity * LOOSE_KEEP + Vector3.yAxis * LOOSE_THROW_UP + side * LOOSE_THROW_SIDE,
-		drag = LOOSE_DRAG,
-		spin_axis = axis,
-		spin = LOOSE_SPIN * random:NextNumber(0.6, 1.2),
-		half_height = shape.half_height * donut.scale,
-		age = 0,
-		lifetime = LOOSE_LIFETIME,
-		resting = nil,
-		fade_at = LOOSE_LIFETIME - LOOSE_FADE,
-		fade_time = LOOSE_FADE,
-		grow_from = nil,
-		grow_to = nil,
-		surface = nil,
-		size = nil,
-		float_seconds = nil,
-		seed = nil,
-	})
-
-	donut.parts = copy_parts(shape, donut.folder)
-	donut.sized = nil
-	donut.painted = nil
-	donut.shown = false
-	donut.status = "off"
+	renew(donut)
 end
 
 local function remove(model: Model)
@@ -498,8 +528,10 @@ local function remove(model: Model)
 		return
 	end
 	donuts[model] = nil
-	for _, part in donut.parts do
-		part:Destroy()
+	for _, parts in donut.rings do
+		for _, part in parts do
+			part:Destroy()
+		end
 	end
 end
 
@@ -531,20 +563,20 @@ local function growth(seconds: number): number
 end
 
 -- Keeps `model`'s donut on it for this frame, as the server says it is (server/donuts.luau, through the `donut`,
--- `donut_shake` and `donut_event` attributes), so every player sees the same. `waist` is where the middle of the donut
--- goes, turned with the body it is round, and `radius` how big what wears it is (its collider's radius), in studs;
--- `folder` is where its parts go. With no `settings`, or not `wearing` (a blueprint, a wreck, or a skin with no
--- donut), it has no donut.
+-- `donut_shake` and `donut_event` attributes), so every player sees the same. `mounts` are where the middle of each of
+-- its rings goes, turned the way the ring lies (its hole along their up), one for a unit's waist or an aircraft's
+-- fuselage and a row down each side for a ship, and `hole` how wide each ring's hole is, in studs; `folder` is where
+-- its parts go. With no `settings`, or not `wearing` (a blueprint, a wreck, or a skin with no donut), it has no donut.
 local function step(
 	model: Model,
-	waist: CFrame,
-	radius: number,
+	mounts: { CFrame },
+	hole: number,
 	settings: DonutSettings?,
 	wearing: boolean,
 	folder: Folder,
 	dt: number
 )
-	if settings == nil or wearing == false then
+	if settings == nil or wearing == false or #mounts == 0 then
 		remove(model)
 		return
 	end
@@ -555,15 +587,25 @@ local function step(
 	end
 	local event = model:GetAttribute "donut_event"
 	local donut = donuts[model]
-	if donut == nil or donut.settings ~= settings or donut.variant ~= variant or donut.folder ~= folder then
+	if
+		donut == nil
+		or donut.settings ~= settings
+		or donut.variant ~= variant
+		or donut.folder ~= folder
+		or #donut.rings ~= #mounts
+	then
 		remove(model)
+		local rings = table.create(#mounts)
+		for index in mounts do
+			rings[index] = copy_parts(shape, folder)
+		end
 		donut = {
 			model = model,
 			settings = settings,
 			variant = variant,
 			shape = shape,
 			folder = folder,
-			parts = copy_parts(shape, folder),
+			rings = rings,
 			-- a new donut inflates, on a unit just finished or just come into sight alike
 			status = "growing",
 			grown = 0,
@@ -580,18 +622,19 @@ local function step(
 		donuts[model] = donut
 	end
 	local current = donut :: Donut
-	-- its hole hugs the unit, so it is as big as the unit is
-	current.scale = settings.hug * radius / variant.hole
+	current.scale = hole / variant.hole
 
 	local team = model:GetAttribute "team_color"
 	local team_color = if typeof(team) == "Color3" then team else NO_TEAM
 	if current.painted ~= team_color then
 		current.painted = team_color
-		paint(current.parts, shape, team_color)
+		for _, parts in current.rings do
+			paint(parts, shape, team_color)
+		end
 	end
 
-	-- how fast it is going, from how far its waist moved, which is what a donut flying off keeps
-	local position = waist.Position
+	-- how fast it is going, from how far its first ring moved, which is what a donut flying off keeps
+	local position = mounts[1].Position
 	local last = current.last_position
 	current.last_position = position
 	if last ~= nil and dt > 0 then
@@ -603,18 +646,17 @@ local function step(
 	end
 
 	-- it came off: popped, flown off or floated off, where it is now. Until the server has said anything, it is on.
-	local frame = waist
 	local now_event = if typeof(event) == "string" then event else nil
 	if now_event ~= current.event then
 		current.event = now_event
 		if now_event ~= nil and current.status ~= "off" then
 			local how = string.match(now_event, ":(%a+)$")
 			if how == "fly" then
-				fly_off(current, frame)
+				fly_off(current, mounts)
 			elseif how == "float" then
-				float_away(current, frame)
+				float_away(current, mounts)
 			else
-				pop(current, frame)
+				pop(current, mounts)
 			end
 		end
 	end
@@ -640,6 +682,7 @@ local function step(
 	end
 
 	-- shaking: tipping and sliding about, as hard as the server says it is shaking
+	local wobble = CFrame.identity
 	local shake = model:GetAttribute "donut_shake"
 	local hard = if typeof(shake) == "number" then math.clamp(shake, 0, 1) else 0
 	if hard > 0 then
@@ -647,26 +690,35 @@ local function step(
 		local seed = current.seed
 		local tip = SHAKE_MAX_ANGLE * hard
 		local slide = SHAKE_MAX_SLIDE * ART_WIDTH * current.scale * hard
-		frame = frame
-			* CFrame.new(math.noise(t, seed, 1) * slide, 0, math.noise(t, seed, 2) * slide)
+		wobble = CFrame.new(math.noise(t, seed, 1) * slide, 0, math.noise(t, seed, 2) * slide)
 			* CFrame.Angles(math.noise(t, seed, 3) * tip, math.noise(t, seed, 4) * tip, math.noise(t, seed, 5) * tip)
 	end
 
 	local scale = current.scale * grown
-	local offsets: { CFrame }
+	local offsets: { CFrame } = {}
 	if current.sized ~= scale then
 		current.sized = scale
-		offsets = size_parts(current.parts, shape, scale)
+		for _, parts in current.rings do
+			offsets = size_parts(parts, shape, scale)
+		end
 	else
-		offsets = table.create(#current.parts)
 		for index, piece in shape.pieces do
 			offsets[index] = CFrame.new(piece.offset * scale) * UPLOADED_TURN
 		end
 	end
-	for index, part in current.parts do
-		part.CFrame = frame * offsets[index]
+	for ring, parts in current.rings do
+		local frame = mounts[ring] * wobble
+		for index, part in parts do
+			part.CFrame = frame * offsets[index]
+		end
 	end
 	show(current, true)
+end
+
+-- How far a ring of `settings`' float that `model` wears reaches out from its middle along its hole, in studs, when
+-- its hole is `hole` wide: half the thickness of its tube, to hang it against a ship's side by.
+local function tube(model: Model, settings: DonutSettings, hole: number): number
+	return ART_TUBE * hole / variant_of(model, settings).hole
 end
 
 -- Moves, lands and fades everything loose, and clears away what has had its time.
@@ -795,6 +847,7 @@ return table.freeze({
 	init = init,
 	preload = preload,
 	step = step,
+	tube = tube,
 	forget = remove,
 	preview = preview,
 })

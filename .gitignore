@@ -31,3 +31,6 @@ __pycache__/
 
 # saved /benchmark reports
 /benchmark*.txt
+
+# synthesized sound effects (tools/sound_pipeline/synth.py rebuilds them)
+tools/sound_pipeline/build/

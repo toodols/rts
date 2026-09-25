@@ -7,8 +7,14 @@
 -- worth the most is named the MVP.
 --
 -- A campaign mission's end also offers the way out (see server/campaign_exit.luau): back to the lobby, and, once it is
--- won, on to the next mission, if there is one. Either asks the server over the CampaignChoice remote,
--- and what it answers, that the player is on their way or why they are not, is shown under the buttons.
+-- won, on to the next mission, if there is one. Going back asks the server over the CampaignChoice remote; going on is
+-- a vote, over the CampaignVote remote, carried once more than half of the winners still here agree. Played together,
+-- the button to go on is a vote the player can take back, and under it is everyone's headshot, lit with a tick once
+-- they have agreed; played alone, one press goes on. What the server answers, that the player is on their way or why
+-- they are not, is shown under the buttons.
+--
+-- Any end can be put away to play on (the world keeps going after the end, see server/init.server.luau), which leaves
+-- a small button at the top of the screen that brings it back.
 --
 -- A campaign mission won that unlocks something first reveals it (unlock_reveal.luau), under the result, and only
 -- then offers the way out.
@@ -20,16 +26,20 @@ local Workspace = game:GetService "Workspace"
 
 local React = require(ReplicatedStorage.Packages.react)
 
+local config = require(ReplicatedStorage.Shared.config)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local campaign = require(ReplicatedStorage.Shared.campaign)
 
 local unlock_reveal = require(ReplicatedStorage.Client.ui.unlock_reveal)
+local scavenger_block = require(ReplicatedStorage.Client.ui.scavenger_block)
+local wave_block = require(ReplicatedStorage.Client.ui.wave_block)
 
 local UnlockReveal = unlock_reveal.UnlockReveal
 local UnlockVignette = unlock_reveal.UnlockVignette
 
 local local_player = Players.LocalPlayer
 local campaign_choice: RemoteEvent = ReplicatedStorage.Shared.CampaignChoice
+local campaign_vote: RemoteEvent = ReplicatedStorage.Shared.CampaignVote
 
 type Outcome = "victory" | "defeat" | "over"
 
@@ -46,8 +56,13 @@ type TeamStats = {
 	metal: number,
 }
 
+-- how long after the game ends the screen comes up, so the last of it can be seen blowing up first
+local END_SCREEN_DELAY = config.END_SCREEN_DELAY_SECONDS
+
 -- the Workspace attribute server/match_stats.luau publishes the stats as
 local STATS_ATTRIBUTE = "match_stats"
+-- the Workspace attribute server/campaign_exit.luau publishes how the vote on going on stands as
+local VOTE_ATTRIBUTE = "campaign_vote"
 
 -- The stats' columns, after the team's name: what each is headed and which figure it shows.
 local COLUMNS: { { heading: string, key: string } } = {
@@ -58,6 +73,15 @@ local COLUMNS: { { heading: string, key: string } } = {
 	{ heading = "METAL", key = "metal" },
 }
 type Choice = "lobby" | "next"
+
+-- How the vote on going on to the next mission stands, as server/campaign_exit.luau publishes it: who votes and who of
+-- them has agreed, by user id, how many it takes, and whether it has been carried.
+type Vote = {
+	voters: { number },
+	agreed: { number },
+	needed: number,
+	passed: boolean,
+}
 
 -- Where a choice has got: nothing asked yet, on the way, or refused or failed and why.
 type ChoiceStatus = {
@@ -85,22 +109,37 @@ local SENDING: { [Choice]: string } = {
 	next = "Heading to the next mission...",
 }
 
--- Redraws whenever the phase, or who won, changes.
+-- Whether the game has ended long enough ago for the screen to be up. Redraws whenever the phase, or who won, changes,
+-- and once the wait after it ended is over.
 local function use_ending(): boolean
 	local _, bump = React.useState(0)
-	React.useEffect(function()
-		local connections = game_phase.changed(function()
-			bump(function(count: number): number
-				return count + 1
-			end)
+	local redraw = React.useCallback(function()
+		bump(function(count: number): number
+			return count + 1
 		end)
+	end, {})
+	React.useEffect(function()
+		local connections = game_phase.changed(redraw)
 		return function()
 			for _, connection in connections do
 				connection:Disconnect()
 			end
 		end
 	end, {})
-	return game_phase.phase() == "ended"
+	-- the end the wait has run out for, which the timer settles even should the server's clock say it is a hair early
+	local waited_for, set_waited_for = React.useState(nil :: number?)
+	local ended_at = if game_phase.phase() == "ended" then game_phase.ended_at() or 0 else nil
+	local wait = if ended_at ~= nil then ended_at + END_SCREEN_DELAY - Workspace:GetServerTimeNow() else 0
+	React.useEffect(function(): (() -> ())?
+		if ended_at == nil or wait <= 0 then
+			return nil
+		end
+		local thread = task.delay(wait, set_waited_for, ended_at)
+		return function()
+			task.cancel(thread)
+		end
+	end, { ended_at })
+	return ended_at ~= nil and (wait <= 0 or waited_for == ended_at)
 end
 
 -- The stats the server published once the game ended, redrawn when they arrive; nil until they have.
@@ -121,6 +160,72 @@ local function use_stats(): { TeamStats }?
 		local ok, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
 		return if ok and typeof(decoded) == "table" and #decoded > 0 then decoded else nil
 	end, { raw })
+end
+
+-- How the vote on going on stands, redrawn as it changes; nil while there is none.
+local function use_vote(): Vote?
+	local raw, set_raw = React.useState(Workspace:GetAttribute(VOTE_ATTRIBUTE))
+	React.useEffect(function()
+		local connection = Workspace:GetAttributeChangedSignal(VOTE_ATTRIBUTE):Connect(function()
+			set_raw(Workspace:GetAttribute(VOTE_ATTRIBUTE))
+		end)
+		return function()
+			connection:Disconnect()
+		end
+	end, {})
+	return React.useMemo(function(): Vote?
+		if typeof(raw) ~= "string" then
+			return nil
+		end
+		local ok, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
+		if ok == false or typeof(decoded) ~= "table" or typeof(decoded.voters) ~= "table" then
+			return nil
+		end
+		return {
+			voters = decoded.voters,
+			agreed = if typeof(decoded.agreed) == "table" then decoded.agreed else {},
+			needed = if typeof(decoded.needed) == "number" then decoded.needed else #decoded.voters // 2 + 1,
+			passed = decoded.passed == true,
+		}
+	end, { raw })
+end
+
+-- Everyone's headshot that has been fetched, by user id, kept for as long as the game is: they do not change.
+local headshots: { [number]: string } = {}
+
+-- The headshots of `user_ids`, as each arrives; one not fetched yet, or that could not be, is missing.
+local function use_headshots(user_ids: { number }): { [number]: string }
+	local _, bump = React.useState(0)
+	local key = table.concat(user_ids, ",")
+	React.useEffect(function(): (() -> ())?
+		local live = true
+		for _, user_id in user_ids do
+			if headshots[user_id] ~= nil then
+				continue
+			end
+			task.spawn(function()
+				local ok, image = pcall(
+					Players.GetUserThumbnailAsync,
+					Players,
+					user_id,
+					Enum.ThumbnailType.HeadShot,
+					Enum.ThumbnailSize.Size60x60
+				)
+				if ok and typeof(image) == "string" then
+					headshots[user_id] = image
+					if live then
+						bump(function(count: number): number
+							return count + 1
+						end)
+					end
+				end
+			end)
+		end
+		return function()
+			live = false
+		end
+	end, { key })
+	return headshots
 end
 
 -- A figure short enough for its column: 950, 12,400, 125k, 1.2M.
@@ -214,8 +319,9 @@ local function Stats(props: { rows: { TeamStats }, LayoutOrder: number })
 	})
 end
 
--- What the server last said about the player's choice, and a way to ask for one.
-local function use_choice(): (ChoiceStatus, (choice: Choice) -> ())
+-- What the server last said about the player's choice, a way to ask to go back to the lobby, and a way to vote on going
+-- on: `alone`, agreeing is going, so it is shown as on its way; together, it waits on the others.
+local function use_choice(): (ChoiceStatus, (choice: Choice) -> (), (agree: boolean, alone: boolean) -> ())
 	local status, set_status = React.useState({ stage = "idle", choice = nil, message = nil } :: ChoiceStatus)
 	React.useEffect(function()
 		local connection = campaign_choice.OnClientEvent:Connect(function(reply: any)
@@ -238,7 +344,11 @@ local function use_choice(): (ChoiceStatus, (choice: Choice) -> ())
 		set_status({ stage = "sending", choice = choice, message = nil })
 		campaign_choice:FireServer(choice)
 	end, {})
-	return status, choose
+	local vote = React.useCallback(function(agree: boolean, alone: boolean)
+		set_status({ stage = if alone and agree then "sending" else "idle", choice = "next", message = nil })
+		campaign_vote:FireServer(agree)
+	end, {})
+	return status, choose, vote
 end
 
 local function ChoiceButton(props: {
@@ -265,17 +375,64 @@ local function ChoiceButton(props: {
 	})
 end
 
--- The way out of a campaign mission: back to the lobby, and on to the next mission for someone who won it, if the
--- campaign has one.
-local function CampaignChoices(props: { mission_id: string, won: boolean })
-	local status, choose = use_choice()
+-- The button that puts the screen away to play on.
+local function ContinueButton(props: { on_continue: () -> () })
+	return React.createElement(ChoiceButton, {
+		text = "Continue playing",
+		primary = false,
+		enabled = true,
+		order = 0,
+		on_click = props.on_continue,
+	})
+end
+
+-- Who votes on going on, a headshot each, in the order the server lists them: lit and ticked once they have agreed,
+-- dimmed until then, and how many have agreed of how many it takes beside them.
+local function Voters(props: { vote: Vote, LayoutOrder: number })
+	local images = use_headshots(props.vote.voters)
+	local children: { [string]: any } = {}
+	for index, user_id in props.vote.voters do
+		local agreed = table.find(props.vote.agreed, user_id) ~= nil
+		children[`Voter{user_id}`] = React.createElement("ImageLabel", {
+			[React.Tag] = if agreed then "victory-voter agreed" else "victory-voter",
+			LayoutOrder = index,
+			Image = images[user_id] or "",
+			ImageTransparency = if agreed then 0 else 0.65,
+		}, {
+			Tick = if agreed
+				then React.createElement("TextLabel", {
+					[React.Tag] = "victory-voter-tick",
+					Text = "✓",
+				})
+				else nil,
+		})
+	end
+	children.Count = React.createElement("TextLabel", {
+		[React.Tag] = "victory-vote-count",
+		LayoutOrder = #props.vote.voters + 1,
+		Text = `{#props.vote.agreed}/{props.vote.needed}`,
+	})
+	return React.createElement("Frame", {
+		[React.Tag] = "victory-voters",
+		LayoutOrder = props.LayoutOrder,
+	}, children)
+end
+
+-- The way out of a campaign mission: playing on, back to the lobby, and on to the next mission for someone who won it,
+-- if the campaign has one, which played together is a vote.
+local function CampaignChoices(props: { mission_id: string, won: boolean, on_continue: () -> () })
+	local status, choose, vote_for = use_choice()
+	local vote = use_vote()
 	local next_mission = campaign.next_mission(props.mission_id)
-	local idle = status.stage ~= "sending"
+	local idle = status.stage ~= "sending" and (vote == nil or vote.passed == false)
+	local together = vote ~= nil and #vote.voters > 1
+	local agreed = vote ~= nil and table.find(vote.agreed, local_player.UserId) ~= nil
 	local message = if status.stage == "sending" and status.choice ~= nil
 		then SENDING[status.choice]
 		else status.message
 
 	local buttons: { [string]: any } = {
+		Continue = React.createElement(ContinueButton, { on_continue = props.on_continue }),
 		Lobby = React.createElement(ChoiceButton, {
 			text = "Back to lobby",
 			primary = props.won == false or next_mission == nil,
@@ -288,12 +445,12 @@ local function CampaignChoices(props: { mission_id: string, won: boolean })
 	}
 	if props.won and next_mission ~= nil then
 		buttons.Next = React.createElement(ChoiceButton, {
-			text = `Next mission: {next_mission.label}`,
-			primary = true,
+			text = if together and agreed then "Withdraw vote" else `Next mission: {next_mission.label}`,
+			primary = together == false or agreed == false,
 			enabled = idle,
 			order = 2,
 			on_click = function()
-				choose "next"
+				vote_for(agreed == false, together == false)
 			end,
 		})
 	end
@@ -303,19 +460,23 @@ local function CampaignChoices(props: { mission_id: string, won: boolean })
 			[React.Tag] = "victory-choices",
 			LayoutOrder = 5,
 		}, buttons),
+		Voters = if together and next_mission ~= nil
+			then React.createElement(Voters, { vote = vote :: Vote, LayoutOrder = 6 })
+			else nil,
 		Status = if message ~= nil
 			then React.createElement("TextLabel", {
 				[React.Tag] = if status.stage == "failed" then "victory-status failed" else "victory-status",
-				LayoutOrder = 6,
+				LayoutOrder = 7,
 				Text = message,
 			})
 			else nil,
 	})
 end
 
--- The screen once the game has ended. A campaign mission won that unlocks something reveals what it unlocks
--- (unlock_reveal.luau) between the result and the way out, which only appears once every card is open.
-local function Ending()
+-- The screen once the game has ended, hidden while it is put away to play on (kept, so that nothing on it starts over
+-- when it is brought back). A campaign mission won that unlocks something reveals what it unlocks (unlock_reveal.luau)
+-- between the result and the way out, which only appears once every card is open.
+local function Ending(props: { hidden: boolean, on_continue: () -> () })
 	local result = outcome()
 	local mission_id = campaign.current_mission()
 	local mission = if mission_id ~= nil then campaign.get(mission_id) else nil
@@ -327,8 +488,25 @@ local function Ending()
 	local choices_shown = unlocks == nil or revealed
 	local stats = use_stats()
 
+	local choices = nil
+	if choices_shown and mission_id ~= nil then
+		choices = React.createElement(CampaignChoices, {
+			mission_id = mission_id,
+			won = result == "victory",
+			on_continue = props.on_continue,
+		})
+	elseif choices_shown then
+		choices = React.createElement("Frame", {
+			[React.Tag] = "victory-choices",
+			LayoutOrder = 5,
+		}, {
+			Continue = React.createElement(ContinueButton, { on_continue = props.on_continue }),
+		})
+	end
+
 	return React.createElement("Frame", {
 		[React.Tag] = `victory-screen {result}`,
+		Visible = props.hidden == false,
 	}, {
 		Vignette = if unlocks ~= nil then React.createElement(UnlockVignette) else nil,
 		Layout = React.createElement("Frame", {
@@ -355,19 +533,52 @@ local function Ending()
 					})
 					else nil,
 				Stats = if stats ~= nil then React.createElement(Stats, { rows = stats, LayoutOrder = 4 }) else nil,
-				Campaign = if mission_id ~= nil and choices_shown
-					then React.createElement(CampaignChoices, { mission_id = mission_id, won = result == "victory" })
-					else nil,
+				Choices = choices,
 			}),
 		}),
 	})
 end
 
+-- The end screen, or, while it is put away to play on, the button beside the resource bar that brings it back, which
+-- sits further out when the bar is wider for the scavengers' difficulty or a mission's waves. Which end it was put
+-- away for is kept, so the next game to end (a mission loaded after this one) shows its own.
 local function VictoryScreen()
-	if use_ending() == false then
+	local ending = use_ending()
+	local put_away_for, set_put_away_for = React.useState(nil :: number?)
+	-- the bar is as wide with the waves in it as with the difficulty
+	local difficulty = scavenger_block.use_difficulty()
+	local waves = wave_block.use_waves()
+	local scavengers = difficulty ~= nil or waves ~= nil
+	if ending == false then
 		return nil
 	end
-	return React.createElement(Ending)
+	local ended_at = game_phase.ended_at() or 0
+	local hidden = put_away_for == ended_at
+	return React.createElement(React.Fragment, nil, {
+		Screen = React.createElement(Ending, {
+			hidden = hidden,
+			on_continue = function()
+				set_put_away_for(ended_at)
+			end,
+		}),
+		Reopen = if hidden
+			then React.createElement("TextButton", {
+				[React.Tag] = if scavengers
+					then `victory-reopen {outcome()} with-scavengers`
+					else `victory-reopen {outcome()}`,
+				Text = "",
+				AutoButtonColor = false,
+				[React.Event.Activated] = function()
+					set_put_away_for(nil)
+				end,
+			}, {
+				Label = React.createElement("TextLabel", {
+					[React.Tag] = "victory-reopen-label",
+					Text = `{TITLES[outcome()]}  ·  RESULTS`,
+				}),
+			})
+			else nil,
+	})
 end
 
 return table.freeze({

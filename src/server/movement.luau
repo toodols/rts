@@ -17,6 +17,8 @@ local passability = require(ReplicatedStorage.Shared.passability)
 local state = require(script.Parent.state)
 local air = require(script.Parent.air)
 local flat_grid = require(script.Parent.flat_grid)
+local pilots = require(script.Parent.pilots)
+local emp = require(script.Parent.emp)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -43,6 +45,8 @@ local impulse_remaining: { [EntityId]: number } = {}
 -- before it recovers, and one with no acceleration at all cannot turn or slow, so it would drift on in a straight line,
 -- often further into the fire, for as long as the fire kept up.
 local HIT_ACCELERATION = 0.5
+-- How high a pilot may take an aircraft that hovers, as many times its usual height.
+local PILOT_CEILING = 1.5
 -- The lab each unit that has just been made is on its way out of. The two do not push each other apart until the
 -- unit is clear of it (see production.luau).
 local exiting: { [EntityId]: EntityId } = {}
@@ -246,8 +250,16 @@ end
 
 -- Climbs or descends an aircraft toward the height it should be at: its flying altitude while it has
 -- somewhere to go, and for a moment after, and the ground once it has been idle for a while. One on wings
--- cannot wait in the air, so it comes down the moment it has nothing to do.
-local function fly(entity: Entity, def: types.EntityDef, aircraft: types.Aircraft, busy: boolean, delta: number)
+-- cannot wait in the air, so it comes down the moment it has nothing to do. One that hovers and is `stunned` sinks
+-- to the ground, as BAR's do.
+local function fly(
+	entity: Entity,
+	def: types.EntityDef,
+	aircraft: types.Aircraft,
+	busy: boolean,
+	stunned: boolean,
+	delta: number
+)
 	local idle = idle_for[entity.id]
 	if busy then
 		idle = 0
@@ -263,10 +275,12 @@ local function fly(entity: Entity, def: types.EntityDef, aircraft: types.Aircraf
 	local floor = air.resting_height(def, x, z)
 	local wanted = floor
 	local hover = hovers[entity.id]
-	if hover ~= nil then
+	if stunned and aircraft.wings == nil then
+		wanted = floor
+	elseif hover ~= nil then
 		wanted = math.max(floor, hover)
 	elseif idle < config.AIR_LAND_DELAY then
-		wanted += aircraft.altitude
+		wanted += aircraft.altitude * config.AIR_ALTITUDE_SCALE
 	end
 
 	local step = aircraft.climb_speed * delta
@@ -364,7 +378,34 @@ local function tick(delta: number)
 		local desired_velocity = Vector3.zero
 		-- which way its goal draws it, if it has one that is drawing it anywhere
 		local drawn_toward: Vector3? = nil
-		local goal = goals[entity.id]
+		-- something stunned goes nowhere of its own accord, whatever it was told or its pilot steers
+		local stunned = emp.is_stunned(entity)
+		local goal = if stunned then nil else goals[entity.id]
+		-- one being piloted goes where its pilot steers it, as fast as it can go, whatever it was told to do; a plane on
+		-- wings, which can only fly on ahead, makes for a point far off the way its pilot looks
+		local pilot = if stunned then nil else pilots.get(entity.id)
+		if pilot ~= nil then
+			goal = nil
+			desired_velocity = pilot.steer * max_speed
+			-- one that hovers flies as high over the ground as its pilot takes it, from on it to a little over its usual
+			-- height
+			local hovering = def.air
+			if hovering ~= nil and hovering.wings == nil then
+				local height = if pilot.height ~= nil then pilot.height else hovering.altitude
+				height =
+					math.clamp(height + pilot.lift * hovering.climb_speed * delta, 0, hovering.altitude * PILOT_CEILING)
+				pilot.height = height
+				hovers[entity.id] = air.resting_height(def, entity.position.X, entity.position.Z) + height
+			end
+			if def.air ~= nil and def.air.wings ~= nil then
+				goal = {
+					position = entity.position + Vector3.new(math.sin(pilot.facing), 0, math.cos(pilot.facing)) * 1e4,
+					stop_radius = 0,
+					through = true,
+					velocity = Vector3.zero,
+				}
+			end
+		end
 		if goal ~= nil then
 			local offset = geometry.flatten(goal.position - entity.position)
 			local distance = offset.Magnitude
@@ -394,11 +435,19 @@ local function tick(delta: number)
 		-- carry out, like a builder that has arrived and is working, or a gunship holding over its target
 		local aircraft = def.air
 		local wings = if aircraft ~= nil then aircraft.wings else nil
-		local busy = aircraft ~= nil and (goal ~= nil or #entity.orders > 0 or #state.cargo_of(entity.id) > 0)
+		local busy = aircraft ~= nil
+			and (pilot ~= nil or goal ~= nil or #entity.orders > 0 or #state.cargo_of(entity.id) > 0)
+		-- a stunned plane on wings glides straight on as it was going, and stays up
+		local gliding = stunned and wings ~= nil and air.is_airborne(entity)
+		if stunned and gliding == false then
+			busy = false
+		end
 
 		-- which way a plane on wings is turning, for which way it slides along the edge of the map if it reaches it
 		local turning = 0
-		if wings ~= nil then
+		if gliding then
+			busy = true
+		elseif wings ~= nil then
 			local facing_before = entity.facing
 			entity.velocity = steer_wings(entity, wings, goal, busy, max_speed, acceleration, delta)
 			turning = (entity.facing - facing_before + math.pi) % (2 * math.pi) - math.pi
@@ -505,14 +554,20 @@ local function tick(delta: number)
 			-- an aircraft keeps the height it is at, which `fly` changes below
 			local height = if def.air ~= nil then entity.position.Y else ground + unit_defs.collider_height(def) / 2
 			entity.position = Vector3.new(next_position.X, height, next_position.Z)
-		else
+		elseif drawn_toward == nil then
+			-- it settles to a stop only when nothing draws it on: one as slow to get going as BAR's Starlight gains
+			-- less than the settle speed in a tick, and has to keep what it gained to ever get over it
 			entity.velocity = Vector3.zero
+		end
+		-- it faces where its pilot looks, whichever way it is going
+		if pilot ~= nil and wings == nil then
+			entity.facing = pilot.facing
 		end
 
 		if aircraft ~= nil then
 			-- one that hovers is also kept up by still moving; one on wings is always moving while it is up, and
 			-- lands as it slows
-			fly(entity, def, aircraft, busy or (wings == nil and entity.velocity.Magnitude > 1), delta)
+			fly(entity, def, aircraft, busy or (wings == nil and entity.velocity.Magnitude > 1), stunned, delta)
 		end
 	end
 end

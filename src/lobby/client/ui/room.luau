@@ -88,6 +88,7 @@ local function Room(props: {
 				mode = lobby.mode,
 				visibility = lobby.visibility,
 				ally_griefing = lobby.ally_griefing,
+				end_mode = lobby.end_mode,
 				is_host = is_host,
 				act = props.act,
 			}),

@@ -274,6 +274,12 @@ local function set_progress(fraction: number): number
 	return wanted
 end
 
+-- Seconds between one beacon's units, or its defences: `interval` stretched for a sea beacon and by the spawn rate.
+local function spawn_gap(interval: number, sea: boolean): number
+	local multiplier = if sea then config.SCAVENGER_SEA_SPAWN_MULTIPLIER else 1
+	return interval * multiplier / config.SCAVENGER_SPAWN_RATE
+end
+
 -- How hard something is to face, for now just what it cost: its metal and its energy over 60. It is only a
 -- stand-in for a better judgement, so it lives in this one function.
 local function difficulty_of(def_name: string): number
@@ -524,11 +530,10 @@ local function spawn_beacon(allow_sea: boolean): boolean
 		end
 		local center, sea = beacon_site(x, z, allow_sea)
 		if center ~= nil then
-			local multiplier = if sea then config.SCAVENGER_SEA_SPAWN_MULTIPLIER else 1
 			place_beacon(
 				center,
 				sea,
-				config.SCAVENGER_INITIAL_SPAWN_DELAY + config.SCAVENGER_SPAWN_INTERVAL * multiplier,
+				config.SCAVENGER_INITIAL_SPAWN_DELAY + spawn_gap(config.SCAVENGER_SPAWN_INTERVAL, sea),
 				false
 			)
 			return true
@@ -750,8 +755,12 @@ local function summon_boss(near: Vector3)
 	boss = summoned
 end
 
--- Their boss is dead: every team but theirs has won.
+-- Their boss is dead: every team but theirs has won. Once the game is over, played on after, it stays over as it
+-- ended.
 local function defeat_boss()
+	if game_phase.phase() == "ended" then
+		return
+	end
 	local winners = {}
 	for id in state.all_teams() do
 		if id ~= config.SCAVENGER_TEAM then
@@ -824,14 +833,13 @@ local function run_beacons()
 		if record.eager == false and progress() < config.SCAVENGER_SPAWN_PROGRESS then
 			continue
 		end
-		local multiplier = if record.sea then config.SCAVENGER_SEA_SPAWN_MULTIPLIER else 1
 		if clock >= record.next_unit_at then
-			record.next_unit_at = clock + config.SCAVENGER_SPAWN_INTERVAL * multiplier
+			record.next_unit_at = clock + spawn_gap(config.SCAVENGER_SPAWN_INTERVAL, record.sea)
 			spawn_at(beacon, record, false)
 		end
 		-- a beacon that has all the defences it will take just skips this: it never costs it a unit
 		if clock >= record.next_defense_at then
-			record.next_defense_at = clock + config.SCAVENGER_DEFENSE_SPAWN_INTERVAL * multiplier
+			record.next_defense_at = clock + spawn_gap(config.SCAVENGER_DEFENSE_SPAWN_INTERVAL, record.sea)
 			spawn_at(beacon, record, true)
 		end
 	end
@@ -1612,6 +1620,33 @@ local function set_health_multiplier(multiple: number)
 	health_multiplier = math.max(multiple, 0.01)
 end
 
+-- How the scavengers are set up this game, and where they have got to, for the `gameconfig` command.
+local function settings(): {
+	enabled: boolean,
+	progress: number,
+	budget: number,
+	game_length: number,
+	pace: number,
+	health_multiplier: number,
+	beacons: number,
+	units: number,
+	next_beacon_in: number?,
+	boss: boolean,
+}
+	return {
+		enabled = enabled,
+		progress = progress(),
+		budget = budget(),
+		game_length = game_length,
+		pace = game_length / config.SCAVENGER_GAME_LENGTH,
+		health_multiplier = health_multiplier,
+		beacons = count_beacons(),
+		units = count_units(),
+		next_beacon_in = if next_beacon_at ~= nil then math.max(next_beacon_at - clock, 0) else nil,
+		boss = boss ~= nil,
+	}
+end
+
 local function forget(entity_id: EntityId)
 	brains[entity_id] = nil
 	local record = beacons[entity_id]
@@ -1639,5 +1674,6 @@ return table.freeze({
 	set_difficulty = set_difficulty,
 	budget = budget,
 	spawn_chances = spawn_chances,
+	settings = settings,
 	forget = forget,
 })

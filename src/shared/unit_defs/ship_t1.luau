@@ -16,7 +16,8 @@ type EntityDef = types.EntityDef
 
 -- The first tier of ships, the ones the Shipyard makes.
 local defs: { [string]: EntityDef } = {
-	-- corcs: builds on the water. It makes a shipyard, and a metal extractor on the sea floor.
+	-- corcs: builds on the water. It makes a shipyard, a metal extractor on the sea floor, and the land labs on the
+	-- shore.
 	construction_ship = {
 		name = "construction_ship",
 		display_name = "Construction Ship",
@@ -36,7 +37,15 @@ local defs: { [string]: EntityDef } = {
 		assisting = true,
 		max_water_depth = studs(9999),
 		min_water_depth = studs(15),
-		build_options = { "shipyard", "metal_extractor", "tidal_generator" },
+		build_options = {
+			"shipyard",
+			"advanced_shipyard",
+			"bot_lab",
+			"vehicle_lab",
+			"air_lab",
+			"metal_extractor",
+			"tidal_generator",
+		},
 		weapons = nil,
 		color = Color3.fromRGB(226, 178, 74),
 	},
@@ -164,6 +173,7 @@ local defs: { [string]: EntityDef } = {
 				range = studs(700),
 				turret = { turn_rate = math.rad(150) },
 				energy_per_shot = 17,
+				kind = "heat_ray",
 				beam_time = 0.8,
 				beam_thickness = 0.35,
 				beam_color = Color3.fromRGB(255, 128, 0),
@@ -279,6 +289,8 @@ local defs: { [string]: EntityDef } = {
 				reload = 2.5,
 				range = studs(500),
 				energy_per_shot = 0,
+				-- its tubes point ahead: a 30 degree cone
+				fire_arc = math.rad(15),
 				projectile = {
 					speed = studs(130),
 					acceleration = studs(15),
@@ -337,6 +349,7 @@ local defs: { [string]: EntityDef } = {
 				range = studs(450),
 				turret = { turn_rate = math.rad(110) },
 				energy_per_shot = 0,
+				kind = "depth_charge",
 				offset = Vector3.new(0, 1, -3),
 				projectile = {
 					speed = studs(150),

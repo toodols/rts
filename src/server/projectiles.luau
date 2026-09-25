@@ -32,12 +32,20 @@ type Projectile = {
 	damage: number,
 	-- whether the weapon that fired it is dedicated anti air, which decides how hard it hits aircraft
 	anti_air: boolean,
+	-- for an EMP weapon's, the longest it stuns for: its damage is EMP (`Weapon.paralyze_time`)
+	paralyze_time: number?,
 	-- whether it has come out of its launcher's collider yet; until it has, the launcher cannot be struck
 	clear_of_owner: boolean,
 	-- the shields it was fired from inside, which do not stop it
 	exempt: { [EntityId]: boolean },
 	-- whether this is a nuclear missile
 	is_nuclear: boolean,
+	-- where it was fired at: for a nuke, where it will come down, which is what an anti-nuke's coverage is about
+	aim: Vector3,
+	-- for a nuke, the interceptor sent after it, so that no other is spent on it
+	chased_by: number?,
+	-- for a nuke, that an interceptor has caught it: it has gone off in the air, and is taken out on its own turn
+	intercepted: boolean,
 	-- whether this is an anti-nuke interceptor that homes onto nuclear missiles
 	is_anti_nuke: boolean,
 	-- the nuke projectile this interceptor is homing onto, if any
@@ -46,6 +54,9 @@ type Projectile = {
 	homing_entity_id: EntityId?,
 	-- what it was fired at, if it was fired at something: the one aircraft it can strike
 	target_id: EntityId?,
+	-- for one that pierces (`ProjectileParams.pierce`), how long until it goes off again inside what it is going
+	-- through; nothing while it is in the clear, so it goes off the moment it strikes something
+	pierce_wait: number,
 }
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
@@ -67,6 +78,11 @@ local PROJECTILE_RADIUS = 0.3
 -- How far under the surface a ship's hull reaches, for a torpedo: a ship rests on the water with nothing of its
 -- collider below it, but a torpedo running under it has to meet its keel.
 local HULL_DRAFT = 1.5
+-- How near an interceptor has to come to the nuke it chases to catch it: about the nuke's own length.
+local INTERCEPT_RADIUS = 4
+-- How often a piercing shot goes off while inside something: every frame of Spring's, where a `noexplode` projectile
+-- collides, and so goes off, on every frame it overlaps a unit.
+local PIERCE_INTERVAL = 1 / 30
 
 -- Direct-hit and splash checks go through flat grids (see flat_grid.luau) instead of every living thing,
 -- rebuilt once a tick while anything is in flight (see `rebuild_grids`). A rocket is tested every half
@@ -75,7 +91,7 @@ local HULL_DRAFT = 1.5
 -- a crowd of small units only allows for small-unit widths there, and wrecks - which a rocket flies
 -- through but a blast still hurts - sit in a third. Aircraft sit in a fourth, for the same reason: as in BAR
 -- they have no collider, so a rocket flies through any aircraft but the one it was fired at, and only a
--- blast reaches the rest.
+-- blast reaches the rest. What hangs from a transport is up with them, and is treated as they are.
 local SMALL_RADIUS = 4
 
 local widest_collider = 0
@@ -132,6 +148,9 @@ local function rebuild_grids()
 		else
 			layer_add(large_layer, entity)
 		end
+	end
+	for _, cargo in state.carried() do
+		layer_add(air_layer, cargo)
 	end
 	flat_grid.sort(small_layer.grid)
 	flat_grid.sort(large_layer.grid)
@@ -204,6 +223,31 @@ local function bomb_steer(owner: Entity, origin: Vector3, aim: Vector3, params: 
 	return steer
 end
 
+-- The enemy nuke an anti-nuke at `position` launches at, if there is one: as in BAR, one that is coming down within
+-- its `coverage` (its weapon's range), wherever the nuke is now, and that no interceptor is chasing yet. The one that
+-- will land nearest it goes first. A nuke still climbing out of its silo is left alone until it levels off at its
+-- cruising height, so the interceptor meets it up there rather than over the silo it was fired from.
+local function pick_nuke_target(position: Vector3, team: types.TeamId, coverage: number): Projectile?
+	local nearest: Projectile? = nil
+	local nearest_distance = coverage
+	for _, projectile in projectiles do
+		if
+			projectile.is_nuclear
+			and projectile.flight.phase ~= "climb"
+			and projectile.chased_by == nil
+			and projectile.intercepted == false
+			and alliances.are_allied(projectile.team, team) == false
+		then
+			local distance = Vector2.new(projectile.aim.X - position.X, projectile.aim.Z - position.Z).Magnitude
+			if distance <= nearest_distance then
+				nearest = projectile
+				nearest_distance = distance
+			end
+		end
+	end
+	return nearest
+end
+
 -- Fires a rocket from `origin` toward `aim`. A lobbed shell is angled to come down on `aim`, ahead of it
 -- by however far `aim_velocity` says it will have gone by then. For homing projectiles, the target entity is needed.
 -- It was fired `late` seconds ago, partway through the tick, so it leaves from where its owner was then and has
@@ -222,6 +266,18 @@ local function launch(
 		return
 	end
 	origin -= owner.velocity * late
+
+	-- an interceptor goes after one nuke, the one its anti-nuke picked (`pick_nuke_target`), and is aimed where it
+	-- will meet it
+	local nuke: Projectile? = nil
+	if weapon.anti_nuke == true then
+		nuke = pick_nuke_target(owner.position, owner.team, weapon.range)
+		if nuke == nil then
+			return
+		end
+		local at = nuke.flight.position
+		aim = at + nuke.flight.velocity * projectile_mod.time_to_reach((at - origin).Magnitude, params)
+	end
 
 	local direction = aim - origin
 	if params.arc ~= nil then
@@ -255,6 +311,10 @@ local function launch(
 	end
 	if direction.Magnitude < 1e-3 then
 		direction = Vector3.new(math.sin(owner.facing), 0, math.cos(owner.facing))
+	end
+	-- a straight shot, like a laser bolt, strays within its cone as a lobbed shell does
+	if params.arc == nil and params.dropped ~= true and params.homing ~= true and params.inaccuracy ~= nil then
+		direction = strayed(direction.Unit, params.inaccuracy)
 	end
 	-- an anti-air missile is guided for so long and no longer, and now and then is fired to just miss; the client has to
 	-- know both to fly it the same
@@ -290,6 +350,9 @@ local function launch(
 	if late > 0 then
 		projectile_mod.step(flight, params, late)
 	end
+	if nuke ~= nil then
+		nuke.chased_by = id
+	end
 	table.insert(projectiles, {
 		id = id,
 		owner_id = owner.id,
@@ -298,13 +361,18 @@ local function launch(
 		params = params,
 		damage = weapon.damage,
 		anti_air = weapon.anti_air == true,
+		paralyze_time = weapon.paralyze_time,
 		clear_of_owner = false,
 		exempt = shields.covering(origin),
 		is_nuclear = params.nuclear == true,
+		aim = aim,
+		chased_by = nil,
+		intercepted = false,
 		is_anti_nuke = weapon.anti_nuke == true,
-		homing_target_id = nil,
+		homing_target_id = if nuke ~= nil then nuke.id else nil,
 		homing_entity_id = homing_entity_id,
 		target_id = if target ~= nil then target.id else nil,
+		pierce_wait = 0,
 	})
 
 	weapon_fired:FireAllClients({
@@ -319,6 +387,8 @@ local function launch(
 			inherited = inherited,
 			late = late,
 			homing_target_id = homing_entity_id,
+			-- and an interceptor, the nuke it chases
+			homing_projectile_id = if nuke ~= nil then nuke.id else nil,
 		},
 		team = owner.team,
 	})
@@ -336,9 +406,10 @@ end
 -- The first thing solid enough to stop the rocket where it is now. Its launcher does not count while the
 -- rocket is still inside it, however big it is, but does once the rocket has come out and fallen back on it. A
 -- missile that is still climbing or crossing is high over everything, and touches nothing until it dives.
--- Aircraft have no collider: the only one it can strike is the one it was fired at. A torpedo strikes only what is
+-- Aircraft have no collider: the only one it can strike is the one it was fired at, and the same goes for what hangs
+-- from a transport. A torpedo strikes only what is
 -- in the water with it (`unit_defs.in_water`), and a ship's hull, which sits on the surface, reaches HULL_DRAFT
--- under it for one.
+-- under it for one. A torpedo never strikes its own launcher.
 local function struck_by(projectile: Projectile): Entity?
 	if projectile.flight.phase == "climb" or projectile.flight.phase == "cruise" then
 		return nil
@@ -378,7 +449,9 @@ local function struck_by(projectile: Projectile): Entity?
 				return nil
 			end
 			if other.id == projectile.owner_id then
-				if projectile.clear_of_owner == false then
+				-- a torpedo runs away level and never comes back down on its launcher; a ship's that is let go from
+				-- the deck would otherwise meet its own keel as it drops into the water
+				if projectile.clear_of_owner == false or torpedo then
 					return nil
 				end
 			-- Don't let a direct hit strike a unit allied with the shooter (e.g. a bomber flying
@@ -396,10 +469,10 @@ local function struck_by(projectile: Projectile): Entity?
 		visit_layer(large_layer)
 	end
 	if found == nil and projectile.target_id ~= nil then
-		local target = state.get(projectile.target_id)
+		local target = state.find(projectile.target_id)
 		if
 			target ~= nil
-			and air.is_aircraft(target)
+			and (air.is_aircraft(target) or state.carrier_of(target.id) ~= nil)
 			and alliances.are_allied(target.team, projectile.team) == false
 			and inside(at, target)
 		then
@@ -421,82 +494,104 @@ end
 
 -- The rocket goes off at `at`. What it struck takes the whole damage; everything else within the blast
 -- takes less the further from the centre it is, friend and foe alike - except the shooter itself,
--- which its own blast never reaches.
+-- which its own blast never reaches. `through` says it is a piercing shot going off inside what it is going
+-- through, and flies on.
 local function detonate(
 	projectile: Projectile,
 	at: Vector3,
 	struck: Entity?,
-	apply_damage: (Entity, number, EntityId?, types.TeamId?) -> ()
+	apply_damage: (Entity, number, EntityId?, types.TeamId?, number?) -> (),
+	through: boolean?
 )
 	weapon_fired:FireAllClients({
-		impact = { id = projectile.id, at = at, radius = projectile.params.aoe_radius },
+		impact = { id = projectile.id, at = at, radius = projectile.params.aoe_radius, through = through },
 		team = projectile.team,
 	})
 
-	deformation.crater(at, projectile.params.aoe_radius, projectile.damage)
+	-- EMP leaves the ground as it was
+	if projectile.paralyze_time == nil then
+		deformation.crater(at, projectile.params.aoe_radius, projectile.damage)
+	end
 
 	if struck ~= nil then
-		apply_damage(struck, damage_to(projectile, struck, projectile.damage), projectile.owner_id, projectile.team)
+		apply_damage(
+			struck,
+			damage_to(projectile, struck, projectile.damage),
+			projectile.owner_id,
+			projectile.team,
+			projectile.paralyze_time
+		)
 	end
 	local aoe = projectile.params.aoe_radius
 	local edge = projectile.params.edge_effectiveness or EDGE_DAMAGE
-	local function blast(other: Entity, reach: number)
+	local function blast(other: Entity, reach: number, half_height: number)
 		-- the shooter itself never takes its own blast - a bomber flying away from a bomb it just
 		-- dropped, say - but nobody else is spared for being on its side: that stays real friendly fire, to
 		-- the team's own things always, and to its allies' with ally griefing on (`alliances.may_harm`)
 		if (struck ~= nil and other.id == struck.id) or other.id == projectile.owner_id then
 			return
 		end
-		local distance = (other.position - at).Magnitude
-		if distance <= aoe + reach then
-			local falloff = 1 - (1 - edge) * math.clamp(distance / aoe, 0, 1)
+		-- as in BAR, the blast is measured to the nearest point of the collider, not its centre: anything the
+		-- blast touches at all is hurt, and something it lands right against takes it all
+		local position = other.position
+		local sideways = math.max(0, Vector2.new(position.X - at.X, position.Z - at.Z).Magnitude - reach)
+		local vertical = math.max(0, math.abs(position.Y - at.Y) - half_height)
+		local distance = math.sqrt(sideways * sideways + vertical * vertical)
+		if distance <= aoe then
+			local falloff = 1 - (1 - edge) * (if aoe > 0 then distance / aoe else 1)
 			apply_damage(
 				other,
 				damage_to(projectile, other, projectile.damage * falloff),
 				projectile.owner_id,
-				projectile.team
+				projectile.team,
+				projectile.paralyze_time
 			)
 		end
 	end
 	-- anything the blast reaches is within the blast plus its own radius of the centre, and so within that
 	-- of it along both axes, which is all a layer is searched by
 	if (aoe + widest_collider) / 8 > MAX_BLAST_CELLS then
-		for _, other in state.all() do
-			if other.alive then
-				blast(other, unit_defs.collider_radius(unit_defs.of(other)))
+		for _, group in { state.all(), state.carried() } do
+			for _, other in group do
+				if other.alive then
+					local def = unit_defs.of(other)
+					blast(other, unit_defs.collider_radius(def), unit_defs.collider_height(def) / 2)
+				end
 			end
 		end
 		return
 	end
 	for _, layer in { small_layer, large_layer, wreck_layer, air_layer } do
-		local rs = layer.grid.rs
+		local rs, half_heights = layer.grid.rs, layer.half_heights
 		each_in_layer(layer, at.X, at.Z, aoe + layer.widest, function(other: Entity, k: number): boolean?
-			blast(other, rs[k])
+			blast(other, rs[k], half_heights[k])
 			return nil
 		end)
 	end
 end
 
--- Finds the nearest nuclear missile projectile within `max_range` that a shooter can target.
--- Excludes nukes from the shooter's own team.
-local function pick_nuke_target(shooter_position: Vector3, shooter_team: types.TeamId, max_range: number): Projectile?
-	local nearest: Projectile? = nil
-	local nearest_distance = max_range
+-- Sets `projectile` off at `at` for show only: nothing is hurt and the ground is left as it was. An interceptor goes
+-- off like this wherever it ends, and so does a nuke it catches, which is drawn going off in the air (`airburst`).
+local function burst_harmlessly(projectile: Projectile, at: Vector3, airburst: boolean)
+	weapon_fired:FireAllClients({
+		impact = { id = projectile.id, at = at, radius = projectile.params.aoe_radius, airburst = airburst },
+		team = projectile.team,
+	})
+end
+
+-- The projectile in flight with the id `id`, if it is still flying.
+local function in_flight_with(id: number): Projectile?
 	for _, projectile in projectiles do
-		if projectile.is_nuclear and projectile.team ~= shooter_team then
-			local distance = (projectile.flight.position - shooter_position).Magnitude
-			if distance < nearest_distance then
-				nearest = projectile
-				nearest_distance = distance
-			end
+		if projectile.id == id and projectile.intercepted == false then
+			return projectile
 		end
 	end
-	return nearest
+	return nil
 end
 
 -- Flies every rocket forward one tick. `apply_damage` is handed in rather than required, because combat
 -- launches rockets and so depends on this module.
-local function tick(delta: number, apply_damage: (Entity, number, EntityId?, types.TeamId?) -> ())
+local function tick(delta: number, apply_damage: (Entity, number, EntityId?, types.TeamId?, number?) -> ())
 	if #projectiles > 0 then
 		rebuild_grids()
 	end
@@ -504,15 +599,20 @@ local function tick(delta: number, apply_damage: (Entity, number, EntityId?, typ
 	while index <= #projectiles do
 		local projectile = projectiles[index]
 
-		-- anti-nuke interceptors find and track nuclear missiles
-		if projectile.is_anti_nuke and projectile.params.homing then
-			-- re-acquire target if lost
-			if projectile.homing_target_id == nil then
-				local target =
-					pick_nuke_target(projectile.flight.position, projectile.team, projectile.params.range or 1000)
-				if target ~= nil then
-					projectile.homing_target_id = target.id
-				end
+		-- a nuke an interceptor caught has already gone off, and only now leaves the list, so that taking it out did not
+		-- throw off the walk through it
+		if projectile.intercepted then
+			table.remove(projectiles, index)
+			continue
+		end
+		-- the nuke an interceptor chases; one whose nuke has come down some other way has nothing left to do
+		local nuke: Projectile? = nil
+		if projectile.is_anti_nuke then
+			nuke = if projectile.homing_target_id ~= nil then in_flight_with(projectile.homing_target_id) else nil
+			if nuke == nil then
+				burst_harmlessly(projectile, projectile.flight.position, false)
+				table.remove(projectiles, index)
+				continue
 			end
 		end
 
@@ -523,29 +623,17 @@ local function tick(delta: number, apply_damage: (Entity, number, EntityId?, typ
 		for _ = 1, steps do
 			-- homing logic: an interceptor steers toward the nuke it tracks, and an AA missile (or other non anti-nuke
 			-- homing weapon) toward the entity it was fired at for as long as that entity is still alive
-			if projectile.is_anti_nuke and projectile.params.homing and projectile.homing_target_id ~= nil then
-				local target: Projectile? = nil
-				for _, p in projectiles do
-					if p.id == projectile.homing_target_id then
-						target = p
-						break
-					end
-				end
-				if target ~= nil then
-					projectile_mod.home(
-						projectile.flight,
-						projectile.params,
-						target.flight.position,
-						target.flight.velocity,
-						sub_delta
-					)
-				else
-					-- target lost, clear it for re-acquisition next tick
-					projectile.homing_target_id = nil
-				end
+			if nuke ~= nil then
+				projectile_mod.home(
+					projectile.flight,
+					projectile.params,
+					nuke.flight.position,
+					nuke.flight.velocity,
+					sub_delta
+				)
 			end
 			if projectile.homing_entity_id ~= nil then
-				local target = state.get(projectile.homing_entity_id)
+				local target = state.find(projectile.homing_entity_id)
 				if target ~= nil and target.alive then
 					projectile_mod.home(
 						projectile.flight,
@@ -575,26 +663,44 @@ local function tick(delta: number, apply_damage: (Entity, number, EntityId?, typ
 				break
 			end
 
-			-- anti-nuke interceptors can collide with nuclear missiles in flight
-			if projectile.is_anti_nuke and projectile.homing_target_id ~= nil then
-				for target_index, target in projectiles do
-					if target.id == projectile.homing_target_id then
-						local distance = (target.flight.position - at).Magnitude
-						if distance < 2 then
-							-- interceptor and nuke collided: detonate interceptor, destroy nuke
-							detonate(projectile, at, nil, apply_damage)
-							finished = true
-							table.remove(projectiles, target_index)
-							break
-						end
-					end
-				end
-				if finished then
+			-- An interceptor that reaches its nuke kills it, as in BAR one is all it takes. The nuke goes off there in the
+			-- air, for show: the blast harms nothing, not even aircraft flying through it. An interceptor strikes
+			-- nothing else, and harms nothing wherever it ends.
+			if projectile.is_anti_nuke then
+				if nuke ~= nil and (nuke.flight.position - at).Magnitude <= INTERCEPT_RADIUS then
+					burst_harmlessly(nuke, nuke.flight.position, true)
+					nuke.intercepted = true
+					burst_harmlessly(projectile, at, false)
+					finished = true
 					break
 				end
+				local floor = math.max(heightmap.height_at(at.X, at.Z), config.WATER_LEVEL)
+				if heightmap.in_bounds(at.X, at.Z) == false or at.Y <= floor or projectile.flight.age > MAX_AGE then
+					-- the nuke it missed is free for another interceptor to go after
+					if nuke ~= nil then
+						nuke.chased_by = nil
+					end
+					burst_harmlessly(projectile, at, false)
+					finished = true
+					break
+				end
+				continue
 			end
 
 			local struck = struck_by(projectile)
+			-- a piercing shot goes off inside what it strikes as often as Spring's would, and flies on through it
+			if projectile.params.pierce == true then
+				if struck == nil then
+					projectile.pierce_wait = 0
+				else
+					projectile.pierce_wait -= sub_delta
+					if projectile.pierce_wait <= 0 then
+						detonate(projectile, at, struck, apply_damage, true)
+						projectile.pierce_wait += PIERCE_INTERVAL
+					end
+					struck = nil
+				end
+			end
 			if struck ~= nil then
 				detonate(projectile, at, struck, apply_damage)
 				finished = true

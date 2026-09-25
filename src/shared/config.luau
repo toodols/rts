@@ -67,6 +67,9 @@ local START_RING_RADIUS = 210
 local START_SLOTS = 4
 -- Once every player has loaded in and chosen a start, the game starts after this many seconds (see lobby.luau).
 local START_COUNTDOWN_SECONDS = 3
+-- Once the game is won the world keeps going for this many seconds, the last of it blowing up, before the end screen
+-- covers it (see server/init.server.luau and client/ui/victory_screen.luau).
+local END_SCREEN_DELAY_SECONDS = 5
 
 -- A metal extractor locks onto the closest metal spot to the cursor, however far away it is; this
 -- is how close that spot has to be, which is no limit at all.
@@ -148,6 +151,9 @@ local NON_AA_AIR_DAMAGE_FRACTION = 0.15
 -- How long an aircraft with nothing to do hovers before it settles onto the ground. One on wings cannot hover, and
 -- comes down at once.
 local AIR_LAND_DELAY = 2
+-- Every aircraft flies this many times as high as its def's altitude (BAR's `cruisealtitude`), since BAR's heights read
+-- too low here.
+local AIR_ALTITUDE_SCALE = 2 -- divergence from bar
 -- How near an enemy has to be to something stealthy (`EntityDef.stealth`) for its weapons to pick it as a target,
 -- in studs: about BAR's line of sight for a light unit, which is all it has to spot something its radar does not show.
 local STEALTH_DETECTION_RANGE = 32
@@ -164,8 +170,11 @@ local ORBIT_CANDIDATES = 10
 -- A missile is gone after this many seconds in the air, which is longer than the flight of any rocket, since
 -- one that climbs and crosses the map takes a while.
 local MISSILE_MAX_AGE = 120
--- How fast a missile turns onto a new heading, as the fraction of the turn it makes in a second's flight.
+-- How fast a missile turns onto a new heading, as the fraction of the turn it makes in a second's flight. A faster
+-- missile turns faster still, so that it never swings wider than MISSILE_TURN_RADIUS studs: at one rate for all, the
+-- Juggernaut's, three times as fast as the rest, came out of its dive late and landed well past what it was fired at.
 local MISSILE_TURN_RATE = 6
+local MISSILE_TURN_RADIUS = 12.5
 -- How fast a homing projectile turns, in radians a second, where its weapon does not say.
 local HOMING_TURN_RATE = 4
 -- The chance an anti-air missile misses whatever its target does: it is fired to pass just clear of it, and falls away
@@ -189,11 +198,10 @@ local TRANSPORT_LOAD_HEIGHT = 1.5
 local TRANSPORT_HOOK_GAP = 0.5
 local TRANSPORT_LOAD_SPEED = 3
 local TRANSPORT_ENEMY_LOAD_SPEED = 1
--- What is carried dangles this far below the transport, spread this far from its middle when there is more than
--- one, and lags this many seconds behind the transport's velocity, which is what makes it swing.
+-- What is carried dangles this far below the transport, and is spread this far from its middle when there is more
+-- than one.
 local TRANSPORT_ROPE = 2
 local TRANSPORT_CARGO_SPREAD = 1.5
-local TRANSPORT_SWAY = 0.25
 
 local BUILD_RANGE = 24
 local RECLAIM_RANGE = 24
@@ -240,8 +248,8 @@ local SCAVENGER_BEACON_SPREAD = 350
 -- How far a beacon keeps from the edge of the map.
 local SCAVENGER_BEACON_EDGE_MARGIN = 40
 -- Beacons grow tougher as the game goes on: a beacon's health is its def's times 1 plus this times the progress, so
--- by the end five times what it starts with. Every beacon standing grows, not only new ones.
-local SCAVENGER_BEACON_HEALTH_GROWTH = 4
+-- by the end ten times what it starts with (2,000 to 20,000). Every beacon standing grows, not only new ones.
+local SCAVENGER_BEACON_HEALTH_GROWTH = 9
 -- Killing a beacon moves the progress on by this much. It is small beside what it buys: one beacon fewer making
 -- units. Killing the last one standing brings their boss at once.
 local SCAVENGER_BEACON_KILL_PROGRESS = 0.01
@@ -258,6 +266,9 @@ local SCAVENGER_FUTILE_PROGRESS = 30
 local SCAVENGER_SPAWN_INTERVAL = 20
 local SCAVENGER_DEFENSE_SPAWN_INTERVAL = 30
 local SCAVENGER_MAX_DEFENSES_PER_BEACON = 6
+-- How often every beacon makes its units and its defences, as a multiple of the intervals above: at 0.5 they come
+-- half as often, every beacon on every map and at every difficulty.
+local SCAVENGER_SPAWN_RATE = 0.5
 -- Not a limit the game is balanced round, only a guard for the server: with this many scavenger units out,
 -- beacons and wrecks wait before adding more.
 local SCAVENGER_UNIT_CEILING = 300
@@ -265,7 +276,7 @@ local SCAVENGER_UNIT_CEILING = 300
 -- on, and how near a beacon it has to lie for that: one further from every beacon just lies there. Something that
 -- takes the wreck apart first, by reclaiming it, wins.
 local SCAVENGER_REVIVE_SECONDS = 60
-local SCAVENGER_REVIVE_RANGE = 300
+local SCAVENGER_REVIVE_RANGE = 150
 -- How far from a player's things a scavenger unit notices them, and how far it wanders in one go.
 local SCAVENGER_DETECTION_RANGE = 220
 -- The share of scavenger units, from 0 to 1, that go looking for the nearest thing of a player's anywhere on the
@@ -324,6 +335,7 @@ return table.freeze({
 	START_RING_RADIUS = START_RING_RADIUS,
 	START_SLOTS = START_SLOTS,
 	START_COUNTDOWN_SECONDS = START_COUNTDOWN_SECONDS,
+	END_SCREEN_DELAY_SECONDS = END_SCREEN_DELAY_SECONDS,
 	METAL_SPOT_SNAP = METAL_SPOT_SNAP,
 
 	STARTING_METAL = STARTING_METAL,
@@ -362,6 +374,7 @@ return table.freeze({
 
 	NON_AA_AIR_DAMAGE_FRACTION = NON_AA_AIR_DAMAGE_FRACTION,
 	AIR_LAND_DELAY = AIR_LAND_DELAY,
+	AIR_ALTITUDE_SCALE = AIR_ALTITUDE_SCALE,
 	STEALTH_DETECTION_RANGE = STEALTH_DETECTION_RANGE,
 	ORBIT_BUILD_REPICK = ORBIT_BUILD_REPICK,
 	ORBIT_GUNSHIP_REPICK = ORBIT_GUNSHIP_REPICK,
@@ -371,6 +384,7 @@ return table.freeze({
 	ORBIT_CANDIDATES = ORBIT_CANDIDATES,
 	MISSILE_MAX_AGE = MISSILE_MAX_AGE,
 	MISSILE_TURN_RATE = MISSILE_TURN_RATE,
+	MISSILE_TURN_RADIUS = MISSILE_TURN_RADIUS,
 	HOMING_TURN_RATE = HOMING_TURN_RATE,
 	HOMING_MISS_CHANCE = HOMING_MISS_CHANCE,
 	TRANSPORT_SLOT_RADIUS = TRANSPORT_SLOT_RADIUS,
@@ -382,7 +396,6 @@ return table.freeze({
 	TRANSPORT_ENEMY_LOAD_SPEED = TRANSPORT_ENEMY_LOAD_SPEED,
 	TRANSPORT_ROPE = TRANSPORT_ROPE,
 	TRANSPORT_CARGO_SPREAD = TRANSPORT_CARGO_SPREAD,
-	TRANSPORT_SWAY = TRANSPORT_SWAY,
 	TRANSPORT_UNLOAD_GAP = TRANSPORT_UNLOAD_GAP,
 
 	BUILD_RANGE = BUILD_RANGE,
@@ -411,6 +424,7 @@ return table.freeze({
 	SCAVENGER_FUTILE_SECONDS = SCAVENGER_FUTILE_SECONDS,
 	SCAVENGER_FUTILE_PROGRESS = SCAVENGER_FUTILE_PROGRESS,
 	SCAVENGER_SPAWN_INTERVAL = SCAVENGER_SPAWN_INTERVAL,
+	SCAVENGER_SPAWN_RATE = SCAVENGER_SPAWN_RATE,
 	SCAVENGER_DEFENSE_SPAWN_INTERVAL = SCAVENGER_DEFENSE_SPAWN_INTERVAL,
 	SCAVENGER_UNIT_CEILING = SCAVENGER_UNIT_CEILING,
 	SCAVENGER_MAX_DEFENSES_PER_BEACON = SCAVENGER_MAX_DEFENSES_PER_BEACON,

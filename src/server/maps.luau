@@ -15,6 +15,7 @@ local map_state = require(ReplicatedStorage.Shared.map_state)
 local passability = require(ReplicatedStorage.Shared.passability)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local environment = require(ReplicatedStorage.Shared.environment)
+local atmosphere = require(ReplicatedStorage.Shared.atmosphere)
 local campaign = require(ReplicatedStorage.Shared.campaign)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 
@@ -31,6 +32,7 @@ local lobby = require(script.Parent.lobby)
 local scenery = require(script.Parent.scenery)
 local ai = require(script.Parent.ai)
 local match_stats = require(script.Parent.match_stats)
+local notifications = require(script.Parent.notifications)
 local missions = require(script.Parent.missions)
 
 local loading = false
@@ -48,6 +50,8 @@ local function build(seed: number, preset: string)
 		environment.apply({})
 	end
 	wind.refit()
+	-- and how it looks, which each client lights its own view by
+	atmosphere.apply(map_presets.presets[preset].atmosphere)
 	passability.initialize()
 	pathfinder.reset()
 	deformation.discard_pending()
@@ -81,7 +85,8 @@ local function load(preset: string, seed: number?): (boolean, string?)
 		lobby.restart_on_new_map()
 		for _, player in Players:GetPlayers() do
 			local team_id = players.team_of(player)
-			if team_id ~= nil then
+			-- once for a team that players share
+			if team_id ~= nil and spawning.owns_anything(team_id) == false then
 				spawning.give_starting_force(team_id)
 			end
 		end
@@ -96,6 +101,7 @@ local function load(preset: string, seed: number?): (boolean, string?)
 		end
 	end
 	match_stats.reset()
+	notifications.reset()
 	loading = false
 	return ok, if ok then nil else tostring(err)
 end

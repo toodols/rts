@@ -1,6 +1,6 @@
 -- Which teams are allied. An alliance is transitive: allying a with b and b with c makes a and c allies too,
 -- so teams fall into groups and two teams are allied when they are in the same one. A team is always allied
--- with itself, and nothing here ever splits a group.
+-- with itself. A team can leave its group (`leave`, pow's unally), which leaves the rest of the group allied.
 --
 -- Whether a team's weapons may hurt its allies is the match's choice (`set_ally_griefing`). BAR always lets them, so a
 -- commander can disintegrate an ally's extractors; here that is off unless the lobby turned it on. A team's weapons
@@ -39,6 +39,30 @@ local function ally(a: TeamId, b: TeamId): boolean
 	return true
 end
 
+-- Takes `team_id` out of its group, leaving it allied with nobody and the rest of the group still allied with each
+-- other. Returns false if it was allied with nobody.
+local function leave(team_id: TeamId): boolean
+	local root = root_of(team_id)
+	local rest: { TeamId } = {}
+	local alone = true
+	for other in parent do
+		if root_of(other) == root and other ~= team_id then
+			alone = false
+			table.insert(rest, other)
+		end
+	end
+	if alone then
+		return false
+	end
+	-- the group is rebuilt without it, every other team pointing straight at the first of them
+	table.sort(rest)
+	for _, other in rest do
+		parent[other] = rest[1]
+	end
+	parent[team_id] = nil
+	return true
+end
+
 -- Every team in `team_id`'s group, itself included, among `teams`, in order.
 local function group_of(team_id: TeamId, teams: { [TeamId]: types.Team }): { TeamId }
 	local result = {}
@@ -67,6 +91,7 @@ end
 
 return table.freeze({
 	ally = ally,
+	leave = leave,
 	are_allied = are_allied,
 	set_ally_griefing = set_ally_griefing,
 	is_ally_griefing = is_ally_griefing,

@@ -355,7 +355,7 @@ local defs: { [string]: EntityDef } = {
 					acceleration = studs(400),
 					thrust_time = 1.05,
 					gravity = 12,
-					drag = 1.5,
+					drag = 0.02,
 					aoe_radius = aoe(studs(24)),
 					edge_effectiveness = 0.15,
 				},
@@ -392,6 +392,7 @@ local defs: { [string]: EntityDef } = {
 				turret = { turn_rate = math.rad(45) },
 				beam_time = 1.5,
 				beam_thickness = 2,
+				charged_beam = true,
 			},
 		},
 		color = Color3.fromRGB(198, 86, 72),
@@ -504,20 +505,21 @@ local defs: { [string]: EntityDef } = {
 		color = Color3.fromRGB(198, 86, 72),
 	},
 
-	-- Anti-nuke interceptor: defends against incoming nuclear missiles by launching homing interceptors
-	-- that track and collide with nukes before they detonate. Continuously searches for nuclear missiles
-	-- and launches interceptors as long as energy is available.
+	-- corfmd, Cortex's Prevailer: an anti-nuke. It stockpiles interceptors (BAR's fmd_rocket, twenty at most, one every
+	-- 90 seconds, each at BAR's price) and launches one on its own at every enemy nuke that is coming down within its
+	-- coverage, BAR's `coverage`, which is its range here. One interceptor is all a nuke takes: it goes off where they
+	-- meet, harmlessly, and comes no further. Its collider is kept to the art's 2 x 2 cells; BAR's volume is
+	-- 48 x 78 x 48 elmos on a 4 x 4 footprint.
 	prevailer = {
 		name = "prevailer",
 		display_name = "Prevailer",
 		subtitle = "Anti-nuke interceptor",
 		kind = "building",
-		-- Similar footprint to other missile defense structures
 		collider = { shape = "box", width = cells(2), height = cells(3), length = cells(2) },
-		metal_cost = 12000,
-		energy_cost = 45000,
-		buildpower_cost = 120000,
-		health = 3200,
+		metal_cost = 1500,
+		energy_cost = 40000,
+		buildpower_cost = 60000,
+		health = 3300,
 		buildpower = nil,
 		acceleration = nil,
 		max_speed = nil,
@@ -527,25 +529,23 @@ local defs: { [string]: EntityDef } = {
 		assisting = false,
 		max_water_depth = 0,
 		build_options = nil,
-		-- homing interceptor weapon that searches for nuclear missiles
 		weapons = {
 			{
-				damage = 2000,
+				damage = 1500,
 				reload = 2,
-				-- range out to which it searches for nukes to intercept
-				range = studs(5000),
-				energy_per_shot = 4000,
+				range = studs(2000),
+				energy_per_shot = 0,
 				anti_nuke = true,
+				stockpile = { limit = 20, build_time = 90, metal = 150, energy = 7500 },
 				projectile = {
-					speed = studs(600),
+					speed = studs(6000),
 					acceleration = 0,
 					thrust_time = 0,
 					gravity = 0,
 					drag = 0,
-					aoe_radius = aoe(studs(400)),
-					edge_effectiveness = 0.2,
+					aoe_radius = aoe(studs(420)),
+					edge_effectiveness = 0.15,
 					homing = true,
-					-- an interceptor turns harder than an anti-air missile: a nuke will not wait for it to come round
 					turn_rate = 8,
 				},
 			},
@@ -640,13 +640,15 @@ local defs: { [string]: EntityDef } = {
 		assisting = false,
 		max_water_depth = studs(9999),
 		build_options = nil,
-		air = { altitude = 7, climb_speed = 20 },
+		-- legheavydrone's `cruisealtitude` 68
+		air = { altitude = studs(68), climb_speed = 20 },
 		weapons = {
 			{
 				damage = 100,
 				reload = 0.8,
 				range = studs(430),
 				energy_per_shot = 0,
+				kind = "heat_ray",
 				beam_time = 0.1,
 				beam_color = Color3.fromRGB(255, 140, 0),
 			},
@@ -746,6 +748,7 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 0,
 		buildpower_cost = 1000 * 4,
 		health = 2800 * 2,
+		self_destruct_countdown = 1,
 		buildpower = nil,
 		acceleration = nil,
 		max_speed = nil,
@@ -754,6 +757,8 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = 0,
+		-- armdrag's `paralyzemultiplier` 0
+		emp_resistance = 1,
 		build_options = nil,
 		weapons = nil,
 		color = Color3.fromRGB(128, 132, 138),

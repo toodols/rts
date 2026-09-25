@@ -1,5 +1,6 @@
--- The build menu's tooltip text for what a builder or factory can make. `text` is only what its stats and subtitle
--- do not already say; `tips` are the only place for how to use it. Anything missing here still gets a tooltip.
+-- What there is to say about a def beyond its numbers: the build menu's tooltip text for what a builder or factory can
+-- make, an unlock's card, and its entry in the lobby's encyclopedia. `text` is only what its stats and subtitle do not
+-- already say; `tips` are the only place for how to use it. Anything missing here still gets a tooltip and an entry.
 
 export type Description = {
 	text: string?,
@@ -103,7 +104,7 @@ local descriptions: { [string]: Description } = {
 		text = "Manual fire. Stockpiled.",
 	},
 	prevailer = {
-		text = "Nuclear missiles only.",
+		text = "Stockpiled. Stops nukes aimed within range.",
 	},
 	calamity = {
 		text = "18000 energy per shot.",
@@ -159,6 +160,9 @@ local descriptions: { [string]: Description } = {
 	mantis = {
 		text = "Unarmed. Launches drones.",
 	},
+	starlight = {
+		text = "Fires only ahead. Costs energy per shot. Explodes on death.",
+	},
 
 	-- Hovercraft
 
@@ -206,6 +210,9 @@ local descriptions: { [string]: Description } = {
 	hailstorm = {
 		text = "Ground only.",
 	},
+	stiletto = {
+		text = "Ground only. EMP. Stealth.",
+	},
 	liche = {
 		text = "Ground only. Nuclear blast.",
 	},
@@ -221,6 +228,13 @@ local descriptions: { [string]: Description } = {
 	},
 	vanguard = {
 		text = "Climbs any slope.",
+	},
+	thor = {
+		text = "Lightning arcs to nearby units. EMP lasers. Immune to EMP.",
+		tips = { "Attack a target to fire its stockpiled EMP missile." },
+	},
+	behemoth = {
+		text = "Gauss shots pass through everything. Immune to EMP.",
 	},
 }
 

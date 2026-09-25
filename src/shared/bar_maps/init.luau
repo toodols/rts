@@ -24,6 +24,18 @@ local comet_catcher = require(script.comet_catcher)
 local altair_crossing = require(script.altair_crossing)
 local ancient_bastion = require(script.ancient_bastion)
 local folsom_dam = require(script.folsom_dam)
+local pinewood_derby = require(script.pinewood_derby)
+local acidic_quarry = require(script.acidic_quarry)
+local aurelia = require(script.aurelia)
+local canis_river = require(script.canis_river)
+local boulder_beach = require(script.boulder_beach)
+local charlie_in_the_hills = require(script.charlie_in_the_hills)
+local coast_to_coast = require(script.coast_to_coast)
+local devils_postpiles = require(script.devils_postpiles)
+local faster_than_light = require(script.faster_than_light)
+local gasbag_grabens = require(script.gasbag_grabens)
+local great_divide = require(script.great_divide)
+local greenest_fields = require(script.greenest_fields)
 
 -- What lies on a map, as its `<name>_features` module has it (see tools/bar_maps/import_bar_features.py).
 export type Features = {
@@ -179,6 +191,18 @@ local ALL_MAPS: { BarMap } = {
 	altair_crossing,
 	ancient_bastion,
 	folsom_dam,
+	pinewood_derby,
+	acidic_quarry,
+	aurelia,
+	canis_river,
+	boulder_beach,
+	charlie_in_the_hills,
+	coast_to_coast,
+	devils_postpiles,
+	faster_than_light,
+	gasbag_grabens,
+	great_divide,
+	greenest_fields,
 }
 
 -- The maps in the game: in Studio every one, and anywhere else only those whose makers have said we may use them

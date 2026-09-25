@@ -5,7 +5,9 @@ local React = require(ReplicatedStorage.Packages.react)
 
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 local wind_block = require(ReplicatedStorage.Client.ui.wind_block)
+local tide_block = require(ReplicatedStorage.Client.ui.tide_block)
 local scavenger_block = require(ReplicatedStorage.Client.ui.scavenger_block)
+local wave_block = require(ReplicatedStorage.Client.ui.wave_block)
 
 type TeamState = {
 	metal: number,
@@ -152,6 +154,8 @@ local function ResourceBar()
 	local ui_scale = use_viewport.use_ui_scale()
 	-- nil while the scavengers gamemode is off, when there is nothing more to show
 	local difficulty = scavenger_block.use_difficulty()
+	-- nil outside the counterattack, which shows its waves where the difficulty would be
+	local waves = wave_block.use_waves()
 
 	React.useEffect(function()
 		-- in case it changed between the first render and this
@@ -164,7 +168,9 @@ local function ResourceBar()
 
 	return React.createElement("Frame", {
 		-- the bar is wider with the difficulty in it, so the readouts keep the room they had
-		[React.Tag] = if difficulty ~= nil then "resource-bar panel with-scavengers" else "resource-bar panel",
+		[React.Tag] = if difficulty ~= nil or waves ~= nil
+			then "resource-bar panel with-scavengers"
+			else "resource-bar panel",
 	}, {
 		Scale = React.createElement("UIScale", { Scale = ui_scale }),
 		Metal = React.createElement(Resource, {
@@ -194,14 +200,18 @@ local function ResourceBar()
 			LayoutOrder = 4,
 		}),
 		Wind = React.createElement(wind_block.WindBlock, { LayoutOrder = 5 }),
-		ScavengerDivider = if difficulty ~= nil
+		Tide = React.createElement(tide_block.TideBlock, { LayoutOrder = 6 }),
+		ScavengerDivider = if difficulty ~= nil or waves ~= nil
 			then React.createElement("Frame", {
 				[React.Tag] = "resource-divider",
-				LayoutOrder = 6,
+				LayoutOrder = 7,
 			})
 			else nil,
 		Scavengers = if difficulty ~= nil
-			then React.createElement(scavenger_block.ScavengerBlock, { LayoutOrder = 7, difficulty = difficulty })
+			then React.createElement(scavenger_block.ScavengerBlock, { LayoutOrder = 8, difficulty = difficulty })
+			else nil,
+		Waves = if waves ~= nil and difficulty == nil
+			then React.createElement(wave_block.WaveBlock, { LayoutOrder = 8, waves = waves })
 			else nil,
 	})
 end

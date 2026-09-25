@@ -1,6 +1,7 @@
 -- The lobby's whole screen: a header with the tabs, then the tab open: Play, the browser while this player is in no
 -- lobby (or the campaign screen, which the browser opens) and the lobby itself while they are in one; Skins, where they
--- pick what their units wear (skins_tab.luau); and Microtransactions (microtransactions_tab.luau). And a line along
+-- pick what their units wear (skins_tab.luau); the Encyclopedia, an entry for every unit and building (encyclopedia.luau),
+-- which the campaign's missions link into; and Microtransactions (microtransactions_tab.luau). And a line along
 -- the bottom for anything that went wrong. All of it over the scene (see LobbyClient.scene), which the backdrop only darkens toward the edges, so the
 -- menus sit in a world rather than on a blank page.
 
@@ -21,6 +22,7 @@ local room = require(script.room)
 local campaign = require(script.campaign)
 local controls = require(script.controls)
 local skins_tab = require(script.skins_tab)
+local encyclopedia = require(script.encyclopedia)
 local microtransactions_tab = require(script.microtransactions_tab)
 
 local player = Players.LocalPlayer
@@ -62,12 +64,13 @@ local function use_fit_scale(): number
 	return scale
 end
 
-type Tab = "play" | "skins" | "microtransactions"
+type Tab = "play" | "skins" | "encyclopedia" | "microtransactions"
 
 -- The tabs along the header, in order, and what each is labelled.
 local TABS: { { id: Tab, label: string } } = {
 	{ id = "play", label = "PLAY" },
 	{ id = "skins", label = "SKINS" },
+	{ id = "encyclopedia", label = "ENCYCLOPEDIA" },
 	{ id = "microtransactions", label = "MICROTRANSACTIONS" },
 }
 
@@ -77,6 +80,8 @@ local function App()
 	-- out of a lobby, whether the campaign screen is open rather than the browser
 	local in_campaign, set_in_campaign = React.useState(false)
 	local tab: Tab, set_tab = React.useState("play" :: Tab)
+	-- the encyclopedia entry another screen last asked to open
+	local focus: encyclopedia.Focus?, set_focus = React.useState(nil :: encyclopedia.Focus?)
 	local ui_scale = use_fit_scale()
 
 	local function show(message: string)
@@ -93,6 +98,11 @@ local function App()
 			show(state.notice)
 		end
 	end, { state })
+
+	local function open_entry(name: string)
+		set_focus({ name = name, nonce = os.clock() })
+		set_tab "encyclopedia"
+	end
 
 	local function act(action: string, argument: any?)
 		task.spawn(function()
@@ -126,6 +136,8 @@ local function App()
 	end
 	if tab == "skins" then
 		title = "SKINS"
+	elseif tab == "encyclopedia" then
+		title = "ENCYCLOPEDIA"
 	elseif tab == "microtransactions" then
 		title = "MICROTRANSACTIONS"
 	end
@@ -133,6 +145,8 @@ local function App()
 	local screen
 	if tab == "skins" then
 		screen = React.createElement(skins_tab.SkinsTab, { act = act })
+	elseif tab == "encyclopedia" then
+		screen = React.createElement(encyclopedia.Encyclopedia, { focus = focus })
 	elseif tab == "microtransactions" then
 		screen = React.createElement(microtransactions_tab.MicrotransactionsTab)
 	elseif current ~= nil then
@@ -143,6 +157,7 @@ local function App()
 			on_back = function()
 				set_in_campaign(false)
 			end,
+			open_entry = open_entry,
 		})
 	else
 		screen = React.createElement(browser.Browser, {

@@ -1,0 +1,28 @@
+@use "theme" as *;
+
+// A ping's marker: the name of the team that pinged over its column, or at the edge of the screen behind an arrow
+// pointing the way to it. Where it sits, which way the arrow points and the team's colour are set from code; this is
+// only what it looks like.
+.ping-marker {
+	width: 0px;
+	height: 0px;
+	pointer-events: none;
+}
+
+.ping-name {
+	width: auto;
+	height: auto;
+	font-family: Michroma;
+	font-size: 16px;
+	color: var(--Text);
+	white-space: nowrap;
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
+// One of the two arms of the arrow's chevron. The background here is only a stand-in for the team's colour.
+.ping-arm {
+	width: 18px;
+	height: 4px;
+	background-color: $void;
+	border: 1px solid veil(black, 0.4);
+}

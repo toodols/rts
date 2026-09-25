@@ -63,6 +63,7 @@ local function view_of(lobby: Lobby?): LobbyView?
 		visibility = lobby.visibility,
 		bonuses = table.clone(lobby.bonuses),
 		ally_griefing = lobby.ally_griefing,
+		end_mode = lobby.end_mode,
 		seats = seats,
 		ready = ready,
 		starting = lobby.starting,
@@ -224,6 +225,8 @@ local function handle(player: Player, action: any, argument: any): (boolean, str
 		return lobbies.set_ready(user_id, argument)
 	elseif action == ACTIONS.set_ally_griefing and typeof(argument) == "boolean" then
 		return lobbies.set_ally_griefing(user_id, argument)
+	elseif action == ACTIONS.set_end_mode and typeof(argument) == "string" then
+		return lobbies.set_end_mode(user_id, argument)
 	elseif action == ACTIONS.move and typeof(argument) == "number" then
 		return lobbies.move(user_id, argument)
 	elseif action == ACTIONS.start then

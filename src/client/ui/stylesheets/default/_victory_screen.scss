@@ -197,3 +197,91 @@
 		color: var(--Caution);
 	}
 }
+
+// Played together, the vote on going on, under the buttons: a headshot each, sunk and dimmed until they agree, then
+// ringed in the win's colour with a tick in the corner, and how many have agreed of how many it takes.
+.victory-voters {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: space(2);
+	width: auto;
+	height: auto;
+}
+
+.victory-voter {
+	width: 40px;
+	height: 40px;
+	background-color: veil($void, 0.6);
+	outline: 1px solid $edge;
+
+	&.agreed {
+		background-color: veil($gain, 0.18);
+		outline: 3px solid var(--Gain);
+	}
+}
+
+.victory-voter-tick {
+	position: absolute;
+	right: -4px;
+	bottom: -4px;
+	width: 20px;
+	height: 20px;
+	background-color: $void;
+	outline: 1px solid var(--Gain);
+	font-weight: bold;
+	font-size: 16px;
+	color: var(--Gain);
+	text-align: center;
+}
+
+.victory-vote-count {
+	width: auto;
+	height: 40px;
+	padding: 0 space(1);
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 14px;
+	color: var(--TextDim);
+}
+
+// The end put away to play on: a small console button in the result's colour, that brings it back, in the resource
+// bar's row just short of its left end (the bar is 868 wide, or 1048 with the scavengers' difficulty in it). Not the
+// top right corner, whose clicks Roblox's player list takes whether it is drawn there or not, and not under the bar,
+// where a mission's cards are.
+.victory-reopen {
+	@include cell;
+	position: absolute;
+	top: 23px;
+	right: calc(50% + 446px);
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	width: auto;
+	height: 30px;
+	padding: 0 space(4);
+	z-index: 100;
+
+	&.with-scavengers {
+		right: calc(50% + 536px);
+	}
+}
+
+.victory-reopen-label {
+	width: auto;
+	height: 100%;
+	font-family: Michroma;
+	font-size: 11px;
+	font-weight: bold;
+	color: var(--Text);
+}
+
+.victory-reopen.victory .victory-reopen-label {
+	color: var(--Gain);
+}
+
+.victory-reopen.defeat .victory-reopen-label {
+	color: var(--Danger);
+}

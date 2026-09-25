@@ -2,8 +2,8 @@
 -- that one after another charges up (its glow swelling and turning the colour of its tier, the card shaking harder
 -- and harder) and bursts open with a flash, a ring, sparks and light rays turning behind it, to show the def's own
 -- model turning slowly, its name, what it is, and a banner with its tier. Nothing is rolled: what is revealed is
--- exactly `def_names`, and each def's tier is fixed by what it costs (`tier_of`). The cheapest is opened first, so the
--- best comes last. A tally beside the heading counts the reveals.
+-- exactly `def_names`, and each def's tier is fixed by what it costs or named by the def (`tier_of`). The cheapest is
+-- opened first, so the best comes last. A tally beside the heading counts the reveals.
 --
 -- Everything that moves runs off one clock (`use_clock`), a binding set every frame, so none of it re-renders
 -- anything; the stylesheet only has how things look at rest. A click, or Space or Enter, speeds the rest of the reveal
@@ -20,14 +20,14 @@ local UserInputService = game:GetService "UserInputService"
 local React = require(ReplicatedStorage.Packages.react)
 
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local unit_descriptions = require(ReplicatedStorage.Shared.unit_descriptions)
 
-local unit_descriptions = require(ReplicatedStorage.Client.ui.unit_descriptions)
 local unit_picture = require(ReplicatedStorage.Client.ui.unit_picture)
 
 local UnitPicture = unit_picture.UnitPicture
 
 -- How rare a def is made to look. A def is of the first tier its power (unit_defs.power: metal plus energy / 60) is
--- below.
+-- below, unless it names its own (EntityDef.tier), which wins.
 export type Tier = {
 	label: string,
 	-- the class its card and banner take in the stylesheet
@@ -196,7 +196,15 @@ local VIGNETTE_FADE = NumberSequence.new({
 local VIGNETTE_DARKNESS = 0.35
 
 local function tier_of(def_name: string): Tier
-	local power = unit_defs.power(unit_defs.get(def_name))
+	local def = unit_defs.get(def_name)
+	if def.tier ~= nil then
+		for _, tier in TIERS do
+			if tier.tag == def.tier then
+				return tier
+			end
+		end
+	end
+	local power = unit_defs.power(def)
 	for _, tier in TIERS do
 		if power < tier.below then
 			return tier

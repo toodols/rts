@@ -5,8 +5,8 @@
 --   - a hit (its health dropped, and not because its skin changed its most) pops it;
 --   - on an aircraft going faster than `shake_speed` of its top speed it shakes, harder the longer it keeps it up, and
 --     after `fly_off_seconds` of that it flies off;
---   - on something under the water deeper than `submerge_depth` (an amphibious unit wading out, a submarine that has
---     dived) it floats off, up to the surface;
+--   - on something that has been under the water deeper than `submerge_depth` for `submerge_seconds` (an amphibious
+--     unit wading out, a submarine that has dived) it floats off, up to the surface;
 --   - once it is gone, `regen_seconds` of nothing that would knock one off (no hit, no speed, not under the water)
 --     puts a new one on.
 --
@@ -35,6 +35,8 @@ type Donut = {
 	quiet: number,
 	-- seconds it has been shaking at speed; it winds back down when the speed drops
 	shaking: number,
+	-- seconds it has been under the water deeper than `submerge_depth`; 0 once it is not
+	submerged: number,
 	-- its health and most health as of the last step, to see a hit by
 	health: number,
 	max_health: number,
@@ -81,6 +83,7 @@ local function knock_off(donut: Donut, event: Event)
 	donut.on = false
 	donut.quiet = 0
 	donut.shaking = 0
+	donut.submerged = 0
 	donut.events += 1
 	donut.last_event = event
 end
@@ -99,6 +102,7 @@ local function tick(delta: number)
 				on = true,
 				quiet = 0,
 				shaking = 0,
+				submerged = 0,
 				health = entity.health,
 				max_health = entity.max_health,
 				events = 0,
@@ -118,9 +122,10 @@ local function tick(delta: number)
 			and entity.velocity.Magnitude > settings.shake_speed * max_speed
 
 		local under = drowned(entity, def, settings)
+		donut.submerged = if under then donut.submerged + delta else 0
 
 		if donut.on then
-			if under then
+			if donut.submerged >= settings.submerge_seconds then
 				knock_off(donut, "float")
 			elseif hit then
 				knock_off(donut, "pop")
@@ -186,6 +191,7 @@ local function force_on(entity: Entity): boolean
 	end
 	donut.on = true
 	donut.shaking = 0
+	donut.submerged = 0
 	return true
 end
 

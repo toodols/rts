@@ -22,6 +22,8 @@ local transport = require(script.Parent.transport)
 local alliances = require(script.Parent.alliances)
 local campaign = require(script.Parent.campaign)
 local orbits = require(script.Parent.orbits)
+local pilots = require(script.Parent.pilots)
+local emp = require(script.Parent.emp)
 
 type Entity = types.Entity
 type Order = types.Order
@@ -391,7 +393,7 @@ end
 
 local function run_attack(entity: Entity, order: Order)
 	local target_id = order.target_id
-	local target = if target_id ~= nil then state.get(target_id) else nil
+	local target = if target_id ~= nil then state.find(target_id) else nil
 	local def = unit_defs.of(entity)
 	if target == nil or combat.is_valid_forced_target(entity, target) == false then
 		combat.set_forced_target(entity, nil)
@@ -497,7 +499,7 @@ end
 
 local function run_reclaim(entity: Entity, order: Order)
 	local target_id = order.target_id
-	local target = if target_id ~= nil then state.get(target_id) else nil
+	local target = if target_id ~= nil then state.find(target_id) else nil
 	if target == nil then
 		pop(entity)
 		return
@@ -673,12 +675,18 @@ local function run_area_attack(entity: Entity, order: Order)
 	end)
 end
 
--- Guarding: stay with a friendly entity. A builder that can assist instead works on whatever the
--- guarded entity is building or reclaiming, and falls back to following when it is doing neither.
+-- Guarding: stay with a friendly entity, its own team's or an ally's. A builder that can assist instead works on
+-- whatever the guarded entity is building or reclaiming, and falls back to following when it is doing neither. The
+-- order ends if the guarded entity's team stops being an ally.
 local function run_guard(entity: Entity, order: Order)
 	local target_id = order.target_id
 	local target = if target_id ~= nil then state.get(target_id) else nil
-	if target == nil or target.alive == false or target.id == entity.id or target.team ~= entity.team then
+	if
+		target == nil
+		or target.alive == false
+		or target.id == entity.id
+		or alliances.are_allied(entity.team, target.team) == false
+	then
 		pop(entity)
 		return
 	end
@@ -947,6 +955,11 @@ local function tick(delta: number)
 		-- one on its way out of the lab that made it does nothing else until it is out: production drives it,
 		-- and its orders wait
 		if movement.exiting_from(entity.id) ~= nil then
+			continue
+		end
+		-- one being piloted does what its pilot does, and its orders wait until it is let go; a stunned one's wait
+		-- until it can move again
+		if pilots.get(entity.id) ~= nil or emp.is_stunned(entity) then
 			continue
 		end
 

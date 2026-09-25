@@ -16,11 +16,14 @@ local placement = require(script.Parent.placement)
 local production = require(script.Parent.production)
 local godmode = require(script.Parent.godmode)
 local campaign = require(script.Parent.campaign)
+local self_destruct = require(script.Parent.self_destruct)
+local alliances = require(script.Parent.alliances)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
 type Order = types.Order
 type OrderKind = types.OrderKind
+type TeamId = types.TeamId
 
 local issue_order: RemoteEvent = ReplicatedStorage.Shared.IssueOrder
 local queue_production: RemoteEvent = ReplicatedStorage.Shared.QueueProduction
@@ -48,6 +51,7 @@ local VALID_ORDER_KINDS: { [string]: boolean } = {
 	load = true,
 	unload = true,
 	stop = true,
+	self_destruct = true,
 	area_reclaim = true,
 	area_repair = true,
 	area_resurrect = true,
@@ -81,6 +85,15 @@ local function owned_entity(player: Player, id: unknown): Entity?
 		return nil
 	end
 	return entity
+end
+
+-- Whether `team` may guard `target`: its own things and its allies', but never an enemy's, since following one would
+-- be a free look at where it goes. In godmode every real team is yours; the neutral team 0 belongs to nobody.
+local function may_guard(team: TeamId?, target: Entity): boolean
+	if team == nil or target.team == 0 then
+		return false
+	end
+	return godmode.is_enabled() or alliances.are_allied(team, target.team)
 end
 
 -- `order` with the way to it that the client sent, `raw`, laid ahead of it as waypoints: moves, or for a fight, fight
@@ -152,6 +165,7 @@ local function on_issue_order(player: Player, payload: unknown)
 		and kind ~= "attack_ground"
 		and kind ~= "unload"
 		and kind ~= "stop"
+		and kind ~= "self_destruct"
 		and AREA_KINDS[kind] == nil
 	if needs_target and target_id == nil then
 		return
@@ -185,8 +199,8 @@ local function on_issue_order(player: Player, payload: unknown)
 		ground = heightmap.ground_position(raw.X, raw.Z)
 	end
 
-	-- only your own team can be guarded; following an enemy would be a free look at where it goes. Anyone's can be loaded
-	if kind == "guard" and owned_entity(player, target_id) == nil then
+	-- your own things and your allies' can be guarded, never an enemy's (`may_guard`). Anyone's can be loaded
+	if kind == "guard" and may_guard(players.team_of(player), state.get(target_id :: number) :: Entity) == false then
 		return
 	end
 
@@ -201,6 +215,14 @@ local function on_issue_order(player: Player, payload: unknown)
 		-- a drone answers to its carrier alone
 		if unit_defs.of(entity).drone == true then
 			continue
+		end
+		-- anything of yours can destroy itself, a building too, and stopping it calls that off
+		if kind == "self_destruct" then
+			self_destruct.toggle(entity)
+			continue
+		end
+		if kind == "stop" then
+			self_destruct.cancel(entity)
 		end
 		-- a lab cannot carry out orders, but it keeps them in its queue like anything else, and each unit it makes
 		-- takes a copy (see production's rally_order)
@@ -239,7 +261,7 @@ local function on_issue_order(player: Player, payload: unknown)
 		-- For reclaim orders, capture the target's current position so waypoints stay at the original
 		-- location, not following the target as it moves or gets reclaimed
 		if kind == "reclaim" and target_id ~= nil then
-			local target = state.get(target_id)
+			local target = state.find(target_id)
 			if target ~= nil then
 				order.position = target.position
 			end
@@ -406,4 +428,5 @@ end
 return table.freeze({
 	init = init,
 	with_route = with_route,
+	may_guard = may_guard,
 })

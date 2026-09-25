@@ -20,6 +20,14 @@
 	white-space: nowrap;
 }
 
+// The nametag past the distance where the rest of a bar drops out: over a zoomed-out map a thin name in a team's
+// colour gets lost in the ground, so it is drawn larger and outlined dark, like the dots around it. Sized in pixels,
+// it stays this size on the screen however far out the camera goes.
+.bar-name.far {
+	font-size: 14px;
+	-webkit-text-stroke: 2px veil($void, 0.85);
+}
+
 // What everything but a commander has instead of a nametag: a dot in its team's colour (set from code, like
 // the nametag's), ringed dark so it stands out over any ground. The background here is only a stand-in for that
 // colour: it is what makes the dot solid at all, since every frame starts out with none.
@@ -29,6 +37,16 @@
 	border-radius: 50%;
 	background-color: $void;
 	border: 1px solid veil(black, 0.4);
+}
+
+// The dot past the distance where the rest of a bar drops out, when it is all that is left of it: zoomed out, the
+// dots are how you tell who holds which part of the map, so they are a touch larger and firmly ringed, to read as
+// territory over grass, sand or rock alike. It is sized in pixels like everything here, so it stays this size on the
+// screen however far out the camera goes.
+.bar-dot.far {
+	width: 8px;
+	height: 8px;
+	border: 1px solid veil(black, 0.8);
 }
 
 .bar-track {
@@ -107,6 +125,18 @@
 	}
 }
 
+// How long something of yours has left before it destroys itself, flashing like the decay readout.
+.bar-self-destruct {
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: $danger;
+	white-space: nowrap;
+
+	&.lit {
+		color: white;
+	}
+}
+
 // How far along a slow weapon is to its next shot.
 .bar-fill.reload {
 	@include meter($energy);
@@ -120,6 +150,19 @@
 // How far along a launcher's next missile is.
 .bar-fill.stockpile {
 	@include meter($metal);
+}
+
+// How much EMP something has on it, filling toward the stun.
+.bar-fill.emp {
+	@include meter($emp);
+}
+
+// How long something stunned by EMP has left.
+.bar-stun {
+	font-family: RobotoMono;
+	font-size: 11px;
+	color: var(--Emp);
+	white-space: nowrap;
 }
 
 // How many missiles a launcher holds, under its bar.

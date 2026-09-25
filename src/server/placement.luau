@@ -141,8 +141,9 @@ local function ground_center(def_name: string, x: number, z: number): Vector3
 	return Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
 end
 
--- Whether something spot-bound already stands on `spot`, or is waiting in some builder's queue to.
--- If `builder_id` is provided, mexes queued by that same builder are ignored (not considered taken).
+-- Whether something spot-bound already stands on `spot`, or is waiting in a builder's queue to.
+-- If `builder_id` is provided, only that builder's own queue counts: it won't snap onto a spot it has already
+-- queued, but may snap onto one another builder has queued. With no builder, every queue counts.
 -- Spots with what `def_name` is built over in place (`EntityDef.upgrades`) on them are not considered taken.
 local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string?): boolean
 	for _, other in state.all() do
@@ -164,8 +165,8 @@ local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string
 				then unit_defs.of(order)
 				else nil
 			if queued_def ~= nil and spots.for_def(queued_def) ~= nil and order.position ~= nil then
-				-- Only ignore this queued mex if it's queued by the same builder (fix #10)
-				if builder_id ~= nil and other.id == builder_id then
+				-- another builder's queued mex doesn't take the spot from this one (fix #10)
+				if builder_id ~= nil and other.id ~= builder_id then
 					continue
 				end
 				if geometry.distance_2d(order.position, spot) < TAKEN_RADIUS then
@@ -179,8 +180,8 @@ end
 
 -- Where a building asked for at (x, z) would actually go, turned to `facing`. Buildings sit on the
 -- building grid, and a spot-bound one goes on the nearest spot of its kind instead, a metal spot or a geothermal vent,
--- or nowhere if there is none close enough. If `builder_id` is provided and this is a spot-bound building, spots
--- queued by that builder are not considered taken. Something built over another in place can use spots that other
+-- or nowhere if there is none close enough. If `builder_id` is provided and this is a spot-bound building, only
+-- spots queued by that builder are taken, not those other builders have queued. Something built over another in place can use spots that other
 -- already stands on.
 local function resolve_center(def_name: string, x: number, z: number, facing: number, builder_id: EntityId?): Vector3?
 	local def = unit_defs.get(def_name)

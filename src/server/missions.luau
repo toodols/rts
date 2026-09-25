@@ -14,11 +14,21 @@
 -- metal spots), half of them within reach of a thug at the cliff's edge and half beyond it. Its energy storage starts
 -- full, so that its guards have the energy to fire for some time.
 --
+-- The counterattack (campaign.COUNTERATTACK, on the overlook's map again), just after the overlook: the overlook's enemy
+-- where it stood, but wrecks now (OVERLOOK_ENEMY again, what stood in the waves' zone just west of it, and the
+-- extractors on its spots), for the player to raise; and the player's base as they won the overlook with
+-- (COUNTERATTACK_BASE): an extractor on each of their four spots, six solar collectors, their bot lab, two graverobbers,
+-- and the thugs and aggravators they took the heights with at the edge. It goes down beside their commander once
+-- the commander has (`furnish`), which starts the mission's clock. Played together, the first team to have its
+-- commander down gets the base and each after it an army of its own. What follows, the time to prepare and then the
+-- waves, is counterattack.luau's; the enemy the waves play as is made here, and has nothing on the field until the
+-- first wave arrives.
+--
 -- A mission with an enemy is won when the enemy has nothing left: no unit and no building, finished or not (a wreck is
--- nobody's). The game then ends in victory for every other team (game_phase.set_ended, as the scavengers' boss ends
--- it), and each player on a winning team has the mission marked complete, saved and its unlocks published
--- (server/campaign.luau). It is lost the other way round: when every team with a player on it has had something on the
--- field and has nothing left, the enemy wins. Neither is looked at before the enemy is on the field, or once the game
+-- nobody's); in the counterattack, only once its final wave has arrived. The game then ends in victory for every other
+-- team (game_phase.set_ended, as the scavengers' boss ends it), and each player on a winning team has the mission
+-- marked complete, saved and its unlocks published (server/campaign.luau). It is lost the other way round: when every
+-- team with a player on it has had something on the field and has nothing left, the enemy wins. Neither is looked at before the enemy is on the field, or once the game
 -- has ended. The end screen then offers to go back to the lobby or on to the next mission (campaign_exit.luau).
 --
 -- What a client may want is published on Workspace: `campaign_enemy_team`, the enemy's team id, and `campaign_boulder`,
@@ -38,6 +48,8 @@ local config = require(ReplicatedStorage.Shared.config)
 local campaign = require(ReplicatedStorage.Shared.campaign)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local geometry = require(ReplicatedStorage.Shared.geometry)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 
 local state = require(script.Parent.state)
@@ -46,6 +58,7 @@ local spawning = require(script.Parent.spawning)
 local placement = require(script.Parent.placement)
 local obstacles = require(script.Parent.obstacles)
 local server_campaign = require(script.Parent.campaign)
+local counterattack = require(script.Parent.counterattack)
 
 type Entity = types.Entity
 type TeamId = types.TeamId
@@ -64,30 +77,67 @@ local BOULDER_FACING = math.pi / 2
 -- cliff's edge is at its z (campaign.overlook_edge_at), since the edge wanders: a guard reaches 39.5 studs and a thug
 -- at the edge about 55 from that height, so 45 out is out of a guard's reach of the edge and well within a thug's.
 -- That is half of it: the front line of guards, two solar collectors and some grunts at the foot of the cliff. The rest
--- stands where `at` says, in world (x, z), beyond a thug's reach of the edge: a guard at the foot of each ramp, a second
--- line, and the base, for the ramps or aggravators.
-local OVERLOOK_ENEMY: { { def_name: string, at: Vector2, from_edge: number? } } = {
+-- stands where `at` says, in world (x, z), beyond a thug's reach of the edge: a guard covering the foot of each ramp
+-- from as far back as its reach lets it (so that an aggravator at the foot outranges it), a second line, and the base,
+-- for the ramps or aggravators. Those distances are the weapons', so they stay what they are
+-- however big the map is; it is the base behind them that is packed into what room the low ground has, some 64 studs
+-- past the edge and more.
+--
+-- In the counterattack all of it is wrecks, where it stood but for what stood in the waves' zone (campaign.COUNTERATTACK
+-- .zone_x), whose wreck lies at `wrecked_at` instead, west of the zone, so that it stays once raised: the ramp guards
+-- nearer the feet of the ramps, which they then cover, and the base's back row closer in.
+type OverlookThing = { def_name: string, at: Vector2, from_edge: number?, wrecked_at: Vector2? }
+local OVERLOOK_ENEMY: { OverlookThing } = {
 	-- in reach from the edge
-	{ def_name = "guard", at = Vector2.new(0, -40), from_edge = 45 },
-	{ def_name = "guard", at = Vector2.new(0, -14), from_edge = 45 },
-	{ def_name = "guard", at = Vector2.new(0, 14), from_edge = 45 },
-	{ def_name = "guard", at = Vector2.new(0, 40), from_edge = 45 },
-	{ def_name = "solar_collector", at = Vector2.new(0, -27), from_edge = 49 },
-	{ def_name = "solar_collector", at = Vector2.new(0, 27), from_edge = 49 },
-	{ def_name = "grunt", at = Vector2.new(0, -50), from_edge = 34 },
-	{ def_name = "grunt", at = Vector2.new(0, -6), from_edge = 34 },
-	{ def_name = "grunt", at = Vector2.new(0, 6), from_edge = 34 },
-	{ def_name = "grunt", at = Vector2.new(0, 50), from_edge = 34 },
+	{ def_name = "guard", at = Vector2.new(0, -24), from_edge = 45 },
+	{ def_name = "guard", at = Vector2.new(0, -8), from_edge = 45 },
+	{ def_name = "guard", at = Vector2.new(0, 8), from_edge = 45 },
+	{ def_name = "guard", at = Vector2.new(0, 24), from_edge = 45 },
+	{ def_name = "solar_collector", at = Vector2.new(0, -16), from_edge = 49 },
+	{ def_name = "solar_collector", at = Vector2.new(0, 16), from_edge = 49 },
+	{ def_name = "grunt", at = Vector2.new(0, -30), from_edge = 34 },
+	{ def_name = "grunt", at = Vector2.new(0, -4), from_edge = 34 },
+	{ def_name = "grunt", at = Vector2.new(0, 4), from_edge = 34 },
+	{ def_name = "grunt", at = Vector2.new(0, 30), from_edge = 34 },
 	-- beyond it: the feet of the ramps, the second line, and the base
-	{ def_name = "guard", at = Vector2.new(46, -62), from_edge = nil },
-	{ def_name = "guard", at = Vector2.new(46, 62), from_edge = nil },
-	{ def_name = "guard", at = Vector2.new(56, -18), from_edge = nil },
-	{ def_name = "guard", at = Vector2.new(56, 18), from_edge = nil },
-	{ def_name = "bot_lab", at = Vector2.new(78, 0), from_edge = nil },
-	{ def_name = "solar_collector", at = Vector2.new(92, -28), from_edge = nil },
-	{ def_name = "solar_collector", at = Vector2.new(92, 28), from_edge = nil },
-	{ def_name = "energy_storage", at = Vector2.new(100, 0), from_edge = nil },
+	{ def_name = "guard", at = Vector2.new(62, -42), from_edge = nil, wrecked_at = Vector2.new(38, -38) },
+	{ def_name = "guard", at = Vector2.new(62, 42), from_edge = nil, wrecked_at = Vector2.new(38, 38) },
+	{ def_name = "guard", at = Vector2.new(48, -10), from_edge = nil },
+	{ def_name = "guard", at = Vector2.new(48, 10), from_edge = nil },
+	{ def_name = "bot_lab", at = Vector2.new(53, 0), from_edge = nil },
+	{ def_name = "solar_collector", at = Vector2.new(60, -17), from_edge = nil, wrecked_at = Vector2.new(54, -18) },
+	{ def_name = "solar_collector", at = Vector2.new(60, 17), from_edge = nil, wrecked_at = Vector2.new(54, 18) },
+	{ def_name = "energy_storage", at = Vector2.new(64, 0), from_edge = nil, wrecked_at = Vector2.new(44, 0) },
 }
+-- The player's base in the counterattack, as they won the overlook with it, on the plateau and facing east, at the
+-- cliff: what, and where in world (x, z), or for what stands at the edge, `back` studs west of wherever the edge is at
+-- its z (campaign.overlook_edge_at). The bot lab stands between the commander and the edge, the solar collectors behind
+-- the commander, and the army along the edge, the thugs in front where they outreach what is below, the aggravators
+-- behind them. An extractor goes on each of the player's four metal spots as well. Two graverobbers, the overlook's
+-- reward, wait beside the lab to raise the old base's guards.
+local COUNTERATTACK_BASE: { { def_name: string, at: Vector2, back: number? } } = {
+	{ def_name = "bot_lab", at = Vector2.new(-38, 0), back = nil },
+	{ def_name = "graverobber", at = Vector2.new(-30, -10), back = nil },
+	{ def_name = "graverobber", at = Vector2.new(-30, 10), back = nil },
+	{ def_name = "solar_collector", at = Vector2.new(-70, -14), back = nil },
+	{ def_name = "solar_collector", at = Vector2.new(-70, 0), back = nil },
+	{ def_name = "solar_collector", at = Vector2.new(-70, 14), back = nil },
+	{ def_name = "solar_collector", at = Vector2.new(-62, -14), back = nil },
+	{ def_name = "solar_collector", at = Vector2.new(-62, 0), back = nil },
+	{ def_name = "solar_collector", at = Vector2.new(-62, 14), back = nil },
+	{ def_name = "thug", at = Vector2.new(0, -15), back = 5 },
+	{ def_name = "thug", at = Vector2.new(0, -9), back = 5 },
+	{ def_name = "thug", at = Vector2.new(0, -3), back = 5 },
+	{ def_name = "thug", at = Vector2.new(0, 3), back = 5 },
+	{ def_name = "thug", at = Vector2.new(0, 9), back = 5 },
+	{ def_name = "thug", at = Vector2.new(0, 15), back = 5 },
+	{ def_name = "aggravator", at = Vector2.new(0, -12), back = 11 },
+	{ def_name = "aggravator", at = Vector2.new(0, -4), back = 11 },
+	{ def_name = "aggravator", at = Vector2.new(0, 4), back = 11 },
+	{ def_name = "aggravator", at = Vector2.new(0, 12), back = 11 },
+}
+local EAST = math.pi / 2
+
 -- Enough energy to fill whatever the overlook's enemy can store.
 local OVERLOOK_ENERGY = 1e6
 
@@ -122,6 +172,8 @@ local completions: { [number]: boolean } = {}
 -- The enemy team a mission played earlier in this game made, which the next one to have an enemy plays as again, so
 -- that loading missions one after another (`begin`) does not leave an empty team behind for each.
 local made_enemy: TeamId? = nil
+-- The teams of the players' whose base the counterattack has put down (`furnish`).
+local furnished: { [TeamId]: boolean } = {}
 
 -- Puts the boulder down with its middle at `at`, belonging to nobody, and makes it a wall.
 local function place_boulder(at: Vector2): Entity
@@ -133,21 +185,49 @@ local function place_boulder(at: Vector2): Entity
 	return boulder
 end
 
+-- Where an extractor built on each metal spot on one side of `x` stands, facing `facing`: those east of it, or with
+-- `west` those west of it.
+local function extractor_sites(x: number, west: boolean, facing: number): { Vector3 }
+	local sites: { Vector3 } = {}
+	for _, spot in metal_spots.all() do
+		if (spot.center.X < x) ~= west then
+			continue
+		end
+		local center = placement.resolve_center(EXTRACTOR_DEF, spot.center.X, spot.center.Z, facing, nil)
+		if center == nil or placement.can_place(EXTRACTOR_DEF, center, facing, nil) == false then
+			warn(`the mission could not put an extractor on the spot at {spot.center}`)
+			continue
+		end
+		table.insert(sites, center)
+	end
+	return sites
+end
+
 -- A finished extractor of `team_id` on every metal spot east of `east_of`, each on the spot as one built there would be.
 local function place_extractors(team_id: TeamId, east_of: number)
-	for _, spot in metal_spots.all() do
-		if spot.center.X <= east_of then
-			continue
-		end
-		local center = placement.resolve_center(EXTRACTOR_DEF, spot.center.X, spot.center.Z, WEST, nil)
-		if center == nil or placement.can_place(EXTRACTOR_DEF, center, WEST, nil) == false then
-			warn(`the mission could not put its enemy's extractor on the spot at {spot.center}`)
-			continue
-		end
+	for _, center in extractor_sites(east_of, false, WEST) do
 		state.create_entity(EXTRACTOR_DEF, team_id, center, WEST, "active")
 		-- so that the next one sees this spot as taken
 		state.flush()
 	end
+end
+
+-- The wreck of a finished `def_name` standing at `center`, as its death would have left it: made, wrecked on the spot
+-- and thrown away before it ever joins the world.
+local function place_wreck(def_name: string, center: Vector3, facing: number)
+	local source = state.create_entity(def_name, 0, center, facing, "active")
+	state.create_wreck(source)
+	state.mark_dead(source)
+end
+
+-- Where on the ground a finished `def_name` put down at (x, z) stands: a building on the building grid.
+local function standing_center(def_name: string, x: number, z: number, facing: number): Vector3
+	local def = unit_defs.get(def_name)
+	if def.kind == "building" then
+		local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
+		x, z = geometry.snap_center(x, z, half, config.CELL_STUDS)
+	end
+	return placement.ground_center(def_name, x, z)
 end
 
 -- Makes the mission's enemy team, keeping the first team for the player whether or not they have arrived yet.
@@ -181,13 +261,19 @@ local function setup_tutorial()
 	end
 end
 
+-- Where one of OVERLOOK_ENEMY stands, in world (x, z).
+local function overlook_enemy_at(each: OverlookThing): Vector2
+	local x = if each.from_edge ~= nil then campaign.overlook_edge_at(each.at.Y) + each.from_edge else each.at.X
+	return Vector2.new(x, each.at.Y)
+end
+
 local function setup_overlook()
 	local team_id = create_enemy()
 	-- first, so that nothing else takes their spots
 	place_extractors(team_id, campaign.OVERLOOK.edge_x)
 	for _, each in OVERLOOK_ENEMY do
-		local x = if each.from_edge ~= nil then campaign.overlook_edge_at(each.at.Y) + each.from_edge else each.at.X
-		local placed = spawning.spawn_near(each.def_name, team_id, heightmap.ground_position(x, each.at.Y), WEST)
+		local at = overlook_enemy_at(each)
+		local placed = spawning.spawn_near(each.def_name, team_id, heightmap.ground_position(at.X, at.Y), WEST)
 		if placed == nil then
 			warn(`the overlook found no room for its enemy's {each.def_name} at {each.at}`)
 		end
@@ -199,6 +285,21 @@ local function setup_overlook()
 	end
 end
 
+-- The counterattack: the overlook's enemy, wrecked where it stood, and an enemy with nothing yet for the waves to play
+-- as. The player's base goes down with their commander (`furnish`).
+local function setup_counterattack()
+	local team_id = create_enemy()
+	for _, center in extractor_sites(campaign.OVERLOOK.edge_x, false, WEST) do
+		place_wreck(EXTRACTOR_DEF, center, WEST)
+	end
+	for _, each in OVERLOOK_ENEMY do
+		local at = each.wrecked_at or overlook_enemy_at(each)
+		place_wreck(each.def_name, standing_center(each.def_name, at.X, at.Y, WEST), WEST)
+	end
+	state.flush()
+	counterattack.setup(team_id)
+end
+
 -- Puts down what the mission being played starts with, if one is. Called once the map is built.
 local function setup()
 	local mission = campaign.current_mission()
@@ -206,6 +307,56 @@ local function setup()
 		setup_tutorial()
 	elseif mission == "overlook" then
 		setup_overlook()
+	elseif mission == "counterattack" then
+		setup_counterattack()
+	end
+end
+
+-- Puts the counterattack's player's base (COUNTERATTACK_BASE) down for `team_id`, whose commander has just gone down,
+-- and starts the mission's clock. Anything there is no room for where it should be goes down as near as there is. Only
+-- the first team furnished gets the extractors and the buildings: there is one base, and a co-op player after the first
+-- brings only an army.
+local function furnish(team_id: TeamId)
+	local first = next(furnished) == nil
+	furnished[team_id] = true
+	if first then
+		for _, center in extractor_sites(campaign.OVERLOOK.edge_x, true, EAST) do
+			state.create_entity(EXTRACTOR_DEF, team_id, center, EAST, "active")
+			state.flush()
+		end
+	end
+	for _, each in COUNTERATTACK_BASE do
+		if first == false and unit_defs.get(each.def_name).kind == "building" then
+			continue
+		end
+		local x = if each.back ~= nil then campaign.overlook_edge_at(each.at.Y) - each.back else each.at.X
+		local placed = spawning.spawn_near(each.def_name, team_id, heightmap.ground_position(x, each.at.Y), EAST)
+		if placed == nil then
+			warn(`the counterattack found no room for the player's {each.def_name} at {each.at}`)
+		end
+	end
+	counterattack.start()
+end
+
+-- Furnishes each team of the players' in the counterattack whose commander has gone down since the last look. The
+-- teams are found first, since what furnishing puts down joins the world at once.
+local function furnish_new_teams()
+	local teams: { TeamId } = {}
+	for _, entity in state.all() do
+		if
+			entity.alive
+			and entity.def_name == "commander"
+			and entity.team ~= enemy_team
+			and entity.team ~= 0
+			and furnished[entity.team] ~= true
+			and table.find(teams, entity.team) == nil
+		then
+			table.insert(teams, entity.team)
+		end
+	end
+	table.sort(teams)
+	for _, team_id in teams do
+		furnish(team_id)
 	end
 end
 
@@ -215,7 +366,7 @@ local function player_start(): Vector2?
 	local mission = campaign.current_mission()
 	if mission == "tutorial" then
 		return campaign.TUTORIAL.player_start
-	elseif mission == "overlook" then
+	elseif mission == "overlook" or mission == "counterattack" then
 		return campaign.OVERLOOK.player_start
 	end
 	return nil
@@ -301,16 +452,28 @@ local function tick(delta: number)
 	if enemy_id == nil or outcome ~= nil or game_phase.phase() == "ended" then
 		return
 	end
+	local defending = campaign.current_mission() == "counterattack"
+	if defending then
+		counterattack.tick(delta)
+	end
 	check_timer += delta
 	if check_timer < CHECK_SECONDS then
 		return
 	end
 	check_timer = 0
+	if defending then
+		furnish_new_teams()
+	end
 	local standing = count_standing()
 	for team_id in standing do
 		fielded[team_id] = true
 	end
-	if fielded[enemy_id] == true and standing[enemy_id] == nil then
+	if defending then
+		counterattack.set_enemies_left(standing[enemy_id] or 0)
+	end
+	-- the counterattack's enemy has nothing between its waves: it is only beaten once the last of them has arrived
+	local beaten = defending == false or counterattack.final_wave_arrived()
+	if fielded[enemy_id] == true and standing[enemy_id] == nil and beaten then
 		win(enemy_id)
 		return
 	end
@@ -364,25 +527,30 @@ local function begin(mission_id: string?)
 	check_timer = 0
 	outcome = nil
 	table.clear(completions)
+	table.clear(furnished)
+	counterattack.reset()
 	Workspace:SetAttribute(ENEMY_TEAM_ATTRIBUTE, nil)
 	Workspace:SetAttribute(BOULDER_ATTRIBUTE, nil)
 	Workspace:SetAttribute(campaign.MISSION_ATTRIBUTE, nil)
 	Workspace:SetAttribute(campaign.MISSION_ATTRIBUTE, mission_id)
 end
 
--- The boulder is gone: nothing to point at any more.
+-- Something is gone: the boulder has nothing to point at any more, and the counterattack need not remember it.
 local function forget(id: types.EntityId)
 	if Workspace:GetAttribute(BOULDER_ATTRIBUTE) == id then
 		Workspace:SetAttribute(BOULDER_ATTRIBUTE, nil)
 	end
+	counterattack.forget(id)
 end
 
 return table.freeze({
 	begin = begin,
 	setup = setup,
+	furnish = furnish,
 	place_boulder = place_boulder,
 	player_start = player_start,
 	enemy = enemy,
+	count_standing = count_standing,
 	tick = tick,
 	result = result,
 	is_settled = is_settled,

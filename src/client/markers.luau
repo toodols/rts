@@ -85,7 +85,7 @@ local BEAM_BASE_TRANSPARENCY = 0.3
 local BEAM_PULSE = 0.2
 local BEAM_PULSE_RATE = 14
 
--- The glow under something a selected unit is guarding.
+-- The glow under something a selected unit is guarding, its own team's or an ally's.
 local HALO_HEIGHT = 0.15
 local HALO_MARGIN = 1.5
 local HALO_TRANSPARENCY = 0.65
@@ -401,20 +401,39 @@ local ring_pool: Pool = { parts = {}, used = 0 }
 -- last guess put it. The ground changes slowly enough that it settles in a few.
 local REACH_ITERATIONS = 4
 
--- A ring round `center`, laid on the ground so that it climbs hills, `radius(direction)` out in each direction,
--- into `pool`.
-local function draw_ring(pool: Pool, center: Vector3, radius: (Vector3) -> number, color: Color3)
-	local previous: Vector3? = nil
-	for step = 0, RING_SEGMENTS do
-		local angle = step / RING_SEGMENTS * math.pi * 2
-		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+-- An arc round `center` from bearing `from` to bearing `to`, measured the way entities face, laid on the ground so
+-- that it climbs hills, `radius(direction)` out in each direction, into `pool`. Returns the points it starts and
+-- ends at.
+local function draw_arc(
+	pool: Pool,
+	center: Vector3,
+	radius: (Vector3) -> number,
+	color: Color3,
+	from: number,
+	to: number
+): (Vector3, Vector3)
+	local steps = math.max(2, math.ceil(RING_SEGMENTS * (to - from) / (math.pi * 2)))
+	local first: Vector3? = nil
+	local previous = center
+	for step = 0, steps do
+		local bearing = from + (to - from) * step / steps
+		local direction = Vector3.new(math.sin(bearing), 0, math.cos(bearing))
 		local out = radius(direction)
 		local point = heightmap.ground_position(center.X + direction.X * out, center.Z + direction.Z * out)
-		if previous ~= nil then
+		if first == nil then
+			first = point
+		else
 			draw_dash(pool, previous, point, color)
 		end
 		previous = point
 	end
+	return first or center, previous
+end
+
+-- A ring round `center`, laid on the ground so that it climbs hills, `radius(direction)` out in each direction,
+-- into `pool`.
+local function draw_ring(pool: Pool, center: Vector3, radius: (Vector3) -> number, color: Color3)
+	draw_arc(pool, center, radius, color, 0, math.pi * 2)
 end
 
 -- The circle an area command (reclaim, repair, resurrect or attack) is being dragged out to: concentric
@@ -454,20 +473,53 @@ local function longest_weapon(def: types.EntityDef): types.Weapon?
 	return longest
 end
 
--- Shows a build range ring, an attack range ring and an intercept ring, whichever of them apply, around `center`.
--- The attack ring of
+-- The arrow out of a factory's front, the side its units come out of.
+local FRONT_ARROW_COLOR = Color3.fromRGB(240, 240, 240)
+-- How far past the footprint's edge the arrow starts, how long its shaft is, and how long each side of its head.
+local FRONT_ARROW_GAP = 1
+local FRONT_ARROW_LENGTH = 7
+local FRONT_ARROW_HEAD = 2.5
+
+-- The ground at (x, z), or the water's surface over it.
+local function surface_at(x: number, z: number): Vector3
+	local ground = heightmap.ground_position(x, z)
+	return Vector3.new(x, math.max(ground.Y, config.WATER_LEVEL), z)
+end
+
+-- An arrow on the ground pointing out of the front of something of `def` standing at `center`, turned to `facing`.
+local function draw_front_arrow(pool: Pool, center: Vector3, def: types.EntityDef, facing: number)
+	local forward = Vector3.new(math.sin(facing), 0, math.cos(facing))
+	local start = FRONT_ARROW_GAP + unit_defs.footprint_half_extents(def).Y
+	local tail = center + forward * start
+	local tip = center + forward * (start + FRONT_ARROW_LENGTH)
+	local tip_point = surface_at(tip.X, tip.Z)
+	draw_dash(pool, surface_at(tail.X, tail.Z), tip_point, FRONT_ARROW_COLOR)
+	for _, side in { 1, -1 } do
+		local back = CFrame.Angles(0, side * math.pi * 3 / 4, 0):VectorToWorldSpace(forward) * FRONT_ARROW_HEAD
+		local barb = tip + back
+		draw_dash(pool, tip_point, surface_at(barb.X, barb.Z), FRONT_ARROW_COLOR)
+	end
+end
+
+-- Shows a build range ring, an attack range ring and an intercept ring, whichever of them apply, around `center`,
+-- and, given the way it faces, an arrow out of the front of a factory. The attack ring of
 -- something whose longest weapon arcs under gravity is drawn as far as it really reaches, which is further over
 -- ground lower than `muzzle`, where its shells come from, and less far over ground higher up, the way the server
--- judges it (`projectile.range_to`). Any other is a circle.
+-- judges it (`projectile.range_to`). Any other is a circle. One whose longest weapon fires only into a cone ahead
+-- (`fire_arc`), like a submarine's torpedo tubes, is drawn as that cone, turned to `facing`.
 local function show_ranges(
 	center: Vector3,
 	build_range: number?,
 	attack_range: number?,
 	def: types.EntityDef?,
 	muzzle: Vector3?,
-	intercept_range: number?
+	intercept_range: number?,
+	facing: number?
 )
 	ring_pool.used = 0
+	if def ~= nil and facing ~= nil and unit_defs.is_factory(def) then
+		draw_front_arrow(ring_pool, center, def, facing)
+	end
 	if build_range ~= nil then
 		draw_ring(ring_pool, center, function(_: Vector3): number
 			return build_range
@@ -475,20 +527,30 @@ local function show_ranges(
 	end
 	if attack_range ~= nil then
 		local weapon = if def ~= nil then longest_weapon(def) else nil
+		if weapon ~= nil and weapon.range ~= attack_range then
+			weapon = nil
+		end
 		local params = if weapon ~= nil then weapon.projectile else nil
-		if weapon ~= nil and params ~= nil and muzzle ~= nil and weapon.range == attack_range then
-			draw_ring(ring_pool, center, function(direction: Vector3): number
+		local reach: (Vector3) -> number = function(_: Vector3): number
+			return attack_range
+		end
+		if weapon ~= nil and params ~= nil and muzzle ~= nil then
+			reach = function(direction: Vector3): number
 				local out = weapon.range
 				for _ = 1, REACH_ITERATIONS do
 					local ground = heightmap.ground_position(center.X + direction.X * out, center.Z + direction.Z * out)
 					out = projectile.range_to(weapon.range, muzzle, ground, params)
 				end
 				return out
-			end, ATTACK_RING_COLOR)
+			end
+		end
+		local arc = if weapon ~= nil then weapon.fire_arc else nil
+		if arc ~= nil and facing ~= nil and arc < math.pi then
+			local left, right = draw_arc(ring_pool, center, reach, ATTACK_RING_COLOR, facing - arc, facing + arc)
+			draw_leg(ring_pool, center, left, ATTACK_RING_COLOR)
+			draw_leg(ring_pool, center, right, ATTACK_RING_COLOR)
 		else
-			draw_ring(ring_pool, center, function(_: Vector3): number
-				return attack_range
-			end, ATTACK_RING_COLOR)
+			draw_ring(ring_pool, center, reach, ATTACK_RING_COLOR)
 		end
 	end
 	if intercept_range ~= nil then

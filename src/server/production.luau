@@ -27,6 +27,7 @@ local construction = require(script.Parent.construction)
 local economy = require(script.Parent.economy)
 local movement = require(script.Parent.movement)
 local campaign = require(script.Parent.campaign)
+local emp = require(script.Parent.emp)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -294,7 +295,8 @@ local function tick(delta: number)
 		if entity.alive == false then
 			continue
 		end
-		if #entity.queue == 0 and in_progress[entity.id] == nil then
+		-- a stunned lab makes nothing until it is not
+		if (#entity.queue == 0 and in_progress[entity.id] == nil) or emp.is_stunned(entity) then
 			continue
 		end
 		tick_factory(entity, delta)

@@ -37,6 +37,19 @@ export type Mode = {
 	mission: string?,
 }
 
+-- How a team game or a free for all is won: which sides are out (see server/conquest.luau). A side is an alliance, the
+-- teams seated on it, and it is out once what the mode looks at is gone from every one of them, as BAR's end modes have
+-- it: its commanders ("commanders", BAR's default and this game's), anything that can build, units and labs alike
+-- ("builders"), or everything it has ("units"). The last side left wins. "never" puts no side out, whatever it loses.
+-- Scavenger and campaign games end their own ways, whatever a match says.
+export type EndMode = "commanders" | "builders" | "units" | "never"
+
+export type EndModeOption = {
+	id: EndMode,
+	-- what the lobby shows
+	label: string,
+}
+
 export type Difficulty = {
 	id: string,
 	label: string,
@@ -67,7 +80,18 @@ export type Match = {
 	bonuses: { [string]: number },
 	-- whether a team's weapons hurt its allies' things, as BAR's always do; off, they only hurt its own and its enemies'
 	ally_griefing: boolean,
+	-- how a team game or a free for all is won
+	end_mode: EndMode,
 }
+
+local END_MODES: { EndModeOption } = {
+	{ id = "commanders", label = "Coms dead" },
+	{ id = "builders", label = "Builders dead" },
+	{ id = "units", label = "All dead" },
+	{ id = "never", label = "Never" },
+}
+
+local DEFAULT_END_MODE: EndMode = "commanders"
 
 local DIFFICULTIES: { Difficulty } = {
 	-- 80, 64, 52 and 40 minutes
@@ -163,6 +187,16 @@ for _, mode in MODES do
 end
 
 local DEFAULT_MODE = "scav_normal"
+
+-- `value` as an end mode, or nil if it is not one.
+local function end_mode(value: any): EndMode?
+	for _, option in END_MODES do
+		if option.id == value then
+			return option.id
+		end
+	end
+	return nil
+end
 
 local function get(id: string): Mode?
 	return mode_by_id[id]
@@ -262,6 +296,7 @@ local function encode(match: Match): { [string]: any }
 		seats = seats,
 		bonuses = table.clone(match.bonuses),
 		ally_griefing = match.ally_griefing,
+		end_mode = match.end_mode,
 	}
 end
 
@@ -305,13 +340,17 @@ local function decode(value: any): Match?
 		bonuses = table.freeze(bonuses),
 		-- a match stored before it could be chosen has it off
 		ally_griefing = value.ally_griefing == true,
+		-- and one stored before it could be chosen ends as BAR's games do by default
+		end_mode = end_mode(value.end_mode) or DEFAULT_END_MODE,
 	})
 end
 
 return table.freeze({
 	MODES = MODES,
 	DIFFICULTIES = DIFFICULTIES,
+	END_MODES = END_MODES,
 	DEFAULT_MODE = DEFAULT_MODE,
+	DEFAULT_END_MODE = DEFAULT_END_MODE,
 	DEFAULT_SEED = DEFAULT_SEED,
 	SPECTATOR_SIDE = SPECTATOR_SIDE,
 	SPECTATOR_CAPACITY = SPECTATOR_CAPACITY,
@@ -321,6 +360,7 @@ return table.freeze({
 	BONUS_MAX = BONUS_MAX,
 	BONUS_STEP = BONUS_STEP,
 	get = get,
+	end_mode = end_mode,
 	clamp_bonus = clamp_bonus,
 	bonus_of = bonus_of,
 	difficulty = difficulty,

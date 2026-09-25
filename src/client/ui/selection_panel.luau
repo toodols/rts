@@ -2,13 +2,16 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local React = require(ReplicatedStorage.Packages.react)
 
-local config = require(ReplicatedStorage.Shared.config)
+local art = require(ReplicatedStorage.Shared.art)
 local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
 
 local input = require(ReplicatedStorage.Client.input)
 local tutorial = require(ReplicatedStorage.Client.tutorial)
+local art_icon = require(ReplicatedStorage.Client.ui.art_icon)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
+local unit_icon = require(ReplicatedStorage.Client.ui.unit_icon)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local use_mission = require(ReplicatedStorage.Client.ui.use_mission)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
@@ -19,15 +22,21 @@ type FlowSource = use_entities.FlowSource
 type Gauge = use_entities.Gauge
 type Content = tooltip.Content
 
+local ArtIcon = art_icon.ArtIcon
 local WithTooltip = tooltip.WithTooltip
+local UnitIcon = unit_icon.UnitIcon
+
+-- How numbers and weapons are put into words, shared with the lobby's encyclopedia (Shared.unit_facts).
+local figure = unit_facts.figure
+local studs = unit_facts.studs
+local weapon_kind = unit_facts.weapon_kind
+local weapon_dps = unit_facts.weapon_dps
+local MANUAL_WEAPON = unit_facts.MANUAL_WEAPON
 
 local cancel_production: RemoteEvent = ReplicatedStorage.Shared.CancelProduction
 
 -- Past this many a gauge is drawn as a meter rather than one pip each.
 local MAX_PIPS = 12
-
--- The gap between the shots of a burst for a weapon that does not give its own, as combat has it.
-local DEFAULT_BURST_INTERVAL = 0.1
 
 -- Rich text is on for every label, so user-made text such as a team name has to be escaped before it goes in.
 local function escape(text: string): string
@@ -42,34 +51,28 @@ local function escape(text: string): string
 	)
 end
 
--- A number as a readout: whole when it is big enough that the fraction would be noise, one place otherwise.
-local function figure(value: number): string
-	if math.abs(value) >= 100 or value == math.floor(value) then
-		return tostring(math.round(value))
-	end
-	return string.format("%.1f", value)
-end
-
--- A time in seconds, to two places while it is short.
-local function seconds(value: number): string
-	if value >= 10 then
-		return `{math.round(value)}s`
-	end
-	return `{string.format("%.2f", value)}s`
-end
-
--- A factory's pending items. Clicking one cancels it.
+-- A factory's pending items, each a picture of what it makes (or its first letters, for a def with no art). Clicking
+-- one cancels it.
 local function Queue(props: { view: EntityView, LayoutOrder: number })
 	local chips = {}
 	for index, def_name in props.view.queue do
 		local def = unit_defs.defs[def_name]
+		local pictured = def ~= nil and art.has(def_name)
 		chips[`Chip{index}`] = React.createElement("TextButton", {
 			[React.Tag] = "queue-chip",
 			LayoutOrder = index,
-			Text = if def ~= nil then string.sub(def.display_name, 1, 2) else "?",
+			Text = if pictured then "" elseif def ~= nil then string.sub(def.display_name, 1, 2) else "?",
 			[React.Event.Activated] = function()
 				cancel_production:FireServer({ factory_id = props.view.id, index = index })
 			end,
+		}, {
+			Icon = if pictured
+				then React.createElement(UnitIcon, {
+					def_name = def_name,
+					team = props.view.team_color,
+					tag = "queue-chip-icon",
+				})
+				else nil,
 		})
 	end
 
@@ -391,11 +394,6 @@ local function Economy(props: { view: EntityView, LayoutOrder: number })
 	})
 end
 
--- A distance in studs, the world's unit.
-local function studs(value: number): string
-	return `{figure(value)} studs`
-end
-
 -- What there is to know about a unit or building that does not change as it goes: what it costs, how tough and how
 -- quick it is. Shown over its title.
 local function unit_tooltip(view: EntityView, def: types.EntityDef): Content
@@ -469,11 +467,13 @@ local function GaugeRow(props: { label: string, gauge: Gauge, tone: string, Layo
 	})
 end
 
--- One row of what something carries: a slot with a short code for what it is, its name, and its headline figure on
--- the right. The rest is in the tooltip it shows when hovered.
+-- One row of what something carries: a slot with its icon (Shared.ui_art), or a short code for what it is while the
+-- icon is not there or for what has none, its name, and its headline figure on the right. The rest is in the tooltip
+-- it shows when hovered.
 local function LoadoutRow(props: {
 	tone: "weapon" | "build" | "manual",
 	slot: string,
+	icon: string?,
 	name: string,
 	value: string,
 	unit: string,
@@ -485,10 +485,22 @@ local function LoadoutRow(props: {
 		LayoutOrder = props.LayoutOrder,
 		content = props.tooltip,
 	}, {
-		Slot = React.createElement("TextLabel", {
+		Slot = React.createElement("Frame", {
 			[React.Tag] = `loadout-slot slot-{props.tone}`,
 			LayoutOrder = 1,
-			Text = props.slot,
+		}, {
+			Icon = if props.icon ~= nil
+				then React.createElement(ArtIcon, {
+					name = props.icon,
+					view = "front",
+					flat = true,
+					fallback = props.slot,
+					tag = "loadout-slot-icon",
+				})
+				else React.createElement("TextLabel", {
+					[React.Tag] = "loadout-slot-code",
+					Text = props.slot,
+				}),
 		}),
 		Name = React.createElement("TextLabel", {
 			[React.Tag] = "loadout-name",
@@ -531,100 +543,12 @@ local function LoadoutHeading(props: { text: string, tone: string, LayoutOrder: 
 	})
 end
 
--- A weapon's name, from what it is, since a def's weapons have none of their own, and the short code on its slot.
-local function weapon_kind(weapon: types.Weapon): (string, string)
-	local projectile = weapon.projectile
-	local name, slot
-	if weapon.anti_nuke then
-		name, slot = "ANTI-NUKE", "ABM"
-	elseif projectile ~= nil and projectile.nuclear then
-		name, slot = "NUCLEAR MISSILE", "NUK"
-	elseif projectile ~= nil and projectile.torpedo then
-		name, slot = "TORPEDO", "TRP"
-	elseif projectile ~= nil and projectile.dropped then
-		name, slot = "BOMBS", "BMB"
-	elseif weapon.beam_time ~= nil then
-		name, slot = "LASER", "LSR"
-	elseif projectile ~= nil and projectile.plasma then
-		name, slot = "PLASMA CANNON", "PLS"
-	elseif projectile ~= nil and (projectile.missile ~= nil or projectile.homing) then
-		name, slot = "MISSILES", "MSL"
-	elseif projectile ~= nil then
-		name, slot = "ROCKETS", "RKT"
-	else
-		name, slot = "GUN", "GUN"
-	end
-	if weapon.anti_air and not weapon.anti_nuke then
-		return `AA {name}`, "AA"
-	end
-	return name, slot
-end
-
--- A weapon's damage a second while it keeps firing: a whole burst, the gaps within it and the reload after it.
-local function weapon_dps(weapon: types.Weapon): number
-	local shots = math.max(1, weapon.burst_count or 1)
-	local cycle = weapon.reload + (shots - 1) * (weapon.burst_interval or DEFAULT_BURST_INTERVAL)
-	return weapon.damage * shots / math.max(cycle, 1e-3)
-end
-
--- What a weapon can shoot at, in a word or two.
-local function targets_text(weapon: types.Weapon): string
-	if weapon.anti_nuke then
-		return "Nuclear missiles"
-	elseif weapon.target_layer == "air" then
-		return "Air"
-	elseif weapon.target_layer == "ground" then
-		return "Ground"
-	end
-	return "Ground and air"
-end
-
 -- Everything about a weapon, for its tooltip.
 local function weapon_tooltip(weapon: types.Weapon, index: number, count: number): Content
-	local name = weapon_kind(weapon)
-	local rows: { tooltip.Row } = {
-		{ label = "Damage a second", value = figure(weapon_dps(weapon)), tag = "weapon" },
-		{ label = "Damage a shot", value = figure(weapon.damage) },
-	}
-	local burst = weapon.burst_count
-	if burst ~= nil and burst > 1 then
-		table.insert(rows, {
-			label = "Burst",
-			value = `{burst} shots, {seconds(weapon.burst_interval or DEFAULT_BURST_INTERVAL)} apart`,
-		})
-	end
-	table.insert(rows, { label = "Reload", value = seconds(weapon.reload) })
-	table.insert(rows, { label = "Range", value = studs(weapon.range) })
-	local projectile = weapon.projectile
-	if projectile ~= nil and projectile.aoe_radius > 0 then
-		table.insert(rows, { label = "Blast radius", value = studs(projectile.aoe_radius) })
-	end
-	if projectile ~= nil and projectile.speed > 0 then
-		table.insert(rows, { label = "Shot speed", value = `{studs(projectile.speed)}/s` })
-	end
-	if weapon.energy_per_shot > 0 then
-		table.insert(rows, { label = "Energy a shot", value = figure(weapon.energy_per_shot), tag = "energy" })
-	end
-	table.insert(rows, { label = "Targets", value = targets_text(weapon) })
-	if not weapon.anti_air and not weapon.anti_nuke and weapon.target_layer ~= "ground" then
-		table.insert(rows, { label = "Vs air", value = `{math.round(config.NON_AA_AIR_DAMAGE_FRACTION * 100)}%` })
-	end
-	local stockpile = weapon.stockpile
-	if stockpile ~= nil then
-		table.insert(rows, { label = "Holds", value = `{stockpile.limit}, one every {seconds(stockpile.build_time)}` })
-		table.insert(rows, { label = "Each costs", value = `{stockpile.metal} M · {stockpile.energy} E` })
-	end
-
-	local notes = {}
-	if weapon.manual_fire then
-		table.insert(notes, "Manual fire")
-	end
-	if weapon.weapon_group ~= nil then
-		table.insert(notes, "Shared reload")
-	end
+	local rows, notes = unit_facts.weapon_rows(weapon)
 	return {
 		kicker = if count > 1 then `WEAPON {index} OF {count}` else "WEAPON",
-		title = name,
+		title = weapon_kind(weapon),
 		tone = "weapon",
 		rows = rows,
 		notes = notes,
@@ -633,36 +557,11 @@ end
 
 -- What building takes and what it reaches, and which of a builder's jobs it does, for its tooltip.
 local function build_tooltip(def: types.EntityDef): Content
-	local rows: { tooltip.Row } = {
-		{ label = "Buildpower", value = `{def.buildpower}/s`, tag = "buildpower" },
-	}
-	if def.build_range ~= nil then
-		table.insert(rows, { label = "Build range", value = studs(def.build_range) })
-	end
-	local jobs = {}
-	if def.build_options ~= nil and #def.build_options > 0 then
-		table.insert(jobs, "Build")
-	end
-	if def.assisting then
-		table.insert(jobs, "Assist")
-	end
-	if def.repairing then
-		table.insert(jobs, "Repair")
-	end
-	if def.reclaiming then
-		table.insert(jobs, "Reclaim")
-	end
-	if def.resurrecting then
-		table.insert(jobs, "Resurrect")
-	end
-	if #jobs > 0 then
-		table.insert(rows, { label = "Can", value = table.concat(jobs, ", ") })
-	end
 	return {
 		kicker = "BUILDER",
 		title = "BUILDPOWER",
 		tone = "build",
-		rows = rows,
+		rows = unit_facts.build_rows(def),
 	}
 end
 
@@ -705,10 +604,11 @@ local function Loadout(props: { def: types.EntityDef, LayoutOrder: number })
 		})
 	end
 	for index, weapon in weapons do
-		local name, slot = weapon_kind(weapon)
+		local name, slot, icon = weapon_kind(weapon)
 		rows[`Weapon{index}`] = React.createElement(LoadoutRow, {
 			tone = "weapon",
 			slot = slot,
+			icon = icon,
 			name = name,
 			value = figure(weapon_dps(weapon)),
 			unit = "DPS",
@@ -721,22 +621,18 @@ local function Loadout(props: { def: types.EntityDef, LayoutOrder: number })
 	if manual ~= nil then
 		rows.Manual = React.createElement(LoadoutRow, {
 			tone = "manual",
-			slot = "DGN",
-			name = "DISINTEGRATOR",
+			slot = MANUAL_WEAPON.slot,
+			icon = MANUAL_WEAPON.icon,
+			name = MANUAL_WEAPON.name,
 			value = figure(manual.energy_per_shot),
 			unit = "E/SHOT",
 			tooltip = function(): Content
 				return {
 					kicker = "MANUAL WEAPON",
-					title = "DISINTEGRATOR",
+					title = MANUAL_WEAPON.name,
 					tone = "weapon",
-					text = "Destroys everything in its strip, allies too.",
-					rows = {
-						{ label = "Range", value = studs(manual.range) },
-						{ label = "Strip width", value = studs(manual.radius * 2) },
-						{ label = "Reload", value = seconds(manual.reload) },
-						{ label = "Energy a shot", value = figure(manual.energy_per_shot), tag = "energy" },
-					},
+					text = MANUAL_WEAPON.text,
+					rows = unit_facts.manual_weapon_rows(manual),
 				}
 			end,
 			LayoutOrder = next_order(),
@@ -855,7 +751,7 @@ local function Remnant(props: { view: EntityView, def: types.EntityDef, simple: 
 	local view = props.view
 	local def = props.def
 	local is_wreck = view.kind == "wreck"
-	local raisable = is_wreck and def.kind == "unit"
+	local raisable = is_wreck and (def.kind == "unit" or def.kind == "building")
 
 	local reclaim_total = view.reclaim_total or 0
 	local reclaimed = if reclaim_total > 0 then 1 - (view.reclaim_left or reclaim_total) / reclaim_total else 0

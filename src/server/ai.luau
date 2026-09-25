@@ -10,17 +10,18 @@
 --
 -- What it builds, in the order it looks at it for each builder with nothing to do:
 --
--- - With only a commander it opens: OPENING_EXTRACTORS metal extractors on the spots nearest home, OPENING_TURBINES wind
---   turbines, and then a lab, a bot lab or a vehicle lab (`choose_line`).
--- - A lab of its line, if it has none; never a second of any lab.
+-- - With only a commander it opens: the profile's opening_extractors metal extractors on the spots nearest home,
+--   OPENING_TURBINES wind turbines, and then a lab, a bot lab or a vehicle lab (`choose_line`).
+-- - A lab of its line, if it has none, and more up to the profile's labs as its income grows; never a second of any
+--   other lab.
 -- - Energy, when it is stalling: wind turbines, advanced solar collectors once the team makes ADVANCED_SOLAR_ENERGY,
 --   and fusion reactors once it makes FUSION_ENERGY and has an advanced constructor.
 -- - Its line's advanced lab, once it makes T2_METAL_INCOME metal.
 -- - Metal extractors on the free spots out on the map, each builder that goes out of the base with an escort.
 -- - Energy, to keep up with its metal (ENERGY_PER_METAL).
--- - A guard beside every metal extractor.
+-- - A guard beside every metal extractor (the profile's extractor_guards of them), and its home_guards round home.
 -- - With an advanced constructor, advanced extractors over the plain ones.
--- - Anti-air, once the enemy has AIR_THREAT_COUNT aircraft up.
+-- - Anti-air, once the enemy has AIR_THREAT_COUNT aircraft up (the profile's air_defense of what it would want).
 -- - Energy storage while its energy piles up, until it can hold STORAGE_SECONDS of its income, and from there energy
 --   converters to turn what piles up into metal. What they burn counts as energy it wants, so it builds more energy
 --   (advanced solar collectors, then fusion) to feed them, and grows on energy once the metal spots run out.
@@ -31,10 +32,19 @@
 --
 -- Its labs keep enough constructors, a rezbot or two while there are wrecks lying about, anti-air while the enemy flies,
 -- and otherwise a mix of whatever fights that its income can pay for (`fighter_for`).
+--
+-- How much of all that it does is its profile's (shared/ai_profiles.luau), which each brain carries: what it may build
+-- at all, its line, how eagerly it spreads its extractors and how many it guards, how big its army grows before it goes
+-- and how that grows over the game, and whether it sends raids of its fastest units at the enemy's extractors and
+-- constructors apart from its army (`run_raids`). Where this file says "the profile's", the number is there; the
+-- default profile is the AI as it always played.
 
+local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
+local config = require(ReplicatedStorage.Shared.config)
+local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local geometry = require(ReplicatedStorage.Shared.geometry)
@@ -42,6 +52,7 @@ local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
 local spots = require(ReplicatedStorage.Shared.spots)
 local starts = require(ReplicatedStorage.Shared.starts)
+local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 
 local state = require(script.Parent.state)
 local orders = require(script.Parent.orders)
@@ -63,9 +74,10 @@ type OrderKind = types.OrderKind
 type Team = types.Team
 type TeamId = types.TeamId
 type Field = danger_field.Field
+type Profile = ai_profiles.Profile
 
 -- Which kind of lab it builds its army from.
-type Line = "bot" | "vehicle"
+type Line = ai_profiles.Line
 
 -- What the army is doing: waiting at its rally point, on its way to an enemy target, or seeing off a raid at home.
 type Mode = "gather" | "attack" | "defend"
@@ -153,8 +165,36 @@ type Census = {
 	enemy_units: { Entity },
 }
 
+-- A few of its fastest units out raiding, apart from the army.
+type Raid = {
+	id: number,
+	-- what it is after, once it has chosen
+	target: EntityId?,
+	-- on its way home, to be let go back into the army once it is there
+	returning: boolean,
+}
+
+-- A wave the army set out in, or a raid sent out, for a test to look at: when (seconds since the brain began), how many
+-- went, what they were worth, and, for a wave, what it had to be worth to go and how it ended once it has, or, for a
+-- raid, what it went after.
+type Sortie = {
+	at: number,
+	units: number,
+	worth: number,
+	needed: number?,
+	target: string?,
+	ended: WaveEnd?,
+}
+
+-- How a wave ended: it had nothing left it could attack, the danger where it stood was too much for it, it lost too
+-- much of itself, it was called home to see off an enemy there, or none of it is left.
+type WaveEnd = "won" | "outmatched" | "broken" | "defend" | "lost"
+
 type Brain = {
 	team: TeamId,
+	profile: Profile,
+	-- the clock when it began, which escalation counts from
+	started: number,
 	home: Vector3,
 	-- the way from home toward the middle of the map, flat and of length 1
 	forward: Vector3,
@@ -183,8 +223,20 @@ type Brain = {
 	mode: Mode,
 	target: EntityId?,
 	next_attack_at: number,
+	-- the units that set out in the wave that is out, what they were worth when they did, and how many waves it has sent
+	wave: { [EntityId]: boolean },
+	wave_worth: number,
+	waves_sent: number,
 	-- buildings with no room left beside them for another of their kind
 	full: { [EntityId]: boolean },
+	-- the raids out, by id, each raider and the raid it is in, and when the next may be sent
+	raids: { [number]: Raid },
+	raiders: { [EntityId]: number },
+	next_raid_id: number,
+	next_raid_at: number,
+	-- the last SORTIES_KEPT waves and raids it sent
+	waves: { Sortie },
+	raids_sent: { Sortie },
 }
 
 -- How often a brain thinks, and how often its danger field is worked out again.
@@ -201,13 +253,12 @@ local ABORT_DANGER = 30
 local FLEE_DANGER = 40
 local FLEE_SECONDS = 12
 
--- The opening, with only a commander.
-local OPENING_EXTRACTORS = 3
+-- The opening, with only a commander: the profile's opening_extractors, and these wind turbines.
 local OPENING_TURBINES = 4
 
--- The base: the commander stays within BASE_RADIUS of home, and a builder sent further gets an escort.
+-- The base: the commander stays within BASE_RADIUS of home, and a builder sent further gets the profile's
+-- escorts_per_builder.
 local BASE_RADIUS = 70
-local ESCORTS_PER_BUILDER = 2
 
 -- Income thresholds, metal and energy a second.
 local T2_METAL_INCOME = 40
@@ -237,9 +288,8 @@ local METAL_PER_TURRET = 12
 local TURRETS_MAX = 8
 local ADVANCED_TURRET_INCOME = 60
 
--- Constructors its labs keep: plain ones from 2 up to 8 as the income grows, and advanced ones from 1 up to 4.
-local CONSTRUCTORS_MIN = 2
-local CONSTRUCTORS_MAX = 8
+-- Constructors its labs keep: plain ones from the profile's constructors_min up to its constructors_max as the income
+-- grows, one more for every METAL_PER_CONSTRUCTOR, and advanced ones from 1 up to 4.
 local METAL_PER_CONSTRUCTOR = 6
 local ADVANCED_CONSTRUCTORS_MAX = 4
 local METAL_PER_ADVANCED_CONSTRUCTOR = 25
@@ -248,10 +298,11 @@ local WRECKS_PER_REZBOT = 6
 local REZBOTS_MAX = 4
 -- A lab keeps this many things queued.
 local FACTORY_QUEUE = 2
--- It fields what costs no more than this many seconds of its metal income, and not what is worth less than
+-- It fields what costs no more than the profile's afford_seconds of its metal income, and not what is worth less than
 -- FODDER_SHARE of the dearest of that.
-local AFFORD_SECONDS = 20
 local FODDER_SHARE = 0.15
+-- A lab past the first of its line (the profile's labs) waits for this much metal income for every lab it has.
+local METAL_PER_EXTRA_LAB = 10
 
 -- Siting. Buildings go RING_STEP apart on rings round where they are wanted, no further than MAX_SITE_TRIES places
 -- being looked at a time. Nothing is built within SPOT_CLEARANCE of a metal spot but an extractor, nor in the LANE_LENGTH
@@ -274,28 +325,36 @@ local GUARDED_RADIUS = 16
 -- Anti-air goes this far from what it covers.
 local AIR_RING_INNER = 8
 local AIR_RING_OUTER = 22
+-- Guards round home go on rings this far out round a point this far in front of it, past the labs, and count as round
+-- home within BASE_RADIUS of it.
+local HOME_GUARD_OFFSET = 40
+local HOME_GUARD_RING = 30
 
 -- Routes. A thought may ask for this many, each settling no more than PATH_MAX_EXPANSIONS cells.
 local PATHS_PER_THINK = 6
 local PATH_MAX_EXPANSIONS = 4000
 
--- The army. It attacks once it is worth ATTACK_BASE plus ATTACK_SECONDS of the metal income, and only something the
--- danger round which is under its worth over ATTACK_SUPERIORITY; it pulls back to regroup for REGROUP_SECONDS when
--- the danger where it stands is over RETREAT_RATIO of its worth. An enemy that has come within DEFEND_RADIUS of home,
--- or ALERT_RADIUS of an extractor, is seen off first.
-local ATTACK_BASE = 600
-local ATTACK_SECONDS = 40
-local ATTACK_SUPERIORITY = 1.5
-local RETREAT_RATIO = 1.5
-local REGROUP_SECONDS = 30
-local DEFEND_RADIUS = 110
-local ALERT_RADIUS = 40
+-- The army. It attacks once it is worth the profile's wave_base plus its wave_income_seconds of the metal income (grown
+-- by its wave_growth, see `wave_needed`), and only something the danger round which is under its worth over the
+-- profile's attack_superiority; it pulls back to regroup for its regroup_seconds when the danger where it stands is over
+-- its retreat_ratio of its worth. An enemy that has come within the profile's defend_radius of home, or its
+-- extractor_alert_radius of an extractor, is seen off first. Raids weigh the danger the same way, with the profile's
+-- raid_superiority and raid_retreat_ratio.
 local TARGET_DANGER_RADIUS = 24
 local RALLY_OFFSET = 40
+-- A wave pulls back, beaten, once what is left of it is worth under this share of what set out: the danger field
+-- cannot tell what will not die, and a wave that only loses is outmatched whatever the field says.
+local WAVE_BROKEN_SHARE = 0.4
 -- An army unit is sent again when where it should be has moved this far from where it was sent.
 local GOAL_DRIFT = 25
 -- How near its rally point a waiting unit has to be.
 local RALLY_SLACK = 25
+-- A raid on its way home is let go back into the army this near the rally point. What counts as one of its fastest
+-- units, to raid with: this share of the speed of the fastest it has.
+local RAID_HOME_SLACK = 40
+local RAIDER_SPEED_SHARE = 0.8
+-- How many of its waves and raids it remembers, for a test to look at.
+local SORTIES_KEPT = 40
 
 local LABS: { [Line]: string } = { bot = "bot_lab", vehicle = "vehicle_lab" }
 local ADVANCED_LABS: { [Line]: string } = { bot = "advanced_bot_lab", vehicle = "advanced_vehicle_lab" }
@@ -363,9 +422,20 @@ local function role_of(def_name: string): Role
 	return role
 end
 
+-- Whether team `team_id` may build or make `def_name`: the campaign lets it, and, if the AI plays it, its profile's
+-- roster has it.
+local function may_build(team_id: TeamId, def_name: string): boolean
+	if campaign.can_build(team_id, def_name) == false then
+		return false
+	end
+	local brain = brains[team_id]
+	local roster = if brain ~= nil then brain.profile.roster else nil
+	return roster == nil or roster[def_name] == true
+end
+
 local function can_build(builder: Entity, def_name: string): boolean
 	local options = unit_defs.of(builder).build_options
-	return options ~= nil and table.find(options, def_name) ~= nil and campaign.can_build(builder.team, def_name)
+	return options ~= nil and table.find(options, def_name) ~= nil and may_build(builder.team, def_name)
 end
 
 local function is_commander(entity: Entity): boolean
@@ -850,14 +920,16 @@ local function upgrade_task(brain: Brain, census: Census, builder: Entity): Task
 end
 
 -- An extractor of its own with nothing to guard it and nothing on its way, and a guard beside it, on the side toward
--- the enemy if there is room there.
+-- the enemy if there is room there; none once the profile's extractor_guards of its extractors are guarded.
 local function guard_task(brain: Brain, census: Census, builder: Entity): Task?
 	local def_name = "guard"
-	if can_build(builder, def_name) == false then
+	local share = brain.profile.extractor_guards
+	if share <= 0 or can_build(builder, def_name) == false then
 		return nil
 	end
 	local best: Entity? = nil
 	local best_distance = math.huge
+	local guarded_count = 0
 	for _, extractor in census.extractors do
 		local guarded = false
 		for _, defense in census.ground_defenses do
@@ -877,7 +949,11 @@ local function guard_task(brain: Brain, census: Census, builder: Entity): Task?
 				end
 			end
 		end
-		if guarded or danger_field.peak_near(brain.field, extractor.position, GUARDED_RADIUS) >= SAFE_DANGER then
+		if guarded then
+			guarded_count += 1
+			continue
+		end
+		if danger_field.peak_near(brain.field, extractor.position, GUARDED_RADIUS) >= SAFE_DANGER then
 			continue
 		end
 		local distance = geometry.distance_2d(builder.position, extractor.position)
@@ -886,12 +962,36 @@ local function guard_task(brain: Brain, census: Census, builder: Entity): Task?
 			best_distance = distance
 		end
 	end
-	if best == nil then
+	if best == nil or (share < 1 and guarded_count >= math.floor(#census.extractors * share)) then
 		return nil
 	end
 	local toward = geometry.flatten(-best.position)
 	local ahead = if toward.Magnitude > 1 then best.position + toward.Unit * GUARD_RING_INNER else best.position
 	return ring_site(brain, census, def_name, ahead, 0, GUARD_RING_OUTER, 0)
+end
+
+-- A guard round home, in front of its labs, while it has fewer there than the profile's home_guards.
+local function home_guard_task(brain: Brain, census: Census, builder: Entity): Task?
+	local def_name = "guard"
+	local wanted = brain.profile.home_guards
+	if wanted <= 0 or can_build(builder, def_name) == false then
+		return nil
+	end
+	local have = 0
+	for _, defense in census.ground_defenses do
+		if geometry.distance_2d(defense.position, brain.home) <= BASE_RADIUS then
+			have += 1
+		end
+	end
+	for _, plan in census.plans do
+		if role_of(plan.def_name).hits_ground and geometry.distance_2d(plan.position, brain.home) <= BASE_RADIUS then
+			have += 1
+		end
+	end
+	if have >= wanted then
+		return nil
+	end
+	return ring_site(brain, census, def_name, brain.home + brain.forward * HOME_GUARD_OFFSET, 0, HOME_GUARD_RING, 0)
 end
 
 -- Anti-air, beside whatever of its own is furthest from the anti-air it has.
@@ -1055,18 +1155,29 @@ local function turret_task(brain: Brain, census: Census, economy: Economy, build
 	return cluster_site(brain, census, def_name)
 end
 
--- A lab of `def_name`, near home with its doorway toward the middle of the map.
-local function lab_task(brain: Brain, census: Census, builder: Entity, def_name: string): Task?
-	if can_build(builder, def_name) == false or count_of(census, def_name) > 0 then
+-- A lab of `def_name`, near home with its doorway toward the middle of the map, while it has fewer than `most`.
+local function lab_task(brain: Brain, census: Census, builder: Entity, def_name: string, most: number): Task?
+	if can_build(builder, def_name) == false or count_of(census, def_name) >= most then
 		return nil
 	end
 	local facing = geometry.snap_facing(math.atan2(brain.forward.X, brain.forward.Z))
 	return ring_site(brain, census, def_name, brain.home + brain.forward * LAB_OFFSET, 0, LAB_SEARCH_RADIUS, facing)
 end
 
--- Bots, unless a vehicle could not get from home toward the middle of the map, which is when the ground is too rough
--- for them; otherwise either, by a toss.
+-- The profile's line if it has one, and the only line whose lab it may build if it may build only one; otherwise bots,
+-- unless a vehicle could not get from home toward the middle of the map, which is when the ground is too rough for
+-- them; otherwise either, by a toss.
 local function choose_line(brain: Brain): Line
+	local chosen = brain.profile.line
+	if chosen ~= nil then
+		return chosen
+	end
+	local bot_line: Line, vehicle_line: Line = "bot", "vehicle"
+	local bots = may_build(brain.team, LABS[bot_line])
+	local vehicles = may_build(brain.team, LABS[vehicle_line])
+	if bots ~= vehicles then
+		return if bots then "bot" else "vehicle"
+	end
 	local probe = unit_defs.get "construction_vehicle"
 	local toward = brain.home + brain.forward * 120
 	if heightmap.in_bounds(toward.X, toward.Z) == false then
@@ -1082,14 +1193,24 @@ end
 
 -- Something for `builder` to build, the first that is wanted of what it can build (see the top of this file).
 local function choose_task(brain: Brain, census: Census, economy: Economy, builder: Entity): Task?
+	local profile = brain.profile
 	local line = brain.line
 	local builders = #census.builders
 	local commander = is_commander(builder)
-	-- the commander keeps to the base
-	local reach: number? = if commander then BASE_RADIUS else nil
+	-- the commander keeps to the base, and the rest to the profile's expansion_radius
+	local reach: number? = if commander
+		then BASE_RADIUS
+		elseif profile.expansion_radius < math.huge then profile.expansion_radius
+		else nil
 	local tasks: { () -> Task? } = {
 		function(): Task?
-			return if line ~= nil then lab_task(brain, census, builder, LABS[line]) else nil
+			if line == nil then
+				return nil
+			end
+			-- a lab past the first waits for the income to keep it busy
+			local labs = count_of(census, LABS[line])
+			local most = if labs > 0 and economy.metal_income < labs * METAL_PER_EXTRA_LAB then labs else profile.labs
+			return lab_task(brain, census, builder, LABS[line], most)
 		end,
 		function(): Task?
 			if economy.energy_stalling and energy_in_progress(census) < builders then
@@ -1099,7 +1220,7 @@ local function choose_task(brain: Brain, census: Census, economy: Economy, build
 		end,
 		function(): Task?
 			if line ~= nil and economy.metal_income >= T2_METAL_INCOME and #census.factories > 0 then
-				return lab_task(brain, census, builder, ADVANCED_LABS[line])
+				return lab_task(brain, census, builder, ADVANCED_LABS[line], 1)
 			end
 			return nil
 		end,
@@ -1107,7 +1228,9 @@ local function choose_task(brain: Brain, census: Census, economy: Economy, build
 			return turret_task(brain, census, economy, builder)
 		end,
 		function(): Task?
-			if in_progress(census, "metal_extractor") < math.max(1, math.ceil(builders / 2)) then
+			if
+				in_progress(census, "metal_extractor") < math.max(1, math.ceil(builders * profile.extractor_builders))
+			then
 				return extractor_task(brain, census, builder, reach)
 			end
 			return nil
@@ -1129,6 +1252,12 @@ local function choose_task(brain: Brain, census: Census, economy: Economy, build
 			return nil
 		end,
 		function(): Task?
+			if #census.factories > 0 and in_progress(census, "guard") < 2 then
+				return home_guard_task(brain, census, builder)
+			end
+			return nil
+		end,
+		function(): Task?
 			if in_progress(census, "advanced_metal_extractor") < census.advanced_builders then
 				return upgrade_task(brain, census, builder)
 			end
@@ -1136,6 +1265,9 @@ local function choose_task(brain: Brain, census: Census, economy: Economy, build
 		end,
 		function(): Task?
 			local wanted = math.min(AIR_DEFENSES_MAX, math.ceil(brain.field.enemy_air_count / 2))
+			if profile.air_defense < 1 then
+				wanted = math.floor(wanted * profile.air_defense)
+			end
 			local have = #census.air_defenses + in_progress(census, "thistle") + in_progress(census, "eradicator")
 			if brain.field.enemy_air_count >= AIR_THREAT_COUNT and have < wanted then
 				return air_defense_task(brain, census, builder, economy)
@@ -1203,7 +1335,8 @@ local function send_to_build(brain: Brain, census: Census, builder: Entity, task
 	return true
 end
 
--- With only a commander: extractors on the spots nearest home, wind turbines, and then a lab, all in one queue.
+-- With only a commander: extractors on the spots nearest home, wind turbines, and then a lab, all in one queue. What
+-- its profile's roster leaves out is left out.
 local function open(brain: Brain, census: Census, commander: Entity)
 	brain.opened = true
 	local chain: { Order } = {}
@@ -1220,15 +1353,22 @@ local function open(brain: Brain, census: Census, commander: Entity)
 		})
 		add_plan(census, task.def_name, task.position, task.facing)
 	end
-	for _ = 1, OPENING_EXTRACTORS do
+	for _ = 1, brain.profile.opening_extractors do
 		plan(extractor_task(brain, census, commander, BASE_RADIUS))
 	end
-	for _ = 1, OPENING_TURBINES do
-		plan(cluster_site(brain, census, "wind_turbine"))
+	-- wind turbines, or solar collectors if it may not build turbines
+	local energy = if can_build(commander, "wind_turbine")
+		then "wind_turbine"
+		elseif can_build(commander, "solar_collector") then "solar_collector"
+		else nil
+	if energy ~= nil then
+		for _ = 1, OPENING_TURBINES do
+			plan(cluster_site(brain, census, energy))
+		end
 	end
 	local line = brain.line or choose_line(brain)
 	brain.line = line
-	plan(lab_task(brain, census, commander, LABS[line]))
+	plan(lab_task(brain, census, commander, LABS[line], 1))
 	if #chain > 0 then
 		orders.issue(commander, chain, false, false)
 	end
@@ -1388,16 +1528,22 @@ local function run_builders(brain: Brain, census: Census, economy: Economy)
 	end
 end
 
+-- The dearest of `options` its labs field now: what costs no more than the profile's afford_seconds of its income, or
+-- the cheapest of them if nothing does.
+local function afford_limit(brain: Brain, economy: Economy, options: { string }): number
+	local cheapest = math.huge
+	for _, name in options do
+		cheapest = math.min(cheapest, unit_defs.get(name).metal_cost)
+	end
+	return math.max((economy.metal_income + economy.converted_metal) * brain.profile.afford_seconds, cheapest)
+end
+
 -- What a lab should make next.
 local function fighter_for(brain: Brain, economy: Economy, options: { string }): string?
 	if #options == 0 then
 		return nil
 	end
-	local cheapest = math.huge
-	for _, name in options do
-		cheapest = math.min(cheapest, unit_defs.get(name).metal_cost)
-	end
-	local limit = math.max((economy.metal_income + economy.converted_metal) * AFFORD_SECONDS, cheapest)
+	local limit = afford_limit(brain, economy, options)
 	local dearest = 0
 	for _, name in options do
 		local cost = unit_defs.get(name).metal_cost
@@ -1418,6 +1564,44 @@ local function fighter_for(brain: Brain, economy: Economy, options: { string }):
 	return chosen[brain.rng:NextInteger(1, #chosen)]
 end
 
+-- Whether it wants another raid out: its profile raids, and has fewer out than its raid_groups.
+local function raids_wanted(brain: Brain): boolean
+	local profile = brain.profile
+	if profile.raid_size <= 0 or profile.raid_groups <= 0 then
+		return false
+	end
+	local out = 0
+	for _ in brain.raids do
+		out += 1
+	end
+	return out < profile.raid_groups
+end
+
+-- The fastest of `options` that goes on the ground and that it can afford (`afford_limit`), the cheapest of them on a
+-- tie: what it raids with.
+local function raider_for(brain: Brain, economy: Economy, options: { string }): string?
+	if #options == 0 then
+		return nil
+	end
+	local limit = afford_limit(brain, economy, options)
+	local best: string? = nil
+	local best_speed = -1
+	local best_cost = math.huge
+	for _, name in options do
+		local def = unit_defs.get(name)
+		if def.air ~= nil or def.metal_cost > limit then
+			continue
+		end
+		local speed = def.max_speed or 0
+		if speed > best_speed or (speed == best_speed and def.metal_cost < best_cost) then
+			best = name
+			best_speed = speed
+			best_cost = def.metal_cost
+		end
+	end
+	return best
+end
+
 local function product_for(brain: Brain, census: Census, economy: Economy, factory: Entity): string?
 	local constructors: { string } = {}
 	local rezbots: { string } = {}
@@ -1426,7 +1610,7 @@ local function product_for(brain: Brain, census: Census, economy: Economy, facto
 	local options: { string } = unit_defs.of(factory).build_options or {}
 	for _, name in options do
 		local def = unit_defs.get(name)
-		if def.kind ~= "unit" or def.drone == true or campaign.can_build(brain.team, name) == false then
+		if def.kind ~= "unit" or def.drone == true or may_build(brain.team, name) == false then
 			continue
 		end
 		local role = role_of(name)
@@ -1445,13 +1629,14 @@ local function product_for(brain: Brain, census: Census, economy: Economy, facto
 	end
 
 	local income = economy.metal_income + economy.converted_metal
+	local profile = brain.profile
 	for _, name in constructors do
 		local wanted = if role_of(name).advanced
 			then math.clamp(1 + math.floor(income / METAL_PER_ADVANCED_CONSTRUCTOR), 1, ADVANCED_CONSTRUCTORS_MAX)
 			else math.clamp(
-				CONSTRUCTORS_MIN + math.floor(income / METAL_PER_CONSTRUCTOR),
-				CONSTRUCTORS_MIN,
-				CONSTRUCTORS_MAX
+				profile.constructors_min + math.floor(income / METAL_PER_CONSTRUCTOR),
+				profile.constructors_min,
+				math.max(profile.constructors_min, profile.constructors_max)
 			)
 		if (census.counts[name] or 0) < wanted then
 			return name
@@ -1485,6 +1670,22 @@ local function product_for(brain: Brain, census: Census, economy: Economy, facto
 	then
 		return anti_air[brain.rng:NextInteger(1, #anti_air)]
 	end
+	-- short of raiders, the fastest it can make, until it has a raid's worth of them not out raiding already
+	if raids_wanted(brain) then
+		local raider = raider_for(brain, economy, fighters)
+		if raider ~= nil then
+			local waiting = census.counts[raider] or 0
+			for raider_id in brain.raiders do
+				local unit = state.get(raider_id)
+				if unit ~= nil and unit.def_name == raider then
+					waiting -= 1
+				end
+			end
+			if waiting < profile.raid_size then
+				return raider
+			end
+		end
+	end
 	return fighter_for(brain, economy, fighters)
 end
 
@@ -1500,7 +1701,7 @@ local function run_factories(brain: Brain, census: Census, economy: Economy)
 	end
 end
 
--- Rezbots raise the wrecks of units that lie somewhere quiet, by a quiet way, reclaim any other wreck there, and with no wrecks about
+-- Rezbots raise the wrecks of units (of what it may build) that lie somewhere quiet, by a quiet way, reclaim any other wreck there, and with no wrecks about
 -- reclaim the rocks and trees near home.
 local function run_rezbots(brain: Brain, census: Census)
 	local claimed: { [EntityId]: boolean } = {}
@@ -1550,7 +1751,11 @@ local function run_rezbots(brain: Brain, census: Census)
 			assist(brain, census, rezbot)
 			continue
 		end
-		local kind: OrderKind = if best.kind == "wreck" and resurrection.can_resurrect(rezbot, best)
+		-- what its roster leaves out it does not raise either, only reclaims
+		local wreck = best.wreck
+		local kind: OrderKind = if best.kind == "wreck"
+				and resurrection.can_resurrect(rezbot, best)
+				and (wreck == nil or may_build(brain.team, wreck.source_def_name))
 			then "resurrect"
 			else "reclaim"
 		if kind == "reclaim" and reclaim.can_reclaim(rezbot, best) == false then
@@ -1572,8 +1777,12 @@ local function is_escort(brain: Brain, unit: Entity): boolean
 	return brain.escorts[unit.id] ~= nil
 end
 
--- Every builder out beyond the base gets ESCORTS_PER_BUILDER of the army waiting at home to guard it, and lets them go
--- once it is back or done.
+local function is_raider(brain: Brain, unit: Entity): boolean
+	return brain.raiders[unit.id] ~= nil
+end
+
+-- Every builder out beyond the base gets the profile's escorts_per_builder of the army waiting at home to guard it, and
+-- lets them go once it is back or done.
 local function run_escorts(brain: Brain, census: Census)
 	local guarding: { [EntityId]: number } = {}
 	for escort_id, builder_id in brain.escorts do
@@ -1602,11 +1811,11 @@ local function run_escorts(brain: Brain, census: Census)
 			continue
 		end
 		local have = guarding[builder_id] or 0
-		while have < ESCORTS_PER_BUILDER do
+		while have < brain.profile.escorts_per_builder do
 			local best: Entity? = nil
 			local best_distance = math.huge
 			for _, unit in census.army do
-				if is_escort(brain, unit) or unit_defs.of(unit).air ~= nil then
+				if is_escort(brain, unit) or is_raider(brain, unit) or unit_defs.of(unit).air ~= nil then
 					continue
 				end
 				local distance = geometry.distance_2d(unit.position, builder.position)
@@ -1652,10 +1861,10 @@ local function nearest_raider(brain: Brain, census: Census): Entity?
 			continue
 		end
 		local distance = geometry.distance_2d(enemy.position, brain.home)
-		local near = distance <= DEFEND_RADIUS
-		if near == false then
+		local near = distance <= brain.profile.defend_radius
+		if near == false and brain.profile.extractor_alert_radius > 0 then
 			for _, extractor in census.extractors do
-				if geometry.distance_2d(enemy.position, extractor.position) <= ALERT_RADIUS then
+				if geometry.distance_2d(enemy.position, extractor.position) <= brain.profile.extractor_alert_radius then
 					near = true
 					break
 				end
@@ -1669,15 +1878,25 @@ local function nearest_raider(brain: Brain, census: Census): Entity?
 	return best
 end
 
--- What to attack: the enemy's building nearest `from` that stands where the danger is well under `worth`, or with none,
--- a unit of theirs that does.
-local function choose_target(brain: Brain, census: Census, from: Vector3, worth: number): Entity?
+-- Of `targets`, the one nearest `from` that stands where the danger times `superiority` is under `worth`, the danger
+-- counting against it as distance does; or nil.
+local function nearest_weak(
+	brain: Brain,
+	targets: { Entity },
+	from: Vector3,
+	worth: number,
+	superiority: number,
+	wanted: (Entity) -> boolean
+): Entity?
 	local best: Entity? = nil
 	local best_score = math.huge
-	local function consider(target: Entity)
+	for _, target in targets do
+		if wanted(target) == false then
+			continue
+		end
 		local danger = danger_field.peak_near(brain.field, target.position, TARGET_DANGER_RADIUS)
-		if danger * ATTACK_SUPERIORITY > worth then
-			return
+		if danger * superiority > worth then
+			continue
 		end
 		local score = geometry.distance_2d(from, target.position) * (1 + danger / math.max(worth, 1))
 		if score < best_score then
@@ -1685,19 +1904,48 @@ local function choose_target(brain: Brain, census: Census, from: Vector3, worth:
 			best_score = score
 		end
 	end
-	for _, target in census.enemy_structures do
-		if target.def_name ~= "wall" then
-			consider(target)
+	return best
+end
+
+-- What to attack: the enemy's building nearest `from` that stands where the danger is well under `worth` (the
+-- profile's attack_superiority), or with none, a unit of theirs that does.
+local function choose_target(brain: Brain, census: Census, from: Vector3, worth: number): Entity?
+	local superiority = brain.profile.attack_superiority
+	local best = nearest_weak(
+		brain,
+		census.enemy_structures,
+		from,
+		worth,
+		superiority,
+		function(target: Entity): boolean
+			return target.def_name ~= "wall"
 		end
-	end
+	)
 	if best == nil then
-		for _, target in census.enemy_units do
-			if unit_defs.of(target).air == nil then
-				consider(target)
-			end
-		end
+		best = nearest_weak(brain, census.enemy_units, from, worth, superiority, function(target: Entity): boolean
+			return unit_defs.of(target).air == nil
+		end)
 	end
 	return best
+end
+
+-- What a raid goes after: the enemy's extractor or constructor (not its commander, which fights) nearest `from` that
+-- stands where the danger is well under the raid's `worth` (the profile's raid_superiority).
+local function choose_raid_target(brain: Brain, census: Census, from: Vector3, worth: number): Entity?
+	local superiority = brain.profile.raid_superiority
+	local extractor = nearest_weak(brain, census.enemy_structures, from, worth, superiority, function(target): boolean
+		return role_of(target.def_name).extractor
+	end)
+	local builder = nearest_weak(brain, census.enemy_units, from, worth, superiority, function(target): boolean
+		return role_of(target.def_name).builder and is_commander(target) == false
+	end)
+	if extractor == nil or builder == nil then
+		return extractor or builder
+	end
+	-- of the two, the nearer
+	return if geometry.distance_2d(from, builder.position) < geometry.distance_2d(from, extractor.position)
+		then builder
+		else extractor
 end
 
 -- Sends `unit` to `goal`, fighting its way there or only moving, by a route if it needs one. Returns whether it went:
@@ -1747,21 +1995,191 @@ local function rally_point(brain: Brain): Vector3
 	return heightmap.ground_position(point.X, point.Z)
 end
 
+-- What the army has to be worth to set out: the profile's wave_base and wave_income_seconds of its metal income, grown
+-- by its wave_growth for every wave it has already sent, but never past its wave_cap_seconds of its whole income (nor
+-- below wave_base), so that each wave is bigger than the last and still goes once the income can pay for it.
+local function wave_needed(brain: Brain, economy: Economy): number
+	local profile = brain.profile
+	local needed = profile.wave_base + economy.metal_income * profile.wave_income_seconds
+	if profile.wave_growth > 0 then
+		needed *= 1 + profile.wave_growth * brain.waves_sent
+	end
+	if profile.wave_cap_seconds < math.huge then
+		local cap = (economy.metal_income + economy.converted_metal) * profile.wave_cap_seconds
+		needed = math.min(needed, math.max(profile.wave_base, cap))
+	end
+	return needed
+end
+
+-- Remembers a wave or a raid sent out, keeping the last SORTIES_KEPT.
+local function remember(list: { Sortie }, sortie: Sortie)
+	table.insert(list, sortie)
+	if #list > SORTIES_KEPT then
+		table.remove(list, 1)
+	end
+end
+
+-- The units of raid `raid_id` still standing.
+local function raid_members(brain: Brain, raid_id: number): { Entity }
+	local members: { Entity } = {}
+	for unit_id, id in brain.raiders do
+		if id ~= raid_id then
+			continue
+		end
+		local unit = state.get(unit_id)
+		if unit ~= nil and unit.alive then
+			table.insert(members, unit)
+		end
+	end
+	return members
+end
+
+-- Lets raid `raid_id` go, its units back into the army.
+local function disband(brain: Brain, raid_id: number)
+	for unit_id, id in brain.raiders do
+		if id == raid_id then
+			brain.raiders[unit_id] = nil
+			brain.goals[unit_id] = nil
+		end
+	end
+	brain.raids[raid_id] = nil
+end
+
+-- Raids, apart from the army: each raid out goes after the enemy's extractors and constructors that stand where it is
+-- well able for them (`choose_raid_target`), one after another, and comes home once where it stands is too dangerous
+-- for it or it has nothing left to go after, to be let go back into the army there. A new one is sent every
+-- raid_interval seconds, while fewer than raid_groups are out, of the raid_size fastest units waiting at home, if there
+-- is something for them to go after.
+local function run_raids(brain: Brain, census: Census)
+	local profile = brain.profile
+	local home = rally_point(brain)
+	for raid_id, raid in brain.raids do
+		local members = raid_members(brain, raid_id)
+		if #members == 0 then
+			disband(brain, raid_id)
+			continue
+		end
+		local middle = centroid(members)
+		local worth = worth_of(members)
+		if raid.returning == false and danger_field.at(brain.field, middle) > worth * profile.raid_retreat_ratio then
+			raid.returning = true
+		end
+		if raid.returning == false then
+			local target = if raid.target ~= nil then state.get(raid.target) else nil
+			if target == nil or target.alive == false or target.team == brain.team then
+				target = choose_raid_target(brain, census, middle, worth)
+				raid.target = if target ~= nil then target.id else nil
+			end
+			if target ~= nil then
+				send_all(brain, members, target.position, "fight", 0)
+				continue
+			end
+			raid.returning = true
+		end
+		if geometry.distance_2d(middle, home) <= RAID_HOME_SLACK then
+			disband(brain, raid_id)
+			continue
+		end
+		send_all(brain, members, home, "move", RALLY_SLACK)
+	end
+
+	-- only what is waiting at home is sent, and not while the army is out
+	if raids_wanted(brain) == false or clock < brain.next_raid_at or brain.mode ~= "gather" then
+		return
+	end
+	local fastest = 0
+	local waiting: { Entity } = {}
+	for _, unit in census.army do
+		local def = unit_defs.of(unit)
+		if
+			is_escort(brain, unit)
+			or is_raider(brain, unit)
+			or def.air ~= nil
+			or role_of(unit.def_name).hits_ground == false
+		then
+			continue
+		end
+		table.insert(waiting, unit)
+		fastest = math.max(fastest, def.max_speed or 0)
+	end
+	local chosen: { Entity } = {}
+	for _, unit in waiting do
+		if (unit_defs.of(unit).max_speed or 0) >= fastest * RAIDER_SPEED_SHARE then
+			table.insert(chosen, unit)
+		end
+	end
+	if #chosen < profile.raid_size then
+		return
+	end
+	-- the fastest, then the nearest home
+	table.sort(chosen, function(a, b): boolean
+		local a_speed = unit_defs.of(a).max_speed or 0
+		local b_speed = unit_defs.of(b).max_speed or 0
+		if a_speed ~= b_speed then
+			return a_speed > b_speed
+		end
+		return geometry.distance_2d(a.position, home) < geometry.distance_2d(b.position, home)
+	end)
+	local members: { Entity } = {}
+	for index = 1, profile.raid_size do
+		table.insert(members, chosen[index])
+	end
+	local worth = worth_of(members)
+	local target = choose_raid_target(brain, census, centroid(members), worth)
+	if target == nil then
+		return
+	end
+	local raid_id = brain.next_raid_id
+	brain.next_raid_id += 1
+	brain.raids[raid_id] = { id = raid_id, target = target.id, returning = false }
+	for _, unit in members do
+		brain.raiders[unit.id] = raid_id
+		brain.goals[unit.id] = nil
+	end
+	brain.next_raid_at = clock + profile.raid_interval
+	remember(brain.raids_sent, {
+		at = clock - brain.started,
+		units = #members,
+		worth = worth,
+		needed = nil,
+		target = target.def_name,
+	})
+end
+
+-- Ends the wave that is out, `how`, and lets what is left of it go back to the army.
+local function end_wave(brain: Brain, how: WaveEnd)
+	for id in brain.wave do
+		brain.goals[id] = nil
+	end
+	brain.wave = {}
+	brain.target = nil
+	local last = brain.waves[#brain.waves]
+	if last ~= nil and last.ended == nil then
+		last.ended = how
+	end
+end
+
 local function run_army(brain: Brain, census: Census, economy: Economy)
+	local profile = brain.profile
 	local army: { Entity } = {}
 	for _, unit in census.army do
-		if is_escort(brain, unit) == false then
+		if is_escort(brain, unit) == false and is_raider(brain, unit) == false then
 			table.insert(army, unit)
 		end
 	end
 	if #army == 0 then
+		if brain.mode == "attack" then
+			end_wave(brain, "lost")
+		end
 		brain.mode = "gather"
 		return
 	end
-	local worth = worth_of(army)
 
 	local raider = nearest_raider(brain, census)
 	if raider ~= nil then
+		if brain.mode == "attack" then
+			end_wave(brain, "defend")
+		end
 		brain.mode = "defend"
 		brain.target = raider.id
 		send_all(brain, army, raider.position, "fight", 0)
@@ -1772,15 +2190,23 @@ local function run_army(brain: Brain, census: Census, economy: Economy)
 		brain.target = nil
 	end
 
+	-- what is out is the wave that set out; what the labs have made since waits at home for the next
+	local home: { Entity } = army
 	if brain.mode == "attack" then
-		local middle = centroid(army)
-		if danger_field.at(brain.field, middle) > worth * RETREAT_RATIO then
-			brain.mode = "gather"
-			brain.target = nil
-			brain.next_attack_at = clock + REGROUP_SECONDS
-			for _, unit in army do
-				brain.goals[unit.id] = nil
-			end
+		local wave: { Entity } = {}
+		home = {}
+		for _, unit in army do
+			table.insert(if brain.wave[unit.id] == true then wave else home, unit)
+		end
+		local worth = worth_of(wave)
+		local middle = centroid(wave)
+		local ended: WaveEnd? = nil
+		if #wave == 0 then
+			ended = "lost"
+		elseif worth < brain.wave_worth * WAVE_BROKEN_SHARE then
+			ended = "broken"
+		elseif danger_field.at(brain.field, middle) > worth * profile.retreat_ratio then
+			ended = "outmatched"
 		else
 			local target = if brain.target ~= nil then state.get(brain.target) else nil
 			if target == nil or target.team == brain.team then
@@ -1788,30 +2214,53 @@ local function run_army(brain: Brain, census: Census, economy: Economy)
 				brain.target = if target ~= nil then target.id else nil
 			end
 			if target ~= nil then
-				send_all(brain, army, target.position, "fight", 0)
-				return
+				send_all(brain, wave, target.position, "fight", 0)
+			else
+				ended = "won"
 			end
-			brain.mode = "gather"
 		end
+		if ended == nil then
+			send_all(brain, home, rally_point(brain), "move", RALLY_SLACK)
+			return
+		end
+		end_wave(brain, ended)
+		brain.mode = "gather"
+		-- beaten, it regroups before it goes again
+		if ended ~= "won" then
+			brain.next_attack_at = clock + profile.regroup_seconds
+		end
+		home = army
 	end
 
 	-- gathering: waiting at the rally point until it is worth enough to go
-	send_all(brain, army, rally_point(brain), "move", RALLY_SLACK)
-	if clock >= brain.next_attack_at and worth >= ATTACK_BASE + economy.metal_income * ATTACK_SECONDS then
-		local target = choose_target(brain, census, centroid(army), worth)
+	send_all(brain, home, rally_point(brain), "move", RALLY_SLACK)
+	local worth = worth_of(home)
+	local needed = wave_needed(brain, economy)
+	if clock >= brain.next_attack_at and worth >= needed then
+		local target = choose_target(brain, census, centroid(home), worth)
 		if target ~= nil then
 			brain.mode = "attack"
 			brain.target = target.id
-			for _, unit in army do
+			brain.wave = {}
+			brain.wave_worth = worth
+			brain.waves_sent += 1
+			for _, unit in home do
+				brain.wave[unit.id] = true
 				brain.goals[unit.id] = nil
 			end
+			remember(
+				brain.waves,
+				{ at = clock - brain.started, units = #home, worth = worth, needed = needed, target = target.def_name }
+			)
 		end
 	end
 end
 
 -- Forgets what it remembered about anything that is gone.
 local function prune(brain: Brain)
-	for _, tally in { brain.assisting, brain.fleeing, brain.goals, brain.expanding } :: { { [EntityId]: any } } do
+	for _, tally in
+		{ brain.assisting, brain.fleeing, brain.goals, brain.expanding, brain.raiders, brain.wave } :: { { [EntityId]: any } }
+	do
 		for id in tally do
 			if state.get(id) == nil then
 				tally[id] = nil
@@ -1877,16 +2326,19 @@ local function think(brain: Brain)
 	run_builders(brain, census, economy)
 	run_rezbots(brain, census)
 	run_escorts(brain, census)
+	run_raids(brain, census)
 	run_army(brain, census, economy)
 end
 
-local function new_brain(team_id: TeamId, home: Vector3): Brain
+local function new_brain(team_id: TeamId, home: Vector3, profile: Profile): Brain
 	local forward = geometry.flatten(-home)
 	return {
 		team = team_id,
+		profile = profile,
+		started = clock,
 		home = home,
 		forward = if forward.Magnitude > 1 then forward.Unit else Vector3.new(1, 0, 0),
-		line = nil,
+		line = profile.line,
 		field = danger_field.new(team_id),
 		rng = Random.new(team_id * 7919 + 17),
 		next_think = clock + (team_id % 7) / 7 * THINK_INTERVAL,
@@ -1903,7 +2355,16 @@ local function new_brain(team_id: TeamId, home: Vector3): Brain
 		mode = "gather",
 		target = nil,
 		next_attack_at = clock,
+		wave = {},
+		wave_worth = 0,
+		waves_sent = 0,
 		full = {},
+		raids = {},
+		raiders = {},
+		next_raid_id = 1,
+		next_raid_at = clock,
+		waves = {},
+		raids_sent = {},
 	}
 end
 
@@ -1917,10 +2378,11 @@ local function home_of(team_id: TeamId): Vector3
 	return heightmap.ground_position(starts.center(team_id).X, starts.center(team_id).Y)
 end
 
--- Hands team `team_id`, which should already have its commander, to the AI.
-local function add(team_id: TeamId)
+-- Hands team `team_id`, which should already have its commander, to the AI, playing by `profile` (the default if not
+-- given).
+local function add(team_id: TeamId, profile: Profile?)
 	state.flush()
-	brains[team_id] = new_brain(team_id, home_of(team_id))
+	brains[team_id] = new_brain(team_id, home_of(team_id), profile or ai_profiles.DEFAULT)
 end
 
 -- Makes team `team_id`'s AI build from `line`'s labs, whatever it would have chosen.
@@ -1931,6 +2393,26 @@ local function set_line(team_id: TeamId, line: Line)
 	end
 end
 
+-- Makes team `team_id`'s AI play by `profile` from now on, and build from its line if it names one. Returns whether the
+-- AI plays the team.
+local function set_profile(team_id: TeamId, profile: Profile): boolean
+	local brain = brains[team_id]
+	if brain == nil then
+		return false
+	end
+	brain.profile = profile
+	if profile.line ~= nil then
+		brain.line = profile.line
+	end
+	return true
+end
+
+-- The profile team `team_id`'s AI plays by, if the AI plays it.
+local function profile_of(team_id: TeamId): Profile?
+	local brain = brains[team_id]
+	return if brain ~= nil then brain.profile else nil
+end
+
 local function remove(team_id: TeamId)
 	brains[team_id] = nil
 end
@@ -1939,45 +2421,162 @@ local function is_ai(team_id: TeamId): boolean
 	return brains[team_id] ~= nil
 end
 
--- The start that is furthest from everything anyone has on the map: the usual start of one of the map's boxes.
-local function free_start(): Vector2
-	local best = Vector2.zero
+-- Everywhere someone is or is about to be: everything any team has on the map, and where each player on a team starts.
+-- Before the game begins nobody has a commander yet, so a player counts where they chose to start or, if they have not
+-- chosen, where their box's usual start is; without them an AI put down then saw an empty map, took the first box and
+-- so stood where the first player was about to.
+local function taken_places(): { Vector3 }
+	local places: { Vector3 } = {}
+	for _, other in state.all() do
+		if other.alive and other.team ~= 0 and other.kind ~= "wreck" and other.kind ~= "reclaimable" then
+			table.insert(places, other.position)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		if players.team_of(player) == nil then
+			continue
+		end
+		local chosen = game_phase.start_of(player)
+		local box = game_phase.box_of(player)
+		if chosen ~= nil then
+			table.insert(places, chosen)
+		elseif box ~= nil then
+			local spot = starts.default_spot(box)
+			table.insert(places, Vector3.new(spot.X, 0, spot.Y))
+		end
+	end
+	return places
+end
+
+-- How far a commander the AI is put down for, with no spot given, has to stand from everything already on the map.
+local MIN_START_SPACING = 100
+-- How far apart the places tried are when no start is that far from everyone and the AI looks across the map instead.
+local SPREAD_STEP = 24
+
+-- Of `candidates`, the one whose nearest neighbour in `places` is furthest off, and how far off that is; the first of
+-- them on a tie. Only a candidate `usable` says a team can start on counts.
+local function furthest_from(
+	candidates: { Vector2 },
+	places: { Vector3 },
+	usable: ((spot: Vector2) -> boolean)?
+): (Vector2?, number)
+	local best: Vector2? = nil
 	local best_distance = -1
-	for index = 1, starts.box_count() do
-		local spot = starts.default_spot(index)
+	for _, spot in candidates do
 		local at = Vector3.new(spot.X, 0, spot.Y)
 		local nearest = math.huge
-		for _, other in state.all() do
-			if other.alive and other.team ~= 0 and other.kind ~= "wreck" and other.kind ~= "reclaimable" then
-				nearest = math.min(nearest, geometry.distance_2d(at, other.position))
+		for _, place in places do
+			nearest = math.min(nearest, geometry.distance_2d(at, place))
+			if nearest <= best_distance then
+				break
 			end
 		end
-		if nearest > best_distance then
+		if nearest > best_distance and (usable == nil or usable(spot)) then
 			best = spot
 			best_distance = nearest
 		end
 	end
-	return best
+	return best, best_distance
 end
 
--- Makes a new team for the AI, named `name`, and puts its commander down at the start furthest from everyone. Returns
--- its team, or nil if there was no room for the commander.
-local function spawn_opponent(name: string?): TeamId?
+local function can_start(spot: Vector2): boolean
+	return starts.can_start_at(spot.X, spot.Y)
+end
+
+-- Every place a team could start in the rectangle from `min` to `max`, SPREAD_STEP apart, to be checked with
+-- `can_start`.
+local function spread_over(min: Vector2, max: Vector2): { Vector2 }
+	local spread: { Vector2 } = {}
+	for x = min.X, max.X, SPREAD_STEP do
+		for z = min.Y, max.Y, SPREAD_STEP do
+			table.insert(spread, Vector2.new(x, z))
+		end
+	end
+	return spread
+end
+
+-- The start furthest from everyone (`taken_places`): of the usual starts of the map's boxes and the starts on its ring,
+-- the one whose nearest neighbour is furthest off. The boxes come first, so an empty map puts the AI in the first box.
+-- When every start has someone within MIN_START_SPACING it looks across the whole map for the ground furthest from
+-- everyone, and returns nil if even that is too close.
+local function free_start(): Vector2?
+	local candidates: { Vector2 } = {}
+	for index = 1, starts.box_count() do
+		table.insert(candidates, starts.default_spot(index))
+	end
+	for slot = 1, config.START_SLOTS do
+		table.insert(candidates, starts.center(slot))
+	end
+	local places = taken_places()
+	local best, distance = furthest_from(candidates, places)
+	if best ~= nil and distance >= MIN_START_SPACING then
+		return best
+	end
+	local half_x, half_z = heightmap.half_extents()
+	best, distance =
+		furthest_from(spread_over(Vector2.new(-half_x, -half_z), Vector2.new(half_x, half_z)), places, can_start)
+	return if best ~= nil and distance >= MIN_START_SPACING then best else nil
+end
+
+-- Where to put a commander in start box `index`: the box's usual start, or if someone is within MIN_START_SPACING of
+-- it, the ground in the box furthest from everyone; nil if all of the box is that close to someone.
+local function box_start(index: number): Vector2?
+	local places = taken_places()
+	local usual = starts.default_spot(index)
+	local best, distance = furthest_from({ usual }, places)
+	if best ~= nil and distance >= MIN_START_SPACING then
+		return best
+	end
+	local box = starts.box(index)
+	best, distance = furthest_from(spread_over(box.min, box.max), places, can_start)
+	return if best ~= nil and distance >= MIN_START_SPACING then best else nil
+end
+
+-- Makes a new team for the AI, named `name`, allied with team `ally` if given, playing by `profile` (the default if not
+-- given), and puts its commander down at `at`, or at the start furthest from everyone. Returns its team, or nil if there
+-- was no room for the commander; no team is made when there is no free start.
+local function spawn_opponent(name: string?, at: Vector2?, ally: TeamId?, profile: Profile?): TeamId?
+	local start = at or free_start()
+	if start == nil then
+		return nil
+	end
 	local count = 0
 	for _ in brains do
 		count += 1
 	end
 	local team_id = players.create_team(name or `AI {count + 1}`)
-	spawning.set_start(team_id, free_start())
+	if ally ~= nil then
+		alliances.ally(team_id, ally)
+	end
+	spawning.set_start(team_id, start)
 	if spawning.give_starting_force(team_id) == false then
 		return nil
 	end
-	add(team_id)
+	add(team_id, profile)
 	return team_id
 end
 
+-- Hands team `team_id` to the AI, playing by `profile` (the default if not given), first putting its commander down at
+-- `at`, or at the start furthest from everyone, if it has nothing on the map yet. Returns false if there was no room for
+-- the commander.
+local function take_over(team_id: TeamId, at: Vector2?, profile: Profile?): boolean
+	if spawning.owns_anything(team_id) == false then
+		local start = at or free_start()
+		if start == nil then
+			return false
+		end
+		spawning.set_start(team_id, start)
+		if spawning.give_starting_force(team_id) == false then
+			return false
+		end
+	end
+	add(team_id, profile)
+	return true
+end
+
 -- A new map: every team the AI plays starts over, at the start furthest from everyone, as a player does. Called once
--- the map is built and the players' commanders stand.
+-- the map is built and the players' commanders stand. With no start free it takes the one numbered as the team. Each
+-- keeps its profile.
 local function restart_on_new_map()
 	local teams: { TeamId } = {}
 	for team_id in brains do
@@ -1985,9 +2584,10 @@ local function restart_on_new_map()
 	end
 	table.sort(teams)
 	for _, team_id in teams do
-		spawning.set_start(team_id, free_start())
+		local profile = brains[team_id].profile
+		spawning.set_start(team_id, free_start() or starts.center(team_id))
 		spawning.give_starting_force(team_id)
-		add(team_id)
+		add(team_id, profile)
 	end
 end
 
@@ -2020,12 +2620,37 @@ local function describe(team_id: TeamId): string?
 		return nil
 	end
 	local census = take_census(brain)
-	return `{team.name} ({team_id}): {brain.line or "no line"}, army {brain.mode} with {#census.army} worth {math.floor(
+	return `{team.name} ({team_id}, {brain.profile.name}): {brain.line or "no line"}, army {brain.mode} with {#census.army} worth {math.floor(
 		worth_of(census.army)
 	)}, {#census.builders} builders ({brain.builders_lost} lost), {#census.factories} labs, {#census.extractors} extractors, metal {string.format(
 		"%.1f",
 		team.metal_income
 	)}/s, energy {string.format("%.0f", team.energy_income)}/s, {brain.field.enemy_air_count} enemy aircraft`
+end
+
+-- What team `team_id`'s AI has sent out, for a test to look at: its waves and raids (the last SORTIES_KEPT of each),
+-- how many raids are out, what its army is doing, and what a wave would have to be worth to set out now.
+local function report(team_id: TeamId): { [string]: any }?
+	local brain = brains[team_id]
+	local team = state.get_team(team_id)
+	if brain == nil or team == nil then
+		return nil
+	end
+	local raids_out = 0
+	for _ in brain.raids do
+		raids_out += 1
+	end
+	local census = take_census(brain)
+	return {
+		profile = brain.profile.name,
+		line = brain.line,
+		mode = brain.mode,
+		waves = table.clone(brain.waves),
+		waves_sent = brain.waves_sent,
+		raids = table.clone(brain.raids_sent),
+		raids_out = raids_out,
+		wave_needed = wave_needed(brain, read_economy(team, census)),
+	}
 end
 
 local function teams(): { TeamId }
@@ -2043,9 +2668,16 @@ return table.freeze({
 	add = add,
 	remove = remove,
 	set_line = set_line,
+	set_profile = set_profile,
+	profile_of = profile_of,
+	report = report,
 	is_ai = is_ai,
 	teams = teams,
 	spawn_opponent = spawn_opponent,
+	take_over = take_over,
+	free_start = free_start,
+	box_start = box_start,
+	MIN_START_SPACING = MIN_START_SPACING,
 	restart_on_new_map = restart_on_new_map,
 	describe = describe,
 })

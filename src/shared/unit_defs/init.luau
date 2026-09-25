@@ -53,6 +53,7 @@ type EntityDef = types.EntityDef
 -- units/CorVehicles/corraid.lua (Brute), units/CorVehicles/T2/correap.lua (Tiger), corparrow.lua (Poison Arrow)
 -- and corvroc.lua (Negotiator), units/ArmBots/T2/armsptk.lua (Recluse), units/CorGantry/corkorg.lua (Juggernaut),
 -- units/ArmGantry/armvang.lua (Vanguard), units/CorBuildings/LandDefenceOffence/corerad.lua (Eradicator) and
+-- units/ArmGantry/armthor.lua (Thor), units/CorGantry/corjugg.lua (Behemoth),
 -- units/CorShips/corpt.lua (Herring), units/CorGantry/corshiva.lua (Shiva), units/CorShips/corsub.lua (Orca) and
 -- units/CorShips/T2/corcrus.lua (Buccaneer), units/CorBuildings/LandEconomy/corgeo.lua and corageo.lua (the
 -- geothermal powerplants) and, from Legion, units/Legion/Economy/legrampart.lua (Rampart) and

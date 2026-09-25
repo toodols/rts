@@ -32,6 +32,9 @@ local KEY_DIRECTIONS: { [Enum.KeyCode]: Vector2 } = {
 
 local held: { [Enum.KeyCode]: boolean } = {}
 
+-- Set while something else has the camera (piloting a unit, client/pilot.luau): this neither moves it nor zooms.
+local suspended = false
+
 -- A move of the view that eases there rather than jumping (`glide_to`): from where and to where, in (x, z), when it
 -- began and how long it takes. The player panning or zooming, or a jump (`look_at`), ends it where it is.
 type Glide = { from: Vector2, to: Vector2, began: number, seconds: number }
@@ -108,7 +111,8 @@ end
 
 local function apply(delta: number)
 	local camera = Workspace.CurrentCamera
-	if camera == nil then
+	if camera == nil or suspended then
+		last_drag_location = nil
 		return
 	end
 
@@ -180,7 +184,7 @@ local function ground_under_cursor(cursor: Vector2, at_focus: Vector3, at_height
 end
 
 local function on_zoom(_, input_state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
-	if input.UserInputType ~= Enum.UserInputType.MouseWheel then
+	if input.UserInputType ~= Enum.UserInputType.MouseWheel or suspended then
 		return Enum.ContextActionResult.Pass
 	end
 	-- Zoom toward the cursor: whatever is under it stays under it. The focus moves by however far the
@@ -219,6 +223,12 @@ local function get_focus(): Vector3
 	return focus
 end
 
+-- Hands the camera over to something else (`true`) or takes it back, looking where it did before.
+local function set_suspended(value: boolean)
+	suspended = value
+	table.clear(held)
+end
+
 local function init()
 	local camera = Workspace.CurrentCamera
 	if camera ~= nil then
@@ -251,5 +261,6 @@ return table.freeze({
 	look_at = look_at,
 	glide_to = glide_to,
 	get_focus = get_focus,
+	set_suspended = set_suspended,
 	subscribe_pan = subscribe_pan,
 })

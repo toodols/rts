@@ -11,7 +11,7 @@
 	top: 0;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 780px;
+	width: 868px;
 	height: 76px;
 	@include stack(row, space(6));
 	align-items: center;
@@ -21,7 +21,7 @@
 	// The scavengers' difficulty is one more block and divider in the row: 130 and 2 wide, and two more gaps of 24
 	// to go with them, so the bar grows by 180 and the readouts keep the room they had.
 	&.with-scavengers {
-		width: 960px;
+		width: 1048px;
 	}
 }
 
@@ -186,6 +186,24 @@
 	&.right {
 		text-align: right;
 	}
+}
+
+// The tidal strength, right after the wind with no divider between, as the other half of the conditions: the
+// wind block's plate, narrower, with a label over the readout. The bar is 88 wider for it and the gap before it.
+.tide-block {
+	width: 64px;
+	height: 64px;
+	@include stack(column, space(1));
+	padding: space(2) space(3);
+	background-color: veil($void, 0.5);
+	outline: 1px solid $edge;
+}
+
+.tide-value {
+	@extend .readout;
+	font-size: 19px;
+	color: var(--Accent);
+	text-align: left;
 }
 
 // The scavengers' difficulty: the same size and plate as the wind block beside it, with a label over a

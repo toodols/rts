@@ -50,6 +50,7 @@ local build_mode = require(ReplicatedStorage.Client.build_mode)
 local markers = require(ReplicatedStorage.Client.markers)
 local routes = require(ReplicatedStorage.Client.routes)
 local unlocks = require(ReplicatedStorage.Client.unlocks)
+local pilot = require(ReplicatedStorage.Client.pilot)
 
 type EntityId = types.EntityId
 type EntityDef = types.EntityDef
@@ -218,9 +219,11 @@ local function mouse_ray(): Ray?
 	return camera:ViewportPointToRay(location.X, location.Y)
 end
 
--- Where the cursor meets the ground. It comes from the heightmap, not from casting a ray at the world:
--- placing a building, ordering a move or aiming a weapon should not depend on what happens to be
--- under the cursor, and whether an action succeeds is a matter of range alone.
+-- Where the cursor meets the ground, or the water's surface over it. It comes from the heightmap, not from
+-- casting a ray at the world: placing a building, ordering a move or aiming a weapon should not depend on
+-- what happens to be under the cursor, and whether an action succeeds is a matter of range alone. Water
+-- stops it like the ground does, so a point out at sea is the one under the cursor, and not the one on the
+-- sea floor further along it.
 local GROUND_RAY_LENGTH = 3000
 
 local function ground_point(): Vector3?
@@ -228,7 +231,13 @@ local function ground_point(): Vector3?
 	if ray == nil then
 		return nil
 	end
-	return heightmap.ray_to_ground(ray.Origin, ray.Direction, GROUND_RAY_LENGTH)
+	local point = heightmap.ray_to_ground(ray.Origin, ray.Direction, GROUND_RAY_LENGTH)
+	-- a ray that reached the sea floor came down through the surface on the way, unless it began underneath
+	if point == nil or point.Y >= config.WATER_LEVEL or ray.Origin.Y <= config.WATER_LEVEL then
+		return point
+	end
+	local on_water = ray.Origin + ray.Direction * ((config.WATER_LEVEL - ray.Origin.Y) / ray.Direction.Y)
+	return Vector3.new(on_water.X, config.WATER_LEVEL, on_water.Z)
 end
 
 local function entity_under_mouse(): Model?
@@ -252,6 +261,10 @@ end
 
 local function alt_held(): boolean
 	return UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt)
+end
+
+local function ctrl_held(): boolean
+	return UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
 end
 
 -- Where a waypoint at (x, z) sits for what is selected: on the water's surface if a selected unit that
@@ -618,13 +631,20 @@ local function order_on_entity(target: Model, queue: boolean)
 	local leftover: { EntityId } = {}
 
 	if target_kind ~= "wreck" and target_group ~= own_group and target_team ~= 0 then
-		-- a transport picks up an enemy it can carry, a tower or a unit; everything else attacks it
+		-- a transport picks up an enemy it can carry, a tower or a unit, but never a commander nor what another
+		-- transport already has hold of; everything else attacks it
 		local target_def_name = target:GetAttribute "def_name"
 		local target_def = if typeof(target_def_name) == "string" then unit_defs.defs[target_def_name] else nil
+		local carriable = if target_def ~= nil
+				and target_state == "active"
+				and target_def.nametag ~= true
+				and target:GetAttribute "carried" ~= true
+			then target_def
+			else nil
 		local ids = {}
 		local loaders = {}
 		for _, entry in entries do
-			if target_def ~= nil and target_state == "active" and unit_defs.can_carry(entry.def, target_def) then
+			if carriable ~= nil and unit_defs.can_carry(entry.def, carriable) then
 				table.insert(loaders, entry.id)
 			elseif can_go(entry.def) or unit_defs.attack_range(entry.def) ~= nil then
 				table.insert(ids, entry.id)
@@ -659,8 +679,8 @@ local function order_on_entity(target: Model, queue: boolean)
 		end
 		send_targeted("assist", capable, target_id, queue)
 	elseif target_group == own_group then
-		-- anything else of yours is guarded: followed, or for builders, helped. A transport takes aboard
-		-- what it can carry instead, and guards what it cannot.
+		-- anything else of yours or an ally's is guarded: followed, or for builders, helped. A transport takes
+		-- aboard what it can carry instead, and guards what it cannot.
 		local target_def_name = target:GetAttribute "def_name"
 		local target_def = if typeof(target_def_name) == "string" then unit_defs.defs[target_def_name] else nil
 		local loaders: { EntityId } = {}
@@ -668,7 +688,11 @@ local function order_on_entity(target: Model, queue: boolean)
 			if entry.id == target_id then
 				continue
 			end
-			if target_def ~= nil and unit_defs.can_carry(entry.def, target_def) then
+			if
+				target_def ~= nil
+				and target:GetAttribute "carried" ~= true
+				and unit_defs.can_carry(entry.def, target_def)
+			then
 				table.insert(loaders, entry.id)
 			else
 				table.insert(capable, entry.id)
@@ -710,22 +734,27 @@ local function move_entries(): { { id: EntityId, model: Model, def: types.Entity
 	return result
 end
 
--- G: every selected unit forgets all its orders.
+-- G: every selected unit forgets all its orders, and anything selected that is counting down to destroy itself stops.
+-- The server sorts out which of them take orders.
 local function send_stop()
-	local ids = {}
-	for _, entry in selected_with_def(false) do
-		table.insert(ids, entry.id)
-	end
-	for _, entry in move_entries() do
-		if table.find(ids, entry.id) == nil then
-			table.insert(ids, entry.id)
-		end
-	end
+	local ids = selection.get()
 	if #ids == 0 then
 		return
 	end
 	issue_order:FireServer({
 		kind = "stop",
+		ids = ids,
+	})
+end
+
+-- Ctrl+B: everything selected starts counting down to destroy itself, or stops if it already is.
+local function send_self_destruct()
+	local ids = selection.get()
+	if #ids == 0 then
+		return
+	end
+	issue_order:FireServer({
+		kind = "self_destruct",
 		ids = ids,
 	})
 end
@@ -767,7 +796,7 @@ end
 
 -- The first selected unit that can build `def_name`, the same one the server treats as the builder
 -- for spot-snapping (placement.resolve_center takes only one), so the client's own metal-spot search
--- exempts the same builder's queue that the server's does.
+-- treats the same builder's queue as taken that the server's does.
 local function primary_builder_id(def_name: string): EntityId?
 	for _, entry in selected_with_def(false) do
 		if entry.def.build_options ~= nil and table.find(entry.def.build_options, def_name) ~= nil then
@@ -923,6 +952,19 @@ local function can_do(mode: string, def: types.EntityDef): boolean
 		elseif mode == "resurrect" then def.resurrecting
 		else def.reclaiming
 	return able and def.buildpower ~= nil
+end
+
+-- Whether the selection may guard `target`: something on its side, its own team's or an ally's, and never an enemy's,
+-- a wreck or a rock. `ally_group` is the same for every team in an alliance, itself included, so comparing it with the
+-- first selected unit's catches both. The server checks it again (commands' `may_guard`).
+local function guardable(target: Model): boolean
+	local first = selected_with_def(false)[1]
+	local kind = target:GetAttribute "kind"
+	return first ~= nil
+		and kind ~= "wreck"
+		and kind ~= "reclaimable"
+		and target:GetAttribute "team" ~= 0
+		and target:GetAttribute "ally_group" == first.model:GetAttribute "ally_group"
 end
 
 -- Selected units that can do the job of `mode`: attack, reclaim, repair or resurrect. An unfinished one counts: what
@@ -1136,6 +1178,10 @@ local function click_target_mode()
 		return
 	end
 	local target = entity_under_mouse()
+	-- an enemy cannot be guarded, so a guard click on one lands on nothing
+	if mode == "guard" and target ~= nil and guardable(target) == false then
+		target = nil
+	end
 	local target_id = if target ~= nil then world.id_of(target) else nil
 	local ids = {}
 	if target_id ~= nil then
@@ -1438,8 +1484,7 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 			[Enum.KeyCode.T] = { "epic_energy_converter" },
 			[Enum.KeyCode.V] = { "advanced_solar_collector" },
 			-- the geothermal plants, on a vent: the advanced one for whoever can build it, and its sidegrade
-			[Enum.KeyCode.S] = { "advanced_geothermal_powerplant", "geothermal_powerplant" },
-			[Enum.KeyCode.D] = { "tidal_generator" },
+			[Enum.KeyCode.S] = { "tidal_generator", "advanced_geothermal_powerplant", "geothermal_powerplant" },
 			[Enum.KeyCode.F] = { "rampart" },
 		},
 	},
@@ -1450,7 +1495,7 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 			[Enum.KeyCode.X] = { "pulsar", "twin_guard" },
 			[Enum.KeyCode.C] = { "warden", "persecutor" },
 			[Enum.KeyCode.W] = { "agitator", "calamity" },
-			[Enum.KeyCode.D] = { "prevailer" },
+			[Enum.KeyCode.D] = { "eradicator", "prevailer" },
 			[Enum.KeyCode.A] = { "thistle" },
 			[Enum.KeyCode.S] = { "screamer" },
 			[Enum.KeyCode.V] = { "catalyst" },
@@ -1471,10 +1516,10 @@ local BUILD_CATEGORIES: { [Enum.KeyCode]: BuildCategory } = {
 			-- construction turret is A while advanced construction turret is C. This is intentional, copied from BAR.
 			[Enum.KeyCode.X] = { "vehicle_lab" },
 			[Enum.KeyCode.A] = { "construction_turret", "experimental_gantry" },
-			[Enum.KeyCode.S] = { "advanced_bot_lab", "advanced_vehicle_lab", "advanced_air_lab" },
+			[Enum.KeyCode.S] = { "advanced_bot_lab", "advanced_vehicle_lab", "advanced_air_lab", "advanced_shipyard" },
 			[Enum.KeyCode.V] = { "shipyard" },
 			[Enum.KeyCode.C] = { "air_lab", "advanced_construction_turret" },
-			[Enum.KeyCode.D] = { "hovercraft_platform" },
+			[Enum.KeyCode.Q] = { "hovercraft_platform" },
 		},
 	},
 }
@@ -1619,6 +1664,10 @@ local function press_build_key(key: Enum.KeyCode): boolean
 end
 
 local function on_input_began(input: InputObject, processed: boolean)
+	-- a unit being piloted has keys and buttons of its own (client/pilot.luau), and nothing is commanded meanwhile
+	if pilot.active() ~= nil then
+		return
+	end
 	-- O is taken by the guard action, which marks it processed; this is in case something ahead of that action takes
 	-- it first, as the key then still arrives here, processed. Starting guard mode twice does no harm.
 	if input.KeyCode == Enum.KeyCode.O and UserInputService:GetFocusedTextBox() == nil then
@@ -1632,6 +1681,8 @@ local function on_input_began(input: InputObject, processed: boolean)
 		on_left_down()
 	elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
 		on_right_down()
+	elseif input.KeyCode == Enum.KeyCode.B and ctrl_held() then
+		send_self_destruct()
 	elseif press_build_key(input.KeyCode) then
 		return
 	elseif input.KeyCode == Enum.KeyCode.G then
@@ -1680,6 +1731,9 @@ local function cycle_commander(_, input_state: Enum.UserInputState): Enum.Contex
 	if input_state ~= Enum.UserInputState.Begin then
 		return Enum.ContextActionResult.Pass
 	end
+	if pilot.active() ~= nil then
+		return Enum.ContextActionResult.Sink
+	end
 
 	local commanders: { { id: EntityId, model: Model } } = {}
 	for _, model in world.all() do
@@ -1714,7 +1768,7 @@ local GUARD_ACTION = "rts_guard_mode"
 -- O: starts guard mode. Bound above the default so that Roblox's own reserved use of O never sees
 -- it (as with Tab above), even though nothing else in the game wants it.
 local function start_guard_mode(_, input_state: Enum.UserInputState): Enum.ContextActionResult
-	if input_state ~= Enum.UserInputState.Begin then
+	if input_state ~= Enum.UserInputState.Begin or pilot.active() ~= nil then
 		return Enum.ContextActionResult.Pass
 	end
 	start_target_mode "guard"
@@ -1722,6 +1776,9 @@ local function start_guard_mode(_, input_state: Enum.UserInputState): Enum.Conte
 end
 
 local function on_input_ended(input: InputObject)
+	if pilot.active() ~= nil then
+		return
+	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		on_left_up()
 	elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -1757,8 +1814,9 @@ local HOVER_RESURRECT_COLOR = Color3.fromRGB(176, 96, 240)
 local HOVER_ATTACK_COLOR = Color3.fromRGB(238, 88, 74)
 
 -- Shows how far something of `def` standing at `at` can build, how far it can shoot and how far out it shoots nukes
--- down, whichever of them it can.
-local function show_ranges_of(def: EntityDef, at: Vector3)
+-- down, whichever of them it can, turned to `facing`: a factory shows which way its front is, and a weapon that fires
+-- only into a cone ahead shows that cone.
+local function show_ranges_of(def: EntityDef, at: Vector3, facing: number)
 	-- a builder's reach is its own if it has one, and the usual build range otherwise
 	local build_range: number? = nil
 	if def.buildpower ~= nil and (def.assisting or def.repairing) then
@@ -1766,7 +1824,8 @@ local function show_ranges_of(def: EntityDef, at: Vector3)
 	end
 	local attack_range = unit_defs.display_range(def)
 	local intercept_range = unit_defs.intercept_range(def)
-	if build_range == nil and attack_range == nil and intercept_range == nil then
+	local factory = unit_defs.is_factory(def)
+	if build_range == nil and attack_range == nil and intercept_range == nil and factory == false then
 		markers.hide_ranges()
 		return
 	end
@@ -1774,7 +1833,7 @@ local function show_ranges_of(def: EntityDef, at: Vector3)
 	-- shots leave from a quarter of its height above its middle, as the server has them (`sight.muzzle_of`)
 	local ground = heightmap.ground_position(at.X, at.Z)
 	local muzzle = ground + Vector3.new(0, unit_defs.collider_height(def) * 0.25, 0)
-	markers.show_ranges(ground, build_range, attack_range, def, muzzle, intercept_range)
+	markers.show_ranges(ground, build_range, attack_range, def, muzzle, intercept_range, facing)
 end
 
 local function update_hover()
@@ -1787,6 +1846,10 @@ local function update_hover()
 		or area_drag_from ~= nil
 	-- a fight click lands on the ground whatever is under it, so nothing is lit for it
 	local model = if dragging or target_mode == "fight" then nil else entity_under_mouse()
+	-- nor is anything that cannot be guarded while guarding: only your own things and your allies'
+	if model ~= nil and target_mode == "guard" and guardable(model) == false then
+		model = nil
+	end
 	local color = HOVER_COLOR
 	if target_mode == "repair" then
 		color = HOVER_REPAIR_COLOR
@@ -1806,7 +1869,7 @@ local function update_hover()
 		if at == nil then
 			markers.hide_ranges()
 		else
-			show_ranges_of(unit_defs.get(placing), at)
+			show_ranges_of(unit_defs.get(placing), at, build_mode.get_facing())
 		end
 		return
 	end
@@ -1824,7 +1887,8 @@ local function update_hover()
 		return
 	end
 
-	show_ranges_of(def, world.position_of(model))
+	local front = model:GetPivot().ZVector
+	show_ranges_of(def, world.position_of(model), math.atan2(front.X, front.Z))
 end
 
 -- Reports a change of what the cursor is over. It says nothing while a box is being dragged or an order is
@@ -1863,6 +1927,31 @@ local function report_mode()
 end
 
 local function on_render()
+	-- while a unit is piloted nothing is hovered, dragged or placed; whatever was is dropped
+	if pilot.active() ~= nil then
+		left_down_at = nil
+		right_down_world = nil
+		mode_drag_from = nil
+		right_mode_drag_from = nil
+		area_drag_from = nil
+		placing_from = nil
+		target_mode = nil
+		stop_manual_aim()
+		build_mode.exit()
+		if drag_rect ~= nil then
+			set_rect(nil)
+		end
+		markers.show_hover(nil, HOVER_COLOR)
+		markers.hide_ranges()
+		report_mode()
+		if reported_hover ~= nil then
+			reported_hover = nil
+			for _, listener in hover_listeners do
+				listener(nil)
+			end
+		end
+		return
+	end
 	report_mode()
 	report_hover()
 	placing_at = nil

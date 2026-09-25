@@ -9,121 +9,35 @@
 -- koth: a mountain in the sea, in three terraces. The teams start on the lowest and the top is to be held.
 -- tutorial: the campaign's first mission, a small valley split by a ridge with one narrow pass through it.
 -- overlook: the campaign's second mission, a plateau whose cliff overlooks the low ground, with a ramp down at each end.
--- supreme_isthmus, hooked, center_command, rifted, comet_catcher, altair_crossing, ancient_bastion, folsom_dam:
+-- switchbacks, tidal_flats, boneyard, caldera, mesas, trenches, canyons, gale, last_stand, pinwheel, prairie: maps each
+--   drawn to show off one part of the game (see map_designs).
+-- supreme_isthmus, hooked, center_command, rifted, comet_catcher, altair_crossing, ancient_bastion, folsom_dam,
+--   pinewood_derby, acidic_quarry, aurelia, canis_river, boulder_beach, charlie_in_the_hills, coast_to_coast,
+--   devils_postpiles, faster_than_light, gasbag_grabens, great_divide, greenest_fields:
 --   Beyond All Reason's maps of those names, from their heightmaps, textures and metal maps (see bar_maps).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local config = require(ReplicatedStorage.Shared.config)
 local bar_maps = require(ReplicatedStorage.Shared.bar_maps)
-local environment = require(ReplicatedStorage.Shared.environment)
+local map_types = require(ReplicatedStorage.Shared.map_types)
+local map_designs = require(ReplicatedStorage.Shared.map_designs)
 
 type BarMap = bar_maps.BarMap
 type Fitted = bar_maps.Fitted
 
--- One band of ground that has metal spots of its own, so that each layer of a map is worth a set number of them.
-export type MetalLayer = {
-	name: string,
-	-- the spots stand on ground between these heights
-	min_height: number,
-	max_height: number,
-	count: number,
-	-- how far apart its spots keep, in studs
-	spacing: number,
-	-- on the sea floor rather than dry land
-	underwater: boolean,
-	-- what an extractor's income is multiplied by there; nil for the ordinary amount
-	multiplier: number?,
-	-- kept clear of the start positions, as the spots on the open ground are
-	clear_of_starts: boolean,
-}
-
--- What the ground of a map is made of. Terrain paints every column from this (see server/terrain.luau): the
--- map's own features decide first, then the steepness, so the routes read off the ground, then the height, then
--- patches of noise.
-export type Theme = {
-	-- open ground, which everything can drive over, and the second material it is mottled with
-	ground: Enum.Material,
-	ground_patches: Enum.Material,
-	-- too steep for tanks, not for bots
-	slope: Enum.Material,
-	-- too steep for anything that walks
-	cliff: Enum.Material,
-	-- ground within a stud or two of the waterline, and the sea floor below that
-	shore: Enum.Material,
-	seabed: Enum.Material,
-	-- open ground from about this height up is `high_ground` instead, like snow on the peaks; nil for none
-	high_ground: Enum.Material?,
-	high_from: number?,
-	-- the colours the map gives its materials; any it leaves out keep Roblox's own
-	colors: { [Enum.Material]: Color3 },
-	water_color: Color3,
-	-- the map's own features, given the seed: a material for a place, told whether the ground there is too steep for
-	-- bots, or nil to leave it to the rules above
-	paint: ((seed: number) -> (x: number, z: number, height: number, too_steep: boolean) -> Enum.Material?)?,
-}
-
--- A team's start box, its corners in world (x, z).
-export type StartBox = {
-	min: Vector2,
-	max: Vector2,
-}
+export type MetalLayer = map_types.MetalLayer
+export type Theme = map_types.Theme
+export type StartBox = map_types.StartBox
+export type FixedMetalSpot = map_types.FixedMetalSpot
+export type FixedReclaimable = map_types.FixedReclaimable
+export type FixedWreck = map_types.FixedWreck
+export type Preset = map_types.Preset
 
 -- A square start box `half` studs out from `center` each way.
 local function box_around(center: Vector2, half: number): StartBox
 	return { min = center - Vector2.new(half, half), max = center + Vector2.new(half, half) }
 end
-
--- A metal spot a map puts in a place of its own choosing, in world (x, z).
-export type FixedMetalSpot = {
-	position: Vector2,
-	-- nil for the ordinary amount
-	multiplier: number?,
-}
-
--- A reclaimable a map puts in a place of its own choosing, in world (x, z), with what it holds (see scenery.luau).
-export type FixedReclaimable = {
-	def_name: string,
-	position: Vector2,
-	facing: number,
-	metal: number,
-	energy: number,
-	buildpower: number,
-}
-
-export type Preset = {
-	name: string,
-	description: string,
-	-- How big the map is, in studs along x and z, rounded to an even number of cells; nil for config's MAP_CELLS_X by
-	-- MAP_CELLS_Z.
-	size: Vector2?,
-	-- Gives the ground height at a world position.
-	build: (seed: number) -> (x: number, z: number) -> number,
-	-- Where a team's start ideally is, as (x, z); nil puts them on a ring around the middle.
-	start_position: ((slot: number) -> Vector2)?,
-	-- The box each team's players choose where to start within, one to a team, in world (x, z): BAR's own for a map
-	-- from BAR, and for any other laid over its starts by eye. More teams than boxes share them.
-	start_boxes: { StartBox },
-	-- The layers the middle spots are laid out in, each with its own count, in place of the usual scatter
-	-- over the whole map and the spots on the sea floor.
-	metal_layers: { MetalLayer }?,
-	-- Every metal spot on the map, where the map says, in place of any laid out from the seed; nil to lay them out.
-	metal_spots: { FixedMetalSpot }?,
-	-- Every geothermal vent on the map, in world (x, z), where the map says. A map with neither this nor `geo_at_starts`
-	-- has none: vents are as particular to a map as its metal is.
-	geo_spots: { Vector2 }?,
-	-- A vent beside every start, for a map that does not say where its vents are.
-	geo_at_starts: boolean?,
-	-- The reclaimables the map starts with, where the map says, in place of any laid out from the seed; nil to lay them
-	-- out. Read only when asked for, since only the server needs them and a map can have thousands.
-	reclaimables: (() -> { FixedReclaimable })?,
-	theme: Theme,
-	-- The least and most the wind blows, and how strong the tide is (see environment.luau); any left nil is config's
-	-- default.
-	conditions: environment.Conditions?,
-	-- Only played as a campaign mission's map, never offered in a lobby.
-	campaign_only: boolean?,
-}
 
 -- Themes ----------------------------------------------------------------------------------------------
 
@@ -675,7 +589,12 @@ end
 -- drawn as a slope of voxels rather than one sheer wall of them, and still far steeper than anything walks (54 degrees
 -- is the most anything can; the face is about 75). None of it depends on the seed: the mission's enemy stands where it
 -- does against this one cliff.
-local OVERLOOK_SIZE = Vector2.new(256, 208)
+--
+-- It is a small map, 152 by 128 studs: the plateau is some 60 studs deep and the low ground some 90, which is room for
+-- the enemy's base behind what a thug at the edge can reach (see server/missions.luau) and not much more. The heights
+-- are the weapons' business (a thug outranges a guard from up there by the drop), so they are what they would be on a
+-- bigger map; only the lengths across it are small.
+local OVERLOOK_SIZE = Vector2.new(152, 128)
 local OVERLOOK_GROUND = 4
 -- The noise every part of it is drawn from, in place of the seed.
 local OVERLOOK_NOISE = 41.7
@@ -685,35 +604,35 @@ local OVERLOOK_HILL_FREQUENCY = 0.03
 -- The plateau: how far above the low ground it stands, and the x its edge wanders about, by as much as
 -- OVERLOOK_EDGE_WANDER one way or the other over long stretches and a little more over short ones.
 local OVERLOOK_DROP = 28
-local OVERLOOK_EDGE_X = -30
-local OVERLOOK_EDGE_WANDER = 5
-local OVERLOOK_EDGE_WANDER_FREQUENCY = 0.025
-local OVERLOOK_EDGE_JITTER = 1.5
+local OVERLOOK_EDGE_X = -18
+local OVERLOOK_EDGE_WANDER = 3
+local OVERLOOK_EDGE_WANDER_FREQUENCY = 0.04
+local OVERLOOK_EDGE_JITTER = 1
 local OVERLOOK_EDGE_JITTER_FREQUENCY = 0.09
 -- The face: how far out from the edge it falls, how much of the drop the scree at its foot takes, over how much more,
 -- and the crags, which push the face in and out by as much as OVERLOOK_CRAGS studs.
 local OVERLOOK_FACE = 10
 local OVERLOOK_SCREE = 0.12
-local OVERLOOK_SCREE_RUN = 10
-local OVERLOOK_CRAGS = 3
+local OVERLOOK_SCREE_RUN = 6
+local OVERLOOK_CRAGS = 2
 local OVERLOOK_CRAG_FREQUENCY = 0.14
 -- The ramps, one each side of z = 0: the middle they wind about, how far either side of it they are a ramp and no
 -- less, and how far more their steep sides take to rise to the cliff. Each runs down from the edge over
 -- OVERLOOK_RAMP_RUN.
-local OVERLOOK_RAMP_Z = 72
-local OVERLOOK_RAMP_WIND = 5
-local OVERLOOK_RAMP_WIND_FREQUENCY = 0.035
-local OVERLOOK_RAMP_HALF = 8
-local OVERLOOK_RAMP_SIDE = 8
-local OVERLOOK_RAMP_RUN = 60
+local OVERLOOK_RAMP_Z = 43
+local OVERLOOK_RAMP_WIND = 3
+local OVERLOOK_RAMP_WIND_FREQUENCY = 0.06
+local OVERLOOK_RAMP_HALF = 6
+local OVERLOOK_RAMP_SIDE = 5
+local OVERLOOK_RAMP_RUN = 40
 -- The hills round the edge: how far in from the edge they reach, give or take, and how high they rise, gently enough
 -- to walk up.
-local OVERLOOK_RIM_REACH = 18
-local OVERLOOK_RIM_WANDER = 6
-local OVERLOOK_RIM_TOP = 10
+local OVERLOOK_RIM_REACH = 11
+local OVERLOOK_RIM_WANDER = 4
+local OVERLOOK_RIM_TOP = 6
 -- The starts, as campaign.OVERLOOK has them.
-local OVERLOOK_PLAYER_START = Vector2.new(-88, 0)
-local OVERLOOK_ENEMY_START = Vector2.new(70, 0)
+local OVERLOOK_PLAYER_START = Vector2.new(-53, 0)
+local OVERLOOK_ENEMY_START = Vector2.new(42, 0)
 
 local function overlook_noise(x: number, z: number, frequency: number, offset: number): number
 	return math.noise(x * frequency, z * frequency, OVERLOOK_NOISE + offset)
@@ -762,8 +681,8 @@ OVERLOOK_THEME.paint = function(_seed: number): (number, number, number, boolean
 	return function(x: number, z: number, _height: number, too_steep: boolean): Enum.Material?
 		local middle = OVERLOOK_RAMP_Z
 			+ overlook_noise(x, 0.5, OVERLOOK_RAMP_WIND_FREQUENCY, 4.4) * OVERLOOK_RAMP_WIND * 2
-		local down_ramp = x > overlook_edge(z) - 12
-			and x < overlook_edge(z) + OVERLOOK_RAMP_RUN + 8
+		local down_ramp = x > overlook_edge(z) - 7
+			and x < overlook_edge(z) + OVERLOOK_RAMP_RUN + 5
 			and math.abs(math.abs(z) - middle) < OVERLOOK_RAMP_HALF - 1
 		if down_ramp and too_steep == false then
 			return Enum.Material.Ground
@@ -773,15 +692,17 @@ OVERLOOK_THEME.paint = function(_seed: number): (number, number, number, boolean
 end
 
 -- Four spots on the plateau for the player, and two in the enemy's base, which it has extractors on from the start.
+-- They are ordinary spots, on which an extractor makes 2 metal a second, so the player's four and their commander's 2
+-- make the 10 a second the mission's guide asks for (campaign.OVERLOOK.metal).
 local OVERLOOK_METAL: { FixedMetalSpot } = {}
 for _, at in
 	{
-		Vector2.new(-100, -40),
-		Vector2.new(-100, 40),
-		Vector2.new(-66, -58),
-		Vector2.new(-66, 58),
-		Vector2.new(104, -48),
-		Vector2.new(104, 48),
+		Vector2.new(-58, -24),
+		Vector2.new(-58, 24),
+		Vector2.new(-40, -35),
+		Vector2.new(-40, 35),
+		Vector2.new(58, -29),
+		Vector2.new(58, 29),
 	}
 do
 	table.insert(OVERLOOK_METAL, { position = at, multiplier = nil })
@@ -791,20 +712,20 @@ end
 -- defs say.
 local function overlook_reclaimables(): { FixedReclaimable }
 	local laid: { { def_name: string, at: Vector2 } } = {
-		{ def_name = "tree", at = Vector2.new(-116, -82) },
-		{ def_name = "tree", at = Vector2.new(-106, -88) },
-		{ def_name = "tree", at = Vector2.new(-118, -64) },
-		{ def_name = "tree", at = Vector2.new(-114, 80) },
-		{ def_name = "tree", at = Vector2.new(-100, 86) },
-		{ def_name = "tree", at = Vector2.new(-118, 12) },
-		{ def_name = "shrub", at = Vector2.new(-108, -16) },
-		{ def_name = "shrub", at = Vector2.new(-54, -26) },
-		{ def_name = "shrub", at = Vector2.new(-50, 30) },
-		{ def_name = "small_rock", at = Vector2.new(-10, -22) },
-		{ def_name = "small_rock", at = Vector2.new(-8, 30) },
-		{ def_name = "rock", at = Vector2.new(-12, 4) },
-		{ def_name = "small_rock", at = Vector2.new(28, -86) },
-		{ def_name = "rock", at = Vector2.new(30, 88) },
+		{ def_name = "tree", at = Vector2.new(-70, -49) },
+		{ def_name = "tree", at = Vector2.new(-64, -53) },
+		{ def_name = "tree", at = Vector2.new(-71, -38) },
+		{ def_name = "tree", at = Vector2.new(-68, 48) },
+		{ def_name = "tree", at = Vector2.new(-60, 52) },
+		{ def_name = "tree", at = Vector2.new(-71, 7) },
+		{ def_name = "shrub", at = Vector2.new(-65, -10) },
+		{ def_name = "shrub", at = Vector2.new(-32, -16) },
+		{ def_name = "shrub", at = Vector2.new(-30, 18) },
+		{ def_name = "small_rock", at = Vector2.new(-6, -13) },
+		{ def_name = "small_rock", at = Vector2.new(-5, 18) },
+		{ def_name = "rock", at = Vector2.new(-7, 2) },
+		{ def_name = "small_rock", at = Vector2.new(17, -52) },
+		{ def_name = "rock", at = Vector2.new(18, 53) },
 	}
 	local out: { FixedReclaimable } = {}
 	for index, each in laid do
@@ -1000,6 +921,19 @@ local presets: { [string]: Preset } = {
 		metal_layers = nil,
 		metal_spots = nil,
 		theme = TEMPERATE,
+		-- A fresh morning in the hills, a little blue in the distance, with a thin mist still lying in the basins.
+		atmosphere = {
+			clock_time = 10.5,
+			latitude = 35,
+			brightness = 2.2,
+			haze_color = Color3.fromRGB(150, 170, 190),
+			decay_color = Color3.fromRGB(100, 120, 140),
+			density = 0.3,
+			haze = 1.2,
+			saturation = 0.05,
+			mist = 0.3,
+			mist_color = Color3.fromRGB(214, 222, 228),
+		},
 	},
 	islands = {
 		name = "islands",
@@ -1011,6 +945,21 @@ local presets: { [string]: Preset } = {
 		metal_layers = nil,
 		metal_spots = nil,
 		theme = ISLANDS_THEME,
+		-- A tropical afternoon: a high hot sun, a humid sea haze and colours a little brighter than life.
+		atmosphere = {
+			clock_time = 13.5,
+			latitude = 10,
+			brightness = 2.6,
+			exposure = 0,
+			outdoor_ambient = Color3.fromRGB(112, 124, 128),
+			haze_color = Color3.fromRGB(160, 196, 204),
+			decay_color = Color3.fromRGB(110, 150, 160),
+			density = 0.3,
+			haze = 1.6,
+			glare = 0.3,
+			tint = Color3.fromRGB(255, 250, 240),
+			saturation = 0.15,
+		},
 	},
 	continents = {
 		name = "continents",
@@ -1024,6 +973,17 @@ local presets: { [string]: Preset } = {
 		metal_layers = nil,
 		metal_spots = nil,
 		theme = TEMPERATE,
+		-- Clear coastal midday, with a blue sea haze on the far shore.
+		atmosphere = {
+			clock_time = 12.5,
+			latitude = 25,
+			brightness = 2.4,
+			outdoor_ambient = Color3.fromRGB(110, 122, 140),
+			haze_color = Color3.fromRGB(130, 160, 190),
+			decay_color = Color3.fromRGB(90, 120, 150),
+			density = 0.28,
+			haze = 1,
+		},
 	},
 	koth = {
 		name = "koth",
@@ -1039,6 +999,20 @@ local presets: { [string]: Preset } = {
 		metal_spots = nil,
 		geo_at_starts = true,
 		theme = KOTH_THEME,
+		-- The golden hour on the mountain, with long shadows down its terraces.
+		atmosphere = {
+			clock_time = 17.2,
+			latitude = 30,
+			brightness = 2.2,
+			sun_color = Color3.fromRGB(60, 36, 10),
+			ambient = Color3.fromRGB(96, 90, 100),
+			outdoor_ambient = Color3.fromRGB(120, 110, 110),
+			haze_color = Color3.fromRGB(200, 160, 120),
+			decay_color = Color3.fromRGB(140, 100, 80),
+			density = 0.3,
+			haze = 1.8,
+			glare = 0.5,
+		},
 	},
 	tutorial = {
 		name = "tutorial",
@@ -1055,6 +1029,16 @@ local presets: { [string]: Preset } = {
 		reclaimables = tutorial_reclaimables,
 		theme = MEADOW,
 		campaign_only = true,
+		-- A calm, sunny late morning in the valley, with nothing in the way of learning the game.
+		atmosphere = {
+			clock_time = 11,
+			latitude = 25,
+			brightness = 2.3,
+			haze_color = Color3.fromRGB(150, 175, 200),
+			decay_color = Color3.fromRGB(104, 128, 150),
+			density = 0.28,
+			haze = 1.2,
+		},
 	},
 	overlook = {
 		name = "overlook",
@@ -1065,17 +1049,31 @@ local presets: { [string]: Preset } = {
 		start_position = function(slot: number): Vector2
 			return if slot % 2 == 1 then OVERLOOK_PLAYER_START else OVERLOOK_ENEMY_START
 		end,
-		start_boxes = { box_around(OVERLOOK_PLAYER_START, 36), box_around(OVERLOOK_ENEMY_START, 36) },
+		start_boxes = { box_around(OVERLOOK_PLAYER_START, 22), box_around(OVERLOOK_ENEMY_START, 22) },
 		metal_layers = nil,
 		metal_spots = OVERLOOK_METAL,
 		reclaimables = overlook_reclaimables,
 		theme = OVERLOOK_THEME,
 		campaign_only = true,
+		-- A warm afternoon, the sun lowering over the plateau's edge.
+		atmosphere = {
+			clock_time = 16.3,
+			latitude = 25,
+			sun_color = Color3.fromRGB(40, 26, 8),
+			haze_color = Color3.fromRGB(190, 170, 140),
+			decay_color = Color3.fromRGB(130, 112, 96),
+			density = 0.3,
+			haze = 1.6,
+		},
 	},
 }
 
 for _, map in bar_maps.MAPS do
 	presets[map.name] = bar_preset(map)
+end
+
+for _, design in map_designs.ALL do
+	presets[design.name] = design
 end
 
 local DEFAULT = "highlands"

@@ -1,0 +1,319 @@
+@use "theme" as *;
+@use "mixins" as *;
+
+// Piloting a unit: a thin lit ring in the very middle of the view, with a dot at its heart, where the shots go. Over an
+// enemy the chosen weapon reaches, it closes in, thicker and red. The ring's colour is the Sass value, since outlass
+// drops the colour of an `outline` given with var().
+.pilot-crosshair {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	outline: 2px solid $accent;
+	pointer-events: none;
+}
+
+.pilot-crosshair.locked {
+	width: 16px;
+	height: 16px;
+	outline: 3px solid $danger;
+}
+
+.pilot-crosshair-dot {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background-color: var(--Accent);
+}
+
+.pilot-crosshair.locked .pilot-crosshair-dot {
+	width: 6px;
+	height: 6px;
+	background-color: var(--Danger);
+}
+
+// The whole screen, reddened as the unit's health runs low; the colour and how deep it is come from the component.
+.pilot-danger {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+
+// Low in the middle: the unit's health, and under it the row of what its keys do.
+.pilot-bar {
+	position: absolute;
+	bottom: space(6);
+	left: 50%;
+	transform: translateX(-50%);
+	width: auto;
+	height: auto;
+	@include stack(column, space(2));
+	align-items: center;
+	pointer-events: none;
+}
+
+.pilot-health {
+	width: 520px;
+	height: auto;
+}
+
+// thicker than the selection panel's, with its numbers bigger to match
+.pilot-health .vitals-track {
+	height: 30px;
+}
+
+.pilot-health .vitals-label {
+	font-size: 18px;
+	line-height: 30px;
+}
+
+.pilot-abilities {
+	width: auto;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: flex-end;
+}
+
+// Down the left, halfway up: the army hold and follow send, as a plate with its health across the top and a line for
+// each kind of unit in it.
+.pilot-army {
+	@include plate;
+	position: absolute;
+	left: space(5);
+	top: 50%;
+	transform: translateY(-50%);
+	width: 240px;
+	height: auto;
+	@include stack(column, space(2));
+	padding: space(3);
+	pointer-events: none;
+}
+
+.pilot-army-title {
+	width: 100%;
+	height: auto;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 13px;
+	color: var(--Accent);
+	text-align: left;
+}
+
+.pilot-army-row {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	justify-content: space-between;
+}
+
+.pilot-army-name {
+	width: auto;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 13px;
+	color: var(--Text);
+	white-space: nowrap;
+}
+
+.pilot-army-count {
+	width: auto;
+	height: auto;
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 13px;
+	color: var(--TextDim);
+	white-space: nowrap;
+}
+
+// One key's tile: the key in its corner and what it does across the middle. Inside it, from the bottom up: the tint
+// of a lit one, the shade of one still charging, the flash of a key just pressed, and its words over all of them.
+.pilot-ability {
+	@include plate;
+	position: relative;
+	width: 84px;
+	height: 84px;
+	outline: 1px solid $edge;
+}
+
+// The manual weapon's, a little bigger, with its cost along the bottom.
+.pilot-ability.large {
+	width: 100px;
+	height: 100px;
+	outline: 1px solid var(--Accent);
+}
+
+.pilot-ability.charging {
+	outline: 1px solid $edge;
+}
+
+// The weapon the trigger fires, or the order the army is under: ringed thick in the accent, washed with it, and a bar
+// of it across the top.
+.pilot-ability.lit {
+	outline: 3px solid var(--Accent);
+}
+
+.pilot-ability-tint {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+	background-color: veil($accent, 0.28);
+}
+
+.pilot-ability-mark {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 5px;
+	z-index: 4;
+	background-color: var(--Accent);
+}
+
+.pilot-ability.lit .pilot-ability-key {
+	color: var(--Accent);
+}
+
+// Something gone wrong with what the key did, like a called transport shot down: ringed and named in red.
+.pilot-ability.danger {
+	outline: 3px solid var(--Danger);
+}
+
+.pilot-ability.danger .pilot-ability-name {
+	color: var(--Danger);
+}
+
+// A key pressed for something that cannot be done yet, for a moment: the whole tile lights up red.
+.pilot-ability.failed {
+	outline: 3px solid var(--Danger);
+}
+
+.pilot-ability-failed {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	background-color: veil($danger, 0.7);
+}
+
+// A key just pressed, for a moment: the whole tile lights up.
+.pilot-ability.flash {
+	outline: 3px solid var(--Text);
+}
+
+.pilot-ability-flash {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	background-color: veil($accent, 0.75);
+}
+
+.pilot-ability-key {
+	position: absolute;
+	left: 5px;
+	top: 4px;
+	width: auto;
+	height: auto;
+	z-index: 5;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 13px;
+	color: var(--TextDim);
+}
+
+.pilot-ability-name {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: auto;
+	height: auto;
+	z-index: 5;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 11px;
+	white-space: nowrap;
+	color: var(--Text);
+}
+
+.pilot-ability.large .pilot-ability-name {
+	font-size: 15px;
+}
+
+.pilot-ability-cost {
+	position: absolute;
+	left: 50%;
+	bottom: 5px;
+	transform: translateX(-50%);
+	width: auto;
+	height: auto;
+	z-index: 5;
+	font-family: RobotoMono;
+	font-weight: bold;
+	font-size: 12px;
+	white-space: nowrap;
+	color: var(--Energy);
+}
+
+// The part of a tile not yet charged, from its top down: it draws back toward the bottom as the weapon charges. How
+// far down it reaches comes from the component.
+.pilot-ability-shade {
+	position: absolute;
+	left: 0;
+	top: 0;
+	z-index: 2;
+	background-color: veil($void, 0.7);
+}
+
+// What a piloted unit says: a dark strip with a thick bar of colour down its left, the accent for the pilot's own and
+// its team's colour, from the component, over anyone else's unit.
+.pilot-callout {
+	width: auto;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(4) 0 0;
+	background-color: veil($void, 0.82);
+	pointer-events: none;
+}
+
+.pilot-callout.world {
+	position: absolute;
+}
+
+.pilot-callout-bar {
+	width: 6px;
+	height: 34px;
+	background-color: var(--Accent);
+}
+
+.pilot-callout.danger .pilot-callout-bar {
+	background-color: var(--Danger);
+}
+
+.pilot-callout.danger .pilot-callout-text {
+	color: var(--Danger);
+}
+
+.pilot-callout-text {
+	width: auto;
+	height: auto;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 18px;
+	color: var(--Text);
+	-webkit-text-stroke: 2px veil($void, 0.8);
+}

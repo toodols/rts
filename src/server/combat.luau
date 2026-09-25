@@ -33,6 +33,9 @@ local movement = require(script.Parent.movement)
 local profiler = require(script.Parent.profiler)
 local turrets = require(script.Parent.turrets)
 local match_stats = require(script.Parent.match_stats)
+local pilots = require(script.Parent.pilots)
+local emp = require(script.Parent.emp)
+local notifications = require(script.Parent.notifications)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -67,6 +70,8 @@ local RECENT_DAMAGE_DECAY = 0.9
 local FRAMES_PER_SECOND = 30
 -- How violent being disintegrated counts as, for how hard the pieces of what it destroys fly (`shatter`).
 local DISINTEGRATION_SEVERITY = 100
+-- How violent a self-destruct counts as: past WRECK_MAX_SEVERITY, since it leaves no wreck.
+local SELF_DESTRUCT_SEVERITY = 100
 
 -- Damage taken lately, by entity, decayed a little every tick.
 local recent_damage: { [EntityId]: number } = {}
@@ -128,47 +133,56 @@ local function target_cell_of(x: number, z: number): (number, number)
 	return math.floor(x / TARGET_CELL), math.floor(z / TARGET_CELL)
 end
 
--- Rebuilt once at the top of every combat tick, from every living thing on the map - a target search
--- does not care what kind or team something is; `is_enemy` still does all of that filtering.
+-- Adds `entity` to the target grid, unless it is dead or can never be a target.
+local function add_to_target_grid(entity: Entity)
+	-- a reclaimable is never anything's target, even by force, so it is left out of the search altogether
+	if entity.alive == false or entity.kind == "reclaimable" then
+		return
+	end
+	local cx, cz = target_cell_of(entity.position.X, entity.position.Z)
+	local column = target_grid[cx]
+	if column == nil then
+		column = {}
+		target_grid[cx] = column
+	end
+	local cell = column[cz]
+	if cell == nil then
+		cell = {}
+		column[cz] = cell
+	end
+	-- wrecks are bucketed under their own team's root, same as anything else - is_valid_forced_target
+	-- lets a forced attack finish one off regardless of root, and that path does not go through
+	-- each_within at all (it looks the wreck up by id directly), so nothing here needs to special-case it
+	local root = alliances.root_of(entity.team)
+	local bucket = cell[root]
+	if bucket == nil then
+		bucket = {}
+		cell[root] = bucket
+	end
+	table.insert(bucket, entity)
+
+	-- team 0 is neutral scenery, never a target (see is_enemy), so it never makes a shooter think
+	-- an enemy might be out there
+	if entity.kind ~= "wreck" and entity.team ~= 0 then
+		if present_roots[root] == nil then
+			present_roots[root] = true
+			present_root_count += 1
+		end
+	end
+end
+
+-- Rebuilt once at the top of every combat tick, from every living thing on the map and everything hanging from a
+-- transport - a target search does not care what kind or team something is; `is_enemy` still does all of that
+-- filtering.
 local function rebuild_target_grid()
 	table.clear(target_grid)
 	table.clear(present_roots)
 	present_root_count = 0
 	for _, entity in state.all() do
-		-- a reclaimable is never anything's target, even by force, so it is left out of the search altogether
-		if entity.alive == false or entity.kind == "reclaimable" then
-			continue
-		end
-		local cx, cz = target_cell_of(entity.position.X, entity.position.Z)
-		local column = target_grid[cx]
-		if column == nil then
-			column = {}
-			target_grid[cx] = column
-		end
-		local cell = column[cz]
-		if cell == nil then
-			cell = {}
-			column[cz] = cell
-		end
-		-- wrecks are bucketed under their own team's root, same as anything else - is_valid_forced_target
-		-- lets a forced attack finish one off regardless of root, and that path does not go through
-		-- each_within at all (it looks the wreck up by id directly), so nothing here needs to special-case it
-		local root = alliances.root_of(entity.team)
-		local bucket = cell[root]
-		if bucket == nil then
-			bucket = {}
-			cell[root] = bucket
-		end
-		table.insert(bucket, entity)
-
-		-- team 0 is neutral scenery, never a target (see is_enemy), so it never makes a shooter think
-		-- an enemy might be out there
-		if entity.kind ~= "wreck" and entity.team ~= 0 then
-			if present_roots[root] == nil then
-				present_roots[root] = true
-				present_root_count += 1
-			end
-		end
+		add_to_target_grid(entity)
+	end
+	for _, cargo in state.carried() do
+		add_to_target_grid(cargo)
 	end
 end
 
@@ -192,10 +206,12 @@ end
 local function each_within(x: number, z: number, radius: number, own_root: number, visit: (Entity) -> boolean?)
 	local rings = math.ceil(radius / TARGET_CELL)
 	if rings > TARGET_GRID_MAX_RINGS then
-		for _, entity in state.all() do
-			if entity.alive and alliances.root_of(entity.team) ~= own_root then
-				if visit(entity) == true then
-					return
+		for _, group in { state.all(), state.carried() } do
+			for _, entity in group do
+				if entity.alive and alliances.root_of(entity.team) ~= own_root then
+					if visit(entity) == true then
+						return
+					end
 				end
 			end
 		end
@@ -460,9 +476,20 @@ local function drop_miss(
 	return geometry.distance_2d(origin + attacker.velocity * lands, position + velocity * lands)
 end
 
+-- Whether `position` is inside the cone of `attacker`'s that a weapon with a `fire_arc` fires into: ahead of it, or
+-- turned `direction` radians off that (`Weapon.fire_direction`).
+local function within_arc(attacker: Entity, arc: number, direction: number, position: Vector3): boolean
+	local dx, dz = position.X - attacker.position.X, position.Z - attacker.position.Z
+	if dx * dx + dz * dz < 1e-6 then
+		return true
+	end
+	local off = (math.atan2(dx, dz) - attacker.facing - direction + math.pi) % (2 * math.pi) - math.pi
+	return math.abs(off) <= arc
+end
+
 -- Whether `weapon`, fired by `attacker` from `origin`, reaches something at `position` moving at `velocity`, which
 -- is `distance` from `attacker` along the ground. A bomb reaches only what it would come down within the drop
--- window of.
+-- window of, and a weapon with a `fire_arc` nothing outside it.
 local function reaches(
 	attacker: Entity,
 	weapon: types.Weapon,
@@ -471,6 +498,12 @@ local function reaches(
 	velocity: Vector3,
 	distance: number
 ): boolean
+	if
+		weapon.fire_arc ~= nil
+		and within_arc(attacker, weapon.fire_arc, weapon.fire_direction or 0, position) == false
+	then
+		return false
+	end
 	local params = weapon.projectile
 	if params ~= nil and params.dropped == true then
 		return drop_miss(attacker, params, origin, position, velocity) < drop_window(attacker, weapon)
@@ -498,9 +531,18 @@ end
 
 -- Whether `weapon` can be turned on `target` at all. A torpedo is aimed at what is in the water and nothing else, and
 -- is the only thing that is aimed at what is wholly under it. A weapon that names a layer shoots only at that one,
--- and a lobbed shell comes down where its target was, so it is never thrown at something in the air.
+-- and a lobbed shell comes down where its target was, so it is never thrown at something in the air. An EMP weapon is
+-- not turned on what EMP cannot stun, as BAR's are not (luarules/gadgets/unit_onlytargetempable.lua). Something
+-- hanging from a transport can be shot at by any weapon that fires straight, whichever layer it names, since it is
+-- up in the air and is still what it was on the ground.
 local function can_target(weapon: types.Weapon, target: Entity): boolean
 	local def = unit_defs.of(target)
+	if weapon.paralyze_time ~= nil and (def.emp_resistance or 0) >= 1 then
+		return false
+	end
+	if state.carrier_of(target.id) ~= nil then
+		return is_torpedo(weapon) == false and is_lobbed(weapon) == false
+	end
 	if is_torpedo(weapon) then
 		return unit_defs.in_water(def, target.position)
 	end
@@ -672,6 +714,8 @@ end
 
 -- Defined below, after the damage it deals, which can kill something that explodes in turn.
 local explode: (source: Entity) -> ()
+-- Defined below `kill`, which it calls and which calls it.
+local lose_cargo: (transport: Entity, severity: number) -> ()
 
 -- `entity`, finished, has gone and left no wreck: its pieces fly apart, harder the more violent its death (`severity`,
 -- as `kill` has it). A blueprint just disappears, and so does a wreck.
@@ -686,7 +730,22 @@ local function shatter(entity: Entity, severity: number)
 	})
 end
 
+-- Takes `cargo` out of the hold it is in, if any, and puts it on the ground right under where it hung.
+local function fall_from_hold(cargo: Entity)
+	local transport_id = state.carrier_of(cargo.id)
+	if transport_id == nil then
+		return
+	end
+	local def = unit_defs.of(cargo)
+	local x = cargo.position.X
+	local z = cargo.position.Z
+	local y = unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2
+	state.unstow(transport_id, cargo, Vector3.new(x, y, z))
+end
+
 local function kill(entity: Entity, severity: number)
+	-- something shot down from under a transport comes down to the ground to die, and leaves its wreck there
+	fall_from_hold(entity)
 	-- a finished thing is a loss to its team, but not a drone, which is only a part of its carrier
 	if entity.kind ~= "wreck" and entity.state == "active" and unit_defs.of(entity).drone ~= true then
 		match_stats.lost(entity.team)
@@ -707,6 +766,25 @@ local function kill(entity: Entity, severity: number)
 	end
 	state.mark_dead(entity)
 	explode(entity)
+	lose_cargo(entity, severity)
+end
+
+-- What `transport` was carrying when it was lost is killed with it: each thing comes down to the ground where it hung
+-- and dies there as violently as the transport did, except that a commander always leaves its wreck.
+lose_cargo = function(transport: Entity, severity: number)
+	for _, cargo in table.clone(state.cargo_of(transport.id)) do
+		kill(cargo, if unit_defs.of(cargo).nametag == true then 0 else severity)
+	end
+end
+
+-- `entity` destroys itself (server/self_destruct.luau): it leaves no wreck, except that a commander always leaves its
+-- own, as in BAR, and its death explosion goes off as any death's does.
+local function self_destruct(entity: Entity)
+	if entity.alive == false then
+		return
+	end
+	recent_damage[entity.id] = nil
+	kill(entity, if unit_defs.of(entity).nametag == true then 0 else SELF_DESTRUCT_SEVERITY)
 end
 
 -- `attacker` has dealt `dealt` damage to `target`, an enemy, and `killed` says whether that finished it. It is credited
@@ -746,7 +824,14 @@ end
 -- `target` takes `amount` of damage, dealt by the entity `attacker_id` if anyone (a death explosion or drowning is
 -- nobody's doing), which is credited for it. `attacker_team` is whose weapon it was, when the attacker may be gone by
 -- now, as a shell's may; otherwise it is the attacker's own. Without ally griefing, an ally's weapon does nothing.
-local function apply_damage(target: Entity, amount: number, attacker_id: EntityId?, attacker_team: TeamId?)
+-- From an EMP weapon, one with a `paralyze_time`, it is EMP and not damage (server/emp.luau), and earns no credit.
+local function apply_damage(
+	target: Entity,
+	amount: number,
+	attacker_id: EntityId?,
+	attacker_team: TeamId?,
+	paralyze_time: number?
+)
 	-- a reclaimable has no health to speak of: nothing but reclaiming it takes it away; and what only a disintegrator
 	-- can hurt takes nothing from anything else
 	if target.kind == "reclaimable" or DGUN_ONLY[target.def_name] ~= nil then
@@ -757,16 +842,30 @@ local function apply_damage(target: Entity, amount: number, attacker_id: EntityI
 	if team ~= nil and alliances.may_harm(team, target.team) == false then
 		return
 	end
+	if paralyze_time ~= nil then
+		emp.add(target, amount, paralyze_time)
+		return
+	end
 	if attacker ~= nil and amount > 0 and earns_credit(attacker, target) then
 		credit(attacker, target, math.min(amount, target.health), amount >= target.health)
 	end
 	target.health -= amount
 	recent_damage[target.id] = (recent_damage[target.id] or 0) + amount
+	-- an unarmed building hurt by an enemy may be news to its side
+	notifications.damaged(target, team)
 	if target.health > 0 then
 		return
 	end
 	local severity = recent_damage[target.id] / target.max_health * 100
 	recent_damage[target.id] = nil
+	-- what a transport was carrying dies with it, and is a kill for whoever brought it down
+	if attacker ~= nil then
+		for _, cargo in state.cargo_of(target.id) do
+			if earns_credit(attacker, cargo) then
+				credit(attacker, cargo, cargo.health, true)
+			end
+		end
+	end
 	kill(target, severity)
 end
 
@@ -810,7 +909,13 @@ end
 -- the weapon is not dedicated anti air. The unit also loses acceleration for a short time due to the impact.
 local function hit(struck: Entity, weapon: types.Weapon, amount: number, attacker_id: EntityId)
 	local def = unit_defs.of(struck)
-	apply_damage(struck, unit_defs.damage_against(weapon.anti_air == true, def, amount), attacker_id)
+	apply_damage(
+		struck,
+		unit_defs.damage_against(weapon.anti_air == true, def, amount),
+		attacker_id,
+		nil,
+		weapon.paralyze_time
+	)
 	-- it answers slower for half a second (`movement.set_impulse`)
 	if def.max_speed ~= nil and def.acceleration ~= nil then
 		movement.set_impulse(struck, 0.5)
@@ -843,8 +948,12 @@ local function burn(attacker: Entity, weapon: types.Weapon, struck: Entity?, tar
 	end
 end
 
--- Pays the energy a shot costs, and says whether it could be paid.
-local function pay_for_shot(attacker: Entity, weapon: types.Weapon): boolean
+-- Pays the energy a shot costs, and says whether it could be paid. A burst is paid for once, as it starts, the way
+-- Spring charges a whole salvo when it begins (CWeapon::Update), so a `mid_burst` shot is free.
+local function pay_for_shot(attacker: Entity, weapon: types.Weapon, mid_burst: boolean?): boolean
+	if mid_burst == true then
+		return true
+	end
 	if weapon.energy_per_shot > 0 and economy.try_spend(attacker.team, 0, weapon.energy_per_shot) == false then
 		starved_at[attacker.id] = os.clock()
 		return false
@@ -852,12 +961,82 @@ local function pay_for_shot(attacker: Entity, weapon: types.Weapon): boolean
 	return true
 end
 
+-- Whether any of `def`'s weapons is a lightning gun, which makes it proof against lightning's sparks, as in BAR.
+local lightning_proof: { [types.EntityDef]: boolean } = {}
+local function is_lightning_proof(def: types.EntityDef): boolean
+	local cached = lightning_proof[def]
+	if cached == nil then
+		cached = false
+		local weapons = def.weapons
+		if weapons ~= nil then
+			for _, weapon in weapons do
+				if weapon.lightning ~= nil then
+					cached = true
+				end
+			end
+		end
+		lightning_proof[def] = cached
+	end
+	return cached
+end
+
+-- A bolt of `weapon`'s, a lightning gun fired by `attacker`, has ended at `at`, striking `struck` if anything: its
+-- sparks jump to what is nearest there (`types.Lightning`), friend and foe alike, each thing measured to the nearest
+-- point of its collider as a blast measures it. Returns where each spark went, for the clients to draw.
+local function spark(attacker: Entity, weapon: types.Weapon, at: Vector3, struck: Entity?): { Vector3 }
+	local lightning = weapon.lightning :: types.Lightning
+	local near: { Entity } = {}
+	local distances: { [Entity]: number } = {}
+	-- no side is left out, the attacker's own included, so the root it skips is one nothing has
+	each_within(at.X, at.Z, lightning.range + TARGET_CELL, -math.huge, function(other: Entity): boolean?
+		if
+			other.alive == false
+			or other.kind == "wreck"
+			or other.team == 0
+			or (struck ~= nil and other.id == struck.id)
+		then
+			return nil
+		end
+		local def = unit_defs.of(other)
+		if is_lightning_proof(def) or unit_defs.submerged(def, other.position) then
+			return nil
+		end
+		local position = other.position
+		local sideways =
+			math.max(0, Vector2.new(position.X - at.X, position.Z - at.Z).Magnitude - unit_defs.collider_radius(def))
+		local vertical = math.max(0, math.abs(position.Y - at.Y) - unit_defs.collider_height(def) / 2)
+		local distance = math.sqrt(sideways * sideways + vertical * vertical)
+		if distance <= lightning.range then
+			table.insert(near, other)
+			distances[other] = distance
+		end
+		return nil
+	end)
+	table.sort(near, function(a: Entity, b: Entity): boolean
+		return distances[a] < distances[b]
+	end)
+	local ends: { Vector3 } = {}
+	for index = 1, math.min(lightning.forks, #near) do
+		local other = near[index]
+		table.insert(ends, other.position)
+		apply_damage(other, weapon.damage * lightning.fork_damage, attacker.id, attacker.team)
+	end
+	return ends
+end
+
 -- Fires `weapon` from `origin` at `target`, and returns whether it went off. A rocket is launched at the
 -- target and hits whatever it meets on the way, `late` seconds into its flight already, for the part of this
 -- tick since the weapon was ready. Anything else is a laser: its beam strikes the first solid thing on the line to
 -- the target, which is the target itself unless something stands between, and goes on burning (see `burn`).
-local function fire(attacker: Entity, target: Entity, weapon: types.Weapon, origin: Vector3, late: number): boolean
-	if pay_for_shot(attacker, weapon) == false then
+local function fire(
+	attacker: Entity,
+	target: Entity,
+	weapon: types.Weapon,
+	origin: Vector3,
+	late: number,
+	mid_burst: boolean?
+): boolean
+	if pay_for_shot(attacker, weapon, mid_burst) == false then
 		return false
 	end
 
@@ -875,6 +1054,8 @@ local function fire(attacker: Entity, target: Entity, weapon: types.Weapon, orig
 	end
 
 	local struck = los(sight.first_hit, attacker, target, origin)
+	-- the bolt strikes before its sparks jump, which leave out what it struck even when that is now dead
+	burn(attacker, weapon, struck, target.id, nil)
 	weapon_fired:FireAllClients({
 		from = origin,
 		to = struck.position,
@@ -882,8 +1063,9 @@ local function fire(attacker: Entity, target: Entity, weapon: types.Weapon, orig
 		beam_time = weapon.beam_time,
 		beam_thickness = weapon.beam_thickness,
 		beam_color = weapon.beam_color,
+		charged = weapon.charged_beam,
+		lightning = if weapon.lightning ~= nil then spark(attacker, weapon, struck.position, struck) else nil,
 	})
-	burn(attacker, weapon, struck, target.id, nil)
 	return true
 end
 
@@ -895,9 +1077,10 @@ local function fire_at_ground(
 	point: Vector3,
 	weapon: types.Weapon,
 	origin: Vector3,
-	late: number
+	late: number,
+	mid_burst: boolean?
 ): boolean
-	if pay_for_shot(attacker, weapon) == false then
+	if pay_for_shot(attacker, weapon, mid_burst) == false then
 		return false
 	end
 
@@ -915,15 +1098,26 @@ local function fire_at_ground(
 	end
 
 	local struck = los(sight.first_hit_at, attacker, point, origin)
+	-- the beam is drawn as far as where it goes into what it strikes, about where the line meets its collider, and no
+	-- further than the point
+	local to = point
+	local line = point - origin
+	if struck ~= nil and line.Magnitude > 1e-3 then
+		local direction = line.Unit
+		local along = (struck.position - origin):Dot(direction) - unit_defs.collider_radius(unit_defs.of(struck))
+		to = origin + direction * math.clamp(along, 0, line.Magnitude)
+	end
+	burn(attacker, weapon, struck, nil, point)
 	weapon_fired:FireAllClients({
 		from = origin,
-		to = if struck ~= nil then struck.position else point,
+		to = to,
 		team = attacker.team,
 		beam_time = weapon.beam_time,
 		beam_thickness = weapon.beam_thickness,
 		beam_color = weapon.beam_color,
+		charged = weapon.charged_beam,
+		lightning = if weapon.lightning ~= nil then spark(attacker, weapon, to, struck) else nil,
 	})
-	burn(attacker, weapon, struck, nil, point)
 	return true
 end
 
@@ -933,7 +1127,7 @@ local function forced_target(attacker: Entity, weapon: types.Weapon, origin: Vec
 	if forced_id == nil then
 		return nil
 	end
-	local forced = state.get(forced_id)
+	local forced = state.find(forced_id)
 	if forced == nil or is_valid_forced_target(attacker, forced) == false or can_target(weapon, forced) == false then
 		return nil
 	end
@@ -964,10 +1158,25 @@ local function forced_point(attacker: Entity, weapon: types.Weapon, origin: Vect
 	return nil
 end
 
+-- Whether `attacker` has an attack order `weapon` could carry out, reachable or not: a point on the ground, or a
+-- target that is still there to be shot and that the weapon can shoot at.
+local function has_order_for(attacker: Entity, weapon: types.Weapon): boolean
+	if locked_ground[attacker.id] ~= nil then
+		return weapon.target_layer ~= "air"
+	end
+	local forced_id = locked[attacker.id]
+	if forced_id == nil then
+		return false
+	end
+	local forced = state.find(forced_id)
+	return forced ~= nil and is_valid_forced_target(attacker, forced) and can_target(weapon, forced)
+end
+
 -- What `weapon` would shoot at now, if anything: a point on the ground, or a target. It is the point an
 -- attack-ground order names or the target an attack order names if it can be shot now, and otherwise the nearest
--- enemy that can be seen, preferring one that is not `claimed`. An anti-nuke weapon looks for a nuclear missile in
--- flight instead, and gives where it is as the point.
+-- enemy that can be seen, preferring one that is not `claimed`. An anti-nuke weapon looks instead for an enemy nuke
+-- coming down within its range that no interceptor is after yet (`projectiles.pick_nuke_target`), and gives where it
+-- is as the point.
 export type Choice = {
 	target: Entity?,
 	point: Vector3?,
@@ -987,6 +1196,11 @@ local function choose(attacker: Entity, weapon: types.Weapon, origin: Vector3, c
 	if target == nil and weapon.manual_fire == true then
 		return { target = nil, point = nil }
 	end
+	-- nor does a bomb on its way to what it was ordered to attack, as in BAR: a burst let go on the way would leave it
+	-- reloading when it gets there
+	if target == nil and is_dropped(weapon) and has_order_for(attacker, weapon) then
+		return { target = nil, point = nil }
+	end
 	if target == nil then
 		target = cached_pick_target(attacker, origin, weapon, claimed)
 	end
@@ -995,6 +1209,92 @@ local function choose(attacker: Entity, weapon: types.Weapon, origin: Vector3, c
 		target = cached_pick_target(attacker, origin, weapon, {})
 	end
 	return { target = target, point = nil }
+end
+
+-- A piloted shot aimed at a point is fired this far on past it, so that the line it is fired along goes into whatever
+-- the point is on the face of, and strikes it, rather than stopping just short.
+local PILOT_AIM_PAST = 1
+-- How far off the line a pilot aims along, in radians, an aircraft may be for an anti air weapon to lock on to it.
+local PILOT_LOCK_CONE = math.rad(12)
+
+-- What the chosen weapon of a piloted unit shoots at (see shared/piloting.luau): the very point its pilot aims at, or as
+-- far as it reaches toward it, and whatever is on the line there is what it hits, whether or not it was aimed at. Only
+-- a weapon that shoots at nothing but aircraft, and so cannot be fired at a point, is fired at the enemy aimed at, if
+-- it can reach it. It is fired whether or not that can be seen, as a pilot fires where they like.
+local function pilot_choice(attacker: Entity, weapon: types.Weapon, origin: Vector3, pilot: pilots.Pilot): Choice
+	if weapon.target_layer == "air" then
+		local function usable(other: Entity): boolean
+			return is_enemy(attacker, other)
+				and can_target(weapon, other)
+				and reaches(
+					attacker,
+					weapon,
+					origin,
+					other.position,
+					other.velocity,
+					geometry.distance_2d(attacker.position, other.position)
+				)
+		end
+		local target_id = pilot.target_id
+		local target = if target_id ~= nil then state.find(target_id) else nil
+		if target ~= nil and usable(target) then
+			return { target = target, point = nil }
+		end
+		-- an aircraft is too quick to keep the crosshair on, so it locks on to whichever it can shoot is nearest the
+		-- line aimed along, if one is within PILOT_LOCK_CONE of it
+		local aim = pilot.aim
+		local line = if aim ~= nil then aim - origin else Vector3.zero
+		if aim == nil or line.Magnitude < 1e-3 then
+			return { target = nil, point = nil }
+		end
+		local direction = line.Unit
+		-- with nothing to lock on to it is fired where it is aimed all the same, as far as it reaches, unguided
+		local within = aim
+		local across = geometry.flatten(line).Magnitude
+		if across > weapon.range then
+			within = origin + line * (weapon.range / across)
+		end
+		local best: Entity? = nil
+		local best_angle = PILOT_LOCK_CONE
+		each_within(
+			attacker.position.X,
+			attacker.position.Z,
+			weapon.range,
+			alliances.root_of(attacker.team),
+			function(other: Entity): boolean?
+				local to = other.position - origin
+				if to.Magnitude < 1e-3 then
+					return nil
+				end
+				local angle = math.acos(math.clamp(to.Unit:Dot(direction), -1, 1))
+				if angle < best_angle and usable(other) then
+					best = other
+					best_angle = angle
+				end
+				return nil
+			end
+		)
+		if best ~= nil then
+			return { target = best, point = nil }
+		end
+		return { target = nil, point = within }
+	end
+	local aim = pilot.aim
+	if aim == nil then
+		return { target = nil, point = nil }
+	end
+	local line = aim - origin
+	if line.Magnitude > 1e-3 and is_lobbed(weapon) == false then
+		aim += line.Unit * PILOT_AIM_PAST
+	end
+	-- aimed further than it reaches, it fires as far as it reaches along the line aimed down, into the air if that is
+	-- where the line goes; a lobbed shell, which comes down where it is aimed, comes down on the ground there instead
+	local across = geometry.flatten(aim - origin).Magnitude
+	if across > weapon.range then
+		local within = origin + (aim - origin) * (weapon.range / across)
+		aim = if is_lobbed(weapon) then heightmap.ground_position(within.X, within.Z) else within
+	end
+	return { target = nil, point = aim }
 end
 
 -- Picks a shot for `weapon` and takes it: what `choose` picks, or `chosen` when that has already been made (for a
@@ -1010,18 +1310,18 @@ local function shoot(
 	late: number,
 	chosen: Choice?
 ): (boolean, EntityId?)
-	-- anti-nuke weapons search for nuclear missiles to intercept instead of targeting entities
+	-- an anti-nuke launches at a nuke, which it picks again for every launch rather than taking an earlier choice: the
+	-- one it chose may have had an interceptor sent after it since
 	if weapon.anti_nuke == true then
-		local nuke_point = (chosen or choose(attacker, weapon, origin, claimed)).point
+		local nuke_point = choose(attacker, weapon, origin, claimed).point
 		if nuke_point ~= nil then
-			-- fire at the nuke's current position as if it were a ground target
 			return fire_at_ground(attacker, nuke_point, weapon, origin, late), nil
 		end
 		return false, nil
 	end
 	local dropped = is_dropped(weapon)
-	-- a bomb is only let go from the air: a bomber sitting on the ground holds on to it
-	if dropped and air.is_airborne(attacker) == false then
+	-- a bomb is only let go from the air: a bomber sitting on the ground holds on to it, as a fighter does its missiles
+	if (dropped or weapon.airborne_only == true) and air.is_airborne(attacker) == false then
 		return false, nil
 	end
 	-- A bomber's burst is one shot: the first bomb is let go when the target is in the drop window, and the rest
@@ -1031,9 +1331,9 @@ local function shoot(
 	if dropped and mid_burst and aim ~= nil then
 		local aimed = if aim.target ~= nil and aim.target.alive then aim.target else nil
 		if aimed ~= nil then
-			return fire(attacker, aimed, weapon, origin, late), aimed.id
+			return fire(attacker, aimed, weapon, origin, late, mid_burst), aimed.id
 		end
-		return fire_at_ground(attacker, aim.point, weapon, origin, late), nil
+		return fire_at_ground(attacker, aim.point, weapon, origin, late, mid_burst), nil
 	end
 
 	local choice = chosen or choose(attacker, weapon, origin, claimed)
@@ -1046,7 +1346,7 @@ local function shoot(
 			end
 			by_weapon_aim[weapon] = { target = nil, point = point }
 		end
-		return fire_at_ground(attacker, point, weapon, origin, late), nil
+		return fire_at_ground(attacker, point, weapon, origin, late, mid_burst), nil
 	end
 
 	local target = choice.target
@@ -1061,7 +1361,7 @@ local function shoot(
 		end
 		by_weapon_aim[weapon] = { target = target, point = target.position }
 	end
-	return fire(attacker, target, weapon, origin, late), target.id
+	return fire(attacker, target, weapon, origin, late, mid_burst), target.id
 end
 
 -- What follows a shot of `weapon` when `fired` shots of its burst were out before it: how long until it may fire
@@ -1254,7 +1554,7 @@ local function manual_fire(shooter: Entity, aim: Vector3): ManualFireResult
 	if weapon == nil then
 		return "unable"
 	end
-	if shooter.manual_reload_remaining > 0 then
+	if shooter.manual_reload_remaining > 0 or emp.is_stunned(shooter) then
 		return "waiting"
 	end
 
@@ -1299,10 +1599,13 @@ local function manual_fire(shooter: Entity, aim: Vector3): ManualFireResult
 	end
 	shooter.manual_reload_remaining = weapon.reload
 
-	local far = shooter.position + direction * weapon.range
+	-- drawn from the commander's gun, sloping down (or up) through the point aimed at and on to the end of its range
+	local from = sight.muzzle_of(shooter)
+	local run = geometry.flatten(aim - from).Magnitude
+	local rise = if run < 1e-3 then 0 else (aim.Y - from.Y) / run
 	weapon_fired:FireAllClients({
-		from = shooter.position,
-		to = heightmap.ground_position(far.X, far.Z),
+		from = from,
+		to = from + direction * weapon.range + Vector3.new(0, rise * weapon.range, 0),
 		team = shooter.team,
 		radius = weapon.radius,
 	})
@@ -1317,6 +1620,7 @@ local function manual_fire(shooter: Entity, aim: Vector3): ManualFireResult
 		state.mark_dead(other)
 		-- disintegrated, but not defused
 		explode(other)
+		lose_cargo(other, DISINTEGRATION_SEVERITY)
 	end
 	return "fired"
 end
@@ -1352,8 +1656,12 @@ local function tick_weapons(entity: Entity, weapons: { types.Weapon }, popup: ty
 	local claimed: { EntityId } = {}
 	local frame = CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0)
 	local open = popup == nil or turrets.advance(entity, popup, has_target(entity))
+	-- the weapon a piloted unit's pilot has chosen is theirs to fire, and the rest hold theirs
+	local pilot = pilots.get(entity.id)
+	local piloted_weapon = if pilot ~= nil then pilot.weapon else nil
 
 	for index, weapon in weapons do
+		local piloted = pilot ~= nil and index == piloted_weapon
 		if entity.weapon_burst_remaining[index] == nil then
 			entity.weapon_burst_remaining[index] = 0
 		end
@@ -1377,13 +1685,27 @@ local function tick_weapons(entity: Entity, weapons: { types.Weapon }, popup: ty
 			)
 		end
 
+		-- a piloted unit fires nothing its pilot does not: its other weapons reload, their turrets turn back to rest,
+		-- and they hold their fire
+		if pilot ~= nil and piloted == false then
+			if weapon.turret ~= nil then
+				turrets.turn(entity, index, weapon.turret, weapon_origin(entity, frame, weapon), nil, delta)
+			end
+			if group_leader(weapons, index) == index then
+				entity.weapon_reloads[index] = math.max(0, count_down(entity.weapon_reloads[index], delta))
+			end
+			continue
+		end
+
 		local origin: Vector3? = nil
 		local chosen: Choice? = nil
 		local aligned = open
 		local turret = weapon.turret
 		if turret ~= nil then
 			origin = weapon_origin(entity, frame, weapon)
-			local choice = choose(entity, weapon, origin :: Vector3, claimed)
+			local choice = if piloted and pilot ~= nil
+				then pilot_choice(entity, weapon, origin :: Vector3, pilot)
+				else choose(entity, weapon, origin :: Vector3, claimed)
 			chosen = choice
 			local aim_point = if choice.point ~= nil
 				then choice.point
@@ -1417,6 +1739,16 @@ local function tick_weapons(entity: Entity, weapons: { types.Weapon }, popup: ty
 
 		if origin == nil then
 			origin = weapon_origin(entity, frame, weapon)
+		end
+		if piloted and pilot ~= nil then
+			-- it fires only while its pilot holds the trigger, and otherwise waits ready
+			if pilot.firing == false then
+				entity.weapon_reloads[leader] = 0
+				continue
+			end
+			if chosen == nil then
+				chosen = pilot_choice(entity, weapon, origin :: Vector3, pilot)
+			end
 		end
 		for _ = 1, MAX_SHOTS_PER_TICK do
 			-- nothing to fire until a missile is ready, and with nothing to shoot it waits ready, and does not save
@@ -1474,7 +1806,7 @@ local function tick_beams()
 			local frame = CFrame.new(shooter.position) * CFrame.Angles(0, shooter.facing, 0)
 			local origin = weapon_origin(shooter, frame, beam.weapon)
 			if beam.target_id ~= nil then
-				local target = state.get(beam.target_id)
+				local target = state.find(beam.target_id)
 				if
 					target == nil
 					or target.alive == false
@@ -1515,7 +1847,7 @@ local function tick(delta: number)
 	sight.invalidate()
 	local decay = RECENT_DAMAGE_DECAY ^ (delta * FRAMES_PER_SECOND)
 	for id, damage in recent_damage do
-		if damage * decay < 1e-3 or state.get(id) == nil then
+		if damage * decay < 1e-3 or state.find(id) == nil then
 			recent_damage[id] = nil
 		else
 			recent_damage[id] = damage * decay
@@ -1538,8 +1870,8 @@ local function tick(delta: number)
 		then
 			continue
 		end
-		-- a drone parked on its carrier holds its fire
-		if docking.is_docked(entity.id) then
+		-- a drone parked on its carrier holds its fire, and something stunned neither fires nor reloads
+		if docking.is_docked(entity.id) or emp.is_stunned(entity) then
 			continue
 		end
 		if entity.manual_reload_remaining > 0 then
@@ -1590,6 +1922,8 @@ return table.freeze({
 	begin_tick = begin_tick,
 	tick = tick,
 	apply_damage = apply_damage,
+	self_destruct = self_destruct,
+	lose_cargo = lose_cargo,
 	manual_fire = manual_fire,
 	set_forced_target = set_forced_target,
 	set_forced_ground = set_forced_ground,

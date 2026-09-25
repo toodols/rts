@@ -3,9 +3,9 @@
 --
 -- A wreck has its own pools (50% of the dead unit's metal over 20% of its buildpower_cost), so
 -- reclaiming a wreck is much faster than rebuilding the unit was. Reclaiming something still
--- standing unwinds its build progress and refunds metal at its own build rate. A reclaimable, a rock or a
--- tree, is taken apart exactly as a wreck is, out of the pools its def gives it, and pays out energy as
--- well as metal.
+-- standing unwinds its build progress and refunds metal at its own build rate, and that goes for something hanging
+-- from a transport too, which is reached from under it. A reclaimable, a rock or a tree, is taken apart exactly as a
+-- wreck is, out of the pools its def gives it, and pays out energy as well as metal.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -17,6 +17,7 @@ local economy = require(script.Parent.economy)
 local flows = require(script.Parent.flows)
 local match_stats = require(script.Parent.match_stats)
 local alliances = require(script.Parent.alliances)
+local combat = require(script.Parent.combat)
 
 type Entity = types.Entity
 
@@ -85,7 +86,7 @@ local function target_of(reclaimer_id: types.EntityId): types.EntityId?
 		if entry.reclaimer_id ~= reclaimer_id then
 			continue
 		end
-		local target = state.get(entry.target_id)
+		local target = state.find(entry.target_id)
 		if target ~= nil and target.alive then
 			return target.id
 		end
@@ -118,7 +119,7 @@ local function recent_target_of(reclaimer_id: types.EntityId): types.EntityId?
 	if target_id == nil then
 		return nil
 	end
-	local target = state.get(target_id)
+	local target = state.find(target_id)
 	if target ~= nil and target.alive then
 		return target.id
 	end
@@ -128,7 +129,7 @@ end
 -- What reclaiming `target_id` is called in the infobox's list of where a reclaimer's income comes from: "Reclaiming
 -- Rock", "Reclaiming Grunt wreck". The target may already be gone by the time its last payout lands.
 local function reclaim_label(target_id: types.EntityId): string
-	local target = state.get(target_id)
+	local target = state.find(target_id)
 	if target == nil then
 		return "Reclaiming"
 	end
@@ -225,11 +226,13 @@ local function reclaim_standing(target: Entity, applied: number, entry: Request,
 		flows.stall(entry.reclaimer_id, "storage")
 	end
 	state.mark_dead(target)
+	-- a transport taken apart with something aboard drops it, and it is lost
+	combat.lose_cargo(target, 0)
 end
 
 local function resolve(delta: number)
 	for _, entry in pending do
-		local target = state.get(entry.target_id)
+		local target = state.find(entry.target_id)
 		-- something another reclaimer finished off earlier this tick pays nobody a second time
 		if target == nil or target.alive == false then
 			continue

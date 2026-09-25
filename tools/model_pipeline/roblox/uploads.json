@@ -2,10 +2,14 @@
   "meshes": {
     "0077aa8d04b8372d": "rbxassetid://90724116877742",
     "00810930f2fa5f55": "rbxassetid://117186101789070",
+    "00fd211a1bdaef83": "rbxassetid://138676414749033",
     "013566833bedc916": "rbxassetid://87487092384387",
+    "013e9f14535d2a0b": "rbxassetid://80513293192271",
     "01d49959b48e158f": "rbxassetid://123844522621688",
     "01f02828cbf04a15": "rbxassetid://80024031068206",
     "022a3256c8db3bbf": "rbxassetid://103198924381300",
+    "022c28335ad678f5": "rbxassetid://109142958107316",
+    "02337127c947122c": "rbxassetid://80902510525145",
     "028539f501e7f955": "rbxassetid://103430577067244",
     "02ca8e59063ab971": "rbxassetid://117667428577495",
     "02dad25f73f5e204": "rbxassetid://131560747703163",
@@ -19,10 +23,13 @@
     "03f4704658046bbf": "rbxassetid://89490087260931",
     "043de8fa91b37300": "rbxassetid://139964255788571",
     "0477008534ecd847": "rbxassetid://122455400306816",
+    "04a8d9db3f54a3cd": "rbxassetid://132049990693358",
+    "04bd4bf804d7d2cb": "rbxassetid://101215409037632",
     "04f2bfcb8202d795": "rbxassetid://105309366112632",
     "0549fa337381a785": "rbxassetid://92439708610549",
     "054f9609dd1daf2e": "rbxassetid://123372309855222",
     "056de234584ab4c8": "rbxassetid://113027724675670",
+    "063bb17ea7405f0e": "rbxassetid://129341713003138",
     "0650ff497edb9dc5": "rbxassetid://107106273461596",
     "069c2bc2cc734356": "rbxassetid://82143908295866",
     "06a6a2b78767b903": "rbxassetid://126183221822607",
@@ -36,6 +43,7 @@
     "08cb860aa6bebdf7": "rbxassetid://82071385008852",
     "08da24e08405f25f": "rbxassetid://117473800337510",
     "091d6cf7881edd7f": "rbxassetid://82198064883270",
+    "097d1d8dfb27c612": "rbxassetid://81761316733893",
     "09a3756f70c55232": "rbxassetid://109020094059121",
     "09caa1476af58a11": "rbxassetid://120438490961678",
     "09f0107480b2baa5": "rbxassetid://135886027096915",
@@ -94,30 +102,36 @@
     "1499bf04bd6a22c5": "rbxassetid://98527081463678",
     "1506dc7ff2db65ae": "rbxassetid://81248646871471",
     "1526e133691a1b33": "rbxassetid://123182374271923",
+    "153055ab50f5f057": "rbxassetid://84658682814423",
     "1576c2f0a096a02c": "rbxassetid://101121472927544",
     "15830ff32f4f65ad": "rbxassetid://90578176036643",
     "15c9bbddb6b2fe3b": "rbxassetid://108769550211092",
     "15cbb6747e1e3f19": "rbxassetid://72637751360885",
     "15cfd352ec2745e9": "rbxassetid://74677845962096",
+    "16637f7093e84a22": "rbxassetid://70546360679140",
     "1690ac768bd49a44": "rbxassetid://117169785485321",
     "16c56a2d012a7bfb": "rbxassetid://75485315577054",
     "16d4e1229194d588": "rbxassetid://103674819352701",
     "16dbad76769006b2": "rbxassetid://120959200497472",
+    "16f6ff6cf0f784db": "rbxassetid://132209860146745",
     "174d2c3377c72c7f": "rbxassetid://98760840070674",
     "174f605365e523ec": "rbxassetid://103938475131274",
     "1781a42c104b543e": "rbxassetid://114665195297808",
     "179b71c5fecc8a02": "rbxassetid://125030588946731",
     "17d8095afc3cf8cb": "rbxassetid://124405092692106",
+    "180702786991e597": "rbxassetid://130585031124366",
     "182d1ccf129be355": "rbxassetid://133302784440019",
     "18365e68284dcb3e": "rbxassetid://114233117838334",
     "1870357b02fb51e0": "rbxassetid://122713238657000",
     "191273ab93f5f922": "rbxassetid://101169794601704",
     "192d0e7999cfaa2e": "rbxassetid://78745356372902",
+    "19451eeaf1f41a21": "rbxassetid://101234575540625",
     "1958ca8ff2f87990": "rbxassetid://136657121483902",
     "19624a476bbabdf1": "rbxassetid://109648233131145",
     "19bb2cf9611dcd0c": "rbxassetid://132391017181725",
     "19e6c1cf33cae10c": "rbxassetid://88206470900810",
     "1aae1b1d31259e11": "rbxassetid://131810933428716",
+    "1ab3e1311ba2007d": "rbxassetid://138895221251702",
     "1b144934a966dd10": "rbxassetid://77575192213303",
     "1b2441cc76401a44": "rbxassetid://89230602931398",
     "1b5f14ee48b37096": "rbxassetid://89816322662461",
@@ -133,6 +147,7 @@
     "1d51578b61fe82cf": "rbxassetid://119235289704134",
     "1dfad496e0d59a2d": "rbxassetid://74620352060758",
     "1e5fb119166b5e86": "rbxassetid://89708449548262",
+    "1e8da11d9d87d5a8": "rbxassetid://98595233081585",
     "1ea83c9f84a27dfc": "rbxassetid://122721831730123",
     "1eab6d4e3345014b": "rbxassetid://128986658845599",
     "1ecce75e0eee9bd2": "rbxassetid://127423104264774",
@@ -143,15 +158,18 @@
     "1fa46cc23a207f49": "rbxassetid://117353997988812",
     "1fa9102e83944dba": "rbxassetid://100172806251034",
     "1fe8015e69627309": "rbxassetid://109144610504846",
+    "207062b964d7bc19": "rbxassetid://104234851078471",
     "209929b2a708677f": "rbxassetid://123840415359273",
     "20f79fd3b31d6e8b": "rbxassetid://108181354425387",
     "2126c526f08f82fa": "rbxassetid://102817480131048",
     "21af80db0755c506": "rbxassetid://89097234177515",
+    "21cffca540fd8aab": "rbxassetid://121885093859793",
     "21f45ed9fff303cd": "rbxassetid://123654849742977",
     "21fd35591aa8a2be": "rbxassetid://108089447327805",
     "2278e1878f20f785": "rbxassetid://130812321838288",
     "22c635341f9f14f0": "rbxassetid://134893469730428",
     "22c795031e3c26a7": "rbxassetid://121037246900642",
+    "232cd590c4a28ea6": "rbxassetid://95299691586315",
     "234ed464b2819f0f": "rbxassetid://140597885073934",
     "23551424e25a0fd3": "rbxassetid://102422043013163",
     "2369ac13e1fbc91b": "rbxassetid://109248575137124",
@@ -166,6 +184,7 @@
     "272d0afb561c7e33": "rbxassetid://118919074199653",
     "273834be25e9f591": "rbxassetid://73055495345955",
     "274fd102f42f7e35": "rbxassetid://121071958620991",
+    "277a111d804bcedd": "rbxassetid://116816415726114",
     "278b9958a7b615e8": "rbxassetid://114661439675212",
     "27a04b0dbedca94c": "rbxassetid://113318074466412",
     "27deca3730da8ee5": "rbxassetid://127280223155408",
@@ -198,6 +217,7 @@
     "2cc737cd5e8d7002": "rbxassetid://122231836157498",
     "2ccfe1bd578b80db": "rbxassetid://95984315466021",
     "2ce88f92cb6f829e": "rbxassetid://109492971272443",
+    "2d02961bd81eda09": "rbxassetid://122708542578704",
     "2d16ff47cb06443d": "rbxassetid://134927846656416",
     "2d26d1fef6a37c24": "rbxassetid://87939070372010",
     "2d4a1b7be285b672": "rbxassetid://73389502165533",
@@ -214,6 +234,7 @@
     "302040357ae58169": "rbxassetid://107973271868316",
     "311bb6c99c44f0de": "rbxassetid://140731348005067",
     "311ea85cde3539a5": "rbxassetid://128670225741939",
+    "318bdd7335d994b2": "rbxassetid://105948567005482",
     "3229e930c16632d5": "rbxassetid://118177004106487",
     "3242320f70060eeb": "rbxassetid://101337554835667",
     "3257db86bd81f3b7": "rbxassetid://118012850532994",
@@ -223,10 +244,12 @@
     "33d183e0c5a2c971": "rbxassetid://74135501923603",
     "33e171dfcad5a74c": "rbxassetid://126191862678501",
     "33f5f7ab484bec15": "rbxassetid://133857932375057",
+    "34504edda6f07ad7": "rbxassetid://99966281704563",
     "345657a24d63562e": "rbxassetid://112897685467346",
     "34a68942a52733af": "rbxassetid://131163659997586",
     "35f6a9fd37a43cdd": "rbxassetid://76923129423934",
     "368a4f3e1b1273b8": "rbxassetid://81258126730276",
+    "37377c46ce133a27": "rbxassetid://82295171310678",
     "375ca37565ce9954": "rbxassetid://120857146616540",
     "382cbfa7b0c07734": "rbxassetid://113367018300682",
     "3849e956b916eb93": "rbxassetid://116395834381087",
@@ -234,6 +257,7 @@
     "38dee58cf6dae415": "rbxassetid://97771401324546",
     "393df89d4bbe0c5a": "rbxassetid://79284733104503",
     "397b4a6388c07472": "rbxassetid://104435544953230",
+    "39b61ccc7bb42275": "rbxassetid://140665408711867",
     "3a4098bc9e7bf141": "rbxassetid://131524612964626",
     "3a525ca9148ebc8e": "rbxassetid://140674293213163",
     "3a5ad667d2cae4eb": "rbxassetid://128190979890997",
@@ -244,16 +268,22 @@
     "3b5d87b72ce3ecd5": "rbxassetid://97632556495710",
     "3b6932b147c1519a": "rbxassetid://73544155698316",
     "3b7cdf9d4155d620": "rbxassetid://96556115380143",
+    "3b8d3ff0fb338bd5": "rbxassetid://90513884354489",
     "3beaa7341d1acfae": "rbxassetid://97827192649737",
     "3beb4c274a8c77d1": "rbxassetid://120057894117467",
+    "3c8c31325ef5ba78": "rbxassetid://124686398091411",
+    "3cddf69b5c50c859": "rbxassetid://101362986087194",
     "3d0fb07d8fbd215a": "rbxassetid://114928725392993",
     "3d5d40de234211ab": "rbxassetid://76294502859388",
     "3d8715d3c39952d3": "rbxassetid://97780520951128",
     "3d8cbdc5991c7484": "rbxassetid://101622372272725",
+    "3db695aa6a99a5ff": "rbxassetid://96842517349441",
     "3e1df24acddc2e4d": "rbxassetid://82802490480772",
+    "3e5bb147167801ed": "rbxassetid://135963669371257",
     "3e8a55d7cc767fe3": "rbxassetid://118914134558562",
     "3eba500262676609": "rbxassetid://107563662358752",
     "3eba762f811c6a79": "rbxassetid://135614549781006",
+    "3ec048878765d380": "rbxassetid://95413729655527",
     "3f08583fea129705": "rbxassetid://85048484956633",
     "3f2da16c304b5abb": "rbxassetid://83352850708291",
     "3f3730f284655610": "rbxassetid://134446112067050",
@@ -268,6 +298,7 @@
     "425dffecc0c92e77": "rbxassetid://97022467355329",
     "426c665653597951": "rbxassetid://95627869087306",
     "4271c47da7e001b1": "rbxassetid://115936488841950",
+    "42ceaf0d0c799428": "rbxassetid://124668252321454",
     "43cdac82dc5fd7c5": "rbxassetid://74912416728530",
     "440f1d2f4174d6f5": "rbxassetid://102555992496643",
     "4413818119a238d5": "rbxassetid://116857965219048",
@@ -318,12 +349,15 @@
     "4d941c42fbe4c36b": "rbxassetid://122790413079893",
     "4da839b06e89fc6b": "rbxassetid://111562747802862",
     "4e242d26b8e0cc54": "rbxassetid://89198556533653",
+    "4e87d97de8f5d009": "rbxassetid://83460342959766",
     "4e91ff132df3b117": "rbxassetid://104302418648231",
     "4e95671850ffd8de": "rbxassetid://92161731348967",
     "4ec37ff858e57392": "rbxassetid://123817718102945",
     "4ed711aca26c50dc": "rbxassetid://109891560795266",
     "4f0b660192cf6bed": "rbxassetid://121116877203793",
     "4fea03f1c86c485d": "rbxassetid://124478859644684",
+    "4ff29373df3553ea": "rbxassetid://99103318449428",
+    "50222e269e856f2f": "rbxassetid://111444033786702",
     "506f3345b87ef9d6": "rbxassetid://76116092894269",
     "50b29f6c161496f3": "rbxassetid://85453657266210",
     "50b860bc7a8414fa": "rbxassetid://84732335470110",
@@ -332,6 +366,7 @@
     "51198bec2ae0a843": "rbxassetid://107289751266336",
     "5193976ddfafaf7e": "rbxassetid://101229359795068",
     "51d7bac0814f8cbb": "rbxassetid://76714706128186",
+    "51f825e5f525f8f5": "rbxassetid://110865539398426",
     "5251e57bb6d5df37": "rbxassetid://107150441363483",
     "527788c076efe4a5": "rbxassetid://103806150696867",
     "528289f8bbdc3bc5": "rbxassetid://114175946685740",
@@ -344,8 +379,10 @@
     "55e9d6d77271667d": "rbxassetid://97440897990212",
     "562178655241fe8a": "rbxassetid://97886406363316",
     "56a2a22f119c305d": "rbxassetid://102340306263409",
+    "56c0fc8233e779a7": "rbxassetid://137575442535620",
     "56e47a7f810c0069": "rbxassetid://137903802792065",
     "56ebe720ad2ebc81": "rbxassetid://132687026494858",
+    "56f64a26748d7802": "rbxassetid://114918807754689",
     "5764b34f05a97dc4": "rbxassetid://124375889044447",
     "5796405714c4ac47": "rbxassetid://136074091362161",
     "57ba5be963ad72b7": "rbxassetid://104451000881510",
@@ -368,6 +405,7 @@
     "5de50a2cf9b365db": "rbxassetid://88100607158976",
     "5de512546095e1d3": "rbxassetid://106540917978913",
     "5e0259e18a13af1a": "rbxassetid://85308061305114",
+    "5e7bb60780f8dd6c": "rbxassetid://107192518501444",
     "5e965c8a11bfa044": "rbxassetid://120717836713443",
     "5edca2347d10ecd5": "rbxassetid://116433658760855",
     "5edef3f73d0378be": "rbxassetid://112937800927011",
@@ -381,11 +419,14 @@
     "6140bcee6f58bdd4": "rbxassetid://91501733711014",
     "61508582d1c09a9a": "rbxassetid://124020149120188",
     "6186f3271b813b99": "rbxassetid://116166665445886",
+    "61c557fb2a3d4e63": "rbxassetid://137478837578210",
+    "61d8911a98666000": "rbxassetid://80800313531598",
     "6204e9089b7230bb": "rbxassetid://81609145286632",
     "620b55197cdb7eff": "rbxassetid://136012775460882",
     "6262de3b46ef717b": "rbxassetid://118028972481857",
     "626aa77f4641745e": "rbxassetid://78218569130874",
     "627ce6bc604eef28": "rbxassetid://93430028269802",
+    "62ce8a982606a6d8": "rbxassetid://110284062198652",
     "63121547ec3582c8": "rbxassetid://131166681567401",
     "635e434b55f9ebe8": "rbxassetid://97920816356793",
     "63f46b0db2957d4c": "rbxassetid://70669068201489",
@@ -402,6 +443,7 @@
     "670e2bde1ac25715": "rbxassetid://78363529061050",
     "679c6a2eef8060ff": "rbxassetid://112255310833694",
     "679d0543aead4d6c": "rbxassetid://135795446873495",
+    "67ad21e88127dedd": "rbxassetid://92602983030407",
     "682c9c05cc74828d": "rbxassetid://88046215813246",
     "6883f21a8a3929e1": "rbxassetid://77632910899148",
     "68a8bc6be0b134ad": "rbxassetid://136956953524010",
@@ -411,6 +453,7 @@
     "69f6a57dc57434fe": "rbxassetid://74105680114898",
     "6a11205d28715449": "rbxassetid://125311782208801",
     "6a608314fd321807": "rbxassetid://91306685901644",
+    "6a925cafbaeb51df": "rbxassetid://76447282884758",
     "6b3d42f93ddd0d06": "rbxassetid://91283031246733",
     "6b63688425407950": "rbxassetid://101971967380303",
     "6c0e802f0672204b": "rbxassetid://101487653636769",
@@ -423,26 +466,32 @@
     "6d357fa6ed13d065": "rbxassetid://71533687527574",
     "6d624111ee796f1f": "rbxassetid://95406527435822",
     "6d90bc308ef90339": "rbxassetid://95419637745112",
+    "6ecb65e84b7968f0": "rbxassetid://112955307055950",
     "6ef3051d6f4236ac": "rbxassetid://76624442647020",
     "6f2dc0c222d37b20": "rbxassetid://114389739286687",
     "6f4a1c7f666eb70e": "rbxassetid://101113093717200",
     "6f8814176fcdde99": "rbxassetid://85596102714014",
     "6f9131050b90be5a": "rbxassetid://80403145387611",
+    "6fa36d9082f32cdc": "rbxassetid://117329799158495",
+    "702090903ad2b1bb": "rbxassetid://121291805345752",
     "7042dc5c30e258aa": "rbxassetid://140551462024167",
     "70595741ce25cea7": "rbxassetid://81830883845173",
     "705b7ee79bdbd5b2": "rbxassetid://93385683378692",
     "70a2b0301646af3a": "rbxassetid://103954587390108",
     "70d35ec3006f3433": "rbxassetid://125051659870386",
     "711331b1dbfa9fd6": "rbxassetid://129984654451348",
+    "71af966b449f47e7": "rbxassetid://75516174611705",
     "71b5ee2c41f7e323": "rbxassetid://111858042136904",
     "71e5e12538cdcc40": "rbxassetid://111111056409332",
     "7201a88726f37cd0": "rbxassetid://107594990555156",
     "7226606eca327c6d": "rbxassetid://83058796953034",
     "727faef82039106f": "rbxassetid://118363087631305",
     "72805fd7b095e9f1": "rbxassetid://74428247382959",
+    "72929101fc99ae34": "rbxassetid://102685669790425",
     "72b05061f0343ee0": "rbxassetid://94136394036063",
     "72cf7913b492e078": "rbxassetid://80786792494235",
     "72f5d35bed314863": "rbxassetid://131999314135029",
+    "7310a7832dd92957": "rbxassetid://99392434290242",
     "7323ccbd1d2eba6a": "rbxassetid://92967215072817",
     "740e9af16dfd6cb2": "rbxassetid://111876513571079",
     "7416667ae3883d9d": "rbxassetid://104391491278257",
@@ -454,12 +503,14 @@
     "7556b966317bb789": "rbxassetid://134442645580092",
     "7567df9f5cfe38ae": "rbxassetid://74535151184472",
     "7576fa5b0c84e2b3": "rbxassetid://103848388295024",
+    "75c55c677865abb5": "rbxassetid://86495740714930",
     "75f794dc950a33c5": "rbxassetid://100877932956132",
     "75fb3524d9cf65bc": "rbxassetid://86183026618544",
     "7646d6459361ede4": "rbxassetid://100595692508702",
     "769f8473b284d1b5": "rbxassetid://116720541300313",
     "76ac7326574bc2e7": "rbxassetid://82262380930922",
     "76d98483ec1f155c": "rbxassetid://112528315011442",
+    "77a57bd06528299d": "rbxassetid://128945761058950",
     "77ff40756cf82126": "rbxassetid://92601487041270",
     "783a0f200679e477": "rbxassetid://127248254109962",
     "786d9c4e0315189d": "rbxassetid://117679834385694",
@@ -471,6 +522,7 @@
     "7935eaa1e55501e5": "rbxassetid://132151321723295",
     "7992afa35b7c0527": "rbxassetid://105471632343391",
     "79fed1d7b010354a": "rbxassetid://110545728993904",
+    "7a19088fbab23276": "rbxassetid://132089160440013",
     "7a1cdd5a3ba74f03": "rbxassetid://104842951414893",
     "7a22181b78924fd7": "rbxassetid://123361839889812",
     "7ae292c960dea188": "rbxassetid://98064288977422",
@@ -492,7 +544,9 @@
     "7fcfebcc8506d950": "rbxassetid://103491338522471",
     "7fe44809f0d76153": "rbxassetid://100163470255241",
     "80163e0d728ea85b": "rbxassetid://127690917564706",
+    "802b0196185679fb": "rbxassetid://126188575275158",
     "8034f8d4e48befe1": "rbxassetid://140329802391783",
+    "8039e05188ed9e63": "rbxassetid://80544523322427",
     "80928ea793c513b2": "rbxassetid://128737133932610",
     "80d60baea27df330": "rbxassetid://139246901673709",
     "81672ff7f5d20d7f": "rbxassetid://114325269492177",
@@ -504,12 +558,14 @@
     "82d9bf03c8e9d5e4": "rbxassetid://88639646060229",
     "83296fa7055ee1bf": "rbxassetid://111963546134332",
     "83539363ce794177": "rbxassetid://83855354550755",
+    "83bd2ade9085ed1c": "rbxassetid://105154525448809",
     "83dc44cde6ad39b0": "rbxassetid://137119878450876",
     "849335a341ea9eb7": "rbxassetid://87547400310029",
     "84abc2cc6ddc9b55": "rbxassetid://98174301595075",
     "85709a607e24878c": "rbxassetid://123829729714050",
     "859f7010c5d4fad3": "rbxassetid://111308028864577",
     "85ae3beeeab3f925": "rbxassetid://86592348511266",
+    "85c032b4945022fc": "rbxassetid://89203496624296",
     "861270705a6f66e1": "rbxassetid://81850536679319",
     "871297c3b32fb982": "rbxassetid://96873677647084",
     "8780ea3e7acec95b": "rbxassetid://95290987181915",
@@ -522,12 +578,14 @@
     "88df76e43b0d0fb3": "rbxassetid://123996009571267",
     "8a02f9f6303d74cb": "rbxassetid://132493100332753",
     "8a1b802cdb86c683": "rbxassetid://76571525665993",
+    "8a7b34a0fbb24ddd": "rbxassetid://110261844185824",
     "8a8c2b99d2623cc8": "rbxassetid://115408018483874",
     "8aaca4272c716cd6": "rbxassetid://127703484813773",
     "8aefcd3e88d116fe": "rbxassetid://80927773730626",
     "8af925bf394d2ac1": "rbxassetid://90091628071748",
     "8b5f9cda1e5425ad": "rbxassetid://112832973092864",
     "8bbe77a89c454c89": "rbxassetid://95680211188024",
+    "8bca809f84e14799": "rbxassetid://135722754438003",
     "8bea95992f53c3a5": "rbxassetid://129246902161776",
     "8c3288550fae4093": "rbxassetid://112232806093496",
     "8c3d9a333996616c": "rbxassetid://100975031449845",
@@ -553,8 +611,10 @@
     "90efaf44f3eeed49": "rbxassetid://74605340076978",
     "916287dc558f65cf": "rbxassetid://79666639074673",
     "9182ac4f325e3316": "rbxassetid://78456820676852",
+    "91eea061b8c1a350": "rbxassetid://132731634966039",
     "923dc0a65cfe2c81": "rbxassetid://96284173645724",
     "9248b6d9c5e64e02": "rbxassetid://123852565445196",
+    "924dc33878063b0d": "rbxassetid://99360131791295",
     "92c4c86bd8be20f0": "rbxassetid://100157567743235",
     "9316727f3ad02ce9": "rbxassetid://98725273082539",
     "933eebdcd0b26657": "rbxassetid://121851621157365",
@@ -586,7 +646,9 @@
     "99b1987ef80af3a3": "rbxassetid://119399430554604",
     "99d965ddbc4eda7f": "rbxassetid://130492003686390",
     "9a047e3f6be3179e": "rbxassetid://139582268636401",
+    "9a3d8b857bd1a396": "rbxassetid://102403206342180",
     "9a6423755498ae72": "rbxassetid://113598994731230",
+    "9abfa02311e7a9c1": "rbxassetid://130284746750497",
     "9b41eb6137d01e38": "rbxassetid://73887283174888",
     "9b6c3ca6a9e82891": "rbxassetid://84974117093794",
     "9bbc35949655eb3b": "rbxassetid://88527946699393",
@@ -605,12 +667,15 @@
     "9efadea546cca4e5": "rbxassetid://91049573192004",
     "9efcfea8d1a7423a": "rbxassetid://124224737649246",
     "9f04bb08f431050b": "rbxassetid://75156473864354",
+    "9f1c033563807ca6": "rbxassetid://92382824875367",
     "9f767d7ac044740e": "rbxassetid://79283206276214",
     "9f9509e065926563": "rbxassetid://79512896572333",
     "a0087373924c7fc1": "rbxassetid://94735812119968",
     "a03bacf2c6bf40bd": "rbxassetid://117435473974397",
+    "a0510bdc12a8b207": "rbxassetid://101717946189445",
     "a087a6e63cc2cdc7": "rbxassetid://99619778740844",
     "a0a0e931ea06a3ce": "rbxassetid://74430280346409",
+    "a0c6f89a43557740": "rbxassetid://73443143501135",
     "a1041d0eeb596bb2": "rbxassetid://115094438052381",
     "a15a3fe3cd77bcf0": "rbxassetid://138203111665603",
     "a15c8b6561176c9a": "rbxassetid://117349139158161",
@@ -621,11 +686,13 @@
     "a2b1871a6cdc242d": "rbxassetid://121268029392646",
     "a2fb372a8212bfd4": "rbxassetid://130909566137747",
     "a337585207f019fe": "rbxassetid://111373893836789",
+    "a34dabe1acbb5c2c": "rbxassetid://98007879218327",
     "a37f211883461475": "rbxassetid://95802921672007",
     "a3b241b4748309da": "rbxassetid://117620313555928",
     "a3bd1d3e7c376160": "rbxassetid://126848397737099",
     "a3e7d97a9afec7bd": "rbxassetid://133861996561053",
     "a477e629829f99d8": "rbxassetid://129559532650619",
+    "a4f60b5ef811e50e": "rbxassetid://95672899350744",
     "a526b4dc10f2da89": "rbxassetid://133845952334969",
     "a5302e9d3e7d14dd": "rbxassetid://101162496607458",
     "a547258192700702": "rbxassetid://85390417253514",
@@ -653,6 +720,7 @@
     "ac8658e6bda27b96": "rbxassetid://115199909552719",
     "accac69bd4c4aa93": "rbxassetid://106200669300212",
     "acceed1c866bbbd3": "rbxassetid://98273529776927",
+    "acd0d177356159d3": "rbxassetid://100366775501377",
     "ace55a66aeaa0ffa": "rbxassetid://93453622240591",
     "ad055ed754f302ab": "rbxassetid://90485278384918",
     "ad088b3c07b08ab8": "rbxassetid://128744135240234",
@@ -672,6 +740,7 @@
     "b03a05c384da3d26": "rbxassetid://135778590869266",
     "b0819ecdacc694a4": "rbxassetid://88816600021448",
     "b0a1336242487a10": "rbxassetid://93699645448422",
+    "b0e8914354bada43": "rbxassetid://102413291146861",
     "b12c296ac5bbe111": "rbxassetid://133220921226962",
     "b14f14c3768ef0ac": "rbxassetid://89901011107137",
     "b25f485048ab776e": "rbxassetid://80311900875753",
@@ -690,6 +759,7 @@
     "b5c6799e9a782eae": "rbxassetid://70414642606511",
     "b62b68f129cb3f30": "rbxassetid://112702824123080",
     "b67666ab135a3b2b": "rbxassetid://100362474834489",
+    "b6ec5e96ebea8536": "rbxassetid://77058437950183",
     "b6f8f963e6068781": "rbxassetid://95891712241466",
     "b7a0d365a7901336": "rbxassetid://120879866262545",
     "b7bca41d2b351e61": "rbxassetid://113113901651766",
@@ -714,6 +784,7 @@
     "bbb792c2101ed0a7": "rbxassetid://124148288313509",
     "bbe5875f452bf693": "rbxassetid://122473975015395",
     "bbf1d643078c99fd": "rbxassetid://85360343074824",
+    "bc25198f990736cd": "rbxassetid://106257025535301",
     "bc94eeebe23bcb3b": "rbxassetid://94668431328383",
     "bcc03f26e93aebf2": "rbxassetid://73542986940618",
     "bcc913632b999826": "rbxassetid://140066161831985",
@@ -721,8 +792,10 @@
     "bcf491a2fbc4cecb": "rbxassetid://86129528131794",
     "bd30af108251733c": "rbxassetid://104919454094036",
     "bd76662fee48f845": "rbxassetid://87786725760306",
+    "bdc54526c6c995e7": "rbxassetid://83872318859318",
     "bdcc5442cf15213d": "rbxassetid://78624603343684",
     "be0d8f66116d2415": "rbxassetid://132661558619367",
+    "be1fd5ccd6f47181": "rbxassetid://82635937240974",
     "be3d1cf0f95d85b3": "rbxassetid://92454777672973",
     "beb56cf1a66b9da9": "rbxassetid://124090532816883",
     "bf1edd722a68e73a": "rbxassetid://84193930463184",
@@ -730,6 +803,7 @@
     "bf7b810b0ab46cca": "rbxassetid://127276774522194",
     "bf8446835173d2aa": "rbxassetid://73893594321968",
     "bfbbcecec20852f8": "rbxassetid://112603959243134",
+    "bfe84682b1a4a418": "rbxassetid://134906962039482",
     "c020f6dbed6f6c92": "rbxassetid://72688962863397",
     "c07904e3511db45f": "rbxassetid://103858810518098",
     "c0856789a8299cf6": "rbxassetid://92667436292649",
@@ -746,8 +820,12 @@
     "c2f69452715cf9c8": "rbxassetid://112460700534377",
     "c2fd6482e906207e": "rbxassetid://140648789020838",
     "c303daea6913ae33": "rbxassetid://93220569231186",
+    "c30d13e4fe3f925e": "rbxassetid://73559063769027",
+    "c32af98d697244a3": "rbxassetid://84542189457260",
+    "c347fb046f631fd5": "rbxassetid://133874444036863",
     "c350b2fc920e4b72": "rbxassetid://127362182667811",
     "c36875dbbacc424e": "rbxassetid://118770378684945",
+    "c36d2f4d1235b0b1": "rbxassetid://87824501618033",
     "c3d1b72f26db058e": "rbxassetid://106040336804045",
     "c3d38355e9c72f71": "rbxassetid://122152765939601",
     "c3e678173ee86a17": "rbxassetid://130730963578308",
@@ -756,12 +834,14 @@
     "c47e7a3a9adbaafc": "rbxassetid://80215203799553",
     "c4d669b9c1f814b0": "rbxassetid://70545005528308",
     "c5006c82e9ea3592": "rbxassetid://120428360788132",
+    "c56ce7277bd14177": "rbxassetid://80310818073825",
     "c584076a8f0a6059": "rbxassetid://102709733995408",
     "c596b5ddc6076b45": "rbxassetid://79366395449235",
     "c5cbf15ec9a8bdde": "rbxassetid://73368221902222",
     "c5cdb30490e3f26c": "rbxassetid://109082649688213",
     "c5fbc30c2eada280": "rbxassetid://77779039876973",
     "c5fe244c35066f21": "rbxassetid://119497453865775",
+    "c6066db5fd7b687c": "rbxassetid://126759136941545",
     "c610e72e81ac6aab": "rbxassetid://113221039109855",
     "c6285059796dd00a": "rbxassetid://78544583861480",
     "c62dc58ee7c0a6a8": "rbxassetid://124289945093407",
@@ -769,6 +849,7 @@
     "c6e621b8352f8402": "rbxassetid://72740932970493",
     "c7da24e5d90998af": "rbxassetid://99195265923360",
     "c8ddc87136ab9b76": "rbxassetid://103448071063714",
+    "c8fa18f3a8d14ff2": "rbxassetid://77668996968262",
     "c9132e5ca88a3f75": "rbxassetid://112678645331165",
     "c94cea9c9c5972e8": "rbxassetid://89969660405828",
     "c950fadffa5ab681": "rbxassetid://101660057347204",
@@ -797,6 +878,7 @@
     "cfc0673bdd66a240": "rbxassetid://70847225706066",
     "cfc8928a328ae820": "rbxassetid://113192260136360",
     "d01a2632d8f232fa": "rbxassetid://89392782340868",
+    "d02ac5048682649f": "rbxassetid://111349038607710",
     "d0320e913d847a9b": "rbxassetid://90510457634529",
     "d052a7375a7106e0": "rbxassetid://133603551754586",
     "d05a8054b24f687d": "rbxassetid://79904670773733",
@@ -821,6 +903,7 @@
     "d4596bbb82bc0410": "rbxassetid://113771443596769",
     "d4a4680f94f79161": "rbxassetid://109546707791598",
     "d4c46f628b1fa332": "rbxassetid://72009676636623",
+    "d4ce100480aa9a57": "rbxassetid://105873943314714",
     "d4e024f66919b563": "rbxassetid://90619754692588",
     "d524e33b92e24bf0": "rbxassetid://137295082222484",
     "d5e0227d6515309e": "rbxassetid://130108317746060",
@@ -875,10 +958,13 @@
     "e17e39d6f4b29581": "rbxassetid://110749524518861",
     "e19ef1c89ce0a5e1": "rbxassetid://116168809882772",
     "e1d2bdde03143611": "rbxassetid://81563953322024",
+    "e208082262317ac2": "rbxassetid://94112635749317",
     "e242f385ef699790": "rbxassetid://90058242552145",
+    "e276023dc4d944c9": "rbxassetid://139938107567583",
     "e290b818e2654be3": "rbxassetid://76528715830218",
     "e2e5ec2c9e1f7d8b": "rbxassetid://103255113268386",
     "e30517edc3cc5281": "rbxassetid://88804878732140",
+    "e34e3f83e552a209": "rbxassetid://138596186510415",
     "e3e5b74917e4e4a0": "rbxassetid://88196042393654",
     "e47e1b993a3e40ff": "rbxassetid://79920543201469",
     "e510e1538f9513be": "rbxassetid://105634570683128",
@@ -891,10 +977,12 @@
     "e84f0dd6bc037cfb": "rbxassetid://73220584226699",
     "e8792a8b3de6a474": "rbxassetid://111524877035679",
     "e899154ad233e30c": "rbxassetid://122792089072858",
+    "e99425853d7f3f81": "rbxassetid://102249118225965",
     "e9b1e61b35295c1e": "rbxassetid://95937001045195",
     "e9e32224fd54b033": "rbxassetid://88070369610316",
     "e9fadad756ed51ff": "rbxassetid://73881023319592",
     "ea128c366d66af0a": "rbxassetid://105442517984414",
+    "ea5d44fc2d908e03": "rbxassetid://95645743968153",
     "ea6f7887c5222ee9": "rbxassetid://97872266030403",
     "eb87ea62e620a596": "rbxassetid://75254506474559",
     "ebd1949eb253c8cc": "rbxassetid://88027553062015",
@@ -903,6 +991,7 @@
     "ec2a8407c6c5b9ea": "rbxassetid://76918208429491",
     "ec4c104283f4d6da": "rbxassetid://137027971156993",
     "ed9742a645cee827": "rbxassetid://87219056556265",
+    "ee536917a226a000": "rbxassetid://109238368054636",
     "ef18b6eb6fa84217": "rbxassetid://71977228826076",
     "ef56f10ec0f8531a": "rbxassetid://129259064723912",
     "efa9f4952defe5d5": "rbxassetid://90446163150957",
@@ -912,7 +1001,10 @@
     "f0d59f017bbdca01": "rbxassetid://111873871294484",
     "f16ee83cda315fcc": "rbxassetid://82124229274945",
     "f17fb4a44441c20f": "rbxassetid://103516622640218",
+    "f190e98763cbd956": "rbxassetid://127488288672626",
+    "f1d278b68775cc99": "rbxassetid://91637442382182",
     "f1d51c8384d9efce": "rbxassetid://109399519288096",
+    "f215377a8f3ff791": "rbxassetid://125343001780908",
     "f236c7249ec3cc66": "rbxassetid://102054182707772",
     "f2aeb05d9381f70d": "rbxassetid://79774269636184",
     "f303107ffa364c87": "rbxassetid://122018088704973",
@@ -922,6 +1014,7 @@
     "f3462c15777356d4": "rbxassetid://136124437414405",
     "f3491d6b2c035377": "rbxassetid://121242833272183",
     "f34b865a66cff00c": "rbxassetid://74518320318496",
+    "f38f7cd2609cc8b6": "rbxassetid://122428234286349",
     "f3fd836e5781976d": "rbxassetid://119835069112390",
     "f457b5ddcb82501a": "rbxassetid://70764857728564",
     "f4b9c79bd16d20ef": "rbxassetid://131345685852408",
@@ -948,11 +1041,14 @@
     "f8e6d51937123d5d": "rbxassetid://97338368407633",
     "f8fa791f8daf4327": "rbxassetid://94534870291722",
     "f92f83bdc3b462e4": "rbxassetid://82157166655412",
+    "f9449f51bd72bba6": "rbxassetid://88545385501318",
     "f9956acb2d5aae0b": "rbxassetid://89611308818535",
     "f9a5caae44159a37": "rbxassetid://93260815116788",
+    "f9d966dd0c1ac643": "rbxassetid://135458105278160",
     "f9f84d5ceb9f15c2": "rbxassetid://94552895276175",
     "fa8305df6901aa3e": "rbxassetid://99693111666439",
     "fa9ed025024762c6": "rbxassetid://100574640613781",
+    "fac096282a410da8": "rbxassetid://136871943409207",
     "fb3c074757d67e74": "rbxassetid://70776671761214",
     "fb5c193b410b8480": "rbxassetid://135431743691691",
     "fbc8fba4d34a2d2b": "rbxassetid://92354574801356",
@@ -960,11 +1056,14 @@
     "fceb8815f9551d8d": "rbxassetid://88136579934711",
     "fcfc8fe9aa9c7ebe": "rbxassetid://124492009401958",
     "fd75d032751af19b": "rbxassetid://99015226444894",
+    "fdfd6a1f4390ed34": "rbxassetid://109084241277681",
     "fe16ac544467924b": "rbxassetid://114074423327397",
+    "fe4db124a1fa13e1": "rbxassetid://120581954928805",
     "fe4f3d02248b62a9": "rbxassetid://126562853988904",
     "fe6d7becd6ff3f51": "rbxassetid://112623154960558",
     "feb3edcf2ab79346": "rbxassetid://95993014034834",
     "feb3f4057944e5b7": "rbxassetid://124208043727801",
+    "fef458e6bae99313": "rbxassetid://106645381177189",
     "fef96a8993f2b774": "rbxassetid://136889094559746",
     "ff30489f04ce9ad6": "rbxassetid://108754672130752",
     "ff8420e40c26745c": "rbxassetid://80887278414506"
@@ -1093,6 +1192,17 @@
       ],
       "pending": false
     },
+    "advanced_shipyard": {
+      "asset_id": "89025608538854",
+      "hashes": [
+        "e276023dc4d944c9",
+        "f38f7cd2609cc8b6",
+        "56f64a26748d7802",
+        "4ff29373df3553ea",
+        "207062b964d7bc19"
+      ],
+      "pending": false
+    },
     "advanced_solar_collector": {
       "asset_id": "82381524036095",
       "hashes": [
@@ -1170,6 +1280,25 @@
         "411e5125f5296c56",
         "f8fa791f8daf4327",
         "b8eb9973cb89918d"
+      ],
+      "pending": false
+    },
+    "behemoth": {
+      "asset_id": "89676871137261",
+      "hashes": [
+        "bdc54526c6c995e7",
+        "42ceaf0d0c799428",
+        "51f825e5f525f8f5",
+        "a0c6f89a43557740",
+        "51f825e5f525f8f5",
+        "f9449f51bd72bba6",
+        "013e9f14535d2a0b",
+        "bfe84682b1a4a418",
+        "013e9f14535d2a0b",
+        "3c8c31325ef5ba78",
+        "be1fd5ccd6f47181",
+        "fdfd6a1f4390ed34",
+        "c347fb046f631fd5"
       ],
       "pending": false
     },
@@ -1608,6 +1737,214 @@
       ],
       "pending": false
     },
+    "icon_anti_air": {
+      "asset_id": "99006214545337",
+      "hashes": [
+        "56c0fc8233e779a7",
+        "85c032b4945022fc"
+      ],
+      "pending": false
+    },
+    "icon_anti_nuke": {
+      "asset_id": "90565634972808",
+      "hashes": [
+        "77a57bd06528299d",
+        "6a925cafbaeb51df"
+      ],
+      "pending": false
+    },
+    "icon_attack": {
+      "asset_id": "85297475026330",
+      "hashes": [
+        "fac096282a410da8",
+        "232cd590c4a28ea6"
+      ],
+      "pending": false
+    },
+    "icon_bombs": {
+      "asset_id": "139416733304150",
+      "hashes": [
+        "c30d13e4fe3f925e",
+        "277a111d804bcedd"
+      ],
+      "pending": false
+    },
+    "icon_cannon": {
+      "asset_id": "77773943982504",
+      "hashes": [
+        "72929101fc99ae34",
+        "097d1d8dfb27c612"
+      ],
+      "pending": false
+    },
+    "icon_depth_charge": {
+      "asset_id": "91511023860069",
+      "hashes": [
+        "61d8911a98666000",
+        "318bdd7335d994b2"
+      ],
+      "pending": false
+    },
+    "icon_disintegrator": {
+      "asset_id": "83876094316688",
+      "hashes": [
+        "8a7b34a0fbb24ddd",
+        "5e7bb60780f8dd6c"
+      ],
+      "pending": false
+    },
+    "icon_emp": {
+      "asset_id": "87133663672004",
+      "hashes": [
+        "75c55c677865abb5",
+        "00fd211a1bdaef83"
+      ],
+      "pending": false
+    },
+    "icon_fight": {
+      "asset_id": "128901576351490",
+      "hashes": [
+        "3b8d3ff0fb338bd5",
+        "16f6ff6cf0f784db"
+      ],
+      "pending": false
+    },
+    "icon_flak": {
+      "asset_id": "93754172102155",
+      "hashes": [
+        "21cffca540fd8aab",
+        "f9d966dd0c1ac643"
+      ],
+      "pending": false
+    },
+    "icon_flamethrower": {
+      "asset_id": "120934967180644",
+      "hashes": [
+        "924dc33878063b0d",
+        "71af966b449f47e7"
+      ],
+      "pending": false
+    },
+    "icon_gauss": {
+      "asset_id": "73409859498577",
+      "hashes": [
+        "e34e3f83e552a209",
+        "83bd2ade9085ed1c"
+      ],
+      "pending": false
+    },
+    "icon_guard": {
+      "asset_id": "121850257745980",
+      "hashes": [
+        "c32af98d697244a3",
+        "153055ab50f5f057"
+      ],
+      "pending": false
+    },
+    "icon_heat_ray": {
+      "asset_id": "103651854932016",
+      "hashes": [
+        "e208082262317ac2",
+        "8bca809f84e14799"
+      ],
+      "pending": false
+    },
+    "icon_laser": {
+      "asset_id": "116236055042846",
+      "hashes": [
+        "04a8d9db3f54a3cd",
+        "61c557fb2a3d4e63"
+      ],
+      "pending": false
+    },
+    "icon_lightning": {
+      "asset_id": "106957473312803",
+      "hashes": [
+        "802b0196185679fb",
+        "4e87d97de8f5d009"
+      ],
+      "pending": false
+    },
+    "icon_machine_gun": {
+      "asset_id": "140041342716418",
+      "hashes": [
+        "fe4db124a1fa13e1",
+        "ea5d44fc2d908e03"
+      ],
+      "pending": false
+    },
+    "icon_missile": {
+      "asset_id": "117123719910433",
+      "hashes": [
+        "50222e269e856f2f",
+        "f1d278b68775cc99"
+      ],
+      "pending": false
+    },
+    "icon_nuke": {
+      "asset_id": "87387968454871",
+      "hashes": [
+        "6fa36d9082f32cdc",
+        "1ab3e1311ba2007d"
+      ],
+      "pending": false
+    },
+    "icon_plasma_cannon": {
+      "asset_id": "135237261976293",
+      "hashes": [
+        "063bb17ea7405f0e",
+        "acd0d177356159d3"
+      ],
+      "pending": false
+    },
+    "icon_reclaim": {
+      "asset_id": "126893035581900",
+      "hashes": [
+        "e99425853d7f3f81",
+        "d4ce100480aa9a57"
+      ],
+      "pending": false
+    },
+    "icon_repair": {
+      "asset_id": "123970900790911",
+      "hashes": [
+        "9abfa02311e7a9c1",
+        "37377c46ce133a27"
+      ],
+      "pending": false
+    },
+    "icon_rocket": {
+      "asset_id": "79347954797298",
+      "hashes": [
+        "2d02961bd81eda09",
+        "c8fa18f3a8d14ff2"
+      ],
+      "pending": false
+    },
+    "icon_shotgun": {
+      "asset_id": "88959935015515",
+      "hashes": [
+        "34504edda6f07ad7",
+        "a34dabe1acbb5c2c"
+      ],
+      "pending": false
+    },
+    "icon_sniper": {
+      "asset_id": "87966353929670",
+      "hashes": [
+        "f190e98763cbd956",
+        "3db695aa6a99a5ff"
+      ],
+      "pending": false
+    },
+    "icon_torpedo": {
+      "asset_id": "82315702660002",
+      "hashes": [
+        "16637f7093e84a22",
+        "9f1c033563807ca6"
+      ],
+      "pending": false
+    },
     "incisor": {
       "asset_id": "92272506013694",
       "hashes": [
@@ -1991,6 +2328,31 @@
       ],
       "pending": false
     },
+    "starlight": {
+      "asset_id": "91747788259106",
+      "hashes": [
+        "3cddf69b5c50c859",
+        "c56ce7277bd14177",
+        "180702786991e597",
+        "67ad21e88127dedd",
+        "c6066db5fd7b687c",
+        "7310a7832dd92957",
+        "a4f60b5ef811e50e",
+        "a0510bdc12a8b207"
+      ],
+      "pending": false
+    },
+    "stiletto": {
+      "asset_id": "88283962844073",
+      "hashes": [
+        "ee536917a226a000",
+        "fef458e6bae99313",
+        "d02ac5048682649f",
+        "6ecb65e84b7968f0",
+        "39b61ccc7bb42275"
+      ],
+      "pending": false
+    },
     "stronghold": {
       "asset_id": "123986450094809",
       "hashes": [
@@ -2048,6 +2410,18 @@
         "52eca9c756ceb5b4",
         "192d0e7999cfaa2e",
         "b6f8f963e6068781"
+      ],
+      "pending": false
+    },
+    "thor": {
+      "asset_id": "75331478147724",
+      "hashes": [
+        "1e8da11d9d87d5a8",
+        "7a19088fbab23276",
+        "91eea061b8c1a350",
+        "02337127c947122c",
+        "62ce8a982606a6d8",
+        "9a3d8b857bd1a396"
       ],
       "pending": false
     },

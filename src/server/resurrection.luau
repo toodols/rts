@@ -1,11 +1,12 @@
--- Resurrection: a wreck brought back as the unit it was.
+-- Resurrection: a wreck brought back as the unit or building it was.
 --
 -- A wreck has to be full of metal before anything can be done to raise it. One that has been reclaimed
 -- from is refilled first: the resurrecting unit puts its buildpower into it and the team pays back the
 -- metal that was taken, at the rate reclaiming took it. Only then does the buildpower go into the
 -- resurrection itself, which takes as much as building the unit did and costs its energy but no metal,
--- the wreck having supplied that. When it is done the wreck is gone and the unit stands in its place,
--- on the team that raised it, with part of its health.
+-- the wreck having supplied that. When it is done the wreck is gone and the thing stands in its place,
+-- on the team that raised it, with part of its health, and every rezzer that raised it goes on to repair it
+-- to full before whatever else it was told to do.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -43,8 +44,9 @@ local function can_resurrect(rezzer: Entity, target: Entity): boolean
 	if target.kind ~= "wreck" or wreck == nil then
 		return false
 	end
-	-- only units come back; a building's wreck is only ever metal
-	return unit_defs.get(wreck.source_def_name).kind == "unit"
+	-- units and buildings come back, as in BAR, where a building's corpse can be raised like a unit's
+	local kind = unit_defs.get(wreck.source_def_name).kind
+	return kind == "unit" or kind == "building"
 end
 
 local function request(rezzer: Entity, target: Entity)
@@ -90,10 +92,37 @@ local function refill(wreck: types.Wreck, applied: number, team: types.TeamId)
 	end
 end
 
+-- Gives every rezzer that worked on the wreck `wreck_id` this tick, and can repair, a repair order on `raised`, the
+-- order a player's repair gives, ahead of whatever it was told to do after: in place of the finished resurrect order
+-- when that is the one it is on, as it usually is, or before whatever it is on otherwise, which it takes up again
+-- once the thing is whole.
+local function repair_after(wreck_id: types.EntityId, raised: Entity)
+	if raised.health >= raised.max_health then
+		return
+	end
+	for _, entry in pending do
+		if entry.target_id ~= wreck_id then
+			continue
+		end
+		local rezzer = state.get(entry.rezzer_id)
+		if rezzer == nil or unit_defs.of(rezzer).repairing == false then
+			continue
+		end
+		local repair: types.Order = { kind = "repair", position = raised.position, target_id = raised.id }
+		local first = rezzer.orders[1]
+		if first ~= nil and first.kind == "resurrect" and first.target_id == wreck_id then
+			rezzer.orders[1] = repair
+		else
+			table.insert(rezzer.orders, 1, repair)
+		end
+	end
+end
+
 local function complete(target: Entity, wreck: types.Wreck, team: types.TeamId)
 	local raised = state.create_entity(wreck.source_def_name, team, target.position, target.facing, "active")
 	raised.health = raised.max_health * config.RESURRECT_HEALTH_FRACTION
 	state.mark_dead(target)
+	repair_after(target.id, raised)
 end
 
 local function resolve(delta: number)

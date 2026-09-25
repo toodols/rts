@@ -34,6 +34,7 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 615000,
 		buildpower_cost = 730000,
 		health = 149000,
+		self_destruct_countdown = 10,
 		energy_income = 300,
 		energy_storage = 5000,
 		buildpower = nil,
@@ -44,6 +45,8 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = studs(5000),
+		-- corkorg's `paralyzemultiplier` 0
+		emp_resistance = 1,
 		build_options = nil,
 		weapons = {
 			{
@@ -52,6 +55,7 @@ local defs: { [string]: EntityDef } = {
 				range = studs(900),
 				turret = { turn_rate = math.rad(90) },
 				energy_per_shot = 1200,
+				kind = "heat_ray",
 				offset = Vector3.new(0, 10, 3),
 				beam_time = 0.6,
 				beam_thickness = 2,
@@ -210,6 +214,203 @@ local defs: { [string]: EntityDef } = {
 			},
 		},
 		color = Color3.fromRGB(150, 176, 120),
+	},
+
+	-- armthor, Armada's Thor: an enormous tank with a lightning cannon, two EMP lasers and an EMP missile.
+	-- - The cannon throws ten bolts in a burst, charged once for the burst as Spring charges a salvo. Each bolt's sparks
+	--   jump to up to five things within 125 elmos for a quarter of its damage, as BAR's lightning gadget has them. The
+	--   spark reach is left at its size in studs and is not shrunk as blasts are.
+	-- - The EMP lasers sit one on either flank. BAR aims each along one side (`maindir` -1 0 0 and 1 0 0) within 90
+	--   degrees of it (`maxangledif` 180).
+	-- - The missile is BAR's `commandfire` stockpile of two, one every 65 seconds for its 100 metal and 5000 energy. It is
+	--   launched only at what an attack order names, as the nuclear silo's is. It flies as the Arbiter's does, with the
+	--   Arbiter's climb and dive.
+	-- - The turret turns at kinematic_turret_1.h's 3 degrees a frame.
+	-- Everything else here is BAR's.
+	thor = {
+		name = "thor",
+		slope_class = "HTANK7",
+		vehicle = true,
+		display_name = "Thor",
+		subtitle = "Experimental lightning tank",
+		kind = "unit",
+		-- 58 x 34 x 58 elmos
+		collider = capsule(58, 34, 58),
+		metal_cost = 9000,
+		energy_cost = 240000,
+		buildpower_cost = 320000,
+		health = 56000,
+		buildpower = nil,
+		acceleration = studs_per_second_squared(0.015),
+		max_speed = studs(54),
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		-- armthor's `paralyzemultiplier` 0
+		emp_resistance = 1,
+		build_options = nil,
+		weapons = {
+			-- thunder
+			{
+				damage = 300,
+				reload = 3.1,
+				burst_count = 10,
+				burst_interval = 0.03333,
+				range = studs(540),
+				turret = { turn_rate = math.rad(90) },
+				energy_per_shot = 350,
+				target_layer = "ground",
+				lightning = { forks = 5, range = studs(125), fork_damage = 0.25 },
+			},
+			-- empmissile
+			{
+				damage = 80000,
+				reload = 3,
+				range = studs(1050),
+				energy_per_shot = 0,
+				target_layer = "ground",
+				paralyze_time = 12,
+				stockpile = { limit = 2, build_time = 65, metal = 100, energy = 5000 },
+				manual_fire = true,
+				offset = Vector3.new(0, 0, -1.5),
+				projectile = {
+					speed = studs(500),
+					acceleration = 0,
+					thrust_time = 0,
+					gravity = 0,
+					drag = 0,
+					aoe_radius = aoe(studs(196)),
+					edge_effectiveness = 1,
+					missile = { climb = 40, dive_angle = math.rad(60) },
+					look = { explosion = "emp" },
+				},
+			},
+			-- emp, on each flank
+			{
+				damage = 300,
+				reload = 0.25,
+				range = studs(350),
+				energy_per_shot = 15,
+				paralyze_time = 8,
+				fire_arc = math.rad(90),
+				fire_direction = math.rad(-90),
+				offset = Vector3.new(-1.6, -0.55, 0),
+				beam_time = 0.25,
+				beam_color = Color3.new(0.7, 0.7, 1),
+			},
+			{
+				damage = 300,
+				reload = 0.25,
+				range = studs(350),
+				energy_per_shot = 15,
+				paralyze_time = 8,
+				fire_arc = math.rad(90),
+				fire_direction = math.rad(90),
+				offset = Vector3.new(1.6, -0.55, 0),
+				beam_time = 0.25,
+				beam_color = Color3.new(0.7, 0.7, 1),
+			},
+		},
+		color = Color3.fromRGB(110, 140, 210),
+	},
+
+	-- corjugg, Cortex's Behemoth: a four-legged walking fortress, slow, with more health than anything else that moves.
+	-- - Its gauss cannon is BAR's DGun weapon. The ball is `noexplode`, so it goes through whatever it strikes, going off
+	--   inside it every frame it spends there, and flies on until it comes down. Nothing close in survives it for long.
+	--   BAR has it fall under the map's gravity, so here it is fired on the low arc a shell takes.
+	-- - Two lasers low on its front each fire within 45 degrees of their own line (`maindir` -1 0 4 and 1 0 4,
+	--   `maxangledif` 90), and one on its back fires all round.
+	-- - Its footsteps are a weapon in BAR that does no damage, and are left out.
+	-- - The turret turns at BAR's 90 degrees a second.
+	-- Everything else here is BAR's.
+	behemoth = {
+		name = "behemoth",
+		slope_class = "HBOT7",
+		display_name = "Behemoth",
+		subtitle = "Experimental heavy assault bot",
+		kind = "unit",
+		-- 90 x 80 x 90 elmos
+		collider = capsule(90, 80, 90),
+		metal_cost = 20000,
+		energy_cost = 513000,
+		buildpower_cost = 780000,
+		health = 335000,
+		buildpower = nil,
+		acceleration = studs_per_second_squared(0.0552),
+		max_speed = studs(16.5),
+		reclaiming = false,
+		repairing = false,
+		resurrecting = false,
+		assisting = false,
+		max_water_depth = 0,
+		-- corjugg's `paralyzemultiplier` 0
+		emp_resistance = 1,
+		build_options = nil,
+		weapons = {
+			-- juggernaut_fire
+			{
+				damage = 1200,
+				reload = 4,
+				range = studs(590),
+				turret = { turn_rate = math.rad(90) },
+				energy_per_shot = 0,
+				projectile = {
+					speed = shell_speed(studs(520)),
+					acceleration = 0,
+					thrust_time = 0,
+					gravity = shell_gravity(studs(MAP_GRAVITY)),
+					drag = 0,
+					aoe_radius = aoe(studs(65)),
+					edge_effectiveness = 0.15,
+					arc = "low",
+					pierce = true,
+					look = {
+						size = Vector3.new(1.2, 1.2, 1.2),
+						color = Color3.new(1, 0.8, 0.17),
+						material = Enum.Material.Neon,
+						light = { color = Color3.new(1, 0.8, 0.17), range = 12, brightness = 2 },
+					},
+				},
+			},
+			-- juggernaut_bottom, left and right
+			{
+				damage = 75,
+				reload = 0.3,
+				range = studs(435),
+				energy_per_shot = 15,
+				target_layer = "ground",
+				fire_arc = math.rad(45),
+				fire_direction = -math.atan2(1, 4),
+				offset = Vector3.new(-1.1, -0.7, 3.2),
+				beam_time = 0.08,
+				beam_color = Color3.new(1, 0, 0),
+			},
+			{
+				damage = 75,
+				reload = 0.3,
+				range = studs(435),
+				energy_per_shot = 15,
+				target_layer = "ground",
+				fire_arc = math.rad(45),
+				fire_direction = math.atan2(1, 4),
+				offset = Vector3.new(1.1, -0.7, 3.2),
+				beam_time = 0.08,
+				beam_color = Color3.new(1, 0, 0),
+			},
+			-- juggernaut_top
+			{
+				damage = 150,
+				reload = 0.46667,
+				range = studs(550),
+				energy_per_shot = 30,
+				offset = Vector3.new(0, 3.2, -0.3),
+				beam_time = 0.15,
+				beam_color = Color3.new(1, 0, 0),
+			},
+		},
+		color = Color3.fromRGB(186, 110, 64),
 	},
 }
 

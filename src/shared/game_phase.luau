@@ -24,6 +24,8 @@ local AWAITING_ATTRIBUTE = "awaiting"
 -- the teams that won, once it has ended, by id and between commas, and a line on how it was won
 local WINNERS_ATTRIBUTE = "winners"
 local END_REASON_ATTRIBUTE = "end_reason"
+-- when it ended, in `Workspace:GetServerTimeNow()`'s seconds
+local ENDED_AT_ATTRIBUTE = "ended_at"
 -- between the names of the players still on their way, which no display name can contain
 local AWAITING_SEPARATOR = "\n"
 
@@ -65,6 +67,12 @@ end
 local function end_reason(): string?
 	local value = Workspace:GetAttribute(END_REASON_ATTRIBUTE)
 	return if typeof(value) == "string" then value else nil
+end
+
+-- When the game ended, in `Workspace:GetServerTimeNow()`'s seconds, once it has.
+local function ended_at(): number?
+	local value = Workspace:GetAttribute(ENDED_AT_ATTRIBUTE)
+	return if typeof(value) == "number" then value else nil
 end
 
 -- When the countdown ends, in `Workspace:GetServerTimeNow()`'s seconds, while there is one.
@@ -115,13 +123,15 @@ local function set_phase(value: Phase, ends: number?)
 	if value ~= "ended" then
 		Workspace:SetAttribute(WINNERS_ATTRIBUTE, nil)
 		Workspace:SetAttribute(END_REASON_ATTRIBUTE, nil)
+		Workspace:SetAttribute(ENDED_AT_ATTRIBUTE, nil)
 	end
 	Workspace:SetAttribute(COUNTDOWN_ENDS_ATTRIBUTE, ends)
 	Workspace:SetAttribute(PHASE_ATTRIBUTE, value)
 end
 
--- Ends the game with `teams` the winners, and `reason` a line on how, for everyone to see. Nothing steps once it has
--- ended. It is for every way a game ends, against the scavengers or each other.
+-- Ends the game with `teams` the winners, and `reason` a line on how, for everyone to see. The world goes on stepping,
+-- for anyone who plays on after it, but nothing ends it again. It is for every way a game ends, against the scavengers
+-- or each other.
 local function set_ended(teams: { number }, reason: string?)
 	local ids = {}
 	for _, team in teams do
@@ -129,6 +139,7 @@ local function set_ended(teams: { number }, reason: string?)
 	end
 	Workspace:SetAttribute(WINNERS_ATTRIBUTE, table.concat(ids, ","))
 	Workspace:SetAttribute(END_REASON_ATTRIBUTE, reason)
+	Workspace:SetAttribute(ENDED_AT_ATTRIBUTE, Workspace:GetServerTimeNow())
 	set_phase("ended", nil)
 end
 
@@ -165,6 +176,7 @@ return table.freeze({
 	awaiting = awaiting,
 	winners = winners,
 	end_reason = end_reason,
+	ended_at = ended_at,
 	changed = changed,
 	set_phase = set_phase,
 	set_ended = set_ended,

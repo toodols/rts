@@ -60,7 +60,8 @@ local defs: { [string]: EntityDef } = {
 			"agitator",
 		},
 		weapons = nil,
-		air = { altitude = 18, climb_speed = 10 },
+		-- corca's `cruisealtitude` 75
+		air = { altitude = studs(75), climb_speed = 10 },
 		color = Color3.fromRGB(226, 178, 74),
 	},
 
@@ -102,6 +103,7 @@ local defs: { [string]: EntityDef } = {
 				energy_per_shot = 0,
 				anti_air = true,
 				target_layer = "air",
+				airborne_only = true,
 				projectile = {
 					speed = studs(500),
 					acceleration = studs(350),
@@ -196,9 +198,12 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = studs(9999),
+		-- armatlas's and corvalk's `paralyzemultiplier` 0
+		emp_resistance = 1,
 		build_options = nil,
 		weapons = nil,
-		air = { altitude = 22, climb_speed = 10 },
+		-- corvalk's `cruisealtitude` 100
+		air = { altitude = studs(100), climb_speed = 10 },
 		transport = { capacity = 2, carries = "light" },
 		color = Color3.fromRGB(226, 178, 74),
 	},
@@ -223,9 +228,12 @@ local defs: { [string]: EntityDef } = {
 		resurrecting = false,
 		assisting = false,
 		max_water_depth = studs(9999),
+		-- armhvytrans's and corhvytrans's `paralyzemultiplier` 0
+		emp_resistance = 1,
 		build_options = nil,
 		weapons = nil,
-		air = { altitude = 22, climb_speed = 8 },
+		-- corhvytrans's `cruisealtitude` 100
+		air = { altitude = studs(100), climb_speed = 8 },
 		transport = { capacity = 1, carries = "heavy" },
 		color = Color3.fromRGB(226, 178, 74),
 	},

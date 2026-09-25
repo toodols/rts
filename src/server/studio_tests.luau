@@ -36,6 +36,8 @@ local map_presets = require(ReplicatedStorage.Shared.map_presets)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local game_modes = require(ReplicatedStorage.Shared.game_modes)
 local shared_skins = require(ReplicatedStorage.Shared.skins)
+local piloting = require(ReplicatedStorage.Shared.piloting)
+local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 
 local state = require(script.Parent.state)
 local orders = require(script.Parent.orders)
@@ -51,10 +53,18 @@ local deformation = require(script.Parent.deformation)
 local match = require(script.Parent.match)
 local alliances = require(script.Parent.alliances)
 local sharing = require(script.Parent.sharing)
+local notifications = require(script.Parent.notifications)
 local server_skins = require(script.Parent.skins)
 local donuts = require(script.Parent.donuts)
 local ai = require(script.Parent.ai)
 local match_stats = require(script.Parent.match_stats)
+local ratings = require(script.Parent.ratings)
+local campaign_exit = require(script.Parent.campaign_exit)
+local pilots = require(script.Parent.pilots)
+local possession = require(script.Parent.possession)
+local self_destruct = require(script.Parent.self_destruct)
+local emp = require(script.Parent.emp)
+local spawning = require(script.Parent.spawning)
 
 type Entity = types.Entity
 type TeamId = types.TeamId
@@ -135,9 +145,11 @@ end
 
 -- A Whirlwind on an attack order against a building it cannot kill, for `args.seconds` (45 by default). For every
 -- burst: how many bombs, how far apart in time they were let go, and where each came down along and across the
--- bomber's path, measured from the target (where it was last seen, within a tick of landing).
+-- bomber's path, measured from the target (where it was last seen, within a tick of landing). With `args.decoy`, another
+-- enemy building sits on its way there, which it should leave alone.
 local function bombing(args: { [string]: any }): Findings
 	local target = unkillable(spawn("solar_collector", ENEMY, 150, -60))
+	local decoy = if args.decoy then unkillable(spawn("solar_collector", ENEMY, 45, -60)) else nil
 	local bomber = spawn("whirlwind", OWN, -60, -60)
 	advance(config.TICK_DELTA)
 	orders.issue(bomber, { { kind = "attack", target_id = target.id } }, false, false)
@@ -186,6 +198,89 @@ local function bombing(args: { [string]: any }): Findings
 		bombs = #order,
 		bursts = bursts,
 		damage_to_target = round(UNKILLABLE - target.health, 0),
+		damage_to_decoy = if decoy ~= nil then round(UNKILLABLE - decoy.health, 0) else nil,
+	}
+end
+
+-- EMP (server/emp.luau). A Stiletto bombs a Thug standing beside an enemy commander, which EMP cannot stun; once the
+-- Thug is stunned it is ordered away and the Stiletto is shot down, and the Thug is watched until it walks. Then a Grunt
+-- is filled with EMP by hand to check the cap and the drain, and another is stunned for 5 seconds by hand beside an
+-- enemy to check it holds its fire until it is not.
+local function emp_test(args: { [string]: any }): Findings
+	local thug = spawn("thug", ENEMY, 100, 0)
+	local commander = spawn("commander", ENEMY, 104, 0)
+	local bomber = spawn("stiletto", OWN, -150, 0)
+	advance(config.TICK_DELTA)
+	orders.issue(bomber, { { kind = "attack", target_id = thug.id } }, false, false)
+
+	local stunned_at: number? = nil
+	local held_at: Vector3? = nil
+	local drift_while_stunned = 0
+	local most_emp, most_stun = 0, 0
+	local recovered_at: number? = nil
+	local moved_after = 0
+	local thug_health = thug.health
+	advance(args.seconds or 60, function()
+		most_emp = math.max(most_emp, thug.emp / thug.max_health)
+		most_stun = math.max(most_stun, emp.seconds_left(thug) or 0)
+		if stunned_at == nil and emp.is_stunned(thug) then
+			stunned_at = sim_time
+			held_at = thug.position
+			orders.issue(thug, { { kind = "move", position = heightmap.ground_position(100, 150) } }, false, false)
+			if bomber.alive then
+				combat.apply_damage(bomber, 1e9)
+			end
+		elseif held_at ~= nil and recovered_at == nil then
+			if emp.is_stunned(thug) then
+				drift_while_stunned = math.max(drift_while_stunned, (thug.position - held_at).Magnitude)
+			else
+				recovered_at = sim_time
+				held_at = thug.position
+			end
+		elseif held_at ~= nil then
+			moved_after = (thug.position - held_at).Magnitude
+		end
+	end)
+
+	-- the cap is the max health times 1 + paralyze_time / 40, and it drains a fortieth of the max health a second
+	local grunt = spawn("grunt", ENEMY, -100, 100)
+	emp.add(grunt, 1e9, 20)
+	local capped = grunt.emp / grunt.max_health
+	local stun_full = emp.seconds_left(grunt)
+	advance(10)
+	local stun_after_10 = emp.seconds_left(grunt)
+	advance(11)
+	local after_21 = grunt.emp / grunt.max_health
+
+	local guard = spawn("grunt", ENEMY, -100, -100)
+	local bait = unkillable(spawn("grunt", OWN, -100, -80))
+	advance(config.TICK_DELTA)
+	emp.add(guard, guard.max_health * (1 + 5 / 40), 5)
+	orders.issue(guard, { { kind = "attack", target_id = bait.id } }, false, false)
+	local before = combat.shots_of(guard.id, 1)
+	advance(4.5)
+	local shots_stunned = combat.shots_of(guard.id, 1) - before
+	advance(args.after or 3)
+	local shots_after = combat.shots_of(guard.id, 1) - before - shots_stunned
+
+	return {
+		thug_stunned_at = if stunned_at ~= nil then round(stunned_at, 2) else nil,
+		thug_health_lost = round(thug_health - thug.health, 1),
+		thug_most_emp = round(most_emp, 3),
+		thug_most_stun = round(most_stun, 2),
+		thug_drift_while_stunned = round(drift_while_stunned, 2),
+		thug_recovered_at = if recovered_at ~= nil then round(recovered_at, 2) else nil,
+		thug_moved_after = round(moved_after, 1),
+		commander_emp = commander.emp,
+		grunt_capped = round(capped, 3),
+		grunt_stun_full = if stun_full ~= nil then round(stun_full, 2) else nil,
+		grunt_stun_after_10 = if stun_after_10 ~= nil then round(stun_after_10, 2) else nil,
+		grunt_after_21 = round(after_21, 3),
+		grunt_stunned_after_21 = emp.is_stunned(grunt),
+		guard_shots_stunned = shots_stunned,
+		guard_shots_after = shots_after,
+		guard_stunned_after = emp.is_stunned(guard),
+		bait_alive = bait.alive,
 	}
 end
 
@@ -688,18 +783,24 @@ local function spawn_resting(def_name: string, team: TeamId, x: number, z: numbe
 end
 
 -- A match of `seconds` of a `shooter_def` at `shooter_at` against a `target_def` at `target_at` that it cannot kill,
--- each resting where it is: how much damage the target took, how many projectiles and how many torpedoes the shooter
--- let go, and how far the target's top and bottom are from the water's surface.
+-- each resting where it is, the shooter turned `turned` radians off facing the target and the target facing the way
+-- `target_facing` gives (straight ahead along z by default): how much damage the target took, how much the shooter
+-- took, how many projectiles and how many torpedoes the shooter let go, and how far the target's top and bottom are
+-- from the water's surface.
 local function water_duel(
 	shooter_def: string,
 	target_def: string,
 	target_at: Vector3,
 	shooter_at: Vector3,
-	seconds: number
+	seconds: number,
+	turned: number?,
+	target_facing: number?
 ): Findings
 	local target = unkillable(spawn_resting(target_def, ENEMY, target_at.X, target_at.Z))
+	target.facing = target_facing or 0
 	-- the target may shoot back, and the shooter has to last the whole match for its count of shots to mean anything
 	local shooter = unkillable(spawn_resting(shooter_def, OWN, shooter_at.X, shooter_at.Z))
+	shooter.facing = math.atan2(target_at.X - shooter_at.X, target_at.Z - shooter_at.Z) + (turned or 0)
 	local seen: { [number]: boolean } = {}
 	local shots, torpedoes = 0, 0
 	advance(seconds, function()
@@ -716,6 +817,7 @@ local function water_duel(
 	local half = unit_defs.collider_height(unit_defs.get(target_def)) / 2
 	local findings = {
 		damage_to_target = round(UNKILLABLE - target.health, 0),
+		damage_to_shooter = round(UNKILLABLE - shooter.health, 0),
 		shots = shots,
 		torpedoes = torpedoes,
 		target_top_above_water = round(target.position.Y + half - config.WATER_LEVEL, 2),
@@ -775,6 +877,33 @@ local function naval(args: { [string]: any }): Findings
 		local land = shore :: Vector3
 		findings.orca_at_commander_on_land = duel("orca", "commander", land, land + shore_offset)
 	end
+	return findings
+end
+
+-- Fixed forward weapons and depth charges, out in deep water, each match `args.seconds` (15 by default) long. An Orca
+-- fires its torpedoes only into the 30 degree cone ahead of it: at a Buccaneer dead ahead and 12 degrees off it
+-- should fire, at 20 and 90 degrees off it should not. A Buccaneer's depth charges, dropped from its deck, must hurt
+-- the Orca and never the Buccaneer itself; the Orca faces away, so nothing else can hurt it. The Buccaneer's laser
+-- spends energy a shot, which a team in a test has none of, so the matches are played with nocost on.
+local function naval_arcs(args: { [string]: any }): Findings
+	local seconds = args.seconds or 15
+	local sea = find_spot(function(x: number, z: number): boolean
+		return deep_all_round(x, z, 8, 70)
+	end)
+	assert(sea ~= nil, "no open deep water on this map")
+	local sea_spot = sea :: Vector3
+	local off = Vector3.new(30, 0, 0)
+	local nocost = require(script.Parent.nocost)
+	nocost.set(true)
+	local findings: Findings = {
+		orca_ahead = water_duel("orca", "buccaneer", sea_spot, sea_spot + off, seconds, 0, 0),
+		orca_12_degrees_off = water_duel("orca", "buccaneer", sea_spot, sea_spot + off, seconds, math.rad(12), 0),
+		orca_20_degrees_off = water_duel("orca", "buccaneer", sea_spot, sea_spot + off, seconds, math.rad(20), 0),
+		orca_90_degrees_off = water_duel("orca", "buccaneer", sea_spot, sea_spot + off, seconds, math.rad(90), 0),
+		-- the Orca faces away from the Buccaneer, along -x, so it cannot fire back
+		buccaneer_at_orca = water_duel("buccaneer", "orca", sea_spot, sea_spot + off, seconds, 0, -math.pi / 2),
+	}
+	nocost.set(false)
 	return findings
 end
 
@@ -1933,6 +2062,147 @@ local function geothermal(args: { [string]: any }): Findings
 	return findings
 end
 
+-- An anti-nuke (`args.def`, the Prevailer by default) works as BAR's do: it stockpiles interceptors faster than a silo
+-- builds nukes, launches one on its own at every enemy nuke aimed within its coverage and only one at each, and that
+-- one kills it in the air, where it goes off harming nothing. A nuke aimed outside the coverage gets through.
+local function anti_nuke(args: { [string]: any }): Findings
+	local projectiles = require(script.Parent.projectiles)
+	local nocost = require(script.Parent.nocost)
+	local placement = require(script.Parent.placement)
+	local findings: Findings = {}
+	local anti_def = unit_defs.get(args.def or "prevailer")
+	local silo_def = unit_defs.get "apocalypse"
+	local interceptor = anti_def.weapons[1]
+	findings.interceptor_build_time = (interceptor.stockpile :: types.Stockpile).build_time
+	findings.nuke_build_time = (silo_def.weapons[1].stockpile :: types.Stockpile).build_time
+
+	if state.get_team(ENEMY) == nil then
+		state.create_team(ENEMY)
+	end
+	-- somewhere on dry land `distance` out from `from`, trying a sixteenth of a turn at a time
+	local function dry_land(from: Vector3, distance: number, turn: number): Vector3
+		for step = 0, 15 do
+			local angle = turn + step * math.pi / 8
+			local x, z = from.X + math.cos(angle) * distance, from.Z + math.sin(angle) * distance
+			if heightmap.in_bounds(x, z) and heightmap.height_at(x, z) > config.WATER_LEVEL + 2 then
+				return Vector3.new(x, 0, z)
+			end
+		end
+		error(`no dry land {distance} studs from {from}`)
+	end
+	-- set down where it could be built, or, for one that needs a vent (a Rampart), on the ground there anyway
+	local function building(def_name: string, team: TeamId, at: Vector3): Entity
+		local def = unit_defs.get(def_name)
+		local center = placement.resolve_center(def_name, at.X, at.Z, 0, nil)
+			or unit_defs.surface_position(def, at.X, at.Z) + Vector3.new(0, unit_defs.collider_height(def) / 2, 0)
+		return unkillable(state.create_entity(def_name, team, center, 0, "active"))
+	end
+
+	nocost.set(true)
+	local anti = building(anti_def.name, OWN, dry_land(Vector3.zero, 0, 0))
+	local mark = unkillable(spawn("grunt", OWN, anti.position.X + 20, anti.position.Z))
+	local silos = {}
+	for n = 1, 2 do
+		table.insert(silos, building("apocalypse", ENEMY, dry_land(anti.position, 250, n * math.pi / 2)))
+	end
+	advance(config.TICK_DELTA * 2)
+	anti.weapon_stockpiles[1] = 5
+	anti.weapon_stockpile_progress[1] = 0
+
+	-- every health on the map, to find anything the interceptions hurt
+	local function healths(): { [number]: number }
+		local out = {}
+		for _, entity in state.all() do
+			if entity.alive then
+				out[entity.id] = entity.health
+			end
+		end
+		return out
+	end
+	-- the nukes in flight and where each was last seen, to tell where they ended
+	local last_seen: { [number]: Vector3 } = {}
+	local ended: { Vector3 } = {}
+	local function watch()
+		local now: { [number]: Vector3 } = {}
+		for _, projectile in projectiles.in_flight() do
+			if projectile.is_nuclear and projectile.intercepted == false then
+				now[projectile.id] = projectile.flight.position
+			end
+		end
+		for id, at in last_seen do
+			if now[id] == nil then
+				table.insert(ended, at)
+			end
+		end
+		last_seen = now
+	end
+
+	local before = healths()
+	for _, silo in silos do
+		silo.weapon_stockpiles[1] = 1
+		orders.issue(silo, { { kind = "attack_ground", position = mark.position, target_id = nil } }, false, false)
+	end
+	local most_in_flight = 0
+	-- the leg of its flight each nuke was on when an interceptor was first seen going after it: it should have climbed
+	-- to its cruising height by then
+	local nuke_phase_at_launch: { string } = {}
+	local seen_interceptors: { [number]: boolean } = {}
+	advance(args.seconds or 40, function()
+		watch()
+		local chasing = 0
+		for _, projectile in projectiles.in_flight() do
+			if projectile.is_anti_nuke then
+				chasing += 1
+				if seen_interceptors[projectile.id] == nil then
+					seen_interceptors[projectile.id] = true
+					for _, other in projectiles.in_flight() do
+						if other.id == projectile.homing_target_id then
+							table.insert(nuke_phase_at_launch, other.flight.phase or "none")
+						end
+					end
+				end
+			end
+		end
+		most_in_flight = math.max(most_in_flight, chasing)
+	end)
+	local after = healths()
+	local hurt = 0
+	for id, health in before do
+		if after[id] ~= nil and after[id] < health then
+			hurt += 1
+		end
+	end
+	local heights = {}
+	for _, at in ended do
+		table.insert(heights, math.round(at.Y - heightmap.height_at(at.X, at.Z)))
+	end
+	findings.covered = {
+		nukes_launched = silos[1].weapon_stockpiles[1] == 0 and silos[2].weapon_stockpiles[1] == 0,
+		interceptors_used = 5 - anti.weapon_stockpiles[1],
+		most_interceptors_in_flight = most_in_flight,
+		nuke_phase_at_launch = nuke_phase_at_launch,
+		nukes_ended = #ended,
+		ended_above_ground = heights,
+		things_hurt = hurt,
+	}
+
+	-- aimed well outside the coverage, a nuke is let through
+	local far = dry_land(anti.position, interceptor.range * 2.2, 0)
+	far = heightmap.ground_position(far.X, far.Z)
+	local far_mark = unkillable(spawn("grunt", OWN, far.X, far.Z))
+	local held = anti.weapon_stockpiles[1]
+	silos[1].weapon_stockpiles[1] = 1
+	orders.issue(silos[1], { { kind = "attack_ground", position = far, target_id = nil } }, false, false)
+	advance(args.seconds or 40)
+	findings.uncovered = {
+		interceptors_used = held - anti.weapon_stockpiles[1],
+		landed = far_mark.health < UNKILLABLE,
+	}
+	nocost.set(false)
+	clear_world()
+	return findings
+end
+
 -- The wind and the tide (`environment`): every map's own are ones that can be, a tidal generator makes as much as the
 -- tidal strength however it is set, and the wind keeps to a range set while the game runs. Puts the defaults back.
 local function conditions(_args: { [string]: any }): Findings
@@ -2728,6 +2998,194 @@ local function hover_reach(args: { [string]: any }): Findings
 	return { maps = results }
 end
 
+-- The maps drawn to show off one part of the game each (shared/map_designs), `args.maps` or every one: loaded in turn,
+-- and for each what it holds (metal spots, rich ones, vents, wrecks) and where a bot (a Grunt), a tank (an Incisor), a
+-- hovercraft (a Goon) and an amphibious unit (the Commander) can go, by the pathfinder's own routes: from the first start
+-- box to the second, and to the places each map is about. For every trip, how far the route runs in studs, or false if it
+-- does not get there.
+local function map_designs_test(args: { [string]: any }): Findings
+	local map_designs = require(ReplicatedStorage.Shared.map_designs)
+	local geo_spots = require(ReplicatedStorage.Shared.geo_spots)
+	-- the places each map is about, in world (x, z)
+	local places: { [string]: { [string]: Vector2 } } = {
+		switchbacks = { plateau = Vector2.new(0, 0) },
+		tidal_flats = { sandbar = Vector2.new(-130, -70), island = Vector2.new(0, 0) },
+		caldera = { crater = Vector2.new(0, 0), rim = Vector2.new(-134, 0) },
+		mesas = { middle_mesa = Vector2.new(0, 0), mesa = Vector2.new(-150, -190) },
+		trenches = { no_mans_land = Vector2.new(0, 0), crest = Vector2.new(-104, 0) },
+		canyons = {
+			plaza = Vector2.new(-60, 26),
+			cut_off = Vector2.new(-164, -198),
+			tableland = Vector2.new(-200, -320),
+		},
+		last_stand = { far_corner = Vector2.new(300, 300) },
+		pinwheel = { hub = Vector2.new(0, 0) },
+		prairie = { middle = Vector2.new(0, 0), far_edge = Vector2.new(400, 0) },
+	}
+	local walkers = { bot = "grunt", tank = "incisor", hover = "goon", amphibious = "commander" }
+	local names: { string } = args.maps
+	if names == nil then
+		names = {}
+		for _, design in map_designs.ALL do
+			table.insert(names, design.name)
+		end
+	end
+
+	local results = {}
+	for _, name in names do
+		local ok, err = maps.load(name, nil)
+		if ok == false then
+			results[name] = { error = err }
+			continue
+		end
+		state.flush()
+		local wrecks = 0
+		for _, entity in state.all() do
+			if entity.kind == "wreck" then
+				wrecks += 1
+			end
+		end
+		local rich = 0
+		for _, spot in metal_spots.all() do
+			if spot.multiplier > 2 then
+				rich += 1
+			end
+		end
+		local targets: { [string]: Vector2 } = { across = starts.default_spot(2) }
+		local own = places[name]
+		if own ~= nil then
+			for place, at in own do
+				targets[place] = at
+			end
+		end
+		local home = starts.default_spot(1)
+		local routes = {}
+		for kind, def_name in walkers do
+			local def = unit_defs.get(def_name)
+			local from = unit_defs.surface_position(def, home.X, home.Y)
+			local found = {}
+			for place, at in targets do
+				local path = pathfinder.find_path(def, from, unit_defs.surface_position(def, at.X, at.Y), 400000)
+				local total, last = 0, from
+				for _, order in path.orders do
+					local position = order.position :: Vector3
+					total += Vector2.new(position.X - last.X, position.Z - last.Z).Magnitude
+					last = position
+				end
+				found[place] = if path.complete then math.round(total) else false
+				task.wait()
+			end
+			routes[kind] = found
+		end
+		results[name] = {
+			spots = #metal_spots.all(),
+			rich = rich,
+			vents = #geo_spots.all(),
+			wrecks = wrecks,
+			boxes = starts.box_count(),
+			routes = routes,
+		}
+	end
+	return { maps = results }
+end
+
+-- The prairie (shared/map_designs/prairie.luau), loaded with `args.seed` or the default: whether it is the open map for
+-- vehicles it is meant to be. For every start box, whether where a player who has not chosen starts is in it and can be
+-- started on, how far it is from the middle of the box, and how far a tank (an Incisor) drives to it from the first box
+-- by the pathfinder's own route, or false if it cannot; the steepest dry cell against a tank's limit, and how much of
+-- the dry ground a tank cannot drive over; how much of the map is under water; and how many metal spots and vents
+-- there are, and which of them an extractor or a geothermal plant cannot be put on.
+local function prairie_test(args: { [string]: any }): Findings
+	local placement = require(script.Parent.placement)
+	local geo_spots = require(ReplicatedStorage.Shared.geo_spots)
+	local ok, err = maps.load("prairie", args.seed)
+	if ok == false then
+		return { error = err }
+	end
+	state.flush()
+
+	local tank = unit_defs.get "incisor"
+	local home = starts.default_spot(1)
+	local from = unit_defs.surface_position(tank, home.X, home.Y)
+	local boxes = {}
+	for index = 1, starts.box_count() do
+		local box = starts.box(index)
+		local spot = starts.default_spot(index)
+		local drive: number | boolean = 0
+		if index > 1 then
+			local path = pathfinder.find_path(tank, from, unit_defs.surface_position(tank, spot.X, spot.Y), 400000)
+			local total, last = 0, from
+			for _, order in path.orders do
+				local position = order.position :: Vector3
+				total += Vector2.new(position.X - last.X, position.Z - last.Z).Magnitude
+				last = position
+			end
+			drive = if path.complete then math.round(total) else false
+			task.wait()
+		end
+		boxes[index] = {
+			at = `{math.round(spot.X)}, {math.round(spot.Y)}`,
+			default_ok = starts.in_box(index, spot.X, spot.Y) and starts.can_start_at(spot.X, spot.Y),
+			off_middle = round((spot - (box.min + box.max) / 2).Magnitude, 1),
+			tank_drive = drive,
+		}
+	end
+
+	local tank_limit = passability.steepness_limit(passability.max_slope "TANK2" :: number)
+	local width, depth = heightmap.cells()
+	local steepest, dry, blocked, wet = 0, 0, 0, 0
+	for cz = 0, depth - 1 do
+		for cx = 0, width - 1 do
+			local x, z = heightmap.grid_to_world(cx + 0.5, cz + 0.5)
+			if heightmap.water_depth(x, z) > 0 then
+				wet += 1
+				continue
+			end
+			dry += 1
+			steepest = math.max(steepest, passability.cell_steepness(cx, cz))
+			if passability.passable_cell("TANK2", cx, cz) == false then
+				blocked += 1
+			end
+		end
+	end
+
+	local unplaceable_spots = {}
+	for _, spot in metal_spots.all() do
+		local center = placement.ground_center("metal_extractor", spot.center.X, spot.center.Z)
+		local placeable, reason = placement.can_place("metal_extractor", center, 0, nil, nil)
+		if placeable == false then
+			table.insert(unplaceable_spots, `{math.round(spot.center.X)}, {math.round(spot.center.Z)}: {reason}`)
+		end
+	end
+	local unplaceable_vents = {}
+	for _, vent in geo_spots.all() do
+		local center = placement.ground_center("geothermal_powerplant", vent.center.X, vent.center.Z)
+		local placeable, reason = placement.can_place("geothermal_powerplant", center, 0, nil, nil)
+		if placeable == false then
+			table.insert(unplaceable_vents, `{math.round(vent.center.X)}, {math.round(vent.center.Z)}: {reason}`)
+		end
+	end
+	local reclaimables = 0
+	for _, entity in state.all() do
+		if entity.kind == "reclaimable" then
+			reclaimables += 1
+		end
+	end
+
+	return {
+		boxes = boxes,
+		steepest_degrees = round(math.deg(math.atan(steepest)), 1),
+		tank_limit_degrees = round(math.deg(math.atan(tank_limit)), 1),
+		dry_tank_blocked = round(blocked / math.max(dry, 1), 4),
+		under_water = round(wet / (width * depth), 3),
+		metal_spots = #metal_spots.all(),
+		unplaceable_spots = unplaceable_spots,
+		vents = #geo_spots.all(),
+		unplaceable_vents = unplaceable_vents,
+		reclaimables = reclaimables,
+	}
+end
+
 -- What the game made of a match handed in the way a lobby hands one over (`args.match`, which this needs): the map and
 -- seed it built, the team each seat was given and which of them are allied, whether the scavengers are on and how far
 -- the game's progress got over `args.seconds` (60 by default), which a difficulty's pace sets, and who the game is still
@@ -2931,6 +3389,140 @@ local function experience(args: { [string]: any }): Findings
 	}
 end
 
+-- A game between players played to its end (conquest.luau) and rated (ratings.luau), from a team or FFA `match` handed
+-- in, ended by its `end_mode` (the commanders' by default): every seated player is taken to have come, and each team
+-- gets an unkillable commander at its start, and apart from it, out of reach of its death, an unkillable bot lab and an
+-- unkillable grunt. After a while, which ends nothing, every side but the first loses its things a kind at a time, two
+-- seconds apart: its commanders, then what else can build (the labs), then the rest (the grunts). Each stage says
+-- whether the game has ended by then and how much the losers and the first side have left: the game should end at the
+-- stage its end mode names, never for "never", with the losers' things all blown up and the first side's untouched.
+-- With `leave = true` all the losers' players leave instead. The game should end with the first side's teams the
+-- winners, rated on its ladder if it is one rated (a duel or a small team game; a free for all is not).
+local function conquest_test(args: { [string]: any }): Findings
+	local handed = match.get()
+	assert(handed ~= nil, "no match was handed in: pass one as `match`")
+	-- a handed-in match waits a moment before it plays, and nothing is looked at until it does
+	local playing_deadline = os.clock() + 15
+	while game_phase.is_playing() == false and os.clock() < playing_deadline do
+		task.wait(0.1)
+	end
+	local first_side: number? = nil
+	local losers: { number } = {}
+	local losing_teams: { [TeamId]: boolean } = {}
+	local winning_teams: { [TeamId]: boolean } = {}
+	for _, seat in handed.seats do
+		local team_id = match.team_of_user(seat.user_id)
+		if team_id == nil then
+			continue
+		end
+		match.arrived_user(seat.user_id)
+		if state.get_team(team_id) == nil then
+			state.create_team(team_id).name = seat.name
+		end
+		local spot = starts.default_spot(team_id)
+		unkillable(spawn_resting("commander", team_id, spot.X, spot.Y))
+		unkillable(spawn_resting("bot_lab", team_id, spot.X + 40, spot.Y))
+		unkillable(spawn_resting("grunt", team_id, spot.X, spot.Y + 40))
+		first_side = first_side or seat.side
+		if seat.side ~= first_side then
+			table.insert(losers, seat.user_id)
+			losing_teams[team_id] = true
+		else
+			winning_teams[team_id] = true
+		end
+	end
+
+	advance(args.seconds or 5)
+	local phase_before = game_phase.phase()
+
+	-- how many units and buildings the teams in `teams` have alive
+	local function left_of(teams: { [TeamId]: boolean }): number
+		local count = 0
+		for _, entity in state.all() do
+			if entity.alive and teams[entity.team] == true and (entity.kind == "unit" or entity.kind == "building") then
+				count += 1
+			end
+		end
+		return count
+	end
+
+	local stages: { string } = {}
+	if args.leave == true then
+		for _, user_id in losers do
+			match.left(user_id)
+		end
+		advance(2)
+	else
+		local kinds: { { name: string, is: (types.EntityDef) -> boolean } } = {
+			{
+				name = "commanders",
+				is = function(def: types.EntityDef): boolean
+					return def.nametag == true
+				end,
+			},
+			{
+				name = "builders",
+				is = function(def: types.EntityDef): boolean
+					return def.build_options ~= nil or def.buildpower ~= nil
+				end,
+			},
+			{
+				name = "units",
+				is = function(_def: types.EntityDef): boolean
+					return true
+				end,
+			},
+		}
+		for _, kind in kinds do
+			if game_phase.phase() == "ended" then
+				break
+			end
+			local killed = 0
+			for _, entity in state.all() do
+				if entity.alive and losing_teams[entity.team] == true and kind.is(unit_defs.of(entity)) then
+					combat.apply_damage(entity, entity.health + 1)
+					killed += 1
+				end
+			end
+			advance(2)
+			table.insert(
+				stages,
+				`{kind.name}: killed {killed}, {game_phase.phase()}, losers have {left_of(losing_teams)},`
+					.. ` first side has {left_of(winning_teams)}`
+			)
+		end
+	end
+
+	-- the game is rated once the phase's change is signalled, which may be a moment later
+	local deadline = os.clock() + 5
+	while (ratings.last() == nil or ratings.is_pending()) and os.clock() < deadline do
+		task.wait(0.1)
+	end
+	local rated = ratings.last()
+	local players_rated = {}
+	if rated ~= nil then
+		for user_id, row in rated.players do
+			players_rated[user_id] = {
+				outcome = row.outcome,
+				mu = `{round(row.before.mu, 3)} -> {round(row.after.mu, 3)}`,
+				sigma = `{round(row.before.sigma, 3)} -> {round(row.after.sigma, 3)}`,
+				record = `{row.after.wins}-{row.after.losses}-{row.after.draws}`,
+			}
+		end
+	end
+	return {
+		mode = handed.mode,
+		end_mode = handed.end_mode,
+		phase_before = phase_before,
+		stages = stages,
+		phase = game_phase.phase(),
+		winners = table.concat(game_phase.winners(), ","),
+		end_reason = game_phase.end_reason(),
+		ladder = if rated ~= nil then rated.ladder else "not rated",
+		players = players_rated,
+	}
+end
+
 -- The end screen's stats (match_stats.luau): a grunt of OWN's fights a ring of ENEMY's, then the game is ended in
 -- OWN's favour and what that published on Workspace is read back, beside what the grunt itself counted, the enemies
 -- that died, and the metal income both teams were on. OWN also has a commander, out of the way, for an income.
@@ -3096,6 +3688,98 @@ local function resource_sharing(_args: { [string]: any }): Findings
 			and to_enemy + to_self + no_team + bad_resource + nan + negative + huge == 0
 			and rejected_left_banks,
 	}
+end
+
+-- Notifications (server/notifications.luau), on teams of their own: an ally's gift of metal and a request for it reach
+-- the right team and nobody else; a base is told it is under attack when an enemy hurts an unarmed building, not again
+-- while that goes on, and again after BASE_QUIET_SECONDS of quiet, and never for an armed one or a harmless hit; and an
+-- enemy's aircraft, a blueprint as much as a finished one, is told of once.
+local function notifications_test(_args: { [string]: any }): Findings
+	local own = state.create_team(9201)
+	local ally = state.create_team(9202)
+	local enemy = state.create_team(9203)
+	alliances.ally(own.id, ally.id)
+	own.metal, own.metal_capacity = 100, 1000
+	ally.metal, ally.metal_capacity, ally.energy, ally.energy_capacity = 500, 1000, 500, 1000
+
+	local log: { [number]: { string } } = { [own.id] = {}, [ally.id] = {}, [enemy.id] = {} }
+	local amounts: { [string]: number } = {}
+	local stop = notifications.observe(function(team_id: TeamId, notice: notifications.Notice)
+		local list = log[team_id]
+		if list ~= nil then
+			table.insert(list, notice.kind)
+			if notice.amount ~= nil then
+				amounts[`{team_id}:{notice.kind}`] = notice.amount
+			end
+		end
+	end)
+	local function count(team_id: TeamId, kind: string): number
+		local total = 0
+		for _, logged in log[team_id] do
+			if logged == kind then
+				total += 1
+			end
+		end
+		return total
+	end
+
+	sharing.share(ally.id, own.id, "metal", 150)
+	sharing.share(ally.id, own.id, "energy", 100)
+	notifications.ask_for_metal(own.id, 5000)
+	notifications.ask_for_metal(own.id, 0 / 0)
+	notifications.ask_for_metal(nil, 100)
+
+	local solar = spawn("solar_collector", own.id, 0, 0)
+	local guard = unkillable(spawn("guard", own.id, 30, 0))
+	advance(1)
+	solar.health = UNKILLABLE
+	solar.max_health = UNKILLABLE
+	combat.apply_damage(guard, 10, nil, enemy.id)
+	combat.apply_damage(solar, 10, nil, ally.id)
+	combat.apply_damage(solar, 10, nil, nil)
+	local before_attack = count(own.id, "base_attacked")
+	combat.apply_damage(solar, 10, nil, enemy.id)
+	local first_attack = count(own.id, "base_attacked")
+	advance(5)
+	combat.apply_damage(solar, 10, nil, enemy.id)
+	local kept_up = count(own.id, "base_attacked")
+	advance(11)
+	combat.apply_damage(solar, 10, nil, enemy.id)
+	local after_quiet = count(own.id, "base_attacked")
+
+	local air_before = count(own.id, "air_detected")
+	state.create_entity("valiant", enemy.id, heightmap.ground_position(-60, 0), 0, "blueprint")
+	advance(2)
+	local air_first = count(own.id, "air_detected")
+	spawn("valiant", enemy.id, -80, 0)
+	advance(3)
+	stop()
+
+	local findings: Findings = {
+		own = log[own.id],
+		ally = log[ally.id],
+		enemy = log[enemy.id],
+		sent_amount = amounts[`{own.id}:metal_sent`],
+		requested_amount = amounts[`{ally.id}:metal_request`],
+		base = { before = before_attack, first = first_attack, kept_up = kept_up, after_quiet = after_quiet },
+		air = { before = air_before, first = air_first, total = count(own.id, "air_detected") },
+	}
+	findings.pass = count(own.id, "metal_sent") == 1
+		and findings.sent_amount == 150
+		and count(ally.id, "metal_request") == 1
+		-- it had 250 of 1000 by then, so room for 750
+		and findings.requested_amount == 750
+		and count(own.id, "metal_request") == 0
+		and before_attack == 0
+		and first_attack == 1
+		and kept_up == 1
+		and after_quiet == 2
+		and air_before == 0
+		and air_first == 1
+		and findings.air.total == 1
+		and count(ally.id, "air_detected") == 1
+		and #log[enemy.id] == 0
+	return findings
 end
 
 -- Skins (shared/skins). Special skins are opt in: a unit of a team nobody chose a skin for wears the plain default. A
@@ -3362,14 +4046,18 @@ end
 -- The overlook (missions.luau, on the "overlook" map), set up as a lobby's match would have it (hand one in with
 -- `match = { mode = "campaign_overlook", ... }`), or else here. First the ground: the plateau under the player's start
 -- and the low ground under the enemy's (`drop` should be about 28), how far the cliff's edge wanders (`edge_xs`), and a
--- grunt's route from one start to the other, which should be found and go round by a ramp (`route_widest_z` near 72)
--- rather than down the cliff. Then the enemy: 20 things in all, 2 extractors on their spots, and full storage a second
--- in. Then what can be reached from the cliff: for each of the enemy's things, a thug put at the edge in line with it,
--- and whether it could shoot it from there (`in_reach`, about half) and whether the thing could shoot back (`fire_back`,
--- none). Then what the mission is about, each told to attack as a player would: a thug at the edge against the front
--- guard nearest z = 0, which it should kill without being hit, and an aggravator on the low ground against the guard at
--- the foot of the south ramp, from `args.gap` (42) studs, which it should hold at and kill without being hit, since its
--- rockets outreach a guard on the level. Each gets `args.seconds` (45).
+-- grunt's route from one start to the other, which should be found and go round by a ramp (`route_widest_z` near 43)
+-- rather than down the cliff. Then the player's side as the guide has it: an extractor put on each metal spot of theirs
+-- (`spots`, each of which should take one and be reached by a grunt from the start), and with their commander, the
+-- metal income the resource bar would show a few seconds on (`metal_income`), which should read the guide's goal (10).
+-- Then the enemy: 20 things in all, 2 extractors on their spots, and full storage a second in. Then what can be
+-- reached from the cliff: for each of the enemy's things, a thug put at the edge in line with it, and whether it could
+-- shoot it from there (`in_reach`, about half) and whether the thing could shoot back (`fire_back`, none). Then what
+-- the mission is about, each told to attack as a player would: a thug at the edge against the front guard nearest
+-- z = 0, which it should kill without being hit; and, once what is in reach of the edge is gone, as the guide means it
+-- to be by then, an aggravator come down the south ramp against the guard covering its foot, from `args.gap` (42)
+-- studs short of it, at the foot, which it should hold at and kill without being hit, since its rockets outreach a
+-- guard on the level. Each gets `args.seconds` (45).
 local function overlook(args: { [string]: any }): Findings
 	local campaign = require(ReplicatedStorage.Shared.campaign)
 	local geometry = require(ReplicatedStorage.Shared.geometry)
@@ -3394,7 +4082,7 @@ local function overlook(args: { [string]: any }): Findings
 	local top = heightmap.height_at(layout.player_start.X, layout.player_start.Y)
 	local bottom = heightmap.height_at(layout.enemy_start.X, layout.enemy_start.Y)
 	local edge_xs: { number } = {}
-	for z = -60, 60, 20 do
+	for z = -30, 30, 10 do
 		table.insert(edge_xs, round(campaign.overlook_edge_at(z), 1))
 	end
 	local route, found = pathfinder.route(
@@ -3408,6 +4096,38 @@ local function overlook(args: { [string]: any }): Findings
 			widest_z = math.max(widest_z, math.abs(order.position.Z))
 		end
 	end
+
+	-- the player's side: an extractor on each of their spots, and their commander, and what that makes
+	local placement = require(script.Parent.placement)
+	local spots: { string } = {}
+	local spots_ok = 0
+	local player_spots = 0
+	for _, spot in metal_spots.all() do
+		if spot.center.X > layout.edge_x then
+			continue
+		end
+		player_spots += 1
+		-- a route always ends somewhere; it reaches the spot if it ends on it
+		local way = pathfinder.route(
+			unit_defs.get "grunt",
+			heightmap.ground_position(layout.player_start.X, layout.player_start.Y),
+			spot.center
+		)
+		local last = way[#way].position
+		local reached = last ~= nil and geometry.distance_2d(last, spot.center) <= 4
+		local center = placement.resolve_center("metal_extractor", spot.center.X, spot.center.Z, 0, nil)
+		local placed = center ~= nil and placement.can_place("metal_extractor", center, 0, nil)
+		if placed and reached then
+			spots_ok += 1
+			state.create_entity("metal_extractor", OWN, center :: Vector3, 0, "active")
+			state.flush()
+		end
+		table.insert(spots, `{math.round(spot.center.X)},{math.round(spot.center.Z)}:{placed}/{reached}`)
+	end
+	local commander = spawn("commander", OWN, layout.player_start.X, layout.player_start.Y)
+	advance(8)
+	local metal_income = round((state.get_team(OWN) :: types.Team).metal_revenue, 2)
+	state.mark_dead(commander)
 
 	-- the enemy
 	advance(1)
@@ -3431,6 +4151,7 @@ local function overlook(args: { [string]: any }): Findings
 	local capacity = team.energy_capacity
 
 	-- what a thug at the edge reaches
+	local reachable: { Entity } = {}
 	local in_reach: { string } = {}
 	local fire_back: { string } = {}
 	for _, thing in things do
@@ -3440,6 +4161,7 @@ local function overlook(args: { [string]: any }): Findings
 		local label = `{thing.def_name}@{math.round(thing.position.X)},{math.round(z)}`
 		if combat.can_shoot(thug, thing) then
 			table.insert(in_reach, label)
+			table.insert(reachable, thing)
 		end
 		if combat.can_shoot(thing, thug) then
 			table.insert(fire_back, label)
@@ -3487,9 +4209,15 @@ local function overlook(args: { [string]: any }): Findings
 
 	local front = nearest("guard", 15, 0)
 	local thug = duel("thug", campaign.overlook_edge_at(front.position.Z) - 1, front.position.Z, front)
-	local ramp_guard = nearest("guard", 46, -62)
+	local ramp_guard = nearest("guard", 62, -42)
+	for _, thing in reachable do
+		if thing.alive then
+			state.mark_dead(thing)
+		end
+	end
+	advance(config.TICK_DELTA)
 	local gap = args.gap or 42
-	local aggravator = duel("aggravator", ramp_guard.position.X + gap, ramp_guard.position.Z, ramp_guard)
+	local aggravator = duel("aggravator", ramp_guard.position.X - gap, ramp_guard.position.Z, ramp_guard)
 
 	return {
 		plateau = round(top, 1),
@@ -3499,6 +4227,8 @@ local function overlook(args: { [string]: any }): Findings
 		route_found = found,
 		route_waypoints = #route,
 		route_widest_z = round(widest_z, 1),
+		spots = spots,
+		metal_income = metal_income,
 		total = total,
 		counts = counts,
 		extractors_on_spots = extractors_on_spots,
@@ -3511,7 +4241,10 @@ local function overlook(args: { [string]: any }): Findings
 		aggravator = aggravator,
 		pass = top - bottom > 24
 			and found
-			and widest_z > 50
+			and widest_z > 30
+			and player_spots == 4
+			and spots_ok == player_spots
+			and math.floor(metal_income + 0.5) == layout.metal
 			and total == 20
 			and extractors_on_spots == 2
 			and stored == capacity
@@ -3522,6 +4255,742 @@ local function overlook(args: { [string]: any }): Findings
 			and thug.damage_taken == 0
 			and aggravator.guard_dead
 			and aggravator.damage_taken == 0,
+	}
+end
+
+-- The counterattack (missions.luau, counterattack.luau, on the overlook's map), loaded as the load_mission command
+-- would, with `args.prep` seconds to prepare (5) and the gaps between its waves `args.pace` times as long as they are
+-- (0.1), and the player's commander put down as a player's arriving would. First the setup, once the commander's base
+-- has gone down beside it: the player's things by def (`own`: the commander, 4 extractors all on metal spots, 6 solar
+-- collectors, a bot lab, 2 graverobbers, 6 thugs and 4 aggravators), the wrecks of the overlook's enemy east of the
+-- cliff (`wrecks`: 8 guards, 4 solar collectors, 4 grunts, a bot lab, an energy storage and 2 extractors), the enemy
+-- zone's edge as published (60), the time to the first wave as published before the test's timing (300) and after it (the prep), and
+-- the enemy with nothing on the field. A solar collector and a grunt of the player's are then put in the zone: the
+-- collector should be warned of (`zone_warned`), and both should be gone once the first wave has arrived, while the bot
+-- lab outside it stands. Then every wave as it arrives (`waves`): how many of each def it brought, which should be what
+-- counterattack.luau says, the metal it is worth, which should grow to the final wave's, and whether all of it came in
+-- at the far end, in the zone. The first wave is left alone until the second arrives: its bots should have set off
+-- west (`moved_west`), a grunt of it by a ramp (`route_widest_z` beyond 30). Each wave is otherwise destroyed outright
+-- as the next arrives, which should never win the game before the final wave (`ended_early`); nor should the final wave
+-- a second after it has arrived. Destroying it then should: the game ended, won, with the enemy among no winners.
+local function overlook_defense(args: { [string]: any }): Findings
+	local campaign = require(ReplicatedStorage.Shared.campaign)
+	local missions = require(script.Parent.missions)
+	local counterattack = require(script.Parent.counterattack)
+	local names = campaign.COUNTERATTACK_ATTRIBUTES
+	local prep = args.prep or 5
+	local pace = args.pace or 0.1
+	-- lets the server finish starting, so that it sets the phase to playing before this can end the game, not after
+	task.wait()
+	local loaded, err = maps.load_mission "counterattack"
+	assert(loaded, err)
+	local prep_default = Workspace:GetAttribute(names.wave_in)
+	counterattack.set_timing(prep, pace)
+	local prep_published = Workspace:GetAttribute(names.wave_in)
+	if state.get_team(OWN) == nil then
+		state.create_team(OWN)
+	end
+	local enemy = missions.enemy() :: TeamId
+	local start = campaign.OVERLOOK.player_start
+	local commander = spawning.spawn_near("commander", OWN, heightmap.ground_position(start.X, start.Y), math.pi / 2)
+	assert(commander ~= nil, "no room for the commander")
+	advance(1)
+
+	-- the setup
+	local own: { [string]: number } = {}
+	local wrecks: { [string]: number } = {}
+	local extractors_on_spots = 0
+	local enemy_things = 0
+	local lab: Entity? = nil
+	for _, entity in state.all() do
+		if entity.kind == "wreck" and entity.position.X > campaign.OVERLOOK.edge_x and entity.wreck ~= nil then
+			local def_name = entity.wreck.source_def_name
+			wrecks[def_name] = (wrecks[def_name] or 0) + 1
+		elseif entity.team == OWN and entity.alive then
+			own[entity.def_name] = (own[entity.def_name] or 0) + 1
+			if entity.def_name == "metal_extractor" and metal_spots.multiplier_at(entity.position) ~= 1 then
+				extractors_on_spots += 1
+			elseif entity.def_name == "bot_lab" then
+				lab = entity
+			end
+		elseif entity.team == enemy and entity.alive then
+			enemy_things += 1
+		end
+	end
+	local zone_x = Workspace:GetAttribute(names.zone_x)
+	local wave_count = Workspace:GetAttribute(names.waves)
+
+	-- the enemy zone
+	local function in_zone(x: number, _z: number): boolean
+		return x - 4 >= campaign.COUNTERATTACK.zone_x
+	end
+	local zone_solar =
+		spawning.spawn_near("solar_collector", OWN, heightmap.ground_position(64, -6), -math.pi / 2, in_zone) :: Entity
+	local zone_grunt =
+		spawning.spawn_near("grunt", OWN, heightmap.ground_position(64, 8), -math.pi / 2, in_zone) :: Entity
+	advance(1)
+	local zone_warned = counterattack.was_warned(zone_solar.id)
+	local zone_things_before = zone_solar.alive and zone_grunt.alive
+
+	-- the waves
+	local seen: { [number]: boolean } = {}
+	local waves: { Findings } = {}
+	local first_bots: { [Entity]: number } = {}
+	local first_bot_count = 0
+	local route_widest_z = 0
+	local moved_west = 0
+	local zone_cleared: boolean? = nil
+	local ended_early = false
+	local arrived = 0
+	advance(prep + 480 * pace + 1, function()
+		local now = Workspace:GetAttribute(names.wave)
+		if typeof(now) ~= "number" or now <= arrived then
+			if game_phase.phase() == "ended" then
+				ended_early = true
+			end
+			return
+		end
+		arrived = now
+		if arrived == 1 then
+			zone_cleared = zone_solar.alive == false and zone_grunt.alive == false
+		elseif arrived == 2 then
+			for bot, x in first_bots do
+				if bot.position.X < x - 3 then
+					moved_west += 1
+				end
+			end
+		end
+		local counts: { [string]: number } = {}
+		local metal = 0
+		local outside_zone = 0
+		local fresh: { [Entity]: boolean } = {}
+		for _, entity in state.all() do
+			if entity.team ~= enemy or entity.kind ~= "unit" or seen[entity.id] == true then
+				continue
+			end
+			seen[entity.id] = true
+			fresh[entity] = true
+			counts[entity.def_name] = (counts[entity.def_name] or 0) + 1
+			metal += unit_defs.of(entity).metal_cost
+			if entity.position.X < campaign.COUNTERATTACK.zone_x then
+				outside_zone += 1
+			end
+		end
+		local expected = counterattack.wave_units(arrived) or {}
+		local as_expected = true
+		for def_name, count in expected do
+			if counts[def_name] ~= count then
+				as_expected = false
+			end
+		end
+		for def_name in counts do
+			if expected[def_name] == nil then
+				as_expected = false
+			end
+		end
+		table.insert(waves, {
+			counts = counts,
+			metal = metal,
+			outside_zone = outside_zone,
+			as_expected = as_expected,
+		})
+		-- the waves before this one go, but the first is watched setting off until the second comes
+		if arrived > 1 then
+			for _, entity in state.all() do
+				if entity.alive and entity.team == enemy and fresh[entity] ~= true then
+					combat.apply_damage(entity, 1e9, nil)
+				end
+			end
+			return
+		end
+		for entity in fresh do
+			local def = unit_defs.of(entity)
+			if unit_defs.is_air(def) == false and def.vehicle ~= true then
+				first_bots[entity] = entity.position.X
+				first_bot_count += 1
+			end
+			if entity.def_name == "grunt" and route_widest_z == 0 then
+				for _, order in entity.orders do
+					if order.position ~= nil then
+						route_widest_z = math.max(route_widest_z, math.abs(order.position.Z))
+					end
+				end
+			end
+		end
+	end)
+	local final_arrived = counterattack.final_wave_arrived()
+	local wave_in_after = Workspace:GetAttribute(names.wave_in)
+	advance(1)
+	local phase_before_clear = game_phase.phase()
+	for _, entity in state.all() do
+		if entity.alive and entity.team == enemy and (entity.kind == "unit" or entity.kind == "building") then
+			combat.apply_damage(entity, 1e9, nil)
+		end
+	end
+	advance(1)
+	local winners = game_phase.winners()
+
+	local escalates = #waves > 1
+	local types_seen: { [string]: boolean } = {}
+	for index, wave in waves do
+		for def_name in wave.counts do
+			types_seen[def_name] = true
+		end
+		if index > 1 and wave.metal < waves[index - 1].metal then
+			escalates = false
+		end
+	end
+	local every_type = true
+	for _, def_name in { "brute", "incisor", "grunt", "thug", "aggravator", "centurion", "wolverine", "whirlwind" } do
+		if types_seen[def_name] ~= true then
+			every_type = false
+		end
+	end
+	local waves_ok = #waves == wave_count
+	for _, wave in waves do
+		if wave.as_expected ~= true or wave.outside_zone ~= 0 then
+			waves_ok = false
+		end
+	end
+
+	return {
+		own = own,
+		extractors_on_spots = extractors_on_spots,
+		wrecks = wrecks,
+		enemy_at_start = enemy_things,
+		zone_x = zone_x,
+		prep_default = prep_default,
+		prep_published = prep_published,
+		wave_count = wave_count,
+		zone_warned = zone_warned,
+		zone_cleared = zone_cleared,
+		lab_standing = lab ~= nil and lab.alive,
+		waves = waves,
+		every_type = every_type,
+		escalates = escalates,
+		first_bots = first_bot_count,
+		moved_west = moved_west,
+		route_widest_z = round(route_widest_z, 1),
+		ended_early = ended_early,
+		final_arrived = final_arrived,
+		wave_in_after = wave_in_after,
+		phase_before_clear = phase_before_clear,
+		phase = game_phase.phase(),
+		result = missions.result(),
+		winners = winners,
+		pass = own.commander == 1
+			and own.metal_extractor == 4
+			and extractors_on_spots == 4
+			and own.solar_collector == 6
+			and own.bot_lab == 1
+			and own.graverobber == 2
+			and own.thug == 6
+			and own.aggravator == 4
+			and wrecks.guard == 8
+			and wrecks.solar_collector == 4
+			and wrecks.grunt == 4
+			and wrecks.bot_lab == 1
+			and wrecks.energy_storage == 1
+			and wrecks.metal_extractor == 2
+			and enemy_things == 0
+			and zone_x == campaign.COUNTERATTACK.zone_x
+			and prep_default == campaign.COUNTERATTACK.prep_seconds
+			and prep_published == prep
+			and zone_things_before
+			and zone_warned
+			and zone_cleared == true
+			and lab ~= nil
+			and lab.alive
+			and waves_ok
+			and every_type
+			and escalates
+			and moved_west > 0
+			and route_widest_z > 30
+			and ended_early == false
+			and final_arrived
+			and wave_in_after == nil
+			and phase_before_clear == "playing"
+			and game_phase.phase() == "ended"
+			and missions.result() == "won"
+			and table.find(winners, enemy) == nil,
+	}
+end
+
+-- Loads the counterattack as the load_mission command would and puts the player's commander down as a player's arriving
+-- would, which puts their base down beside it. Returns the mission's enemy team.
+local function start_counterattack(): TeamId
+	local campaign = require(ReplicatedStorage.Shared.campaign)
+	local missions = require(script.Parent.missions)
+	-- lets the server finish starting, so that it sets the phase to playing before this can end the game, not after
+	task.wait()
+	local loaded, err = maps.load_mission "counterattack"
+	assert(loaded, err)
+	if state.get_team(OWN) == nil then
+		state.create_team(OWN)
+	end
+	local start = campaign.OVERLOOK.player_start
+	local commander = spawning.spawn_near("commander", OWN, heightmap.ground_position(start.X, start.Y), math.pi / 2)
+	assert(commander ~= nil, "no room for the commander")
+	advance(1)
+	return missions.enemy() :: TeamId
+end
+
+-- The old base's guard wrecks in the counterattack, those nearest the cliff first.
+local function old_guard_wrecks(): { Entity }
+	local campaign = require(ReplicatedStorage.Shared.campaign)
+	local wrecks: { Entity } = {}
+	for _, entity in state.all() do
+		if
+			entity.alive
+			and entity.kind == "wreck"
+			and entity.wreck ~= nil
+			and entity.wreck.source_def_name == "guard"
+			and entity.position.X > campaign.OVERLOOK.edge_x
+		then
+			table.insert(wrecks, entity)
+		end
+	end
+	table.sort(wrecks, function(a: Entity, b: Entity): boolean
+		return a.position.X < b.position.X
+	end)
+	return wrecks
+end
+
+-- The counterattack's way to hold (missions.luau, resurrection.luau): the old base's guards, raised from their wrecks by
+-- rezbots and turned on the waves. Loaded as overlook_defense loads it, with the usual five minutes to prepare. No wreck
+-- of the old base should lie in the enemy zone (`wrecks_in_zone` 0), and its guards' should number
+-- campaign.COUNTERATTACK.old_guards. One of the player's two graverobbers is sent down the ramp to raise the guard wreck
+-- nearest it (`walker_raised`), and a graverobber put beside each of the others raises that one, the team's energy kept
+-- topped up meanwhile: every wreck should come back as a finished guard of the player's where it lay (`raised`), and
+-- once its rezbot is done, repaired whole by it (`repaired`), all of them below the cliff, where the guide counts them
+-- (`guide_count`). Then the time to prepare is cut short by the Workspace attribute the command bar's
+-- `set_timing` goes by, the module left alone (`wave_in_before` nearly 300, `retimed_wave_in` 3), and the first wave
+-- arrives: every raised guard should still stand once it has (`survived_arrival`), and over the next `args.watch`
+-- seconds (20) from its arrival, on the team's own energy, at least two of them should fire on it (`guards_firing`,
+-- `guard_shots`) and it should lose units: of the `wave_size` of it counted as it arrived, `wave_lost` gone.
+local function counterattack_rez(args: { [string]: any }): Findings
+	local campaign = require(ReplicatedStorage.Shared.campaign)
+	local counterattack = require(script.Parent.counterattack)
+	local names = campaign.COUNTERATTACK_ATTRIBUTES
+	local layout = campaign.COUNTERATTACK
+	local watch = args.watch or 20
+	local enemy = start_counterattack()
+	local team = state.get_team(OWN) :: types.Team
+
+	-- the old base, and the player's graverobbers
+	local wrecks_in_zone = 0
+	local rezbots: { Entity } = {}
+	for _, entity in state.all() do
+		if
+			entity.kind == "wreck"
+			and entity.position.X > campaign.OVERLOOK.edge_x
+			and counterattack.is_in_zone(entity.position)
+		then
+			wrecks_in_zone += 1
+		elseif entity.alive and entity.team == OWN and entity.def_name == "graverobber" then
+			table.insert(rezbots, entity)
+		end
+	end
+	local wrecks = old_guard_wrecks()
+	assert(#rezbots > 0, "the player has no graverobber")
+	assert(#wrecks > 0, "the old base left no guard wrecks")
+
+	-- the walker takes the wreck nearest it; one is put beside each of the rest
+	local walker = rezbots[1]
+	local walker_at = Vector2.new(walker.position.X, walker.position.Z)
+	local nearest = 1
+	for index, wreck in wrecks do
+		local best = wrecks[nearest].position
+		if
+			(Vector2.new(wreck.position.X, wreck.position.Z) - walker_at).Magnitude
+			< (Vector2.new(best.X, best.Z) - walker_at).Magnitude
+		then
+			nearest = index
+		end
+	end
+	local sites: { Vector3 } = {}
+	local rezzers: { Entity } = { walker }
+	for index, wreck in wrecks do
+		table.insert(sites, wreck.position)
+		local raise_it: types.Order = { kind = "resurrect", position = nil, target_id = wreck.id }
+		if index ~= nearest then
+			local rezzer = spawn("graverobber", OWN, wreck.position.X - 5, wreck.position.Z)
+			orders.issue(rezzer, { raise_it }, false, false)
+			table.insert(rezzers, rezzer)
+			continue
+		end
+		-- down the ramp, the way the client would have found for it
+		local below = heightmap.ground_position(wreck.position.X - 8, wreck.position.Z)
+		local chain = pathfinder.route(unit_defs.of(walker), walker.position, below, 6000)
+		table.insert(chain, raise_it)
+		orders.issue(walker, chain, false, false)
+	end
+	local walker_wreck = wrecks[nearest]
+	local deadline = sim_time + 90
+	while sim_time < deadline do
+		local left = 0
+		for _, wreck in wrecks do
+			if wreck.alive then
+				left += 1
+			end
+		end
+		if left == 0 then
+			break
+		end
+		advance(1, function()
+			team.energy = team.energy_capacity
+		end)
+	end
+	local rez_seconds = round(sim_time - (deadline - 90), 1)
+	-- and the rezbots repair what they raised
+	local repair_deadline = sim_time + 30
+	while sim_time < repair_deadline do
+		local busy = false
+		for _, rezzer in rezzers do
+			if #rezzer.orders > 0 then
+				busy = true
+			end
+		end
+		if busy == false then
+			break
+		end
+		advance(1)
+	end
+
+	-- what came back
+	local guards: { Entity } = {}
+	local repaired = 0
+	for _, site in sites do
+		for _, entity in state.all() do
+			if
+				entity.alive
+				and entity.team == OWN
+				and entity.def_name == "guard"
+				and entity.state == "active"
+				and (Vector2.new(entity.position.X, entity.position.Z) - Vector2.new(site.X, site.Z)).Magnitude
+					< 0.5
+			then
+				table.insert(guards, entity)
+				if entity.health >= entity.max_health - 0.01 then
+					repaired += 1
+				end
+				break
+			end
+		end
+	end
+	local guide_count = 0
+	for _, entity in state.all() do
+		if
+			entity.alive
+			and entity.team == OWN
+			and entity.def_name == "guard"
+			and entity.state == "active"
+			and entity.position.X > campaign.OVERLOOK.edge_x
+		then
+			guide_count += 1
+		end
+	end
+
+	-- the prep cut short from outside the module, as the command bar's copy of it does
+	local wave_in_before = Workspace:GetAttribute(names.wave_in) :: number
+	Workspace:SetAttribute(counterattack.TIMING_ATTRIBUTES.prep, layout.prep_seconds - wave_in_before + 3)
+	task.wait()
+	local retimed_wave_in = Workspace:GetAttribute(names.wave_in)
+
+	-- the first wave, counted the tick it arrives, before the guards have had a shot at it
+	local survived_arrival: boolean? = nil
+	local shots_before: { [Entity]: number } = {}
+	local wave: { Entity } = {}
+	local arrived_at: number? = nil
+	local wave_deadline = sim_time + 10
+	while arrived_at == nil and sim_time < wave_deadline do
+		advance(config.TICK_DELTA)
+		if Workspace:GetAttribute(names.wave) ~= 1 then
+			continue
+		end
+		arrived_at = sim_time
+		survived_arrival = true
+		for _, guard in guards do
+			if guard.alive == false then
+				survived_arrival = false
+			end
+			shots_before[guard] = combat.shots_of(guard.id, 1)
+		end
+		-- the wave's units are in the main table even if they came down after this tick's flush
+		state.flush()
+		for _, entity in state.all() do
+			if entity.alive and entity.team == enemy and entity.kind == "unit" then
+				table.insert(wave, entity)
+			end
+		end
+	end
+	advance(watch)
+	local guard_shots = 0
+	local guards_firing = 0
+	for guard, before in shots_before do
+		local fired = combat.shots_of(guard.id, 1) - before
+		guard_shots += fired
+		if fired > 0 then
+			guards_firing += 1
+		end
+	end
+	local wave_lost = 0
+	for _, entity in wave do
+		if entity.alive == false then
+			wave_lost += 1
+		end
+	end
+
+	return {
+		guard_wrecks = #wrecks,
+		wrecks_in_zone = wrecks_in_zone,
+		rezbots = #rezbots,
+		walker_raised = walker_wreck.alive == false,
+		rez_seconds = rez_seconds,
+		raised = #guards,
+		repaired = repaired,
+		guide_count = guide_count,
+		wave_in_before = wave_in_before,
+		retimed_wave_in = retimed_wave_in,
+		survived_arrival = survived_arrival,
+		wave_size = #wave,
+		guard_shots = guard_shots,
+		guards_firing = guards_firing,
+		wave_lost = wave_lost,
+		energy = round(team.energy, 0),
+		pass = #wrecks == layout.old_guards
+			and wrecks_in_zone == 0
+			and #rezbots == 2
+			and walker_wreck.alive == false
+			and #guards == layout.old_guards
+			and repaired == layout.old_guards
+			and guide_count == layout.old_guards
+			and wave_in_before > 200
+			and retimed_wave_in == 3
+			and survived_arrival == true
+			and #wave > 0
+			and guards_firing >= 2
+			and wave_lost > 0,
+	}
+end
+
+-- Rezbots repair what they raise (resurrection.luau): a guard's wreck (a building) and a grunt's (a unit), each raised
+-- by two graverobbers, the team's energy kept topped up. The first rezbot on each has a move queued after its
+-- resurrect order (shift), the second nothing. The tick the thing comes back it should be at
+-- config.RESURRECT_HEALTH_FRACTION of its health (`raised_at`), and both its rezbots should be on a repair order on it
+-- (`repair_orders` 2), the first still with its move queued behind that (`queue_kept`). Once they are done it should be
+-- whole (`whole`), the first rezbot having gone on to where its move sent it (`went_on`), within `args.seconds` (60).
+local function rez_repair(args: { [string]: any }): Findings
+	local seconds = args.seconds or 60
+	clear_world()
+	if state.get_team(OWN) == nil then
+		state.create_team(OWN)
+	end
+	local team = state.get_team(OWN) :: types.Team
+	local function top_up()
+		team.energy = team.energy_capacity
+		team.metal = team.metal_capacity
+	end
+
+	local function case(def_name: string, z: number): Findings
+		local source = spawn(def_name, 0, 0, z)
+		local wreck = state.create_wreck(source)
+		state.mark_dead(source)
+		local first = spawn("graverobber", OWN, -8, z - 3)
+		local second = spawn("graverobber", OWN, -8, z + 3)
+		local away = heightmap.ground_position(-30, z)
+		local raise_it: types.Order = { kind = "resurrect", position = nil, target_id = wreck.id }
+		orders.issue(first, { raise_it, { kind = "move", position = away, target_id = nil } }, false, false)
+		orders.issue(second, { table.clone(raise_it) }, false, false)
+		advance(config.TICK_DELTA)
+
+		local raised: Entity? = nil
+		local raised_at: number? = nil
+		local repair_orders = 0
+		local queue_kept = false
+		local deadline = sim_time + seconds
+		while raised == nil and sim_time < deadline do
+			advance(config.TICK_DELTA, top_up)
+			if wreck.alive then
+				continue
+			end
+			-- it joined the main table as the step that raised it ended
+			for _, entity in state.all() do
+				if entity.alive and entity.team == OWN and entity.def_name == def_name then
+					raised = entity
+				end
+			end
+		end
+		if raised ~= nil then
+			-- the orders ran before it came back, so nothing has been repaired yet
+			raised_at = round(raised.health / raised.max_health, 2)
+			for _, rezzer in { first, second } do
+				local order = rezzer.orders[1]
+				if order ~= nil and order.kind == "repair" and order.target_id == raised.id then
+					repair_orders += 1
+				end
+			end
+			local next_order = first.orders[2]
+			queue_kept = next_order ~= nil and next_order.kind == "move"
+			while sim_time < deadline and (#first.orders > 0 or #second.orders > 0) do
+				advance(config.TICK_DELTA, top_up)
+			end
+		end
+		local went_on = Vector2.new(first.position.X - away.X, first.position.Z - away.Z).Magnitude < 4
+		local whole = raised ~= nil and raised.alive and raised.health >= raised.max_health - 0.01
+		return {
+			raised = raised ~= nil,
+			raised_at = raised_at,
+			repair_orders = repair_orders,
+			queue_kept = queue_kept,
+			whole = whole,
+			went_on = went_on,
+			pass = raised ~= nil
+				and raised_at ~= nil
+				and math.abs(raised_at - config.RESURRECT_HEALTH_FRACTION) < 0.02
+				and repair_orders == 2
+				and queue_kept
+				and whole
+				and went_on,
+		}
+	end
+
+	local building = case("guard", -20)
+	local unit = case("grunt", 20)
+	clear_world()
+	return {
+		building = building,
+		unit = unit,
+		pass = building.pass == true and unit.pass == true,
+	}
+end
+
+-- The counterattack played out with nobody at the controls, a rough measure of its balance: loaded as above, with
+-- `args.raise` of the old base's guards (8 by default, 0 for none) raised at once, whole, as rezbots would have raised and
+-- repaired them, the nearest the cliff first, `args.prep` seconds to prepare (5), and the waves at `args.pace` (1, as
+-- played), up to wave `args.waves` (7, all of them). The player's army stands where it starts, firing at whatever comes
+-- in reach, and nothing is built, raised or repaired. As each wave arrives (`waves`), and at the end (`final`): how many raised guards,
+-- thugs and aggravators are standing, whether the commander is, the team's energy, and how many of the enemy's units
+-- are on the field, and how many of those are left over from the waves before it (`leftover`). The run ends
+-- `args.seconds` (90) after the last wave asked for, or sooner once the game is: `result` is then "won", "lost" or nil,
+-- with `seconds` of game played. `starved_seconds` is how long the team's energy was all but gone.
+--
+-- The balance it should have, at the usual pace: with all the old guards raised, something of the player's defence
+-- (a guard, thug or aggravator) should still stand as wave BALANCE_HOLD_WAVE arrives, with no more than
+-- BALANCE_MAX_LEFTOVER of the waves before it still about; with none raised, every thug and aggravator should be gone by
+-- the time wave BALANCE_OVERRUN_WAVE arrives, or the game be lost. Any other number raised, or another pace, passes as
+-- long as it runs.
+local BALANCE_HOLD_WAVE = 5
+local BALANCE_MAX_LEFTOVER = 8
+local BALANCE_OVERRUN_WAVE = 4
+local function counterattack_balance(args: { [string]: any }): Findings
+	local campaign = require(ReplicatedStorage.Shared.campaign)
+	local missions = require(script.Parent.missions)
+	local counterattack = require(script.Parent.counterattack)
+	local names = campaign.COUNTERATTACK_ATTRIBUTES
+	local layout = campaign.COUNTERATTACK
+	local raise = args.raise or 8
+	local prep = args.prep or 5
+	local pace = args.pace or 1
+	local last_wave = math.min(args.waves or counterattack.WAVE_COUNT, counterattack.WAVE_COUNT)
+	local extra = args.seconds or 90
+	local enemy = start_counterattack()
+	local team = state.get_team(OWN) :: types.Team
+
+	local raised: { Entity } = {}
+	for index, wreck in old_guard_wrecks() do
+		if index > raise then
+			break
+		end
+		local guard = state.create_entity("guard", OWN, wreck.position, wreck.facing, "active")
+		-- whole, as the rezbots that raised it would have repaired it
+		guard.health = guard.max_health
+		state.mark_dead(wreck)
+		state.flush()
+		table.insert(raised, guard)
+	end
+	counterattack.set_timing(prep, pace)
+
+	local function census(): Findings
+		local found: Findings = { guards = 0, thugs = 0, aggravators = 0, commander = false, enemies = 0 }
+		for _, guard in raised do
+			if guard.alive then
+				found.guards += 1
+			end
+		end
+		for _, entity in state.all() do
+			if entity.alive == false then
+				continue
+			end
+			if entity.team == OWN then
+				if entity.def_name == "thug" then
+					found.thugs += 1
+				elseif entity.def_name == "aggravator" then
+					found.aggravators += 1
+				elseif entity.def_name == "commander" then
+					found.commander = true
+				end
+			elseif entity.team == enemy and entity.kind == "unit" then
+				found.enemies += 1
+			end
+		end
+		found.energy = round(team.energy, 0)
+		return found
+	end
+
+	local waves: { Findings } = {}
+	local seen = 0
+	local starved = 0
+	local started = sim_time
+	local deadline = sim_time + prep + (counterattack.wave_at(last_wave) or 0) * pace + extra
+	while sim_time < deadline and game_phase.phase() ~= "ended" do
+		advance(1, function()
+			if team.energy < 20 then
+				starved += config.TICK_DELTA
+			end
+			local now = Workspace:GetAttribute(names.wave)
+			if typeof(now) == "number" and now > seen then
+				seen = now
+				local found = census()
+				found.wave = now
+				local size = 0
+				for _, count in counterattack.wave_units(now) or {} do
+					size += count
+				end
+				found.leftover = found.enemies - size
+				table.insert(waves, found)
+			end
+		end)
+	end
+
+	-- the balance asked for, by the census as each wave arrived
+	local function at_wave(index: number): Findings?
+		for _, found in waves do
+			if found.wave == index then
+				return found
+			end
+		end
+		return nil
+	end
+	local pass = true
+	if pace == 1 and #raised >= layout.old_guards then
+		local hold = at_wave(BALANCE_HOLD_WAVE)
+		pass = hold ~= nil and hold.guards + hold.thugs + hold.aggravators > 0 and hold.leftover <= BALANCE_MAX_LEFTOVER
+	elseif pace == 1 and #raised == 0 then
+		local overrun = at_wave(BALANCE_OVERRUN_WAVE)
+		-- lost outright before it came is overrun too
+		pass = if overrun ~= nil then overrun.thugs + overrun.aggravators == 0 else missions.result() == "lost"
+	end
+
+	return {
+		raise = #raised,
+		pace = pace,
+		waves = waves,
+		final = census(),
+		result = missions.result(),
+		seconds = round(sim_time - started, 0),
+		starved_seconds = round(starved, 1),
+		pass = pass,
 	}
 end
 
@@ -3693,8 +5162,8 @@ end
 -- its donut is on once it is finished, a hit pops it (published `donut_event` "1:pop"), it stays off for
 -- `regen_seconds` and is on again after. A pool Valiant ordered across the map flat out: how far its shake got and
 -- when its donut flew off. A commander (amphibious) set down on the sea floor, `args.depth` deep (8 by default): its
--- donut floats off ("float") and stays off past `regen_seconds` while it is still down there; and a ship on the water
--- beside it keeps its own. A golden grunt wears none. Then the debug calls: force_off and force_on.
+-- donut is still on at first, floats off ("float") once it has been down `submerge_seconds`, and stays off past
+-- `regen_seconds` while it is still down there; and a ship on the water beside it keeps its own. A golden grunt wears none. Then the debug calls: force_off and force_on.
 local function donut_state(args: { [string]: any }): Findings
 	for _, team_id in { OWN, ENEMY } do
 		if state.get_team(team_id) == nil then
@@ -3741,6 +5210,8 @@ local function donut_state(args: { [string]: any }): Findings
 		local ship = spawn_resting(args.ship or "supporter", OWN, sea.X + 20, sea.Z)
 		advance(config.TICK_DELTA * 2)
 		underwater.under_the_surface = round(config.WATER_LEVEL - diver.position.Y, 1)
+		underwater.diver_at_once = donuts.published(diver)
+		advance(settings.submerge_seconds)
 		underwater.diver = donuts.published(diver)
 		underwater.ship = donuts.published(ship)
 		advance(settings.regen_seconds + 2)
@@ -4083,6 +5554,175 @@ local function ai_match(args: { [string]: any }): Findings
 	}
 end
 
+-- pow's ai_add, run through the command itself with a context that keeps what it logs: a player's commander at the
+-- first box's usual start, then each case in turn. Every case reports, for each team it put down, the team, where its
+-- commander stands, its allies and how far it is from the nearest other commander, and whatever it logged. An AI put
+-- down with no spot given has to stand ai.MIN_START_SPACING from every other commander (less a little for the commander
+-- stepping off a blocked start), a boxed one in its box, one at a spot at that spot; a bad team or a spot off the map
+-- puts nobody down and says why; and every AI asked for is either put down or answered with an error. "Crowd" asks for
+-- more than the map has room for, so it has to end in an error.
+local function ai_add_test(_args: { [string]: any }): Findings
+	local players = require(script.Parent.players)
+	local register: any = require(script.Parent.pow_server_ext)
+	local registered = { commands = {}, types = {}, permission_types = {} }
+	register(registered)
+	local command = registered.commands.ai_add
+
+	local function commanders(): { [TeamId]: Vector2 }
+		local found: { [TeamId]: Vector2 } = {}
+		for _, entity in state.all() do
+			if entity.alive and entity.def_name == "commander" then
+				found[entity.team] = Vector2.new(entity.position.X, entity.position.Z)
+			end
+		end
+		return found
+	end
+	local function nearest_other(team_id: TeamId, all: { [TeamId]: Vector2 }): number
+		local nearest = math.huge
+		for other, at in all do
+			if other ~= team_id then
+				nearest = math.min(nearest, (at - all[team_id]).Magnitude)
+			end
+		end
+		return nearest
+	end
+
+	local player_team = players.create_team "Player"
+	spawning.set_start(player_team, starts.default_spot(1))
+	spawning.give_starting_force(player_team)
+	local joined_team = players.create_team "Joined"
+
+	-- `expect`: "free" (MIN_START_SPACING clear), "box" (that and in box 2), "spot" (at 100, -100), "error" (nobody put
+	-- down) or "fill" (free, until an error)
+	local cases = {
+		{ label = "default", args = {}, want = 1, expect = "free" },
+		{ label = "pair", args = { "Pair", 2 }, want = 2, expect = "free" },
+		{ label = "boxed", args = { "Boxed", 1, 2 }, want = 1, expect = "box" },
+		{ label = "spot", args = { "Spot", 1, 100, -100 }, want = 1, expect = "spot" },
+		{ label = "friend", args = { "Friend", 1, 0, "ally", player_team }, want = 1, expect = "free", ally = true },
+		{ label = "lined", args = { "Lined", 1, 0, "enemy", 0, "vehicle" }, want = 1, expect = "free" },
+		{
+			label = "profiled",
+			args = { "Profiled", 1, 0, "enemy", 0, "any", "raider" },
+			want = 1,
+			expect = "free",
+			profile = "raider",
+		},
+		{ label = "bad_profile", args = { "x", 1, 0, "enemy", 0, "any", "nobody" }, want = 0, expect = "error" },
+		{ label = "bad_team", args = { "x", 1, 0, "ally", 999 }, want = 0, expect = "error" },
+		{ label = "off_map", args = { "Off", 1, 9999, 9999 }, want = 0, expect = "error" },
+		{ label = "joined", args = { "J", 1, 0, "join", joined_team }, want = 1, expect = "free" },
+		{ label = "many", args = { "Many", 6 }, want = 6, expect = "free" },
+		{ label = "crowd", args = { "Crowd", 60 }, want = 60, expect = "fill" },
+	}
+
+	local spacing = ai.MIN_START_SPACING - 20
+	local results: { Findings } = {}
+	local pass = true
+	for _, case in cases do
+		local before = commanders()
+		local logs: { any } = {}
+		command.server_run({
+			args = case.args,
+			executor = nil,
+			log = function(_self: any, log: any)
+				table.insert(logs, log)
+			end,
+		})
+		local after = commanders()
+		local placed: { Findings } = {}
+		local errors: { string } = {}
+		for _, log in logs do
+			if log.type == "error" then
+				table.insert(errors, log.value)
+			end
+		end
+		local ok = true
+		for team_id, at in after do
+			if before[team_id] ~= nil then
+				continue
+			end
+			local allies: { number } = {}
+			for _, ally in alliances.group_of(team_id, state.all_teams()) do
+				if ally ~= team_id then
+					table.insert(allies, ally)
+				end
+			end
+			table.sort(allies)
+			local nearest = nearest_other(team_id, after)
+			table.insert(placed, {
+				team = team_id,
+				x = round(at.X, 1),
+				z = round(at.Y, 1),
+				allies = allies,
+				nearest = round(nearest, 1),
+			})
+			local spot_ok = if case.expect == "spot"
+				then (at - Vector2.new(100, -100)).Magnitude < 30
+				elseif case.expect == "box" then nearest >= spacing and starts.in_box(2, at.X, at.Y)
+				else nearest >= spacing
+			local ally_ok = alliances.are_allied(team_id, player_team) == (case.ally == true)
+			ok = ok and spot_ok and ally_ok and ai.is_ai(team_id)
+			local profile = ai.profile_of(team_id)
+			local profile_name = if profile ~= nil then profile.name else nil
+			ok = ok and profile_name == (case.profile or "default")
+		end
+		table.sort(placed, function(a, b): boolean
+			return a.team < b.team
+		end)
+		if case.expect == "error" then
+			ok = ok and #placed == 0 and #errors > 0
+		elseif case.expect == "fill" then
+			ok = ok and #placed < case.want and #errors > 0
+		else
+			ok = ok and #placed == case.want and #errors == 0
+		end
+		-- every AI asked for is put down or answered with an error
+		ok = ok and (#placed == case.want or #errors > 0)
+		pass = pass and ok
+		local log_text: { string } = {}
+		for _, log in logs do
+			table.insert(log_text, log.value)
+		end
+		table.insert(results, {
+			label = case.label,
+			pass = ok,
+			placed = placed,
+			log = table.concat(log_text, "\n"),
+		})
+	end
+
+	-- the closest two commanders but the one put at a spot, which stands where it is told whatever is near
+	local total = 0
+	local closest = math.huge
+	local final = commanders()
+	local told: { [TeamId]: boolean } = {}
+	for _, result in results do
+		if result.label == "spot" then
+			for _, one in result.placed do
+				told[one.team] = true
+			end
+		end
+	end
+	for team_id, at in final do
+		total += 1
+		for other, other_at in final do
+			if other ~= team_id and not told[team_id] and not told[other] then
+				closest = math.min(closest, (at - other_at).Magnitude)
+			end
+		end
+	end
+	return {
+		pass = pass and closest >= spacing,
+		preset = heightmap.get_preset(),
+		boxes = starts.box_count(),
+		min_spacing = ai.MIN_START_SPACING,
+		commanders = total,
+		closest = round(closest, 1),
+		cases = results,
+	}
+end
+
 -- Puts down an AI opponent and `towers` (6) unkillable guard towers of an enemy team beside the metal spots nearest
 -- its home past `from` (80) studs, and lets it play for `seconds` (480), looking once a second at how many of its
 -- constructors stand within reach of a tower. `builder_seconds_in_reach` should stay near nothing and `lost` at 0.
@@ -4164,8 +5804,1413 @@ local function ai_danger(args: { [string]: any }): Findings
 	}
 end
 
+-- The AI profile a test asked for: `args.profile` (`fallback` if not given) with `args.overrides`, a table of the
+-- profile's numbers, over it.
+local function test_profile(args: { [string]: any }, fallback: string): ai_profiles.Profile
+	local name = if typeof(args.profile) == "string" then args.profile else fallback
+	local profile = ai_profiles.get(name)
+	assert(profile ~= nil, `there is no AI profile "{name}"; there are {table.concat(ai_profiles.names(), ", ")}`)
+	if typeof(args.overrides) == "table" then
+		profile = ai_profiles.with(profile, args.overrides)
+	end
+	return profile
+end
+
+-- `vector` flattened onto the ground and of length 1, or along x if it is too short to have a way.
+local function geometry_flat_unit(vector: Vector3): Vector3
+	local flat = Vector3.new(vector.X, 0, vector.Z)
+	return if flat.Magnitude > 1 then flat.Unit else Vector3.new(1, 0, 0)
+end
+
+-- Puts down an AI opponent playing by `profile` and returns its team and where its commander stands.
+local function spawn_ai(name: string, profile: ai_profiles.Profile): (TeamId, Vector3)
+	local team = ai.spawn_opponent(name, nil, nil, profile)
+	assert(team ~= nil, `there was no room for {name}'s commander`)
+	for _, entity in state.all() do
+		if entity.alive and entity.team == team and unit_defs.of(entity).nametag == true then
+			return team, entity.position
+		end
+	end
+	error(`{name} has no commander`)
+end
+
+-- How many of each def team `team` has, finished or not.
+local function counts_of(team: TeamId): { [string]: number }
+	local counts: { [string]: number } = {}
+	for _, entity in state.all() do
+		if entity.alive and entity.team == team then
+			counts[entity.def_name] = (counts[entity.def_name] or 0) + 1
+		end
+	end
+	return counts
+end
+
+-- The metal spots, nearest `from` first, or furthest first with `furthest`.
+local function spots_by_distance(from: Vector3, furthest: boolean): { Vector3 }
+	local geometry = require(ReplicatedStorage.Shared.geometry)
+	local found: { Vector3 } = {}
+	for _, spot in metal_spots.all() do
+		for _, position in spot.positions do
+			table.insert(found, position)
+		end
+	end
+	table.sort(found, function(a, b): boolean
+		local a_distance = geometry.distance_2d(a, from)
+		local b_distance = geometry.distance_2d(b, from)
+		return if furthest then a_distance > b_distance else a_distance < b_distance
+	end)
+	return found
+end
+
+-- A finished extractor of `team` on the metal spot at `position`, or nil if one cannot go there.
+local function put_extractor(team: TeamId, position: Vector3): Entity?
+	local placement = require(script.Parent.placement)
+	local center = placement.ground_center("metal_extractor", position.X, position.Z)
+	if placement.can_place("metal_extractor", center, 0, nil, team) == false then
+		return nil
+	end
+	local extractor = state.create_entity("metal_extractor", team, center, 0, "active")
+	state.flush()
+	return extractor
+end
+
+-- The roster lock: an AI playing by `profile` ("swarm", whose roster leaves out some of what its bot lab and its
+-- constructors could make) plays for `seconds` (240), and every second everything its team has, everything its labs
+-- have queued and everything its builders have been told to build is looked at. `outside` lists each def seen that its
+-- roster does not have (the commander it starts with aside), and should be empty; `counts` shows it built at all.
+local function ai_roster(args: { [string]: any }): Findings
+	local seconds = if typeof(args.seconds) == "number" then args.seconds else 240
+	local profile = test_profile(args, "swarm")
+	local roster = profile.roster
+	assert(roster ~= nil, `the profile "{profile.name}" has no roster`)
+	local team = spawn_ai("AI", profile)
+	local started_with: { [string]: boolean } = {}
+	for name in counts_of(team) do
+		started_with[name] = true
+	end
+	local outside: { [string]: string } = {}
+	local function check(def_name: string, how: string)
+		if roster[def_name] ~= true and started_with[def_name] ~= true and outside[def_name] == nil then
+			outside[def_name] = `{how} at {round(sim_time, 0)} s`
+		end
+	end
+	local started = os.clock()
+	local elapsed = 0
+	local queued_total = 0
+	while elapsed < seconds do
+		advance(1)
+		elapsed += 1
+		for _, entity in state.all() do
+			if entity.alive == false or entity.team ~= team then
+				continue
+			end
+			check(entity.def_name, "stood")
+			for _, queued in entity.queue do
+				queued_total += 1
+				check(queued, "queued")
+			end
+			for _, order in entity.orders do
+				if order.kind == "build" and order.def_name ~= nil then
+					check(order.def_name, "ordered")
+				end
+			end
+		end
+	end
+	local outside_list: { string } = {}
+	for name, how in outside do
+		table.insert(outside_list, `{name} ({how})`)
+	end
+	table.sort(outside_list)
+	local counts = counts_of(team)
+	local built = 0
+	for name, count in counts do
+		if started_with[name] ~= true then
+			built += count
+		end
+	end
+	return {
+		pass = #outside_list == 0 and built > 0 and queued_total > 0,
+		profile = profile.name,
+		outside = outside_list,
+		built = built,
+		queued_seen = queued_total,
+		counts = counts,
+		summary = ai.describe(team),
+		real_seconds = round(os.clock() - started, 1),
+	}
+end
+
+-- Defence weight: two AIs play side by side for `seconds` (300), one by the default profile and one by `profile`
+-- ("raider", which guards none of its extractors), and what each built to stand guard is counted: guards and
+-- anti-air, against its extractors. The default should have guards by its extractors, and the other no more than
+-- `max_guards` (0) plus its profile's home_guards.
+local function ai_defense(args: { [string]: any }): Findings
+	local seconds = if typeof(args.seconds) == "number" then args.seconds else 300
+	local max_guards = if typeof(args.max_guards) == "number" then args.max_guards else 0
+	local profile = test_profile(args, "raider")
+	local default_team = spawn_ai("Default", ai_profiles.DEFAULT)
+	local other_team = spawn_ai(profile.name, profile)
+	local started = os.clock()
+	local most_guards = { default = 0, other = 0 }
+	local elapsed = 0
+	while elapsed < seconds do
+		advance(5)
+		elapsed += 5
+		most_guards.default = math.max(most_guards.default, counts_of(default_team).guard or 0)
+		most_guards.other = math.max(most_guards.other, counts_of(other_team).guard or 0)
+	end
+	local function look(team: TeamId): Findings
+		local counts = counts_of(team)
+		return {
+			guards = counts.guard or 0,
+			thistles = counts.thistle or 0,
+			extractors = counts.metal_extractor or 0,
+			summary = ai.describe(team),
+		}
+	end
+	local default_look = look(default_team)
+	return {
+		pass = most_guards.other <= max_guards + profile.home_guards and default_look.guards > 0,
+		profile = profile.name,
+		most_guards = most_guards,
+		default = default_look,
+		other = look(other_team),
+		real_seconds = round(os.clock() - started, 1),
+	}
+end
+
+-- Harassment: an AI playing by `profile` ("raider") starts with a finished bot lab and `raiders` (6) of `unit` ("tick")
+-- by home, and a team of an enemy's stands at the far end of the map: a finished extractor on each of the `extractors`
+-- (6) metal spots furthest from the AI and `builders` (2) constructors beside them, nothing to defend them. For `seconds`
+-- (150) it plays; what it sent (ai.report) and what the enemy lost is looked at. Every raid should be its profile's
+-- raid_size, go after an extractor or a constructor, and the enemy should lose some; `army_attacked` says whether the
+-- main army set out too, which it has no need to. With `guarded`, an unkillable guard with the energy to fire stands by each extractor and constructor, and no raid
+-- should go out at all.
+local function ai_raids(args: { [string]: any }): Findings
+	local seconds = if typeof(args.seconds) == "number" then args.seconds else 150
+	local raider_count = if typeof(args.raiders) == "number" then args.raiders else 6
+	local unit = if typeof(args.unit) == "string" then args.unit else "tick"
+	local extractor_count = if typeof(args.extractors) == "number" then args.extractors else 6
+	local builder_count = if typeof(args.builders) == "number" then args.builders else 2
+	local guarded = args.guarded == true
+	local profile = test_profile(args, "raider")
+	assert(profile.raid_size > 0, `the profile "{profile.name}" does not raid`)
+
+	local team, home = spawn_ai("AI", profile)
+	local toward = geometry_flat_unit(-home)
+	local lab_at = home + toward * 20
+	spawning.spawn_near(
+		if profile.line == "vehicle" then "vehicle_lab" else "bot_lab",
+		team,
+		heightmap.ground_position(lab_at.X, lab_at.Z),
+		0
+	)
+	for index = 1, raider_count do
+		local at = home + toward * 10 + Vector3.new(index * 3 - raider_count * 1.5, 0, 6)
+		spawning.spawn_near(unit, team, heightmap.ground_position(at.X, at.Z), 0)
+	end
+
+	local enemy = 97
+	local enemy_team = state.create_team(enemy)
+	local extractors: { Entity } = {}
+	for _, position in spots_by_distance(home, true) do
+		if #extractors >= extractor_count then
+			break
+		end
+		local extractor = put_extractor(enemy, position)
+		if extractor ~= nil then
+			table.insert(extractors, extractor)
+		end
+	end
+	assert(#extractors > 0, "there was nowhere to put the enemy's extractors")
+	local builders: { Entity } = {}
+	for index = 1, builder_count do
+		local near = extractors[(index - 1) % #extractors + 1].position
+		local placed = spawning.spawn_near("construction_bot", enemy, near + Vector3.new(6, 0, 6), 0)
+		if placed ~= nil then
+			table.insert(builders, placed)
+		end
+	end
+	if guarded then
+		local guarded_things: { Entity } = table.clone(extractors)
+		for _, builder in builders do
+			table.insert(guarded_things, builder)
+		end
+		for _, thing in guarded_things do
+			local guard = spawning.spawn_near("guard", enemy, thing.position + Vector3.new(-8, 0, -8), 0)
+			if guard ~= nil then
+				unkillable(guard)
+			end
+		end
+	end
+	state.flush()
+
+	local started = os.clock()
+	local attacked = false
+	local elapsed = 0
+	while elapsed < seconds do
+		advance(1, function()
+			enemy_team.energy = enemy_team.energy_capacity
+		end)
+		elapsed += 1
+		local report = ai.report(team)
+		if report ~= nil and report.mode == "attack" then
+			attacked = true
+		end
+	end
+	local extractors_lost, builders_lost = 0, 0
+	for _, extractor in extractors do
+		if extractor.alive == false or state.get(extractor.id) == nil then
+			extractors_lost += 1
+		end
+	end
+	for _, builder in builders do
+		if builder.alive == false or state.get(builder.id) == nil then
+			builders_lost += 1
+		end
+	end
+	local report = ai.report(team) :: { [string]: any }
+	local right_size, right_target = true, true
+	for _, raid in report.raids do
+		right_size = right_size and raid.units == profile.raid_size
+		right_target = right_target and (raid.target == "metal_extractor" or raid.target == "construction_bot")
+	end
+	local pass = if guarded
+		then #report.raids == 0 and extractors_lost == 0
+		else #report.raids > 0 and right_size and right_target and extractors_lost + builders_lost > 0
+	return {
+		pass = pass,
+		profile = profile.name,
+		guarded = guarded,
+		raids = report.raids,
+		raids_out = report.raids_out,
+		enemy_extractors = #extractors,
+		extractors_lost = extractors_lost,
+		enemy_builders = #builders,
+		builders_lost = builders_lost,
+		army_attacked = attacked,
+		summary = ai.describe(team),
+		real_seconds = round(os.clock() - started, 1),
+	}
+end
+
+-- Escalation: an AI playing by `profile` ("swarm", with `growth` (0.5) as its wave_growth a wave and its profile's
+-- wave_cap_seconds unless `cap` is given) is given a `unit` ("grunt") at home every `feed_every` (2) seconds, and across
+-- the map stand `towers` (2) unkillable guards with the energy to fire, which beat every wave in the end, so that it
+-- pulls back, regroups and goes again. For `seconds` (360) it plays; each wave it sent is listed with how many went,
+-- what they were worth, what a wave had to be worth then and how it ended. There should be at least two waves, and what
+-- a wave has to be worth should grow from the first wave to the last, and so should the waves.
+local function ai_waves(args: { [string]: any }): Findings
+	local seconds = if typeof(args.seconds) == "number" then args.seconds else 360
+	local feed_every = if typeof(args.feed_every) == "number" then args.feed_every else 2
+	local unit = if typeof(args.unit) == "string" then args.unit else "grunt"
+	local tower_count = if typeof(args.towers) == "number" then args.towers else 2
+	local overrides: { [string]: any } = if typeof(args.overrides) == "table" then table.clone(args.overrides) else {}
+	overrides.wave_growth = if typeof(args.growth) == "number" then args.growth else overrides.wave_growth or 0.5
+	if typeof(args.cap) == "number" then
+		overrides.wave_cap_seconds = args.cap
+	end
+	local profile = test_profile({ profile = args.profile, overrides = overrides }, "swarm")
+
+	local team, home = spawn_ai("AI", profile)
+	local toward = geometry_flat_unit(-home)
+	local enemy = 96
+	local enemy_team = state.create_team(enemy)
+	-- the far side of the map from it
+	local far = Vector3.new(-home.X, 0, -home.Z)
+	for index = 1, tower_count do
+		local at = far + Vector3.new(-toward.Z, 0, toward.X) * (index - (tower_count + 1) / 2) * 10
+		local tower = spawning.spawn_near("guard", enemy, heightmap.ground_position(at.X, at.Z), 0)
+		if tower ~= nil then
+			unkillable(tower)
+		end
+	end
+
+	local started = os.clock()
+	local elapsed = 0
+	local fed = 0
+	local next_feed = 0
+	while elapsed < seconds do
+		advance(1, function()
+			enemy_team.energy = enemy_team.energy_capacity
+		end)
+		elapsed += 1
+		if elapsed >= next_feed then
+			next_feed = elapsed + feed_every
+			local at = home + toward * 30
+			if spawning.spawn_near(unit, team, heightmap.ground_position(at.X, at.Z), 0) ~= nil then
+				fed += 1
+			end
+		end
+	end
+	local report = ai.report(team) :: { [string]: any }
+	local waves = report.waves
+	local rounded: { Findings } = {}
+	for _, wave in waves do
+		table.insert(rounded, {
+			at = round(wave.at, 0),
+			units = wave.units,
+			worth = round(wave.worth, 0),
+			needed = round(wave.needed, 0),
+			ended = wave.ended or "out",
+		})
+	end
+	local first, last = waves[1], waves[#waves]
+	return {
+		pass = #waves >= 2 and last.needed > first.needed and last.units > first.units,
+		profile = profile.name,
+		growth = profile.wave_growth,
+		cap = if profile.wave_cap_seconds < math.huge then profile.wave_cap_seconds else "none",
+		fed = fed,
+		waves = rounded,
+		needed_now = round(report.wave_needed, 0),
+		summary = ai.describe(team),
+		real_seconds = round(os.clock() - started, 1),
+	}
+end
+
+-- Piloting (shared/piloting.luau): a piloted commander walks where it is steered, at its own top speed, and faces where
+-- its pilot looks, whatever its orders say; its weapon holds its fire until the trigger is held, then fires at the enemy
+-- aimed at, or at the ground aimed at; its disintegrator fires when asked; and once let go it carries on with its
+-- orders. Nobody joins a test, so the pilot is written straight to `pilots`, as possession.luau would on a player's word.
+local function pilot_test(_: { [string]: any }): Findings
+	local findings: Findings = {}
+	local commander = unkillable(spawn("commander", OWN, 0, 0))
+	local def = unit_defs.of(commander)
+	local primary = piloting.primary_weapon(def) :: number
+	orders.issue(
+		commander,
+		{ { kind = "move", position = heightmap.ground_position(200, 0), target_id = nil } },
+		false,
+		false
+	)
+	local pilot: pilots.Pilot = {
+		player = nil :: any,
+		steer = Vector3.new(0, 0, 1),
+		facing = 0,
+		aim = nil,
+		target_id = nil,
+		firing = false,
+		weapon = primary,
+		lift = 0,
+		height = nil,
+		loadable = nil,
+		can_unload = false,
+		transporter = nil,
+		rider = nil,
+		called = nil,
+		call_lost_at = nil,
+		-- never goes quiet
+		heard_at = math.huge,
+	}
+	pilots.set(commander.id, pilot)
+
+	local start = commander.position
+	advance(3)
+	findings.walked = { x = round(commander.position.X - start.X, 2), z = round(commander.position.Z - start.Z, 2) }
+	findings.top_speed = round(def.max_speed :: number, 2)
+	findings.speed = round(commander.velocity.Magnitude, 2)
+	findings.orders_kept = #commander.orders
+
+	pilot.steer = Vector3.zero
+	pilot.facing = math.pi / 2
+	advance(0.5)
+	findings.facing = round(commander.facing, 3)
+
+	-- an enemy well within reach, off the way it now faces
+	local weapon = (def.weapons :: { types.Weapon })[primary]
+	local here = commander.position
+	local enemy = unkillable(spawn("grunt", ENEMY, here.X + weapon.range * 0.6, here.Z))
+	-- aimed at a point on the near side of it, as a crosshair on it would be, and not at it: whatever the shot's line
+	-- goes into there is what it hits
+	pilot.aim = enemy.position - Vector3.new(unit_defs.collider_radius(unit_defs.of(enemy)) * 0.9, 0, 0)
+	pilot.target_id = nil
+	local shots = combat.shots_of(commander.id, primary)
+	advance(2)
+	findings.held_fire = combat.shots_of(commander.id, primary) == shots and enemy.health == UNKILLABLE
+
+	pilot.firing = true
+	advance(2)
+	findings.shots_at_enemy = combat.shots_of(commander.id, primary) - shots
+	findings.enemy_damage = round(UNKILLABLE - enemy.health, 1)
+
+	-- the ground, off to the side, with no enemy aimed at
+	pilot.target_id = nil
+	pilot.aim = heightmap.ground_position(here.X, here.Z + weapon.range * 0.5)
+	shots = combat.shots_of(commander.id, primary)
+	advance(2)
+	findings.shots_at_ground = combat.shots_of(commander.id, primary) - shots
+
+	-- the disintegrator, the other way, at something it has never been ordered to shoot
+	pilot.firing = false
+	local manual = def.manual_weapon :: types.ManualWeapon
+	local victim = spawn("grunt", ENEMY, here.X - manual.range * 0.5, here.Z)
+	-- it spends energy a shot, which a team in a test has none of
+	local nocost = require(script.Parent.nocost)
+	nocost.set(true)
+	possession.request_ability(commander.id, victim.position)
+	advance(0.2)
+	nocost.set(false)
+	findings.disintegrated = victim.alive == false
+	findings.manual_reloading = commander.manual_reload_remaining > 0
+
+	-- let go, it takes up its move order again
+	pilots.clear(commander.id)
+	local before = commander.position.X
+	advance(2)
+	findings.resumed_orders = round(commander.position.X - before, 2)
+	return findings
+end
+
+-- A commander and transports: an enemy Hephaestus sent to load it should never get it aboard, and its own Hephaestus,
+-- shot down with it aboard, should take it down with it, leaving its wreck on the ground below and both as kills for
+-- whoever shot the transport down.
+local function transport_commander(_args: { [string]: any }): Findings
+	local commander = spawn("commander", OWN, 0, 0)
+	local thief = unkillable(spawn("hephaestus", ENEMY, 6, 0))
+	advance(config.TICK_DELTA)
+	orders.issue(thief, { { kind = "load", target_id = commander.id } }, false, false)
+	until_idle(thief, 10)
+	local enemy_loaded = #state.cargo_of(thief.id) > 0
+	state.mark_dead(thief)
+
+	local carrier = spawn("hephaestus", OWN, 6, 0)
+	local shooter = unkillable(spawn("commander", ENEMY, 300, 300))
+	advance(config.TICK_DELTA)
+	orders.issue(carrier, { { kind = "load", target_id = commander.id } }, false, false)
+	until_idle(carrier, 20)
+	local own_loaded = #state.cargo_of(carrier.id) > 0
+	-- up and away from where it was picked up before it is shot down
+	orders.issue(
+		carrier,
+		{ { kind = "move", position = heightmap.ground_position(40, 0), target_id = nil } },
+		false,
+		false
+	)
+	advance(4)
+	local hung_at = commander.position
+	local kills_before = shooter.kills
+	combat.apply_damage(carrier, carrier.health + 1, shooter.id)
+	advance(config.TICK_DELTA)
+
+	local wreck: Entity? = nil
+	for _, entity in state.all() do
+		if entity.alive and entity.kind == "wreck" and entity.def_name == "commander" then
+			wreck = entity
+		end
+	end
+	local ground = heightmap.height_at(hung_at.X, hung_at.Z)
+	return {
+		enemy_loaded = enemy_loaded,
+		own_loaded = own_loaded,
+		hung_height = round(hung_at.Y - ground, 2),
+		commander_alive = commander.alive,
+		still_carried = #state.carried(),
+		wreck = wreck ~= nil,
+		wreck_height = if wreck ~= nil
+			then round(wreck.position.Y - unit_defs.collider_height(unit_defs.of(wreck)) / 2 - ground, 2)
+			else nil,
+		wreck_offset = if wreck ~= nil
+			then round(((wreck.position - hung_at) * Vector3.new(1, 0, 1)).Magnitude, 2)
+			else nil,
+		kills = shooter.kills - kills_before,
+	}
+end
+
+-- Something hanging from a transport can still be targeted: a grunt carried by its own Hephaestus, hovering where it
+-- picked it up, is attacked by an enemy grunt told to, shot at by one left to pick its own targets, reclaimed by an
+-- enemy construction bot, and sent for by an enemy Hephaestus, each in a spot of its own. The carried grunt should die
+-- to the first two, leaving its wreck on the ground under it, be taken apart by the third, paying out its metal and
+-- leaving nothing, and never be taken from its transport by the fourth.
+local function transport_targets(_args: { [string]: any }): Findings
+	local function carried_grunt(x: number): (Entity, Entity, boolean)
+		local cargo = spawn("grunt", OWN, x, 0)
+		local carrier = unkillable(spawn("hephaestus", OWN, x + 6, 0))
+		advance(config.TICK_DELTA)
+		orders.issue(carrier, { { kind = "load", target_id = cargo.id } }, false, false)
+		until_idle(carrier, 20)
+		advance(1)
+		return cargo, carrier, #state.cargo_of(carrier.id) > 0
+	end
+
+	local function wreck_under(at: Vector3): Findings?
+		for _, entity in state.all() do
+			if entity.alive and entity.kind == "wreck" and entity.def_name == "grunt" then
+				local offset = (entity.position - at) * Vector3.new(1, 0, 1)
+				if offset.Magnitude < 10 then
+					local ground = heightmap.height_at(entity.position.X, entity.position.Z)
+					return {
+						height = round(
+							entity.position.Y - unit_defs.collider_height(unit_defs.of(entity)) / 2 - ground,
+							2
+						),
+						offset = round(offset.Magnitude, 2),
+					}
+				end
+			end
+		end
+		return nil
+	end
+
+	local function shot_at(x: number, ordered: boolean): Findings
+		local cargo, carrier, loaded = carried_grunt(x)
+		-- well within a grunt's reach of where the transport hovers
+		local shooter = unkillable(spawn("grunt", ENEMY, x + 15, 0))
+		advance(config.TICK_DELTA)
+		if ordered then
+			orders.issue(shooter, { { kind = "attack", target_id = cargo.id } }, false, false)
+		end
+		local hung_at = cargo.position
+		local started = sim_time
+		-- what the shooter makes of it a moment in, while it still hangs there
+		local seen: Findings? = nil
+		while cargo.alive and sim_time - started < 30 do
+			hung_at = cargo.position
+			advance(config.TICK_DELTA)
+			if seen == nil and sim_time - started >= 1 and cargo.alive then
+				seen = {
+					has_target = combat.has_target(shooter),
+					can_shoot = combat.can_shoot(shooter, cargo),
+					distance = round(((cargo.position - shooter.position) * Vector3.new(1, 0, 1)).Magnitude, 1),
+					cargo_damage = round(cargo.max_health - cargo.health, 1),
+				}
+			end
+		end
+		local killed_after = sim_time - started
+		advance(config.TICK_DELTA)
+		local findings = {
+			loaded = loaded,
+			hung_height = round(hung_at.Y - heightmap.height_at(hung_at.X, hung_at.Z), 2),
+			killed = cargo.alive == false,
+			seconds = round(killed_after, 2),
+			wreck = wreck_under(hung_at),
+			still_aboard = #state.cargo_of(carrier.id),
+			carrier_alive = carrier.alive,
+			seen = seen,
+			damage_dealt = round(shooter.damage_dealt, 1),
+		}
+		state.mark_dead(shooter)
+		state.mark_dead(cargo)
+		state.mark_dead(carrier)
+		advance(config.TICK_DELTA)
+		return findings
+	end
+
+	local findings: Findings = {
+		attacked = shot_at(-200, true),
+		auto_targeted = shot_at(0, false),
+	}
+
+	local cargo, carrier, loaded = carried_grunt(200)
+	local reclaimer = unkillable(spawn("construction_bot", ENEMY, 230, 0))
+	advance(config.TICK_DELTA)
+	if state.get_team(ENEMY) == nil then
+		state.create_team(ENEMY)
+	end
+	local team = state.get_team(ENEMY) :: types.Team
+	team.metal = 0
+	orders.issue(reclaimer, { { kind = "reclaim", target_id = cargo.id } }, false, false)
+	local hung_at = cargo.position
+	local started = sim_time
+	while cargo.alive and sim_time - started < 60 do
+		hung_at = cargo.position
+		advance(config.TICK_DELTA)
+	end
+	advance(config.TICK_DELTA)
+	findings.reclaimed = {
+		loaded = loaded,
+		gone = cargo.alive == false,
+		seconds = round(sim_time - started, 2),
+		metal = round(team.metal, 1),
+		grunt_metal = unit_defs.get("grunt").metal_cost,
+		wreck = wreck_under(hung_at) ~= nil,
+		still_aboard = #state.cargo_of(carrier.id),
+	}
+	state.mark_dead(reclaimer)
+	state.mark_dead(cargo)
+	state.mark_dead(carrier)
+	advance(config.TICK_DELTA)
+
+	local held, owner, owner_loaded = carried_grunt(0)
+	local thief = unkillable(spawn("hephaestus", ENEMY, 20, 0))
+	advance(config.TICK_DELTA)
+	orders.issue(thief, { { kind = "load", target_id = held.id } }, false, false)
+	until_idle(thief, 10)
+	findings.stolen = {
+		loaded = owner_loaded,
+		thief_holds = #state.cargo_of(thief.id),
+		owner_holds = #state.cargo_of(owner.id),
+	}
+	state.mark_dead(thief)
+	state.mark_dead(held)
+	state.mark_dead(owner)
+	advance(config.TICK_DELTA)
+	return findings
+end
+
+-- Self-destruct (server/self_destruct.luau): how long each countdown runs before the thing goes, BAR's roughly 6
+-- seconds for most, 1.6 for a wall and 11 for a Juggernaut, whether it left a wreck (only the commander should), and
+-- that toggling it again or stopping calls it off.
+local function self_destruct_test(args: { [string]: any }): Findings
+	local home = starts.default_spot(1)
+	local names: { string } = args.defs or { "grunt", "wall", "juggernaut", "commander" }
+	local findings: Findings = {}
+	for index, name in names do
+		-- far enough apart that no death explosion reaches the next one
+		local entity = spawn_resting(name, OWN, home.X + (index - 1) * 60, home.Y)
+		advance(config.TICK_DELTA)
+		self_destruct.toggle(entity)
+		local started = sim_time
+		while entity.alive and sim_time - started < 20 do
+			advance(config.TICK_DELTA)
+		end
+		local seconds = sim_time - started
+		advance(config.TICK_DELTA)
+		local wrecks = 0
+		for _, other in state.all() do
+			if other.alive and other.kind == "wreck" and other.def_name == name then
+				wrecks += 1
+			end
+		end
+		findings[name] = { seconds = round(seconds, 2), gone = entity.alive == false, wrecks = wrecks }
+	end
+
+	local toggled = spawn_resting("grunt", OWN, home.X, home.Y + 60)
+	local stopped = spawn_resting("grunt", OWN, home.X + 60, home.Y + 60)
+	advance(config.TICK_DELTA)
+	self_destruct.toggle(toggled)
+	self_destruct.toggle(stopped)
+	advance(2)
+	self_destruct.toggle(toggled)
+	self_destruct.cancel(stopped)
+	advance(10)
+	findings.toggled_off_alive = toggled.alive
+	findings.stopped_alive = stopped.alive
+	return findings
+end
+
+-- A mex placed at a metal spot, the way `commands` resolves a player's: queued by one builder, then placed at the same
+-- spot again by that builder, by another builder, and by no builder. Only the builder that queued it should snap past it.
+local function mex_queue_snap(_args: { [string]: any }): Findings
+	local placement = require(script.Parent.placement)
+	clear_world()
+	local spot = metal_spots.all()[1].center
+	local first = spawn("construction_bot", OWN, spot.X + 10, spot.Z + 10)
+	local second = spawn("construction_bot", OWN, spot.X + 10, spot.Z + 10)
+	advance(config.TICK_DELTA)
+	local queued = placement.resolve_center("metal_extractor", spot.X, spot.Z, 0, first.id) :: Vector3
+	orders.issue(
+		first,
+		{ { kind = "build", position = queued, target_id = nil, def_name = "metal_extractor", facing = 0 } },
+		false,
+		false
+	)
+	local same = placement.resolve_center("metal_extractor", spot.X, spot.Z, 0, first.id)
+	local other = placement.resolve_center("metal_extractor", spot.X, spot.Z, 0, second.id)
+	local nobody = placement.resolve_center("metal_extractor", spot.X, spot.Z, 0, nil)
+	clear_world()
+	return {
+		same_builder_snaps_past = same ~= nil and same ~= queued,
+		other_builder_takes_it = other == queued,
+		no_builder_snaps_past = nobody ~= nil and nobody ~= queued,
+	}
+end
+
+-- The Starlight's tachyon beam fires only into the half ahead of it, and it blows up when it dies. On flat open ground,
+-- a Starlight facing along z, left to itself, against a building it cannot kill 40 studs off at each of several
+-- bearings off its nose, for `args.seconds` (8 by default) each: how much damage that took. Then one told to attack a
+-- building right behind it, which it has to turn onto first. Then a Starlight killed beside an enemy building: how much
+-- its blast did to it.
+local function starlight(args: { [string]: any }): Findings
+	local nocost = require(script.Parent.nocost)
+	local seconds = args.seconds or 8
+	local ground = find_spot(function(x: number, z: number): boolean
+		local height = heightmap.height_at(x, z)
+		for dx = -40, 40, 20 do
+			for dz = -40, 40, 20 do
+				if
+					heightmap.water_depth(x + dx, z + dz) > 0
+					or math.abs(heightmap.height_at(x + dx, z + dz) - height) > 4
+				then
+					return false
+				end
+			end
+		end
+		return true
+	end)
+	assert(ground ~= nil, "no flat open ground on this map")
+	clear_world()
+	nocost.set(true)
+
+	-- damage done to a building at `bearing` degrees off a Starlight's nose, with or without an order to attack it
+	local function duel(bearing: number, ordered: boolean): number
+		local shooter = unkillable(spawn_resting("starlight", OWN, ground.X, ground.Z))
+		local angle = math.rad(bearing)
+		local target = unkillable(
+			spawn_resting("solar_collector", ENEMY, ground.X + math.sin(angle) * 40, ground.Z + math.cos(angle) * 40)
+		)
+		advance(config.TICK_DELTA)
+		if ordered then
+			orders.issue(shooter, { { kind = "attack", target_id = target.id } }, false, false)
+		end
+		advance(seconds)
+		local dealt = round(UNKILLABLE - target.health, 0)
+		clear_world()
+		return dealt
+	end
+
+	local findings: Findings = {}
+	for _, bearing in { 0, 60, 85, 95, 135, 180 } do
+		findings[`idle_{bearing}`] = duel(bearing, false)
+	end
+	findings.ordered_180 = duel(180, true)
+
+	local victim = unkillable(spawn_resting("solar_collector", ENEMY, ground.X + 12, ground.Z))
+	local doomed = spawn_resting("starlight", OWN, ground.X, ground.Z)
+	advance(config.TICK_DELTA)
+	combat.apply_damage(doomed, doomed.health + 1)
+	advance(config.TICK_DELTA)
+	findings.blast_damage_at_12 = round(UNKILLABLE - victim.health, 0)
+	clear_world()
+	nocost.set(false)
+	return findings
+end
+
+-- A piloted anti air bot with its trigger held, aimed near an enemy aircraft coming at it, `args.prey` or a Whirlwind:
+-- well off it, 40 degrees, it fires where it is aimed, unguided, and misses; within a few degrees of it, it locks on to
+-- it and hits it. Then a piloted Tyrannus with its plasma chosen and the trigger up, with that aircraft over it: its
+-- anti air missiles, not chosen, hold their fire.
+local function pilot_aa(args: { [string]: any }): Findings
+	local findings: Findings = {}
+	local launcher = unkillable(spawn("trasher", OWN, 0, 0))
+	local bait = unkillable(spawn("solar_collector", OWN, 30, 0))
+	local prey = unkillable(spawn(args.prey or "whirlwind", ENEMY, -250, 40))
+	advance(config.TICK_DELTA)
+	orders.issue(prey, { { kind = "attack", target_id = bait.id } }, false, false)
+	local pilot: pilots.Pilot = {
+		player = nil :: any,
+		steer = Vector3.zero,
+		facing = 0,
+		aim = nil,
+		target_id = nil,
+		firing = true,
+		weapon = 1,
+		lift = 0,
+		height = nil,
+		loadable = nil,
+		can_unload = false,
+		transporter = nil,
+		rider = nil,
+		called = nil,
+		call_lost_at = nil,
+		-- never goes quiet
+		heard_at = math.huge,
+	}
+	pilots.set(launcher.id, pilot)
+	-- aims `angle` round from the aircraft, as far again past it
+	local function aim_off(angle: number): () -> ()
+		return function()
+			local to = prey.position - launcher.position
+			pilot.aim = launcher.position + CFrame.Angles(0, angle, 0):VectorToWorldSpace(to) * 2
+		end
+	end
+	aim_off(math.rad(40))()
+	advance(10, aim_off(math.rad(40)))
+	local shots = combat.shots_of(launcher.id, 1)
+	findings.shots_aimed_40_off = shots
+	findings.damage_aimed_40_off = round(UNKILLABLE - prey.health, 1)
+	local health = prey.health
+	advance(10, aim_off(math.rad(6)))
+	findings.shots_aimed_6_off = combat.shots_of(launcher.id, 1) - shots
+	findings.damage_aimed_6_off = round(health - prey.health, 1)
+	pilots.clear(launcher.id)
+
+	local fortress = unkillable(spawn("tyrannus", OWN, 10, 10))
+	advance(config.TICK_DELTA)
+	pilot.firing = false
+	pilot.weapon = 1
+	pilot.aim = nil
+	pilots.set(fortress.id, pilot)
+	advance(5)
+	findings.unchosen_aa_shots = combat.shots_of(fortress.id, 3)
+	pilots.clear(fortress.id)
+	return findings
+end
+
+-- Airlifting while piloting. A piloted Hercules over a Grunt, brought down onto it, has it in its hook's reach and picks
+-- it up when asked (J); taken back up it cannot set it down, and brought down again it can, and does (U). Then the
+-- Grunt, piloted, calls the Hercules over (G), is picked up, and its pilot finds themself piloting the Hercules; set
+-- down again, they are back in the Grunt.
+-- Nobody joins a test, so a Folder stands in for the pilot's player, which is only asked for its attributes.
+local function pilot_airlift(_: { [string]: any }): Findings
+	local findings: Findings = {}
+	local grunt = spawn("grunt", OWN, 0, 0)
+	local hercules = spawn("hercules", OWN, 0, 0)
+	advance(config.TICK_DELTA)
+	local player = Instance.new "Folder"
+	local function new_pilot(entity: Entity): pilots.Pilot
+		return {
+			player = player :: any,
+			steer = Vector3.zero,
+			facing = entity.facing,
+			aim = nil,
+			target_id = nil,
+			firing = false,
+			weapon = nil,
+			lift = 0,
+			height = nil,
+			loadable = nil,
+			can_unload = false,
+			transporter = nil,
+			rider = nil,
+			called = nil,
+			call_lost_at = nil,
+			-- never goes quiet
+			heard_at = math.huge,
+		}
+	end
+
+	local flying = new_pilot(hercules)
+	pilots.set(hercules.id, flying)
+	player:SetAttribute(piloting.PLAYER_ATTRIBUTE, hercules.id)
+	flying.lift = 1
+	advance(3)
+	findings.climbed_to = round(flying.height or 0, 2)
+	findings.can_load_high = flying.loadable ~= nil
+	flying.lift = -1
+	advance(6)
+	findings.can_load_low = flying.loadable ~= nil
+	possession.request_cargo(hercules.id, "load")
+	advance(config.TICK_DELTA * 2)
+	findings.loaded = state.carrier_of(grunt.id) == hercules.id
+	flying.lift = 1
+	advance(3)
+	findings.can_unload_high = flying.can_unload
+	flying.lift = -1
+	advance(6)
+	findings.can_unload_low = flying.can_unload
+	possession.request_cargo(hercules.id, "unload")
+	advance(config.TICK_DELTA * 2)
+	findings.unloaded = state.carrier_of(grunt.id) == nil and state.get(grunt.id) ~= nil
+	pilots.clear(hercules.id)
+
+	-- the Hercules goes back up and off to one side, and the Grunt, piloted, calls it
+	orders.issue(
+		hercules,
+		{ { kind = "move", position = heightmap.ground_position(40, 0), target_id = nil } },
+		false,
+		false
+	)
+	advance(8)
+	local walking = new_pilot(grunt)
+	pilots.set(grunt.id, walking)
+	player:SetAttribute(piloting.PLAYER_ATTRIBUTE, grunt.id)
+	advance(config.TICK_DELTA * 2)
+	findings.transporter_near = walking.transporter == hercules.id
+	possession.request_cargo(grunt.id, "call")
+	local waited = 0
+	while state.carrier_of(grunt.id) == nil and waited < 30 do
+		advance(0.5)
+		waited += 0.5
+	end
+	advance(config.TICK_DELTA * 2)
+	findings.called_and_carried = state.carrier_of(grunt.id) == hercules.id
+	findings.call_seconds = waited
+	findings.now_piloting_hercules = pilots.get(hercules.id) ~= nil
+		and pilots.get(grunt.id) == nil
+		and player:GetAttribute(piloting.PLAYER_ATTRIBUTE) == hercules.id
+
+	-- brought down and set down, the pilot is back in the Grunt
+	local carrying = pilots.get(hercules.id)
+	if carrying ~= nil then
+		carrying.lift = -1
+		advance(6)
+		possession.request_cargo(hercules.id, "unload")
+		advance(config.TICK_DELTA * 2)
+	end
+	findings.back_in_grunt = pilots.get(grunt.id) ~= nil
+		and pilots.get(hercules.id) == nil
+		and player:GetAttribute(piloting.PLAYER_ATTRIBUTE) == grunt.id
+
+	-- called again from further off, the Hercules is shot down on its way, and the Grunt's pilot is told so
+	local again = pilots.get(grunt.id)
+	if again ~= nil then
+		orders.issue(
+			hercules,
+			{ { kind = "move", position = heightmap.ground_position(40, 0), target_id = nil } },
+			false,
+			false
+		)
+		advance(8)
+		possession.request_cargo(grunt.id, "call")
+		advance(config.TICK_DELTA * 2)
+		findings.call_coming = again.called == hercules.id
+		combat.apply_damage(hercules, hercules.health * 10, nil, ENEMY)
+		advance(config.TICK_DELTA * 3)
+		findings.call_lost = again.called == nil and again.call_lost_at ~= nil
+	end
+	pilots.clear(grunt.id)
+	pilots.clear(hercules.id)
+	player:Destroy()
+	return findings
+end
+
+-- A piloted `args.unit`, a Stronghold unless told otherwise, up at its usual height, firing level at a point far past its
+-- range: how far along the ground from it any of its shots got before it came down, against its range.
+local function bolt_falloff(args: { [string]: any }): Findings
+	local geometry = require(ReplicatedStorage.Shared.geometry)
+	local unit = spawn(args.unit or "stronghold", OWN, -200, 0)
+	local def = unit_defs.get(unit.def_name)
+	local weapon = (def.weapons :: { types.Weapon })[1]
+	local pilot: pilots.Pilot = {
+		player = nil :: any,
+		steer = Vector3.zero,
+		facing = math.pi / 2,
+		aim = nil,
+		target_id = nil,
+		firing = false,
+		weapon = 1,
+		lift = 0,
+		height = nil,
+		loadable = nil,
+		can_unload = false,
+		transporter = nil,
+		rider = nil,
+		called = nil,
+		call_lost_at = nil,
+		-- never goes quiet
+		heard_at = math.huge,
+	}
+	pilots.set(unit.id, pilot)
+	-- up to its height first
+	advance(6)
+	pilot.firing = true
+	local furthest = 0
+	advance(6, function()
+		pilot.aim = unit.position + Vector3.new(weapon.range * 20, 0, 0)
+		for _, projectile in projectiles.in_flight() do
+			if projectile.owner_id == unit.id then
+				furthest = math.max(furthest, geometry.distance_2d(projectile.flight.position, unit.position))
+			end
+		end
+	end)
+	pilots.clear(unit.id)
+	return {
+		range = round(weapon.range, 1),
+		furthest = round(furthest, 1),
+		furthest_over_range = round(furthest / weapon.range, 2),
+		shots = combat.shots_of(unit.id, 1),
+	}
+end
+
+-- unally (alliances.leave) and a shared team's single starting force (spawning.owns_anything). Teams 1-4 in one
+-- alliance: 3 leaves from the middle and 4, its root, leaves after; 1 and 2 stay allied throughout.
+local function unally_test(_args: { [string]: any }): Findings
+	for team_id = 1, 5 do
+		if state.get_team(team_id) == nil then
+			state.create_team(team_id)
+		end
+	end
+	alliances.ally(1, 2)
+	alliances.ally(2, 3)
+	alliances.ally(3, 4)
+	local root_before = alliances.root_of(1)
+	local left_3 = alliances.leave(3)
+	local after_3 = {
+		one_two = alliances.are_allied(1, 2),
+		one_four = alliances.are_allied(1, 4),
+		three_one = alliances.are_allied(3, 1),
+		three_four = alliances.are_allied(3, 4),
+		three_may_harm_one = alliances.may_harm(3, 1),
+	}
+	local left_3_again = alliances.leave(3)
+	local left_4 = alliances.leave(4)
+	local after_4 = {
+		one_two = alliances.are_allied(1, 2),
+		four_one = alliances.are_allied(4, 1),
+		group_of_1 = table.concat(alliances.group_of(1, state.all_teams()), ","),
+	}
+
+	-- team 5 has nothing until its starting force goes down, and then gets no second one
+	local owned_before = spawning.owns_anything(5)
+	spawning.give_starting_force(5)
+	local owned_after = spawning.owns_anything(5)
+	local commanders = 0
+	for _, entity in state.all() do
+		if entity.team == 5 and entity.def_name == "commander" then
+			commanders += 1
+		end
+	end
+
+	return {
+		root_before = root_before,
+		left_3 = left_3,
+		after_3 = after_3,
+		left_3_again = left_3_again,
+		left_4 = left_4,
+		after_4 = after_4,
+		owned_before = owned_before,
+		owned_after = owned_after,
+		commanders = commanders,
+		ok = left_3
+			and after_3.one_two
+			and after_3.one_four
+			and not after_3.three_one
+			and not after_3.three_four
+			and after_3.three_may_harm_one
+			and not left_3_again
+			and left_4
+			and after_4.one_two
+			and not after_4.four_one
+			and after_4.group_of_1 == "1,2"
+			and not owned_before
+			and owned_after
+			and commanders == 1,
+	}
+end
+
+-- The Thor and the Behemoth (unit_defs/t3.luau). A Thor on an attack order against a target in a crowd: how much of its
+-- lightning the target and the crowd took, how many of the crowd its sparks reached, and whether its own side's unit
+-- beside the target was sparked too. Then its stockpiled EMP missile, launched at the target on an order. Then its EMP
+-- lasers with an enemy off its right flank only: which of the two fired. Then a Behemoth firing its gauss cannon (with
+-- no energy, so its lasers hold fire) at the nearest of a column of units straight ahead: what each took, and whether
+-- the ball was gone by the end.
+local function t3_test(args: { [string]: any }): Findings
+	local nocost = require(script.Parent.nocost)
+	-- on the flattest dry ground there is, so that no hill between them gets in the way of a shot
+	local spot: Vector3? = nil
+	local flattest = math.huge
+	local extent = math.min(heightmap.half_extents()) - 60
+	for x = -extent, extent, 16 do
+		task.wait()
+		for z = -extent, extent, 16 do
+			local low, high = math.huge, -math.huge
+			for dx = -15, 30, 5 do
+				for dz = -15, 55, 5 do
+					local y = heightmap.height_at(x + dx, z + dz)
+					low, high = math.min(low, y), math.max(high, y)
+				end
+			end
+			if low > config.WATER_LEVEL + 1 and high - low < flattest then
+				spot = Vector3.new(x, 0, z)
+				flattest = high - low
+			end
+		end
+	end
+	if spot == nil then
+		return { error = "no dry ground" }
+	end
+	local function put(def_name: string, team: TeamId, x: number, z: number): Entity
+		return spawn_resting(def_name, team, spot.X + x, spot.Z + z)
+	end
+	local function sturdy(def_name: string, team: TeamId, x: number, z: number): Entity
+		return unkillable(put(def_name, team, x, z))
+	end
+	nocost.set(true)
+
+	local thor = put("thor", OWN, 0, 0)
+	local target = sturdy("grunt", ENEMY, 0, 40)
+	local crowd: { Entity } = {}
+	for index = 1, 7 do
+		local angle = index * 2 * math.pi / 7
+		table.insert(crowd, sturdy("grunt", ENEMY, math.sin(angle) * 5, 40 + math.cos(angle) * 5))
+	end
+	local friend = sturdy("grunt", OWN, 0, 42.5)
+	advance(config.TICK_DELTA)
+	orders.issue(thor, { { kind = "attack", target_id = target.id } }, false, false)
+	advance(args.seconds or 3)
+	local crowd_lost, crowd_hit = 0, 0
+	for _, other in crowd do
+		local lost = UNKILLABLE - other.health
+		crowd_lost += lost
+		if lost > 0 then
+			crowd_hit += 1
+		end
+	end
+	local lightning = {
+		bolts = combat.shots_of(thor.id, 1),
+		target_lost = round(UNKILLABLE - target.health, 1),
+		crowd_lost = round(crowd_lost, 1),
+		crowd_hit = crowd_hit,
+		friend_lost = round(UNKILLABLE - friend.health, 1),
+		thor_lost = round(thor.max_health - thor.health, 1),
+	}
+
+	-- EMP stuns only what it fills past its max health, so the target is made stunnable, and sturdy enough to outlast
+	-- the lightning meanwhile
+	target.max_health = 20000
+	target.health = 20000
+	thor.weapon_stockpiles[2] = 1
+	orders.issue(thor, { { kind = "attack", target_id = target.id } }, false, false)
+	advance(args.missile_seconds or 8)
+	local missile = {
+		launched = thor.weapon_stockpiles[2] < 1,
+		target_stunned = emp.is_stunned(target),
+		target_stun_left = round(emp.seconds_left(target) or 0, 2),
+	}
+	for _, entity in state.all() do
+		state.mark_dead(entity)
+	end
+	advance(config.TICK_DELTA)
+
+	-- facing 0 is +Z, so +X is along `fire_direction` +90 degrees, weapon 4's
+	local flanked = put("thor", OWN, 0, 0)
+	sturdy("grunt", ENEMY, 20, 0)
+	advance(args.flank_seconds or 2)
+	local flanks = { minus_90 = combat.shots_of(flanked.id, 3), plus_90 = combat.shots_of(flanked.id, 4) }
+	for _, entity in state.all() do
+		state.mark_dead(entity)
+	end
+	advance(config.TICK_DELTA)
+
+	nocost.set(false)
+	local behemoth = put("behemoth", OWN, 0, 0)
+	local column: { Entity } = {}
+	for index = 0, 3 do
+		table.insert(column, sturdy("grunt", ENEMY, 0, 25 + index * 3))
+	end
+	advance(config.TICK_DELTA)
+	orders.issue(behemoth, { { kind = "attack", target_id = column[1].id } }, false, false)
+	advance(args.gauss_seconds or 3)
+	local taken = {}
+	for _, other in column do
+		table.insert(taken, round(UNKILLABLE - other.health, 1))
+	end
+	local gauss = {
+		shots = combat.shots_of(behemoth.id, 1),
+		laser_shots = combat.shots_of(behemoth.id, 2)
+			+ combat.shots_of(behemoth.id, 3)
+			+ combat.shots_of(behemoth.id, 4),
+		column_taken = taken,
+		in_flight = #projectiles.in_flight(),
+	}
+	for _, entity in state.all() do
+		state.mark_dead(entity)
+	end
+	advance(config.TICK_DELTA)
+
+	return {
+		ground_spread = round(flattest, 2),
+		lightning = lightning,
+		missile = missile,
+		flanks = flanks,
+		gauss = gauss,
+	}
+end
+
+-- The vote on going on to the next campaign mission (campaign_exit.tally): carried once more than half of the voters
+-- here agree, one press when there is only one of them, and someone who leaves counted neither for nor against it.
+-- Nobody joins a test session, so it is the tally itself that is looked at, with made-up user ids.
+local function campaign_vote(_args: { [string]: any }): Findings
+	local function carried(voters: { number }, agreeing: { number }): boolean
+		local set: { [number]: boolean } = {}
+		for _, user_id in agreeing do
+			set[user_id] = true
+		end
+		local count, needed = campaign_exit.tally(voters, set)
+		return count >= needed
+	end
+	local cases: { { name: string, voters: { number }, agreeing: { number }, carried: boolean } } = {
+		{ name = "alone, pressed", voters = { 1 }, agreeing = { 1 }, carried = true },
+		{ name = "alone, not pressed", voters = { 1 }, agreeing = {}, carried = false },
+		{ name = "1 of 2", voters = { 1, 2 }, agreeing = { 1 }, carried = false },
+		{ name = "2 of 2", voters = { 1, 2 }, agreeing = { 1, 2 }, carried = true },
+		{ name = "1 of 3", voters = { 1, 2, 3 }, agreeing = { 2 }, carried = false },
+		{ name = "2 of 3", voters = { 1, 2, 3 }, agreeing = { 1, 3 }, carried = true },
+		{ name = "2 of 4", voters = { 1, 2, 3, 4 }, agreeing = { 1, 2 }, carried = false },
+		{ name = "3 of 4", voters = { 1, 2, 3, 4 }, agreeing = { 1, 2, 4 }, carried = true },
+		-- 1 of 3 agreed, and one who had not left: 1 of 2 is still not more than half
+		{ name = "1 of 3, a holdout left", voters = { 1, 2 }, agreeing = { 1 }, carried = false },
+		-- 1 of 3 agreed, and both who had not left: the one left carries it
+		{ name = "1 of 3, both holdouts left", voters = { 1 }, agreeing = { 1 }, carried = true },
+		-- 2 of 3 agreed, and one of them left: their agreeing goes with them
+		{ name = "2 of 3, one who agreed left", voters = { 2, 3 }, agreeing = { 1, 2 }, carried = false },
+	}
+	local wrong: { string } = {}
+	for _, case in cases do
+		if carried(case.voters, case.agreeing) ~= case.carried then
+			table.insert(wrong, case.name)
+		end
+	end
+	return {
+		pass = #wrong == 0,
+		cases = #cases,
+		wrong = wrong,
+	}
+end
+
+-- Guarding an ally's unit (orders' run_guard, commands' may_guard), with OWN and ALLY allied and ENEMY against both.
+-- A grunt of OWN's guards one of ALLY's that walks off: how far apart they end up and whether it is still guarding.
+-- Then an enemy grunt attacks the ally's: the shots the guard fires meanwhile. Then a Construction Bot of OWN's guards
+-- one of ALLY's that builds a solar collector: for how many ticks it worked on the ally's blueprint, and whether that
+-- was finished. Then whether a guard of an enemy's unit is refused, as a command and as an order that got through
+-- anyway. Last, ALLY leaves the alliance: whether both guard orders are dropped.
+local function ally_guard(_args: { [string]: any }): Findings
+	local geometry = require(ReplicatedStorage.Shared.geometry)
+	local commands = require(script.Parent.commands)
+	local construction = require(script.Parent.construction)
+	local placement = require(script.Parent.placement)
+	local ALLY: TeamId = 3
+	for _, team_id in { OWN, ENEMY, ALLY } do
+		if state.get_team(team_id) == nil then
+			state.create_team(team_id)
+		end
+		local team = state.get_team(team_id) :: types.Team
+		team.metal = team.metal_capacity
+		team.energy = team.energy_capacity
+	end
+	alliances.ally(OWN, ALLY)
+	local home = starts.default_spot(1)
+
+	local function guarding(entity: Entity): boolean
+		return entity.orders[1] ~= nil and entity.orders[1].kind == "guard"
+	end
+
+	-- following: the ally's grunt walks 60 studs off and the guard keeps up
+	-- each resting on the ground, since one that stands still is never lifted to it, and one sunk into it is hidden
+	-- from every shot
+	local guarded = unkillable(spawn_resting("grunt", ALLY, home.X, home.Y))
+	local guard = unkillable(spawn_resting("grunt", OWN, home.X - 12, home.Y))
+	local own_grunt = spawn_resting("grunt", OWN, home.X - 12, home.Y + 12)
+	local enemy_grunt = unkillable(spawn_resting("grunt", ENEMY, home.X + 150, home.Y + 150))
+	local may = {
+		own = commands.may_guard(OWN, own_grunt),
+		ally = commands.may_guard(OWN, guarded),
+		enemy = commands.may_guard(OWN, enemy_grunt),
+		nobody = commands.may_guard(nil, guarded),
+	}
+	orders.issue(guard, { { kind = "guard", position = nil, target_id = guarded.id } }, false, false)
+	local walk_to = heightmap.ground_position(home.X + 60, home.Y)
+	orders.issue(guarded, { { kind = "move", position = walk_to, target_id = nil } }, false, false)
+	advance(20)
+	local follow = {
+		ally_left_to_go = round(geometry.distance_2d(guarded.position, walk_to), 1),
+		apart = round(geometry.distance_2d(guard.position, guarded.position), 1),
+		still_guarding = guarding(guard),
+	}
+
+	-- fighting: an enemy grunt comes up to the ally's and attacks it; the guard beside it shoots back. The attacker
+	-- cannot be killed, since the ally's grunt shoots back too and a dead one's count of shots is forgotten with it.
+	local range = unit_defs.attack_range(unit_defs.get "grunt") :: number
+	local attacker = unkillable(spawn_resting("grunt", ENEMY, guarded.position.X, guarded.position.Z + range * 0.6))
+	orders.issue(attacker, { { kind = "attack", position = nil, target_id = guarded.id } }, false, false)
+	-- the guard's gun is still reloading as the attack starts, so the attacker gets its shots in first and the guard
+	-- is seen answering an attack rather than getting in ahead of it
+	guard.weapon_reloads[1] = 3
+	local shots_before = combat.shots_of(guard.id, 1)
+	local guarded_health = guarded.health
+	advance(10)
+	local fight = {
+		range = round(range, 1),
+		guard_to_attacker = round(geometry.distance_2d(guard.position, attacker.position), 1),
+		attacker_shots = combat.shots_of(attacker.id, 1),
+		ally_damage = round(guarded_health - guarded.health, 1),
+		guard_shots = combat.shots_of(guard.id, 1) - shots_before,
+		-- dealt by the guard and the ally's grunt together
+		attacker_damage = round(UNKILLABLE - attacker.health, 1),
+		still_guarding = guarding(guard),
+	}
+	state.mark_dead(attacker)
+	advance(config.TICK_DELTA)
+
+	-- assisting: a Construction Bot of OWN's guards one of ALLY's that builds a solar collector
+	local site_x, site_z = home.X - 40, home.Y - 40
+	local ally_bot = unkillable(spawn_resting("construction_bot", ALLY, site_x, site_z + 20))
+	local own_bot = unkillable(spawn_resting("construction_bot", OWN, site_x - 20, site_z + 20))
+	advance(config.TICK_DELTA)
+	local site = placement.resolve_center("solar_collector", site_x, site_z, 0, ally_bot.id)
+		or heightmap.ground_position(site_x, site_z)
+	orders.issue(own_bot, { { kind = "guard", position = nil, target_id = ally_bot.id } }, false, false)
+	orders.issue(
+		ally_bot,
+		{ { kind = "build", position = site, target_id = nil, def_name = "solar_collector", facing = 0 } },
+		false,
+		false
+	)
+	local ally_ticks, assisting_ticks = 0, 0
+	local finished = false
+	local deadline = sim_time + 40
+	while sim_time < deadline and finished == false do
+		advance(config.TICK_DELTA)
+		local blueprint = construction.recent_target_of(ally_bot.id)
+		if blueprint ~= nil then
+			ally_ticks += 1
+			if construction.recent_target_of(own_bot.id) == blueprint then
+				assisting_ticks += 1
+			end
+		end
+		for _, entity in state.all() do
+			if entity.def_name == "solar_collector" and entity.team == ALLY and entity.state == "active" then
+				finished = true
+			end
+		end
+	end
+	local assist = {
+		ally_ticks = ally_ticks,
+		assisting_ticks = assisting_ticks,
+		finished = finished,
+		still_guarding = guarding(own_bot),
+	}
+
+	-- an enemy's unit: refused as a command (`may` above), and dropped as an order that got through anyway
+	orders.issue(own_grunt, { { kind = "guard", position = nil, target_id = enemy_grunt.id } }, false, false)
+	advance(config.TICK_DELTA * 2)
+	local enemy_order_dropped = #own_grunt.orders == 0
+
+	-- the alliance ends: both guards let go
+	local guarding_before_leave = guarding(guard) and guarding(own_bot)
+	local left = alliances.leave(ALLY)
+	advance(config.TICK_DELTA * 2)
+	local dropped_on_leave = guarding(guard) == false and guarding(own_bot) == false
+
+	clear_world()
+	return {
+		may_guard = may,
+		follow = follow,
+		fight = fight,
+		assist = assist,
+		enemy_order_dropped = enemy_order_dropped,
+		guarding_before_leave = guarding_before_leave,
+		left = left,
+		dropped_on_leave = dropped_on_leave,
+		pass = may.own
+			and may.ally
+			and may.enemy == false
+			and may.nobody == false
+			and follow.still_guarding
+			and follow.apart < 16
+			and fight.attacker_shots > 0
+			and fight.ally_damage > 0
+			and fight.guard_shots > 0
+			and fight.attacker_damage > 0
+			and fight.still_guarding
+			and assist.assisting_ticks > 0
+			and assist.finished
+			and enemy_order_dropped
+			and guarding_before_leave
+			and left
+			and dropped_on_leave,
+	}
+end
+
 local TESTS: { [string]: (args: { [string]: any }) -> Findings } = {
+	ally_guard = ally_guard,
+	campaign_vote = campaign_vote,
+	t3 = t3_test,
+	unally = unally_test,
+	bolt_falloff = bolt_falloff,
+	pilot_airlift = pilot_airlift,
+	pilot_aa = pilot_aa,
+	starlight = starlight,
+	mex_queue_snap = mex_queue_snap,
+	self_destruct = self_destruct_test,
+	pilot = pilot_test,
 	ai_danger = ai_danger,
+	ai_roster = ai_roster,
+	ai_defense = ai_defense,
+	ai_raids = ai_raids,
+	ai_waves = ai_waves,
+	ai_add = ai_add_test,
 	ai_match = ai_match,
 	air_ring = air_ring,
 	gunship_ring = gunship_ring,
@@ -4176,10 +7221,16 @@ local TESTS: { [string]: (args: { [string]: any }) -> Findings } = {
 	tutorial_victory = tutorial_victory,
 	overlook = overlook,
 	load_mission = load_mission,
+	overlook_defense = overlook_defense,
+	counterattack_rez = counterattack_rez,
+	rez_repair = rez_repair,
+	counterattack_balance = counterattack_balance,
 	resource_sharing = resource_sharing,
+	notifications = notifications_test,
 	ally_griefing = ally_griefing,
 	experience = experience,
 	match_stats = match_stats_test,
+	conquest = conquest_test,
 	match = match_test,
 	resource_bonus = resource_bonus,
 	load_map = load_map,
@@ -4195,6 +7246,7 @@ local TESTS: { [string]: (args: { [string]: any }) -> Findings } = {
 	reclaim_income = reclaim_income,
 	geothermal = geothermal,
 	nuke_manual = nuke_manual,
+	anti_nuke = anti_nuke,
 	hit_control = hit_control,
 	wing_edges = wing_edges,
 	build_route = build_route,
@@ -4204,16 +7256,22 @@ local TESTS: { [string]: (args: { [string]: any }) -> Findings } = {
 	turret = turret,
 	beam = beam,
 	bombing = bombing,
+	emp = emp_test,
 	fighter = fighter,
 	aa_missiles = aa_missiles,
 	transport_pickup = transport_pickup,
+	transport_commander = transport_commander,
+	transport_targets = transport_targets,
 	scavenger_hunt = scavenger_hunt,
 	scavenger_opening = scavenger_opening,
 	scavenger_endgame = scavenger_endgame,
 	scavenger_stranded = scavenger_stranded,
 	naval = naval,
+	naval_arcs = naval_arcs,
 	hovercraft = hovercraft,
 	hover_reach = hover_reach,
+	map_designs = map_designs_test,
+	prairie = prairie_test,
 }
 
 -- The arguments the session was started with, if a Studio plugin started it with a table of them.

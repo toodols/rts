@@ -109,6 +109,22 @@ local function can_start_at(x: number, z: number): boolean
 	return fits(x, z)
 end
 
+-- The ground in box `index` nearest (x, z) that a team can start on, or nil if there is none near.
+local function nearest_start(index: number, x: number, z: number): Vector2?
+	for radius = 0, SEARCH_RADIUS, SEARCH_STEP do
+		local around = math.max(1, math.ceil(math.pi * 2 * radius / SEARCH_STEP))
+		for step = 0, around - 1 do
+			local angle = step * (math.pi * 2 / around)
+			local at_x = x + math.cos(angle) * radius
+			local at_z = z + math.sin(angle) * radius
+			if in_box(index, at_x, at_z) and fits(at_x, at_z) then
+				return Vector2.new(at_x, at_z)
+			end
+		end
+	end
+	return nil
+end
+
 -- Where to start in box `index` for a player who has not chosen: the start nearest its middle that is in it, or the
 -- ground nearest its middle that a team can start on, or its middle if there is none.
 local function default_spot(index: number): Vector2
@@ -122,21 +138,7 @@ local function default_spot(index: number): Vector2
 			best = start
 		end
 	end
-	if best ~= nil then
-		return best
-	end
-	for radius = 0, SEARCH_RADIUS, SEARCH_STEP do
-		local around = math.max(1, math.ceil(math.pi * 2 * radius / SEARCH_STEP))
-		for step = 0, around - 1 do
-			local angle = step * (math.pi * 2 / around)
-			local x = middle.X + math.cos(angle) * radius
-			local z = middle.Y + math.sin(angle) * radius
-			if in_box(index, x, z) and fits(x, z) then
-				return Vector2.new(x, z)
-			end
-		end
-	end
-	return middle
+	return best or nearest_start(index, middle.X, middle.Y) or middle
 end
 
 return table.freeze({
@@ -147,5 +149,6 @@ return table.freeze({
 	box = box,
 	in_box = in_box,
 	can_start_at = can_start_at,
+	nearest_start = nearest_start,
 	default_spot = default_spot,
 })

@@ -19,6 +19,7 @@ local state = require(script.Parent.state)
 local alliances = require(script.Parent.alliances)
 local players = require(script.Parent.players)
 local economy = require(script.Parent.economy)
+local notifications = require(script.Parent.notifications)
 
 type TeamId = types.TeamId
 type Team = types.Team
@@ -122,6 +123,7 @@ local function give(from: TeamId, to: TeamId, resource: "metal" | "energy", amou
 	if resource == "metal" then
 		giver.metal -= banked
 		economy.record_spent(from, banked, 0)
+		notifications.metal_sent(from, to, banked)
 	else
 		giver.energy -= banked
 		economy.record_spent(from, 0, banked)

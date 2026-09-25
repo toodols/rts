@@ -12,10 +12,13 @@ local build_menu = require(ReplicatedStorage.Client.ui.build_menu)
 local command_panel = require(ReplicatedStorage.Client.ui.command_panel)
 local selection_box = require(ReplicatedStorage.Client.ui.selection_box)
 local world_bars = require(ReplicatedStorage.Client.ui.world_bars)
+local ping_markers = require(ReplicatedStorage.Client.ui.ping_markers)
+local pilot_hud = require(ReplicatedStorage.Client.ui.pilot_hud)
 local lobby_panel = require(ReplicatedStorage.Client.ui.lobby_panel)
 local victory_screen = require(ReplicatedStorage.Client.ui.victory_screen)
 local pause_overlay = require(ReplicatedStorage.Client.ui.pause_overlay)
 local player_list = require(ReplicatedStorage.Client.ui.player_list)
+local notifications = require(ReplicatedStorage.Client.ui.notifications)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
 local tutorial = require(ReplicatedStorage.Client.ui.tutorial)
 local use_mission = require(ReplicatedStorage.Client.ui.use_mission)
@@ -62,6 +65,7 @@ local function Main()
 		PlacementProblem = React.createElement(PlacementProblem),
 		ModeHint = React.createElement(ModeHint),
 		PlayerList = React.createElement(player_list.PlayerList),
+		Notifications = React.createElement(notifications.Notifications),
 		LobbyPanel = React.createElement(lobby_panel.LobbyPanel),
 		PauseOverlay = React.createElement(pause_overlay.PauseOverlay),
 		VictoryScreen = React.createElement(victory_screen.VictoryScreen),
@@ -77,6 +81,21 @@ local function Overlay()
 			StyleSheet = stylesheets.default_stylesheet,
 		}),
 		WorldBars = React.createElement(world_bars.WorldBars),
+		-- the crosshair has to be in the very middle of the view, which only a GUI that ignores the inset has
+		PilotHud = React.createElement(pilot_hud.PilotHud),
+		-- what piloted units say, over them, which everyone sees
+		PilotCallouts = React.createElement(pilot_hud.PilotCallouts),
+	})
+end
+
+-- The pings' names and the arrows to those off screen, in a GUI of their own over the HUD, so that an arrow along
+-- the bottom edge is not lost behind the panels there; it ignores the inset for the same reason the bars' does.
+local function Pings()
+	return React.createElement(React.Fragment, {}, {
+		StyleLink = React.createElement("StyleLink", {
+			StyleSheet = stylesheets.default_stylesheet,
+		}),
+		PingMarkers = React.createElement(ping_markers.PingMarkers),
 	})
 end
 
@@ -106,6 +125,16 @@ local function init_ui()
 	overlay.Parent = player:WaitForChild "PlayerGui"
 
 	ReactRoblox.createRoot(overlay):render(React.createElement(Overlay))
+
+	local pings = Instance.new "ScreenGui"
+	pings.Name = "Pings"
+	pings.ResetOnSpawn = false
+	pings.IgnoreGuiInset = true
+	pings.DisplayOrder = 1
+	pings.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	pings.Parent = player:WaitForChild "PlayerGui"
+
+	ReactRoblox.createRoot(pings):render(React.createElement(Pings))
 end
 
 return table.freeze({

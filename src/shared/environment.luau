@@ -39,6 +39,11 @@ local function tidal_strength(): number
 	return read(TIDAL_ATTRIBUTE, config.TIDAL_STRENGTH)
 end
 
+-- Fires when the tidal strength is set, so a readout of it can follow.
+local function tidal_strength_changed(): RBXScriptSignal
+	return Workspace:GetAttributeChangedSignal(TIDAL_ATTRIBUTE)
+end
+
 -- Sets the wind's range. It is refused, with a reason, unless it runs from nothing or more up to at least that.
 local function set_wind(least: number, most: number): (boolean, string?)
 	if least < 0 or most < least then
@@ -71,6 +76,7 @@ return table.freeze({
 	min_wind = min_wind,
 	max_wind = max_wind,
 	tidal_strength = tidal_strength,
+	tidal_strength_changed = tidal_strength_changed,
 	set_wind = set_wind,
 	set_tidal = set_tidal,
 	apply = apply,

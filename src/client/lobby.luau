@@ -1,7 +1,8 @@
 -- Choosing where to start while the game is waiting to begin (see shared/game_phase.luau). Every team's start box is
 -- drawn on the ground, laid along it so it climbs the hills: the local player's own lit in their colour, and the rest in
 -- red. Where each player has chosen to start is a ring with their name over it. Clicking anywhere in the player's own
--- box that a team can start on asks the server to start there. It is all gone once the game is playing.
+-- box asks the server to start there, or on the nearest ground there a team can start on. It is all gone once the game
+-- is playing.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -225,8 +226,8 @@ local function init()
 		if own == nil or at == nil then
 			return
 		end
-		-- the server checks the same, and ignores anything else
-		if starts.in_box(own, at.X, at.Y) and starts.can_start_at(at.X, at.Y) then
+		-- the server moves the start to the nearest ground it can be on
+		if starts.in_box(own, at.X, at.Y) then
 			choose_start:FireServer(heightmap.ground_position(at.X, at.Y))
 		end
 	end)

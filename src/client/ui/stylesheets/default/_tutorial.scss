@@ -161,6 +161,51 @@
 	}
 }
 
+// An income against its goal: the income a second in the resource's colour, a meter filling towards the goal, and the
+// goal. The income turns green once it is there.
+.tutorial-rate {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.tutorial-rate-have {
+	width: auto;
+	height: auto;
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 20px;
+	font-weight: bold;
+
+	&.metal {
+		color: var(--Metal);
+	}
+
+	&.energy {
+		color: var(--Energy);
+	}
+
+	&.done {
+		color: var(--Gain);
+	}
+}
+
+.tutorial-rate-track {
+	@include track(8px);
+	// a small basis the row grows to fill, rather than the track's whole width
+	width: 40px;
+	flex-grow: 1;
+}
+
+.tutorial-rate-goal {
+	width: auto;
+	height: auto;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 14px;
+}
+
 // What a building step asks for, its own model filling the card's picture.
 .tutorial-build-unit {
 	position: absolute;

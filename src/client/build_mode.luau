@@ -24,6 +24,7 @@ local VALID_COLOR = Color3.fromRGB(120, 220, 140)
 local INVALID_COLOR = Color3.fromRGB(226, 96, 84)
 
 local current_def: string? = nil
+-- Kept between placements: the next building picked up faces the way the last one was turned.
 local facing = 0
 local ghost: Part? = nil
 -- The building's own model, see-through, drawn in the box: what it will look like, where the box is
@@ -105,9 +106,9 @@ local function taken_positions(placing_def_name: string, builder_id: EntityId?):
 			end
 		end
 
-		-- this builder's own queued mexes do not count as taking their spot, mirroring the server's
-		-- placement.spot_taken, so it can requeue past a spot it has already queued itself
-		if builder_id ~= nil and world.id_of(model) == builder_id then
+		-- only this builder's own queued mexes take their spot, mirroring the server's placement.spot_taken:
+		-- it skips spots it has already queued, but may snap onto ones other builders have queued
+		if builder_id ~= nil and world.id_of(model) ~= builder_id then
 			continue
 		end
 
@@ -230,7 +231,6 @@ local function enter(def_name: string)
 	end
 	destroy_ghost()
 	current_def = def_name
-	facing = 0
 
 	local collider = def.collider
 	local part = Instance.new "Part"
@@ -361,7 +361,7 @@ end
 
 -- Moves the ghost onto the ground under `point` and recolours it by validity. Returns the placement
 -- the client would send, or nil when there is nothing to place. `builder_id` is the unit that would be
--- sent to build it, whose own queued mexes are not treated as taking their spot.
+-- sent to build it: only its own queued mexes are treated as taking their spot, not other builders'.
 local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolean)
 	local def_name = current_def
 	local part = ghost
