@@ -412,9 +412,10 @@ def bubbles(t: np.ndarray, count: int, spread: float, low: float, high: float) -
     return unit(out)
 
 
-def torpedo() -> np.ndarray:
-    """A torpedo launched, heard through water: everything muffled. A dull thump of compressed air from the tube, a
-    heavy splash as it goes in, then a burble of bubbles and the churn of its screw fading as it runs off."""
+def torpedo_hit() -> np.ndarray:
+    """A torpedo or a depth charge going off under water, heard through it: everything muffled. A dull thump, a heavy
+    splash, then a burble of bubbles and a churn fading away. (It was made as the launch; the two were swapped when
+    each proved to sound more like the other.)"""
     t = times(1.4)
     n = len(t)
     thump_phase = sweep_phase(95, 38, t, 0.12)
@@ -435,9 +436,9 @@ def torpedo() -> np.ndarray:
     return trimmed(reverb(wet, 0.8, 0.3, 1200))
 
 
-def torpedo_hit() -> np.ndarray:
-    """A torpedo or a depth charge going off under water: a deep, dull boom with no crack to it, the gas bubble
-    throbbing twice more as it swells and collapses, a boil of bubbles, and the thrown-up water falling back."""
+def torpedo() -> np.ndarray:
+    """A torpedo launched, heard through water: a deep, dull boom with no crack to it, throbbing twice more, a boil of
+    bubbles, and the water it threw up falling back. (Made as the hit; see torpedo_hit.)"""
     t = times(2.0)
     n = len(t)
     boom = np.zeros(n)
@@ -500,12 +501,16 @@ SOUNDS = {
 }
 
 
+# Sounds seeded under another name: the one each was first made and heard under, so that it stays as it was heard.
+SEEDS = {"torpedo": "torpedo_hit", "torpedo_hit": "torpedo"}
+
+
 def main():
     BUILD.mkdir(exist_ok=True)
     global rng
     for name, make in SOUNDS.items():
         # each sound draws its noise from its own seed, so changing one never changes another
-        rng = np.random.default_rng(zlib.crc32(name.encode()))
+        rng = np.random.default_rng(zlib.crc32(SEEDS.get(name, name).encode()))
         signal = normalize(limited(make()))
         wav = BUILD / f"{name}.wav"
         wavfile.write(wav, RATE, (signal * 32767).astype(np.int16))
