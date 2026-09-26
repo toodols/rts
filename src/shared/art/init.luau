@@ -1,19 +1,23 @@
--- Procedural art: the meshes tools/model_pipeline generates for a def, one module per def, named after it. A
--- mesh that has been uploaded to Roblox is named by its asset id; one that has not carries its vertices, and the
--- client builds it with EditableMesh. Either way the client dresses the entity itself (src/client/art.luau), and
--- where a def has art the server's model is only an invisible hitbox.
+-- Procedural art: the meshes tools/model_pipeline generates, one module per def (or skin) named after it. Every mesh
+-- is uploaded to Roblox and named by its asset id (tools/model_pipeline/check_art.py fails on a module that is not).
+-- The client dresses the entity itself (src/client/art.luau), and where a def has art the server's model is only an
+-- invisible hitbox.
 --
--- Each module holds `groups`, the model's rigid pieces, and `parts`, one mesh per material of a piece. See
--- build.py's export_art for the format.
+-- Each module holds `groups`, the model's rigid pieces, and `parts`, one mesh per material of a piece. The types below are
+-- the format tools/model_pipeline/art_format.py writes, which check_art.py holds them to.
+
+-- How a piece of a model moves (see `Group`).
+export type GroupKind = "turret" | "work" | "spin" | "leg" | "wheel" | "hatch"
 
 export type Group = {
 	-- relative to the model's origin: the middle of its footprint, on the ground, facing +Z
 	pivot: { number },
-	-- how it moves: "turret" follows weapon `weapon`'s aim, "work" turns toward what a builder is working on, "spin"
+	-- how it moves: "turret" follows weapon `weapon`'s aim (where the weapon fires from is its def's, as
+	-- `Weapon.turret_mount`, which this piece is built to agree with), "work" turns toward what a builder is working on, "spin"
 	-- turns about `axis` at `speed` radians a second, and "leg" swings `swing` radians either way about `axis` (its
 	-- hip), once per `stride` studs the unit walks, `phase` of a cycle apart from its other legs. Nil for a piece that
 	-- holds still.
-	kind: string?,
+	kind: GroupKind?,
 	weapon: number?,
 	axis: { number }?,
 	speed: number?,
@@ -24,8 +28,6 @@ export type Group = {
 	-- `axis` when weapon `weapon` fires
 	radius: number?,
 	open: number?,
-	-- for a "turret", where its weapon fires from, relative to its pivot and at rest (the server's weapon_origin)
-	muzzle: { number }?,
 }
 
 export type Part = {
@@ -36,14 +38,12 @@ export type Part = {
 	size: { number },
 	-- a hash of its geometry, which is what it is named by on Roblox
 	hash: string,
-	-- its asset id, once it has been uploaded; until then, its vertices and triangles
+	-- its asset id, once it has been uploaded: until every mesh of a model is, it needs uploading
 	mesh: string?,
 	-- glows, as Neon
 	neon: boolean?,
 	-- takes its team's colour, as a part named "Team" does on a hand-made model
 	team: boolean?,
-	vertices: string?,
-	triangles: string?,
 }
 
 export type Art = {

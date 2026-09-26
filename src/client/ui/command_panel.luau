@@ -1,5 +1,5 @@
 -- The commands the selected units can be given as modes, each with its icon and its key: Attack - A, Fight - F, and
--- so on. It lists a command when at least one selected finished unit can use it, marks the one that is on,
+-- so on. It lists a command when anything selected can take part in it (`selected.for_mode`), marks the one that is on,
 -- and a click on a row does what pressing its key does. In the tutorial, the command its step wants clicked
 -- (Client.tutorial's `command_target`) is lit and pointed at, until it is on.
 
@@ -7,61 +7,34 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local React = require(ReplicatedStorage.Packages.react)
 
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
-
-local input = require(ReplicatedStorage.Client.input)
-local tutorial = require(ReplicatedStorage.Client.tutorial)
-local art_icon = require(ReplicatedStorage.Client.ui.art_icon)
+local command_state = require(ReplicatedStorage.Client.command_state)
+local order_modes = require(ReplicatedStorage.Client.order_modes)
+local selected = require(ReplicatedStorage.Client.selected)
 local tutorial_pointer = require(ReplicatedStorage.Client.ui.tutorial_pointer)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 
+local art_icon = require(ReplicatedStorage.ClientShared.art_icon)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
+
 local ArtIcon = art_icon.ArtIcon
 local TutorialPointer = tutorial_pointer.TutorialPointer
 
--- Each command's icon (Shared.ui_art); a command with none keeps the space empty, so every name lines up.
-local ICONS: { [string]: string } = {
-	attack = "icon_attack",
-	fight = "icon_fight",
-	reclaim = "icon_reclaim",
-	repair = "icon_repair",
-	guard = "icon_guard",
-	disintegrator = "icon_disintegrator",
-}
-
 local function CommandPanel()
-	local ids = use_entities.use_selection()
-	local views = use_entities.use_views(ids)
-	local mode, set_mode = React.useState(nil :: string?)
-
-	React.useEffect(function()
-		return input.subscribe_mode(function(next_mode: string?)
-			set_mode(next_mode)
-		end)
-	end, {})
-	-- only to re-render when the tutorial's step changes
-	use_tutorial.use_tutorial()
-	local target = tutorial.command_target()
+	-- rendered again as the selection, or anything of what is in it, changes: something that has just been finished
+	-- can take part in more
+	use_entities.use_views(use_entities.use_selection())
+	local mode = use_store.use_store(command_state.mode, command_state.subscribe_mode)
+	-- what the guide wants clicked, if anything
+	local target = use_tutorial.use_command_target()
 	if mode == target then
 		target = nil
 	end
 
 	local rows = {}
 	local any = false
-	for index, command in input.commands do
-		local able = false
-		for _, view in views do
-			local def = unit_defs.defs[view.def_name]
-			if
-				def ~= nil
-				and (unit_defs.takes_orders(def) or unit_defs.is_factory(def))
-				and input.can_command(command.mode, def)
-			then
-				able = true
-				break
-			end
-		end
-		if able == false then
+	for index, command in order_modes.all do
+		if #selected.for_mode(command) == 0 then
 			continue
 		end
 
@@ -69,16 +42,16 @@ local function CommandPanel()
 		local pointed = command.mode == target
 		local tag = if mode == command.mode then "command-row active" else "command-row"
 		rows[command.mode] = React.createElement("TextButton", {
-			[React.Tag] = if pointed then `{tag} tutorial-highlight` else tag,
+			[React.Tag] = tutorial_pointer.lit(tag, pointed),
 			LayoutOrder = index + 1,
 			Text = "",
 			[React.Event.Activated] = function()
-				input.toggle_mode(command.mode)
+				command_state.toggle_mode(command.mode)
 			end,
 		}, {
-			Icon = if ICONS[command.mode] ~= nil
+			Icon = if command.icon ~= nil
 				then React.createElement(ArtIcon, {
-					name = ICONS[command.mode],
+					name = command.icon,
 					view = "front",
 					flat = true,
 					tag = "command-icon",
@@ -99,7 +72,7 @@ local function CommandPanel()
 				Text = command.key,
 			}),
 			-- the panel is at the left of the screen, so the pointer stands off the row's right
-			Pointer = if pointed then React.createElement(TutorialPointer, { text = "CLICK", side = "right" }) else nil,
+			Pointer = if pointed then React.createElement(TutorialPointer, { side = "right" }) else nil,
 		})
 	end
 	if any == false then

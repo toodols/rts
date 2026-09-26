@@ -10,13 +10,13 @@ sourcemap.json
 Packages
 globalTypes.d.luau
 
-# outlass preview intermediate (only lingers if a build is killed mid-run)
+# the stylesheet's browser preview (build_preview.bat) and its intermediate (only lingers if a build is killed mid-run)
+src/client/ui/stylesheets/preview.html
 src/client/ui/stylesheets/preview/.compiled.css
 
 # procedural model pipeline build output
 tools/model_pipeline/build/
-# Open Cloud key for tools/model_pipeline/roblox/upload_art.py
-tools/model_pipeline/roblox/.api_key
+# the Open Cloud key (tools/roblox_open_cloud.py)
 /rbxopencloudkey.txt
 
 # tools/bar_maps/import_bar_maps.py writes this picture of what the materials came out as
@@ -34,3 +34,6 @@ __pycache__/
 
 # synthesized sound effects (tools/sound_pipeline/synth.py rebuilds them)
 tools/sound_pipeline/build/
+
+# the AI arena's match logs and search checkpoints (tools/ai_arena), which grow large
+tools/ai_arena/runs/

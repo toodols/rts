@@ -1,4 +1,4 @@
-@use "default/main";
+@use "../../../client_shared/stylesheets/main";
 @use "default/resource_bar";
 @use "default/selection_panel";
 @use "default/build_menu";
@@ -15,3 +15,4 @@
 @use "default/notifications";
 @use "default/tutorial";
 @use "default/pilot_hud";
+@use "default/commander_hurt";

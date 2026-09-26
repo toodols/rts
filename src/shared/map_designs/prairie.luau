@@ -1,3 +1,4 @@
+--!strict
 -- Prairie: a wide open grassland, made for vehicles. The ground rolls gently everywhere, and nowhere is it steeper than a
 -- tank can drive, so the whole map is open to them and the view runs a long way. What little there is on it is only
 -- there to break it up a little: a broad rise in the middle and a few lower ones about the map, a creek in each quarter
@@ -239,16 +240,18 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "prairie",
+	display_name = "Prairie",
 	description = "Open grassland for vehicles, for two to eight",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return STARTS[(slot - 1) % 4 + 1]
-	end,
+	starts = STARTS,
 	start_boxes = BOXES,
 	metal_layers = nil,
 	metal_spots = SPOTS,
-	geo_spots = VENTS,
+	geo_spots = function(): { Vector2 }
+		return VENTS
+	end,
 	reclaimables = nil,
 	wrecks = nil,
 	theme = THEME,

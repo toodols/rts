@@ -4,19 +4,25 @@ A lean bot built around one big rocket launcher: a box of tubes slung over the r
 tilted up, its glowing rocket noses showing at the front, balanced by a sensor head and an armored
 pad on the left and a counterweight pack on the back. The upper body turns as weapon 1's turret; each leg swings about its hip as it walks.
 
-Collider capsule(22, 28, 22): radius 1.0, height 2.55 studs. Budget: 100 triangles.
+Budget: 100 triangles.
 """
 
 import math
 
-from . import bot_t1_common as bt
+from .shared import bot_t1 as bt
+from .shared import common
+from .shared import palette
 
-ACCENT = bt.rgb(196, 140, 84)
-GLOW = (1.0, 0.6, 0.2, 1.0)  # rocket motor orange
+CATEGORY = "entity"
+DEF = "aggravator"
+MOUNTS = {
+    1: {"pivot": (0, 0, 0), "muzzle": (0.4541, 2.194, 1)},
+}
 
 
 def generate(params):
-    m = bt.Mats("aggravator", ACCENT, GLOW)
+    accent = params["color"]
+    m = common.Materials(accent, palette.ROCKET_MOTOR)
 
     upper = []
     chest = m.body(bt.slab("chest", 0.44, 0.36, 0.54, top_w=0.66, top_d=0.48, origin=(0.0, 0.0, 1.14)))
@@ -55,6 +61,4 @@ def generate(params):
 
     bt.group(upper, "torso", chest, kind="turret", weapon=1)
     objs = upper + legs
-    bt.finish(objs)
-    bt.check_fit(objs, *bt.collider(22, 28, 22), "aggravator")
     return objs

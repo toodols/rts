@@ -2,15 +2,15 @@
 return {
 	groups = {
 		base = { pivot = { 0, 0, 0 } },
-		wheel_fl = { pivot = { -1.0366, 0.4897, 1.21 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
-		wheel_fr = { pivot = { 1.0366, 0.4897, 1.21 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
-		wheel_bl = { pivot = { -1.0366, 0.4897, -1.2332 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
-		wheel_br = { pivot = { 1.0366, 0.4897, -1.2332 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
-		turret_2 = { pivot = { 0, 0.9738, -0.5817 }, kind = "turret", weapon = 2, muzzle = { -0.6754, 1.0702, 0.5136 } },
+		wheel_fl = { pivot = { -1.0366, 0.4897, 1.1983 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
+		wheel_fr = { pivot = { 1.0366, 0.4897, 1.1983 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
+		wheel_bl = { pivot = { -1.0366, 0.4897, -1.2449 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
+		wheel_br = { pivot = { 1.0366, 0.4897, -1.2449 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4897 },
+		turret_2 = { pivot = { 0, 0.9738, -0.5933 }, kind = "turret", weapon = 2 },
 	},
 	parts = {
-		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.6911, 0.0116 }, size = { 1.9476, 0.5654, 3.8393 }, hash = "d5fcd08c5f9adb9d", mesh = "rbxassetid://137541765743307" },
-		{ group = "base", color = { 0.6902, 0.4784, 0.3451 }, offset = { 0, 1.4293, 1.3612 }, size = { 1.8219, 0.911, 1.1867 }, hash = "cd9e5e0f9175cdaa", team = true, mesh = "rbxassetid://120700826500265" },
+		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.6911, 0 }, size = { 1.9476, 0.5654, 3.8393 }, hash = "d5fcd08c5f9adb9d", mesh = "rbxassetid://137541765743307" },
+		{ group = "base", color = { 0.6902, 0.4784, 0.3451 }, offset = { 0, 1.4293, 1.3496 }, size = { 1.8219, 0.911, 1.1867 }, hash = "cd9e5e0f9175cdaa", team = true, mesh = "rbxassetid://120700826500265" },
 		{ group = "wheel_fl", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0, 0 }, size = { 0.4712, 0.9793, 1.1308 }, hash = "bcf491a2fbc4cecb", mesh = "rbxassetid://86129528131794" },
 		{ group = "wheel_fr", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0, 0 }, size = { 0.4712, 0.9793, 1.1308 }, hash = "ce1dea969ce70fd7", mesh = "rbxassetid://121621168364756" },
 		{ group = "wheel_bl", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0, 0 }, size = { 0.4712, 0.9793, 1.1308 }, hash = "bcf491a2fbc4cecb", mesh = "rbxassetid://86129528131794" },

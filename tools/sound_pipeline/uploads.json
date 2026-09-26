@@ -1,34 +1,36 @@
 {
-  "cannon": {
-    "id": "135228456191047",
-    "sha256": "cbe5f372eadb3e737daf16bae35069581fd388914d3e07827c115765a599b723"
-  },
-  "click": {
-    "id": "122889249366577",
-    "sha256": "0a87a2b832373a36a2918964b9fb3d61929094c6b59e5c007d14f60892c54088"
-  },
-  "explosion_large": {
-    "id": "77674252738624",
-    "sha256": "5c2df99042abb8ac7be34a69ce88c861d7773b2d49f102a52016a5d305dfa342"
-  },
-  "explosion_small": {
-    "id": "124363757202063",
-    "sha256": "70eb293c54c682b3eafab0bc0625153b8d4470f415ec18bad05b194ee76fd8d4"
-  },
-  "laser": {
-    "id": "109742071750414",
-    "sha256": "c7c18a8a1f44fe1f5a8466c61d9b007eb4ae76353e91fb91d48e51d312c67452"
-  },
-  "notify": {
-    "id": "124115317599599",
-    "sha256": "cd4c12321076f2ff5921642f8cee97a6c77eacada3089c51aa4ff29cdbe0040a"
-  },
-  "anti_air": {
-    "id": "98215948705762",
-    "sha256": "c9783c1b47db5c8d19386a48b8aa1d54454f395bdbf4e3e130de88cc49d8b5de"
-  },
-  "dgun": {
-    "id": "82247042644798",
-    "sha256": "e288f9b693820d951cf4b6f5ca69409bb1ad9b2089f4a88b63f67f599f772cf9"
+  "assets": {
+    "anti_air": {
+      "id": "98215948705762",
+      "sha256": "c9783c1b47db5c8d19386a48b8aa1d54454f395bdbf4e3e130de88cc49d8b5de"
+    },
+    "cannon": {
+      "id": "135228456191047",
+      "sha256": "cbe5f372eadb3e737daf16bae35069581fd388914d3e07827c115765a599b723"
+    },
+    "click": {
+      "id": "122889249366577",
+      "sha256": "0a87a2b832373a36a2918964b9fb3d61929094c6b59e5c007d14f60892c54088"
+    },
+    "dgun": {
+      "id": "82247042644798",
+      "sha256": "e288f9b693820d951cf4b6f5ca69409bb1ad9b2089f4a88b63f67f599f772cf9"
+    },
+    "explosion_large": {
+      "id": "77674252738624",
+      "sha256": "5c2df99042abb8ac7be34a69ce88c861d7773b2d49f102a52016a5d305dfa342"
+    },
+    "explosion_small": {
+      "id": "124363757202063",
+      "sha256": "70eb293c54c682b3eafab0bc0625153b8d4470f415ec18bad05b194ee76fd8d4"
+    },
+    "laser": {
+      "id": "109742071750414",
+      "sha256": "c7c18a8a1f44fe1f5a8466c61d9b007eb4ae76353e91fb91d48e51d312c67452"
+    },
+    "notify": {
+      "id": "124115317599599",
+      "sha256": "cd4c12321076f2ff5921642f8cee97a6c77eacada3089c51aa4ff29cdbe0040a"
+    }
   }
 }

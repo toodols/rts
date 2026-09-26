@@ -9,10 +9,10 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
 local state = require(script.Parent.state)
-local combat = require(script.Parent.combat)
+local deaths = require(script.Parent.deaths)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -24,7 +24,7 @@ local SLOW_UPDATE_SECONDS = 16 / 30
 local counting: { [EntityId]: number } = {}
 
 local function countdown_seconds(entity: Entity): number
-	local countdown = unit_defs.of(entity).self_destruct_countdown or DEFAULT_COUNTDOWN
+	local countdown = entity.def.self_destruct_countdown or DEFAULT_COUNTDOWN
 	return (countdown * 2 + 1) * SLOW_UPDATE_SECONDS
 end
 
@@ -50,7 +50,8 @@ end
 local function tick(delta: number)
 	for id, left in counting do
 		local entity = state.get(id)
-		if entity == nil or entity.alive == false then
+		-- one that has been taken aboard a transport, or has died some other way, is not counting any more
+		if entity == nil then
 			counting[id] = nil
 			continue
 		end
@@ -60,13 +61,25 @@ local function tick(delta: number)
 			continue
 		end
 		counting[id] = nil
-		combat.self_destruct(entity)
+		deaths.destroy(entity, "self_destructed")
 	end
 end
 
+local function forget(id: EntityId)
+	counting[id] = nil
+end
+
+-- Publishes whole seconds until `entity` destroys itself, rounded up (`self_destruct`); nil unless it is counting down.
+local function publish(entity: Entity, _def: types.EntityDef, write: entity_attrs.Publish)
+	local left = counting[entity.id]
+	write("self_destruct", if left ~= nil then math.ceil(left) else nil)
+end
+
 return table.freeze({
+	seconds_left = seconds_left,
+	forget = forget,
 	toggle = toggle,
 	cancel = cancel,
-	seconds_left = seconds_left,
 	tick = tick,
+	publish = publish,
 })

@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
 type EntityId = types.EntityId
 
@@ -14,13 +15,9 @@ type EntityId = types.EntityId
 export type Stall = "energy" | "metal" | "storage"
 
 -- One source of what an entity makes or spends, in a second's worth.
-export type Source = {
-	label: string,
-	metal: number,
-	energy: number,
-}
+type Source = entity_attrs.FlowSource
 
-type Flow = {
+export type Flow = {
 	-- positive is made, negative is spent
 	metal: number,
 	energy: number,
@@ -73,31 +70,37 @@ local function tenth(value: number): number
 	return math.round(value * 10) / 10
 end
 
--- `entity_id`'s sources as one string for an attribute, "label|metal|energy" for each joined by ";", leaving out any
--- that come to nothing at the infobox's precision. Nil when there are none.
-local function encode_sources(entity_id: EntityId): string?
+-- `entity_id`'s sources, to the infobox's precision, leaving out any that come to nothing at it.
+local function shown_sources(entity_id: EntityId): { Source }
+	local shown: { Source } = {}
 	local flow = flows[entity_id]
-	if flow == nil then
-		return nil
-	end
-	local parts = {}
-	for _, source in flow.sources do
-		local metal = tenth(source.metal)
-		local energy = tenth(source.energy)
-		if metal ~= 0 or energy ~= 0 then
-			table.insert(parts, `{source.label}|{metal}|{energy}`)
+	if flow ~= nil then
+		for _, source in flow.sources do
+			local metal = tenth(source.metal)
+			local energy = tenth(source.energy)
+			if metal ~= 0 or energy ~= 0 then
+				table.insert(shown, { label = source.label, metal = metal, energy = energy })
+			end
 		end
 	end
-	if #parts == 0 then
-		return nil
-	end
-	return table.concat(parts, ";")
+	return shown
+end
+
+-- Publishes what `entity` is making or spending this second, in metal and energy, to a tenth (`metal_rate`,
+-- `energy_rate`), what is holding it back if anything is (`stalled`), and what that is made of (`flow_sources`); all nil
+-- for something that makes and spends nothing.
+local function publish(entity: types.Entity, _def: types.EntityDef, write: entity_attrs.Publish)
+	local flow = flows[entity.id]
+	write("metal_rate", if flow ~= nil then tenth(flow.metal) else nil)
+	write("energy_rate", if flow ~= nil then tenth(flow.energy) else nil)
+	write("stalled", if flow ~= nil then flow.stall else nil)
+	write("flow_sources", entity_attrs.encode_flow_sources(shown_sources(entity.id)))
 end
 
 return table.freeze({
+	get = get,
 	begin_tick = begin_tick,
 	add = add,
 	stall = stall,
-	get = get,
-	encode_sources = encode_sources,
+	publish = publish,
 })

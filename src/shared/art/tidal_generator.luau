@@ -6,7 +6,7 @@ return {
 	},
 	parts = {
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 1.0318, 0.0025 }, size = { 3.94, 2.8636, 3.955 }, hash = "1690ac768bd49a44", mesh = "rbxassetid://117169785485321" },
-		{ group = "base", color = { 0.376, 0.667, 0.839 }, offset = { 0, 1.2259, -1.35 }, size = { 2.4, 1.6518, 1.2 }, hash = "5796405714c4ac47", team = true, mesh = "rbxassetid://136074091362161" },
+		{ group = "base", color = { 0.3765, 0.6667, 0.8392 }, offset = { 0, 1.2259, -1.35 }, size = { 2.4, 1.6518, 1.2 }, hash = "5796405714c4ac47", team = true, mesh = "rbxassetid://136074091362161" },
 		{ group = "base", color = { 0.35, 0.9, 1 }, offset = { 0, 1.0759, -0.8698 }, size = { 1.2, 0.8518, 0.1636 }, hash = "8e6409943f21d90a", neon = true, mesh = "rbxassetid://82178826335326" },
 		{ group = "wheel", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0, 0 }, size = { 2.84, 1.9853, 2.2 }, hash = "d2c58a94d79550cc", mesh = "rbxassetid://98023980327901" },
 	},

@@ -1,4 +1,4 @@
-"""unit_defs `advanced_geothermal_powerplant` (corageo): 2x2x2 cells (8x8x8 studs), hazard orange accent. Budget:
+"""unit_defs `advanced_geothermal_powerplant` (corageo): hazard orange accent. Budget:
 100 triangles.
 
 The plain geothermal plant's big brother, built over the same vent but filling its whole box: a heavy armoured
@@ -10,45 +10,47 @@ Nothing moves.
 
 import math
 
-from . import economy_common as eco
+from .shared import common
+from .shared import palette
 
-ACCENT = (0.839, 0.431, 0.243, 1.0)  # unit_defs Color3.fromRGB(214, 110, 62)
-HEAT_GLOW = (1.0, 0.38, 0.10, 1.0)  # molten orange-red geothermal heat
+CATEGORY = "entity"
+DEF = "advanced_geothermal_powerplant"
 
 
 def generate(params):
-    w = float(params.get("width", 8.0))
+    accent = params["color"]
+    w = params["collider"]["width"]
     s = w / 8.0
     objects = []
 
     # Armoured plinth over the vent.
     plinth_h = 1.3 * s
-    plinth = eco.Mesh().frustum(eco.rect(7.9 * s, 7.9 * s), eco.rect(7.0 * s, 7.0 * s), 0.0, plinth_h)
-    objects.append(eco.body(plinth.build("plinth")))
+    plinth = common.Faces().frustum(common.rect(7.9 * s, 7.9 * s), common.rect(7.0 * s, 7.0 * s), 0.0, plinth_h)
+    objects.append(common.body_mat(plinth.build("plinth")))
 
-    glow = eco.Mesh()
+    glow = common.Faces()
 
     # Heat stack: orange armour skirt, exposed glowing core band, dark chimney with a glowing mouth.
     rot = math.radians(30.0)
     skirt_top = 3.4 * s
     band_top = 4.7 * s
     stack_top = 7.7 * s
-    skirt = eco.Mesh().frustum(eco.ngon(2.15 * s, 6, rot), eco.ngon(1.55 * s, 6, rot), plinth_h, skirt_top)
-    objects.append(eco.accent(skirt.build("stack_skirt"), "adv_geo", ACCENT))
-    glow.frustum(eco.ngon(1.4 * s, 6, rot), eco.ngon(1.4 * s, 6, rot), skirt_top, band_top, cap_top=False)
-    chimney = eco.Mesh().frustum(eco.ngon(1.6 * s, 6, rot), eco.ngon(1.15 * s, 6, rot), band_top, stack_top, cap_top=False)
-    objects.append(eco.trim(chimney.build("stack_chimney")))
-    glow.poly(eco.at(eco.ngon(1.15 * s, 6, rot), stack_top))
+    skirt = common.Faces().frustum(common.ngon(6, 2.15 * s, rot), common.ngon(6, 1.55 * s, rot), plinth_h, skirt_top)
+    objects.append(common.accent_mat(skirt.build("stack_skirt"), accent))
+    glow.frustum(common.ngon(6, 1.4 * s, rot), common.ngon(6, 1.4 * s, rot), skirt_top, band_top, cap_top=False)
+    chimney = common.Faces().frustum(common.ngon(6, 1.6 * s, rot), common.ngon(6, 1.15 * s, rot), band_top, stack_top, cap_top=False)
+    objects.append(common.trim_mat(chimney.build("stack_chimney")))
+    glow.polygon(common.at(common.ngon(6, 1.15 * s, rot), stack_top))
 
     # Four cooling towers at the corners, venting heat.
-    towers = eco.Mesh()
+    towers = common.Faces()
     tower_top = 4.4 * s
     for sx in (-1.0, 1.0):
         for sy in (-1.0, 1.0):
             xy = (sx * 2.45 * s, sy * 2.45 * s)
-            towers.frustum(eco.rect(1.8 * s, 1.8 * s, xy), eco.rect(1.3 * s, 1.3 * s, xy), plinth_h, tower_top, cap_top=False)
-            glow.poly(eco.at(eco.rect(1.3 * s, 1.3 * s, xy), tower_top - 0.05 * s))
-    objects.append(eco.accent(towers.build("cooling_towers"), "adv_geo", ACCENT))
+            towers.frustum(common.rect(1.8 * s, 1.8 * s, xy), common.rect(1.3 * s, 1.3 * s, xy), plinth_h, tower_top, cap_top=False)
+            glow.polygon(common.at(common.rect(1.3 * s, 1.3 * s, xy), tower_top - 0.05 * s))
+    objects.append(common.accent_mat(towers.build("cooling_towers"), accent))
 
-    objects.append(eco.glow(glow.build("heat_glow"), "adv_geo", HEAT_GLOW, emission=1.4))
+    objects.append(common.glow_mat(glow.build("heat_glow"), palette.DEEP_VENT_HEAT))
     return objects

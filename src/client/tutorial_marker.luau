@@ -4,14 +4,16 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
-local Workspace = game:GetService "Workspace"
 
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
-local COLOR = Color3.fromRGB(126, 240, 154)
+local world_fx = require(ReplicatedStorage.Client.world_fx)
+
+local palette = require(ReplicatedStorage.ClientShared.palette)
+
+local COLOR = palette.buildpower
 local RING_SEGMENTS = 40
-local RING_THICKNESS = 0.35
-local RING_LIFT = 0.4
+local RING_STYLE: world_fx.LineStyle = table.freeze({ lift = 0.4, thickness = 0.35, closed_corners = true })
 local PAD_DIAMETER = 5
 local PAD_HEIGHT = 0.2
 local BEAM_HEIGHT = 40
@@ -24,23 +26,8 @@ local RING_FADE = 0.35
 local BEAM_TRANSPARENCY = 0.55
 local BEAM_FADE = 0.25
 
-local function effects_folder(): Instance
-	local folder = Workspace:FindFirstChild "Effects"
-	if folder ~= nil then
-		return folder
-	end
-	return Workspace
-end
-
 local function make_part(name: string, parent: Instance): Part
-	local part = Instance.new "Part"
-	part.Name = name
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
+	local part = world_fx.part(name)
 	part.Color = COLOR
 	part.Parent = parent
 	return part
@@ -53,35 +40,29 @@ local function show(at: Vector2, radius: number): () -> ()
 	local ground = heightmap.ground_position(at.X, at.Y)
 
 	local ring: { Part } = {}
-	local previous: Vector3? = nil
-	for step = 0, RING_SEGMENTS do
-		local angle = step / RING_SEGMENTS * math.pi * 2
-		local point = heightmap.ground_position(at.X + math.cos(angle) * radius, at.Y + math.sin(angle) * radius)
-			+ Vector3.new(0, RING_LIFT, 0)
-		if previous ~= nil then
-			local dash = make_part("Ring", model)
-			local length = (point - previous).Magnitude
-			dash.Size = Vector3.new(RING_THICKNESS, RING_THICKNESS, length + RING_THICKNESS)
-			dash.CFrame = CFrame.lookAt((previous + point) / 2, point)
-			dash.Transparency = RING_TRANSPARENCY
-			table.insert(ring, dash)
-		end
-		previous = point
-	end
+	local points = world_fx.arc_points(ground, function(_: Vector3): number
+		return radius
+	end, 0, math.pi * 2, RING_SEGMENTS)
+	world_fx.lay_line(points, RING_STYLE, function(): Part
+		local dash = make_part("Ring", model)
+		dash.Transparency = RING_TRANSPARENCY
+		table.insert(ring, dash)
+		return dash
+	end)
 
-	-- a Cylinder part's flat faces point along X, so the pad is rolled to lie flat and the beam to stand up
+	-- the pad lies flat, and the beam, a cylinder too, stands up (a lying cylinder's length is its size's X)
 	local pad = make_part("Pad", model)
 	pad.Shape = Enum.PartType.Cylinder
 	pad.Size = Vector3.new(PAD_HEIGHT, PAD_DIAMETER, PAD_DIAMETER)
-	pad.CFrame = CFrame.new(ground + Vector3.new(0, RING_LIFT, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+	pad.CFrame = world_fx.lying_flat(ground + Vector3.new(0, RING_STYLE.lift, 0))
 
 	local beam = make_part("Beam", model)
 	beam.Shape = Enum.PartType.Cylinder
 	beam.Size = Vector3.new(BEAM_HEIGHT, BEAM_DIAMETER, BEAM_DIAMETER)
-	beam.CFrame = CFrame.new(ground + Vector3.new(0, BEAM_HEIGHT / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+	beam.CFrame = world_fx.lying_flat(ground + Vector3.new(0, BEAM_HEIGHT / 2, 0))
 	beam.Transparency = BEAM_TRANSPARENCY
 
-	model.Parent = effects_folder()
+	model.Parent = world_fx.folder()
 
 	local began = os.clock()
 	local connection = RunService.RenderStepped:Connect(function()

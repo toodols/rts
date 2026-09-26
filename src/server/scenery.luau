@@ -11,21 +11,25 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local config = require(ReplicatedStorage.Shared.config)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
-local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local surface = require(ReplicatedStorage.Shared.surface)
+local map_state = require(ReplicatedStorage.Shared.map_state)
+local map_types = require(ReplicatedStorage.Shared.map_types)
+local types = require(ReplicatedStorage.Shared.types)
 local ground_paint = require(ReplicatedStorage.Shared.ground_paint)
 local passability = require(ReplicatedStorage.Shared.passability)
 local starts = require(ReplicatedStorage.Shared.starts)
-local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
-local geo_spots = require(ReplicatedStorage.Shared.geo_spots)
+local spots = require(ReplicatedStorage.Shared.spots)
 
 local state = require(script.Parent.state)
+local deaths = require(script.Parent.deaths)
 
 -- On a map of the usual size, 192 cells a side, this many groves and rock fields, and loose rocks besides, each with
 -- its twin. A bigger map has more, in proportion to its area, up to MAX_SCALE times as many.
-local USUAL_AREA = (192 * config.CELL_STUDS) ^ 2
+local USUAL_AREA = (192 * world_scale.CELL_STUDS) ^ 2
 local MAX_SCALE = 3
 local GROVES = 6
 local TREES_PER_GROVE = { 5, 10 }
@@ -41,32 +45,12 @@ local ROCK_MIX = { "small_rock", "small_rock", "small_rock", "rock", "rock", "la
 local EDGE_MARGIN = 12
 local START_CLEARANCE = 40
 local SPOT_CLEARANCE = 7
+local SPOT_KINDS: { types.SpotKind } = { "metal", "geo" }
 -- and this much apart, edge to edge
 local SPACING = 1
 -- Tries for every one placed, before giving up on it.
 local ATTEMPTS_EACH = 12
 
--- Ground a tree grows on, and ground a rock lies on.
-local TREE_GROUND: { [Enum.Material]: boolean } = {
-	[Enum.Material.Grass] = true,
-	[Enum.Material.LeafyGrass] = true,
-	[Enum.Material.Ground] = true,
-	[Enum.Material.Mud] = true,
-}
-local ROCK_GROUND: { [Enum.Material]: boolean } = {
-	[Enum.Material.Rock] = true,
-	[Enum.Material.Slate] = true,
-	[Enum.Material.Basalt] = true,
-	[Enum.Material.Sandstone] = true,
-	[Enum.Material.Limestone] = true,
-	[Enum.Material.Ground] = true,
-	[Enum.Material.Sand] = true,
-	[Enum.Material.Salt] = true,
-	[Enum.Material.Snow] = true,
-	[Enum.Material.CrackedLava] = true,
-	[Enum.Material.Grass] = true,
-	[Enum.Material.LeafyGrass] = true,
-}
 -- The steepest ground a bot can climb, so that there is always something that can get to it to reclaim it.
 local MAX_STEEPNESS = passability.steepness_limit(passability.max_slope "BOT2" :: number)
 -- Decorrelates the layout from the terrain noise and the spots, which are seeded with the same number.
@@ -82,7 +66,7 @@ local function fits(def_name: string, x: number, z: number, paint: ground_paint.
 		return false
 	end
 	local height = heightmap.height_at(x, z)
-	if height < config.WATER_LEVEL + 0.5 then
+	if height < ground_levels.WATER_LEVEL + ground_levels.DRY_GROUND_MARGIN then
 		return false
 	end
 	local gx, gz = heightmap.world_to_grid(x, z)
@@ -91,26 +75,24 @@ local function fits(def_name: string, x: number, z: number, paint: ground_paint.
 		return false
 	end
 	local ground = paint(x, z, height, steepness)
-	local allowed = if def_name == "tree" then TREE_GROUND else ROCK_GROUND
-	if allowed[ground] ~= true then
+	local def = unit_defs.get(def_name)
+	local feature = def.feature
+	if ground_paint.bears(ground, if feature ~= nil then feature.ground else "any") == false then
 		return false
 	end
 
 	local here = Vector2.new(x, z)
-	local radius = unit_defs.collider_radius(unit_defs.get(def_name))
-	for slot = 1, config.START_SLOTS do
+	local radius = unit_defs.collider_radius(def)
+	for slot = 1, starts.count() do
 		if (here - starts.center(slot)).Magnitude < START_CLEARANCE then
 			return false
 		end
 	end
-	for _, spot in metal_spots.all() do
-		if (here - Vector2.new(spot.center.X, spot.center.Z)).Magnitude < SPOT_CLEARANCE then
-			return false
-		end
-	end
-	for _, spot in geo_spots.all() do
-		if (here - Vector2.new(spot.center.X, spot.center.Z)).Magnitude < SPOT_CLEARANCE then
-			return false
+	for _, kind in SPOT_KINDS do
+		for _, spot in spots.all(kind) do
+			if (here - Vector2.new(spot.position.X, spot.position.Z)).Magnitude < SPOT_CLEARANCE then
+				return false
+			end
 		end
 	end
 	for _, other in placed do
@@ -123,34 +105,34 @@ end
 
 local function put(def_name: string, x: number, z: number, facing: number)
 	local def = unit_defs.get(def_name)
-	local position = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
+	local position = Vector3.new(x, surface.height(def, x, z) + unit_defs.collider_height(def) / 2, z)
 	state.create_reclaimable(def_name, position, facing)
 end
 
 -- The wrecks the map starts with (`Preset.wrecks`), each standing where the unit it is the wreck of would.
-local function lay_wrecks(preset: map_presets.Preset)
+local function lay_wrecks(preset: map_types.Preset)
 	if preset.wrecks == nil then
 		return
 	end
 	for _, fixed in preset.wrecks() do
 		local def = unit_defs.get(fixed.def_name)
 		local x, z = fixed.position.X, fixed.position.Y
-		local position = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
-		state.create_wreck({ def_name = fixed.def_name, position = position, facing = fixed.facing } :: any)
+		local position = Vector3.new(x, surface.height(def, x, z) + unit_defs.collider_height(def) / 2, z)
+		state.create_wreck(fixed.def_name, position, fixed.facing)
 	end
 end
 
 -- Lays out the reclaimables of the map as it is now, and its wrecks. Must be called once the map is built, on an empty
 -- world.
 local function scatter()
-	local preset = map_presets.get(heightmap.get_preset())
+	local preset = map_state.preset()
 	lay_wrecks(preset)
 	-- a map that says what lies on it has exactly that, each holding what it holds there
 	if preset.reclaimables ~= nil then
 		for _, fixed in preset.reclaimables() do
-			local def = unit_defs.of(fixed)
+			local def = unit_defs.get(fixed.def_name)
 			local x, z = fixed.position.X, fixed.position.Y
-			local position = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
+			local position = Vector3.new(x, surface.height(def, x, z) + unit_defs.collider_height(def) / 2, z)
 			state.create_reclaimable(
 				fixed.def_name,
 				position,
@@ -160,7 +142,7 @@ local function scatter()
 		end
 		return
 	end
-	local seed = heightmap.get_seed()
+	local seed = (map_state.get() :: map_state.MapState).seed
 	local paint = ground_paint.make_painter(preset.theme, seed)
 	local random = Random.new(seed + SEED_OFFSET)
 	local half_x, half_z = heightmap.half_extents()
@@ -216,10 +198,9 @@ end
 
 -- Takes every reclaimable and wreck off the map, for a test that wants the world to hold only what it makes.
 local function clear()
-	state.flush()
 	for _, entity in state.all() do
-		if entity.kind == "reclaimable" or entity.kind == "wreck" then
-			state.mark_dead(entity)
+		if unit_defs.is_remains(entity.def) then
+			deaths.destroy(entity, "removed")
 		end
 	end
 end

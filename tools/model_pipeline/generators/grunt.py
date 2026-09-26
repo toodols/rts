@@ -4,17 +4,23 @@ A slim, long-legged runner caught mid-stride: a chest that is narrow at the wais
 shoulders, a helmeted head low and forward with a glowing visor, big red shoulder pads, and a long
 laser rifle slung under the right pad. The upper body turns as weapon 1's turret; each leg swings about its hip as it walks.
 
-Collider capsule(24, 32, 24): radius 1.09, height 2.91 studs. Budget: 100 triangles.
+Budget: 100 triangles.
 """
 
-from . import bot_t1_common as bt
+from .shared import bot_t1 as bt
+from .shared import common
+from .shared import palette
 
-ACCENT = bt.rgb(198, 86, 72)
-GLOW = (1.0, 0.45, 0.25, 1.0)  # hot red-orange laser
+CATEGORY = "entity"
+DEF = "grunt"
+MOUNTS = {
+    1: {"pivot": (0, 0, 0), "muzzle": (0.8416, 2.0618, 1.0909)},
+}
 
 
 def generate(params):
-    m = bt.Mats("grunt", ACCENT, GLOW)
+    accent = params["color"]
+    m = common.Materials(accent, palette.LASER_ORANGE)
 
     upper = []
     # chest first: it is the footprint build.py centres the model on
@@ -38,6 +44,4 @@ def generate(params):
 
     bt.group(upper, "torso", chest, kind="turret", weapon=1)
     objs = upper + legs
-    bt.finish(objs)
-    bt.check_fit(objs, *bt.collider(24, 32, 24), "grunt")
     return objs

@@ -63,8 +63,9 @@ local function close_enough(a: CFrame, b: CFrame): boolean
 	return (a.Position - b.Position).Magnitude < SAME_EPSILON and (a.LookVector - b.LookVector).Magnitude < SAME_EPSILON
 end
 
-local function forget(child: Instance)
-	states[child] = nil
+-- An entity has gone (the world's `subscribe_removed`).
+local function forget(model: Model)
+	states[model] = nil
 end
 
 local function step(_dt: number)
@@ -109,7 +110,7 @@ local function step(_dt: number)
 end
 
 local function init()
-	world.container().ChildRemoved:Connect(forget)
+	world.subscribe_removed(forget)
 	-- first of everything bound to render, see art.luau
 	RunService:BindToRenderStep("interpolation", Enum.RenderPriority.First.Value, step)
 end

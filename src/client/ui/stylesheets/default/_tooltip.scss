@@ -1,8 +1,8 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 // `.tooltip-value` extends `.readout`, which _main.scss declares.
-@use "main" as *;
+@use "../../../../client_shared/stylesheets/main" as *;
 
 // A card of detail beside a panel while one of its rows is hovered (tooltip.luau). It sits over everything else in
 // the HUD, the command panel included, and goes as soon as the cursor leaves the row.

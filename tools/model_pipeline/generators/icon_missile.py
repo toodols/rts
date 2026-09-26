@@ -1,9 +1,10 @@
-"""HUD icon: guided missiles, a missile with fins, puffs of its trail behind it. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: guided missiles, a missile with fins, puffs of its trail behind it. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     body = ic.poly(((-1.35, -0.3), (0.8, -0.3), (1.2, -0.22), (1.5, -0.1), (1.65, 0.0), (1.5, 0.1), (1.2, 0.22), (0.8, 0.3), (-1.35, 0.3)))
@@ -14,8 +15,8 @@ def generate(params):
     return ic.build(
         "missile",
         [
-            ic.layer(ic.place(trail, shift, angle, scale), ic.ICON),
-            ic.layer(ic.place(tail + canards, shift, angle, scale), ic.ICON),
-            ic.layer(ic.place([body], shift, angle, scale), ic.ICON),
+            ic.layer(ic.place(trail, shift, angle, scale), palette.ICON_FILL),
+            ic.layer(ic.place(tail + canards, shift, angle, scale), palette.ICON_FILL),
+            ic.layer(ic.place([body], shift, angle, scale), palette.ICON_FILL),
         ],
     )

@@ -2,23 +2,25 @@
 
 The Arbiter's rocket on a truck: a flatbed on three axles of hexagonal wheels that roll as it drives, a
 team-colour cab up front, and on the bed an erector holding one big rocket, raised off the bed, that goes
-straight up, over and down. Collider
-capsule(40, 40, 44): radius 2.0, height 3.64 studs. 100-triangle budget.
-"""
+straight up, over and down."""
 
 import math
 
-from . import common
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import palette
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(196, 140, 84)
+CATEGORY = "entity"
+DEF = "negotiator"
+MOUNTS = {
+    1: {"pivot": (0, 1.1724, -0.334), "muzzle": (0, 1.6245, 1.0041)},
+}
 
 PITCH = 22.0  # the rocket's elevation on its erector, raised a little off the bed
 
 
 def generate(params):
-    radius, height = v.collider(40, 40, 44)
-    m = v.Mats("negotiator", tuple(params.get("accent_color", ACCENT)))
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
 
     L, W = 3.3, 1.96
@@ -27,8 +29,7 @@ def generate(params):
     deck = bed_z + bed_h
 
     # Footprint first: the flatbed, its front hidden by the cab (8 tris).
-    bed = v.block("bed", W, L, bed_h, origin=(0.0, 0.0, bed_z), top=(W - 0.08, L - 0.04),
-                  drop=("bottom", "front"))
+    bed = common.block("bed", W, L, bed_h, top=(W - 0.08, L - 0.04), at=(0.0, 0.0, bed_z), drop=("bottom", "front"))
     objects.append(m.body(bed))
 
     # Three axles, each a pair of hexagonal wheels rolling as one piece about its hub (20 tris an axle).
@@ -41,8 +42,7 @@ def generate(params):
 
     # Cab: sloped windscreen forward (10 tris) with a lit window across it (2).
     cy0, cy1, cz0, ch = -hl + 0.02, -hl + 0.95, deck, 0.72
-    cab = v.block("cab", W - 0.04, cy1 - cy0, ch, origin=(0.0, (cy0 + cy1) / 2.0, cz0), top=(W - 0.34, 0.52),
-                  top_offset=(0.0, 0.16))
+    cab = common.block("cab", W - 0.04, cy1 - cy0, ch, top=(W - 0.34, 0.52), top_offset=(0.0, 0.16), at=(0.0, (cy0 + cy1) / 2.0, cz0), drop=('bottom',))
     objects.append(m.accent(cab))
     # the cab's front face runs from (y=cy0, z=cz0) up to (y=cy1 - 0.52 + 0.16 ..., z=cz0 + ch)
     fy_top = (cy0 + cy1) / 2.0 + 0.16 - 0.26
@@ -77,5 +77,4 @@ def generate(params):
     rocket = common.merge("rocket", [body, nose], origin=pivot)
     objects.append(common.art_group(rocket, "turret_1", kind="turret", weapon=1))
 
-    v.check_fit(objects, radius, height, "negotiator")
     return objects

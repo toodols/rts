@@ -1,3 +1,4 @@
+--!strict
 -- Trenches: two long ridges face each other across a sunken no man's land, one in front of each side's base. Behind
 -- its own ridge a side is out of sight and out of direct fire, and from the crest it looks down on the ground between;
 -- to reach the other side's base, shells have to arc over the ridge, so it is plasma artillery against shields. The
@@ -116,12 +117,12 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "trenches",
+	display_name = "Trenches",
 	description = "Two ridges and a no man's land",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 58), kit.box_around(-WEST_START, 58) },
 	metal_layers = nil,
 	metal_spots = SPOTS,

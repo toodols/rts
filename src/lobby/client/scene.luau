@@ -1,19 +1,24 @@
+--!strict
 -- The world behind the lobby's menus: a stretch of battlefield at dusk, with a commander on its pad in front, its army
 -- and factories behind it, another army on the far ridge, and a camera drifting slowly around it all. None of it is
 -- simulated; it is the game's own art, set out and moved just enough to look alive.
 --
 -- Everything here is client-side: the lobby place has no world of its own and nobody else sees this one. Units are
--- built from Shared.art the way src/client/art.luau dresses a match's entities, from the same uploaded meshes, and
--- painted the same way (Shared.appearance), but posed by this module rather than by replicated attributes.
+-- copies of the game's own art, rigged and posed as a match's entities are (ClientShared.art_pose), but moved by this
+-- module rather than by replicated attributes.
 
-local AssetService = game:GetService "AssetService"
 local Lighting = game:GetService "Lighting"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
 local Workspace = game:GetService "Workspace"
 
-local art = require(ReplicatedStorage.Shared.art)
 local appearance = require(ReplicatedStorage.Shared.appearance)
+
+local art_models = require(ReplicatedStorage.ClientShared.art_models)
+local art_pose = require(ReplicatedStorage.ClientShared.art_pose)
+local palette = require(ReplicatedStorage.ClientShared.palette)
+
+type RigGroup = art_pose.RigGroup
 
 local TAU = 2 * math.pi
 
@@ -26,16 +31,11 @@ local origin = CFrame.new(TERRAIN_TOP)
 -- Blue is the player's side, nearest the camera; red holds the far ridge.
 local BLUE = appearance.team_color(1)
 local RED = appearance.team_color(2)
--- See src/client/art.luau: an uploaded mesh comes in half a turn about its own vertical axis.
-local UPLOADED_TURN = CFrame.Angles(0, math.pi, 0)
-local MATERIAL = Enum.Material.SmoothPlastic
 -- A turret sweeping on its own: how far either way, in radians, and how long a sweep takes, in seconds.
 local SWEEP = math.rad(35)
 local SWEEP_PERIOD = 9
--- How fast the patrol walks, in studs a second, and a leg's swing where its art does not say.
+-- How fast the patrol walks, in studs a second.
 local PATROL_SPEED = 5
-local DEFAULT_SWING = math.rad(25)
-local DEFAULT_STRIDE = 3
 -- How long the camera takes to glide from one framing to the next, in seconds, and how far it drifts, in radians,
 -- either way about its framing's centre, once every DRIFT_PERIOD seconds.
 local FRAMING_TIME = 1.6
@@ -123,22 +123,14 @@ local FRAMINGS: { [string]: Framing } = {
 	room = { eye = Vector3.new(30, 42, 70), focus = Vector3.new(0, 0, -50), fov = 55 },
 }
 
--- One piece of a unit's art that moves, and the meshes on it.
-type Group = {
-	def: art.Group,
-	pivot: CFrame,
-	parts: { { part: MeshPart, offset: CFrame } },
-	angle: number,
-	-- a turret's sweep, offset per unit so they do not all swing together
-	phase: number,
-}
-
 type Unit = {
 	model: Model,
-	groups: { Group },
+	groups: { RigGroup },
 	origin: CFrame,
-	-- how far it has walked, in studs, which its legs keep pace with
+	-- how far it has walked, in studs, which its legs and wheels keep pace with
 	walked: number,
+	-- where its turrets are in their sweep, so they do not all swing together
+	phase: number,
 }
 
 local units: { Unit } = {}
@@ -150,114 +142,38 @@ local framing_from: CFrame? = nil
 local framing_changed = 0
 local next_flash = 0
 
-local function vector(values: { number }): Vector3
-	return Vector3.new(values[1], values[2], values[3])
-end
-
--- A unit of `def_name` in `team`'s colours, standing at `at`, or nil if it has no art or none of it could be
--- fetched. It yields while its meshes are fetched, all at once.
+-- A unit of `def_name` in `team`'s colours, standing at `at`, or nil if it has no art or its art could not be built.
+-- It yields while its art is built.
 local function build_unit(def_name: string, team: Color3, at: CFrame, parent: Instance): Unit?
-	local data = art.get(def_name)
-	if data == nil then
+	if art_models.await(def_name) == nil then
 		return nil
 	end
-	local model = Instance.new "Model"
-	model.Name = def_name
-
-	local by_name: { [string]: Group } = {}
-	local groups: { Group } = {}
-	for name, group_def in data.groups do
-		local group: Group = {
-			def = group_def,
-			pivot = CFrame.new(vector(group_def.pivot)),
-			parts = {},
-			angle = 0,
-			phase = math.random() * TAU,
-		}
-		by_name[name] = group
-		table.insert(groups, group)
+	local rig = art_pose.rig(def_name, team)
+	if rig == nil then
+		return nil
 	end
-
-	local remaining = #data.parts
-	local waiting = coroutine.running()
-	for _, part in data.parts do
-		task.spawn(function()
-			-- a mesh not uploaded yet would need EditableMesh, which the lobby does without: it is left out
-			if part.mesh ~= nil then
-				local ok, mesh = pcall(function()
-					return AssetService:CreateMeshPartAsync(
-						Content.fromUri(part.mesh :: string),
-						{ CollisionFidelity = Enum.CollisionFidelity.Box }
-					)
-				end)
-				if ok then
-					local color = Color3.new(part.color[1], part.color[2], part.color[3])
-					mesh.Anchored = true
-					mesh.CanCollide = false
-					mesh.CanTouch = false
-					mesh.CanQuery = false
-					mesh.CastShadow = true
-					mesh.Size = vector(part.size)
-					mesh.Material = if part.neon == true then Enum.Material.Neon else MATERIAL
-					mesh.Color = if part.team == true then appearance.team_tint(color, team) else color
-					mesh.Parent = model
-					table.insert(by_name[part.group].parts, {
-						part = mesh,
-						offset = CFrame.new(vector(part.offset)) * UPLOADED_TURN,
-					})
-				end
-			end
-			remaining -= 1
-			if remaining == 0 and coroutine.status(waiting) == "suspended" then
-				task.spawn(waiting)
-			end
-		end)
-	end
-	if remaining > 0 then
-		coroutine.yield()
-	end
-
-	local unit: Unit = { model = model, groups = groups, origin = at, walked = 0 }
-	model.Parent = parent
-	return unit
+	rig.model.Parent = parent
+	return { model = rig.model, groups = rig.groups, origin = at, walked = 0, phase = math.random() * TAU }
 end
 
--- Puts every piece of `unit` where its group's pivot and angle say (as src/client/art.luau's `place` does).
+-- Puts every piece of `unit` where its group's pivot and angle say.
 local function place(unit: Unit)
-	for _, group in unit.groups do
-		local kind = group.def.kind
-		local turn: CFrame
-		if kind == "spin" then
-			turn = CFrame.fromAxisAngle(vector(group.def.axis or { 0, 1, 0 }), group.angle)
-		elseif kind == "turret" or kind == "work" then
-			turn = CFrame.Angles(0, group.angle, 0)
-		elseif kind == "leg" or kind == "wheel" or kind == "hatch" then
-			turn = CFrame.fromAxisAngle(vector(group.def.axis or { 1, 0, 0 }), group.angle)
-		else
-			turn = CFrame.identity
-		end
-		local frame = unit.origin * group.pivot * turn
-		for _, piece in group.parts do
-			piece.part.CFrame = frame * piece.offset
-		end
-	end
+	art_pose.place(unit.groups, unit.origin)
 end
 
 -- Moves each piece that moves on its own: turrets sweep, a commander looks about, rotors and turbines spin, and legs
--- keep pace with however far the unit has walked.
+-- and wheels keep pace with however far the unit has walked.
 local function animate(unit: Unit, now: number, dt: number)
 	for _, group in unit.groups do
 		local kind = group.def.kind
 		if kind == "turret" or kind == "work" then
-			group.angle = SWEEP * math.sin(TAU * now / SWEEP_PERIOD + group.phase)
+			group.angle = SWEEP * math.sin(TAU * now / SWEEP_PERIOD + unit.phase)
 		elseif kind == "spin" then
-			group.angle = (group.angle + (group.def.speed or 0) * dt) % TAU
+			group.angle = art_pose.spin(group.def, group.angle, dt)
 		elseif kind == "leg" then
-			local stride = group.def.stride or DEFAULT_STRIDE
-			group.angle = (group.def.swing or DEFAULT_SWING)
-				* math.sin(TAU * (unit.walked / stride + (group.def.phase or 0)))
+			group.angle = art_pose.leg_swing(group.def, unit.walked / art_pose.stride(group.def), 1)
 		elseif kind == "wheel" then
-			group.angle = (unit.walked / (group.def.radius or 0.5)) % TAU
+			group.angle = art_pose.wheel_turn(group.def, unit.walked) % TAU
 		end
 	end
 end
@@ -318,7 +234,7 @@ local function build_ground(parent: Instance)
 	ring.Anchored = true
 	ring.CanCollide = false
 	ring.Material = Enum.Material.Neon
-	ring.Color = Color3.fromRGB(96, 210, 242)
+	ring.Color = palette.accent
 	ring.Size = Vector3.new(0.3, PAD_WIDTH + 0.5, PAD_WIDTH + 0.5)
 	ring.CFrame = origin * CFrame.new(0, PAD_HEIGHT * 0.6, 0) * CFrame.Angles(0, 0, math.pi / 2)
 	ring.Parent = parent

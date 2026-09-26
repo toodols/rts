@@ -1,3 +1,4 @@
+--!strict
 -- The list of lobbies this player may join, across every lobby server, and the button to make one of their own; and
 -- above them the way into the campaign, a card that is its own button (campaign_card.luau).
 
@@ -15,22 +16,17 @@ local map_image = require(script.Parent.map_image)
 local controls = require(script.Parent.controls)
 local campaign_card = require(script.Parent.campaign_card)
 
+local format = require(ReplicatedStorage.ClientShared.format)
+
 type Summary = protocol.Summary
-
-local ACTIONS = protocol.ACTIONS
-
-local function format_units(units: Vector2): string
-	return `{math.round(units.X)} × {math.round(units.Y)}`
-end
 
 local function LobbyRow(props: {
 	summary: Summary,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 	LayoutOrder: number,
 })
 	local summary = props.summary
-	local mode = game_modes.get(summary.mode)
-	local known_map = map_presets.presets[summary.preset] ~= nil
+	local map = map_presets.presets[summary.preset]
 	local full = summary.players >= summary.capacity
 	-- a lobby whose seats are taken can still be joined to watch, while it has room for that
 	local watch_only = full and (summary.spectators or 0) < game_modes.SPECTATOR_CAPACITY
@@ -39,7 +35,7 @@ local function LobbyRow(props: {
 		[React.Tag] = "lobby-row",
 		LayoutOrder = props.LayoutOrder,
 	}, {
-		Thumb = if known_map
+		Thumb = if map ~= nil
 			then React.createElement(map_image.MapImage, {
 				preset = summary.preset,
 				seed = game_modes.DEFAULT_SEED,
@@ -55,7 +51,7 @@ local function LobbyRow(props: {
 			Name = React.createElement("TextLabel", {
 				[React.Tag] = "lobby-host",
 				LayoutOrder = 1,
-				Text = `{summary.host_name}'s lobby`,
+				Text = `{format.escape(summary.host_name)}'s lobby`,
 			}),
 			Visibility = React.createElement("TextLabel", {
 				[React.Tag] = if summary.visibility == "friends" then "tag friends" else "tag",
@@ -66,10 +62,7 @@ local function LobbyRow(props: {
 		Mode = React.createElement("TextLabel", {
 			[React.Tag] = "lobby-cell mode readout",
 			LayoutOrder = 3,
-			Text = if mode == nil
-				then summary.mode
-				elseif mode.kind == "campaign" then `Co-op: {mode.label}`
-				else mode.label,
+			Text = game_modes.label_of(summary.mode),
 		}),
 		Map = React.createElement("Frame", {
 			[React.Tag] = "lobby-cell map",
@@ -78,13 +71,13 @@ local function LobbyRow(props: {
 			Name = React.createElement("TextLabel", {
 				[React.Tag] = "lobby-map-name",
 				LayoutOrder = 1,
-				Text = if known_map then map_preview.info(summary.preset).name else summary.preset,
+				Text = if map ~= nil then map.display_name else summary.preset,
 			}),
-			Size = if known_map
+			Size = if map ~= nil
 				then React.createElement("TextLabel", {
 					[React.Tag] = "lobby-map-size faint",
 					LayoutOrder = 2,
-					Text = format_units(map_preview.info(summary.preset).units),
+					Text = map_preview.units_text(map),
 				})
 				else nil,
 		}),
@@ -99,7 +92,7 @@ local function LobbyRow(props: {
 			label = if watch_only then "Watch" elseif full then "Full" else "Join",
 			locked = full and watch_only == false,
 			on_press = function()
-				props.act(ACTIONS.join, summary.key)
+				props.act("join", summary.key)
 			end,
 			LayoutOrder = 6,
 		}),
@@ -109,7 +102,7 @@ end
 local function Browser(props: {
 	lobbies: { Summary },
 	received: boolean,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 	open_campaign: () -> (),
 })
 	local rows: { [string]: any } = {}
@@ -165,7 +158,7 @@ local function Browser(props: {
 				tag = "primary",
 				label = "Create lobby",
 				on_press = function()
-					props.act(ACTIONS.create)
+					props.act "create"
 				end,
 				LayoutOrder = 5,
 			}),

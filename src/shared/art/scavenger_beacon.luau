@@ -6,8 +6,8 @@ return {
 	},
 	parts = {
 		{ group = "base", color = { 0.1, 0.08, 0.12 }, offset = { 0, 2.6, 0 }, size = { 11.0851, 5.2, 12.8 }, hash = "bcc913632b999826", mesh = "rbxassetid://140066161831985" },
-		{ group = "base", color = { 0.588, 0.275, 0.784 }, offset = { 0, 7.8, 1.5036 }, size = { 11.0851, 13.2, 9.7928 }, hash = "c5fbc30c2eada280", team = true, mesh = "rbxassetid://77779039876973" },
+		{ group = "base", color = { 0.5882, 0.2745, 0.7843 }, offset = { 0, 7.8, 1.5036 }, size = { 11.0851, 13.2, 9.7928 }, hash = "c5fbc30c2eada280", team = true, mesh = "rbxassetid://77779039876973" },
 		{ group = "base", color = { 0.85, 0.25, 1 }, offset = { 0, 8, 0 }, size = { 2.2627, 5.12, 2.2627 }, hash = "c36875dbbacc424e", neon = true, mesh = "rbxassetid://118770378684945" },
-		{ group = "shards", color = { 0.588, 0.275, 0.784 }, offset = { 0, 0, -0.7417 }, size = { 6.2181, 3.38, 5.6966 }, hash = "b8aa9408812cc064", team = true, mesh = "rbxassetid://80633119760507" },
+		{ group = "shards", color = { 0.5882, 0.2745, 0.7843 }, offset = { 0, 0, -0.7417 }, size = { 6.2181, 3.38, 5.6966 }, hash = "b8aa9408812cc064", team = true, mesh = "rbxassetid://80633119760507" },
 	},
 }

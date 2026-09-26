@@ -1,4 +1,4 @@
-"""A contact sheet of the HUD icons (generators/icon_*.py) drawn flat, the way Client.ui.art_icon shows them unlit,
+"""A contact sheet of the HUD icons (generators/icon_*.py) drawn flat, the way ClientShared.art_icon shows them unlit,
 without Blender: each icon big, and beside it at the sizes the HUD uses, on the HUD's dark panel and on a light one.
 
     python tools/model_pipeline/icon_sheet.py [names...]  ->  tools/model_pipeline/build/icons_sheet.png
@@ -18,7 +18,7 @@ sys.path.insert(0, str(PIPELINE_ROOT))
 for stub in ("bpy", "bmesh", "mathutils"):
     sys.modules.setdefault(stub, types.ModuleType(stub))
 
-ic = importlib.import_module("generators.icon_common")
+ic = importlib.import_module("generators.shared.icon")
 
 SUPERSAMPLE = 4
 BIG = 160
@@ -86,7 +86,7 @@ def capture(name):
 
 def main(names):
     if not names:
-        names = sorted(p.stem[len("icon_") :] for p in (PIPELINE_ROOT / "generators").glob("icon_*.py") if p.stem != "icon_common")
+        names = sorted(p.stem[len("icon_") :] for p in (PIPELINE_ROOT / "generators").glob("icon_*.py"))
     font = ImageFont.load_default()
     smalls_width = sum(SMALL) + CELL_PAD * len(SMALL)
     cell_w = BIG + CELL_PAD + smalls_width + CELL_PAD

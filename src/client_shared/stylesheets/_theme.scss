@@ -1,0 +1,118 @@
+@use "sass:color";
+@use "sass:map";
+
+// Command-console palette: gun-metal steel, hard edges, hot signal colours.
+//
+// The scalars below are compile-time Sass variables. The `:root` block underneath publishes the
+// same colours as StyleSheet attributes, so a rule referencing `var(--Metal)` emits a live token
+// reference the whole sheet shares rather than a baked-in Color3.
+
+$void: rgb(8, 11, 15);
+$steel: rgb(20, 26, 34);
+$steel-raised: rgb(31, 40, 51);
+$steel-lit: rgb(52, 66, 82);
+$edge: rgb(78, 96, 118);
+
+// Secondary text is lifted well clear of the plate rather than sunk into it: against a body of
+// rgb(20, 26, 34) the old dim grey sat near 5:1 and the faint grey near 3:1, which reads as muddy
+// at 11px over a gradient. These land around 10:1 and 6.5:1, and carry a slight cool cast so they
+// belong to the palette instead of looking washed out.
+$text: rgb(236, 244, 252);
+$text-dim: rgb(186, 202, 220);
+$text-faint: rgb(146, 166, 188);
+
+$metal: rgb(196, 206, 220);
+$energy: rgb(255, 230, 64);
+$buildpower: rgb(126, 240, 154);
+$gain: rgb(96, 224, 128);
+$danger: rgb(238, 88, 74);
+$caution: rgb(236, 184, 68);
+$accent: rgb(96, 210, 242);
+$resurrect: rgb(176, 96, 240);
+$fight: rgb(255, 138, 64);
+// EMP: a light turquoise, far nearer blue than green
+$emp: rgb(130, 215, 255);
+// Drawn in the world as well as on the HUD: the disintegrator's sweep, and a guard order.
+$disintegrator: rgb(238, 60, 48);
+$guard: rgb(190, 150, 255);
+
+// How rare a def is made to look (Shared.rarity): each tier's colour, for an unlock's card on the end screen and a
+// unit's card in the lobby's encyclopedia.
+$tiers: (
+	common: rgb(178, 190, 204),
+	uncommon: rgb(110, 222, 96),
+	rare: $accent,
+	epic: $resurrect,
+	legendary: rgb(255, 196, 64),
+	mythic: rgb(255, 98, 74),
+);
+
+// Spacing scale. `space(3)` is 12px; `_main.scss` turns the same scale into .gap-N utilities.
+$unit: 4px;
+@function space($steps) {
+	@return $unit * $steps;
+}
+
+@function veil($color, $amount) {
+	@return rgba($color, $amount);
+}
+
+// Diagonal hazard stripes. Roblox has no repeating gradient, but outlass writes the pattern out
+// stop by stop into the 20 keypoints a ColorSequence holds, so the CSS spelling is the one to use.
+// The doubled positions are hard stops: stripe fills 0-12%, base fills 12-25%, repeat.
+@function hazard($stripe, $base) {
+	@return repeating-linear-gradient(45deg, $stripe 0 12%, $base 12% 25%);
+}
+
+// Brushed metal: a hot lip along the top, then a hard line into the body falling away to black.
+@function brushed($top, $body) {
+	@return linear-gradient(
+		180deg,
+		$top 0%,
+		$top 3%,
+		$body 4%,
+		$body 55%,
+		color.adjust($body, $lightness: -10%) 100%
+	);
+}
+
+// Angular means no rounding. These stay as named constants so the intent survives.
+$radius: 0;
+$rail: 2px;
+
+$ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+$ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+$fast: 0.1s;
+$medium: 0.2s;
+
+// A custom property's value is raw text, in CSS and in Sass alike, so the variables go through
+// `#{}`. outlass reads the substituted text back as a CSS value, which is what makes each of these
+// a Color3 attribute on the StyleSheet rather than a string.
+:root {
+	--Void: #{$void};
+	--Steel: #{$steel};
+	--SteelRaised: #{$steel-raised};
+	--SteelLit: #{$steel-lit};
+	--Edge: #{$edge};
+	--Text: #{$text};
+	--TextDim: #{$text-dim};
+	--TextFaint: #{$text-faint};
+	--Metal: #{$metal};
+	--Energy: #{$energy};
+	--Buildpower: #{$buildpower};
+	--Gain: #{$gain};
+	--Danger: #{$danger};
+	--Caution: #{$caution};
+	--Accent: #{$accent};
+	--Resurrect: #{$resurrect};
+	--Fight: #{$fight};
+	--Emp: #{$emp};
+	--Disintegrator: #{$disintegrator};
+	--Guard: #{$guard};
+	--TierCommon: #{map.get($tiers, common)};
+	--TierUncommon: #{map.get($tiers, uncommon)};
+	--TierRare: #{map.get($tiers, rare)};
+	--TierEpic: #{map.get($tiers, epic)};
+	--TierLegendary: #{map.get($tiers, legendary)};
+	--TierMythic: #{map.get($tiers, mythic)};
+}

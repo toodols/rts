@@ -1,13 +1,24 @@
+--!strict
 -- What there is to say about a def beyond its numbers: the build menu's tooltip text for what a builder or factory can
--- make, an unlock's card, and its entry in the lobby's encyclopedia. `text` is only what its stats and subtitle do not
--- already say; `tips` are the only place for how to use it. Anything missing here still gets a tooltip and an entry.
+-- make, an unlock's card, and its entry in the lobby's encyclopedia. A def's text is first what its def says outright
+-- that its figures do not make plain (`unit_facts.notes`: "Metal spots only.", "Air only.", "Manual fire."), then what
+-- is written for it here, which is only what no field of its def says; `tips` are the only place for how to use it.
+-- Anything missing here still gets a tooltip and an entry.
+
+local ReplicatedStorage = game:GetService "ReplicatedStorage"
+
+local types = require(ReplicatedStorage.Shared.types)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
+
+type EntityDef = types.EntityDef
 
 export type Description = {
 	text: string?,
 	tips: { string }?,
 }
 
-local descriptions: { [string]: Description } = {
+local DESCRIPTIONS: { [string]: Description } = {
 	-- Builders
 
 	construction_bot = {
@@ -34,80 +45,27 @@ local descriptions: { [string]: Description } = {
 
 	-- Economy
 
-	metal_extractor = {
-		text = "Metal spots only.",
-	},
 	advanced_metal_extractor = {
-		text = "Metal spots only.",
 		tips = { "Build over a Metal Extractor to upgrade it." },
 	},
 	wind_turbine = {
 		text = "Output varies with the wind.",
 	},
-	tidal_generator = {
-		text = "Water only.",
-	},
-	geothermal_powerplant = {
-		text = "Vents only. Explodes when destroyed.",
-	},
 	advanced_geothermal_powerplant = {
-		text = "Vents only. Explodes when destroyed.",
 		tips = { "Build over a Geothermal Powerplant to upgrade it." },
 	},
 	rampart = {
-		text = "Vents only. Anti-nuke and drones.",
+		text = "Anti-nuke.",
 		tips = { "Build over a Geothermal Powerplant to upgrade it." },
-	},
-	fusion_reactor = {
-		text = "Explodes when destroyed.",
-	},
-	advanced_fusion_reactor = {
-		text = "Huge explosion when destroyed.",
-	},
-	epic_fusion_reactor = {
-		text = "Huge explosion when destroyed.",
-	},
-	energy_converter = {
-		text = "70 energy/s into 1 metal/s.",
-	},
-	advanced_energy_converter = {
-		text = "600 energy/s into 10 metal/s. Explodes when destroyed.",
-	},
-	epic_energy_converter = {
-		text = "6000 energy/s into 120 metal/s. Explodes when destroyed.",
-	},
-	hardened_energy_storage = {
-		text = "Explodes when destroyed.",
 	},
 
 	-- Defenses
 
-	warden = {
-		text = "Costs energy per shot.",
-	},
-	pulsar = {
-		text = "Costs energy per shot.",
-	},
-	thistle = {
-		text = "Air only.",
-	},
-	eradicator = {
-		text = "Air only.",
-	},
-	screamer = {
-		text = "Air only. Stockpiles 5 missiles.",
-	},
 	catalyst = {
-		text = "Manual fire. Cannot be blocked.",
-	},
-	apocalypse = {
-		text = "Manual fire. Stockpiled.",
+		text = "Cannot be blocked.",
 	},
 	prevailer = {
-		text = "Stockpiled. Stops nukes aimed within range.",
-	},
-	calamity = {
-		text = "18000 energy per shot.",
+		text = "Stops nukes aimed within range.",
 	},
 	overseer = {
 		text = "Blocks shells only.",
@@ -116,25 +74,12 @@ local descriptions: { [string]: Description } = {
 		tips = { "Shift-drag lays a line." },
 	},
 
-	-- Factories
-
-	shipyard = {
-		text = "Water only.",
-	},
-
 	-- Bots
 
-	trasher = {
-		text = "Air only.",
-	},
 	arbiter = {
 		text = "Rockets arc over obstacles.",
 	},
-	sharpshooter = {
-		text = "Costs energy per shot.",
-	},
 	gunslinger = {
-		text = "Self-repairs.",
 		tips = {
 			"repairs itself in the heat of battle",
 			"doesn't need energy to fight",
@@ -154,23 +99,17 @@ local descriptions: { [string]: Description } = {
 	lasher = {
 		text = "Ground and air missiles; one fires at a time.",
 	},
+	janus = {
+		text = "Two guided rockets a volley.",
+	},
 	negotiator = {
 		text = "Rockets arc over obstacles.",
 	},
 	mantis = {
-		text = "Unarmed. Launches drones.",
+		text = "Unarmed.",
 	},
 	starlight = {
-		text = "Fires only ahead. Costs energy per shot. Explodes on death.",
-	},
-
-	-- Hovercraft
-
-	birdeater = {
-		text = "Air only.",
-	},
-	halberd = {
-		text = "Costs energy per shot.",
+		text = "Fires only ahead.",
 	},
 
 	-- Ships
@@ -178,46 +117,32 @@ local descriptions: { [string]: Description } = {
 	riptide = {
 		text = "Blocked by friendly units.",
 	},
-	syracusia = {
-		text = "Costs energy per shot.",
-	},
 	orca = {
+		text = "Only torpedoes can hit it.",
+	},
+	sea_dragon = {
 		text = "Only torpedoes can hit it.",
 	},
 
 	-- Aircraft
 
-	valiant = {
-		text = "Air only.",
-	},
-	whirlwind = {
-		text = "Ground only.",
-	},
 	hercules = {
-		text = "Carries 2 light units.",
 		tips = { "J to load, U to unload." },
 	},
 	hephaestus = {
-		text = "Carries heavy units. Unarmed.",
+		text = "Unarmed.",
 		tips = { "J to load, U to unload." },
 	},
 	advanced_construction_aircraft = {
 		text = "Builds tier 2.",
 	},
-	nighthawk = {
-		text = "Air only. Stealth.",
-	},
-	hailstorm = {
-		text = "Ground only.",
-	},
 	stiletto = {
-		text = "Ground only. EMP. Stealth.",
+		text = "EMP.",
 	},
 	liche = {
-		text = "Ground only. Nuclear blast.",
+		text = "Nuclear blast.",
 	},
 	stronghold = {
-		text = "Carries heavy units.",
 		tips = { "J to load, U to unload." },
 	},
 
@@ -230,12 +155,35 @@ local descriptions: { [string]: Description } = {
 		text = "Climbs any slope.",
 	},
 	thor = {
-		text = "Lightning arcs to nearby units. EMP lasers. Immune to EMP.",
+		text = "Lightning arcs to nearby units. EMP lasers.",
 		tips = { "Attack a target to fire its stockpiled EMP missile." },
 	},
 	behemoth = {
-		text = "Gauss shots pass through everything. Immune to EMP.",
+		text = "Gauss shots pass through everything.",
 	},
 }
 
-return table.freeze(descriptions)
+for name in DESCRIPTIONS do
+	assert(unit_defs.defs[name] ~= nil, `unit_descriptions has "{name}", which is not a def`)
+end
+
+-- What to say about `def` under its name: what its def says outright, then what is written for it; nil for nothing.
+local function text_of(def: EntityDef): string?
+	local parts = unit_facts.notes(def)
+	local description = DESCRIPTIONS[def.name]
+	if description ~= nil and description.text ~= nil then
+		table.insert(parts, description.text)
+	end
+	return if #parts > 0 then table.concat(parts, " ") else nil
+end
+
+-- How to use something of `def_name`, if anything is written for it.
+local function tips_of(def_name: string): { string }?
+	local description = DESCRIPTIONS[def_name]
+	return if description ~= nil then description.tips else nil
+end
+
+return table.freeze({
+	text_of = text_of,
+	tips_of = tips_of,
+})

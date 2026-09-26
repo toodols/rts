@@ -6,11 +6,9 @@ Each key is its own art group, `key_w`, `key_a`, `key_s`, `key_d`: its cap (mate
 is the middle of the cluster on the ground. Written to src/shared/ui_art/, not src/shared/art/.
 """
 
-from . import tutorial_common as tc
+from .shared import tutorial as tc
 
-MAX_TRIANGLES = tc.MAX_TRIANGLES
-RECENTRE = False
-
+CATEGORY = "hud"
 KEYS = ("W", "A", "S", "D")  # in tc.INVERTED_T order: back centre, then left, middle, right in front
 
 

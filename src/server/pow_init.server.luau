@@ -1,18 +1,25 @@
--- Starts pow, the in-game command bar (press ; to open it). Debugging and administration only.
+-- Starts pow, the in-game command bar (press ; to open it), with this game's commands (see
+-- server_shared/pow_setup.luau): debugging and administration only.
 
+local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
 
-local pow = require(ServerScriptService.Server.pow)
+local pow_setup = require(ServerScriptService.ServerShared.pow_setup)
 
-pow.init({
-	permissions = {
-		-- -1 is the local player in Studio
-		owner = {
-			["-1"] = 5,
-			["195294332"] = 5,
-		},
+local commands = ServerScriptService.Server.pow_commands
+
+pow_setup.start(ServerScriptService.Server.pow, {
+	shared = { ServerScriptService.Server.pow_shared_ext },
+	server = {
+		commands.players,
+		commands.switches,
+		commands.maps,
+		commands.teams,
+		commands.ai,
+		commands.scavengers,
+		commands.campaign,
+		commands.status,
+		commands.donuts,
 	},
-	disable_data_store = true,
-	extras_shared = { ServerScriptService.Server.pow_shared_ext },
-	extras_server = { ServerScriptService.Server.pow_server_ext },
+	client = { ReplicatedStorage.Client.pow_client_ext },
 })

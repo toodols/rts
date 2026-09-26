@@ -1,9 +1,10 @@
-"""HUD icon: the commander's Disintegrator (D-gun), a searing ball, the bits of whatever it hit trailing off behind it. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: the commander's Disintegrator (D-gun), a searing ball, the bits of whatever it hit trailing off behind it. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     cx, cy = 0.45, 0.4
@@ -11,7 +12,7 @@ def generate(params):
     return ic.build(
         "disintegrator",
         [
-            ic.layer(fragments + [ic.star(cx, cy, 1.5, 1.08, points=11, angle=12.0)], ic.ICON),
-            ic.layer([ic.circle(cx, cy, 0.72, 20)], ic.ICON),
+            ic.layer(fragments + [ic.star(cx, cy, 1.5, 1.08, points=11, angle=12.0)], palette.ICON_FILL),
+            ic.layer([ic.circle(cx, cy, 0.72, 20)], palette.ICON_FILL),
         ],
     )

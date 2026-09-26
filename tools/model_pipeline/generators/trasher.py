@@ -4,19 +4,25 @@ A broad, squat, sealed hull on sturdy wading legs, with a tall missile rack on e
 steeply up and forward, their warheads bright at the tips so it reads as "shoots at the sky" from
 above. A small sensor head sits between the racks. The upper body turns as weapon 1's turret; each leg swings about its hip as it walks.
 
-Collider capsule(30, 32, 30): radius 1.36, height 2.91 studs. Budget: 100 triangles.
+Budget: 100 triangles.
 """
 
 import math
 
-from . import bot_t1_common as bt
+from .shared import bot_t1 as bt
+from .shared import common
+from .shared import palette
 
-ACCENT = bt.rgb(196, 140, 84)
-GLOW = (0.55, 0.9, 1.0, 1.0)  # icy blue seeker lenses
+CATEGORY = "entity"
+DEF = "trasher"
+MOUNTS = {
+    1: {"pivot": (0, 0, 0), "muzzle": (-1.207, 2.7342, 0.9331)},
+}
 
 
 def generate(params):
-    m = bt.Mats("trasher", ACCENT, GLOW)
+    accent = params["color"]
+    m = common.Materials(accent, palette.SEEKER_BLUE)
 
     upper = []
     hull = m.body(bt.slab("hull", 0.74, 0.6, 0.6, top_w=0.9, top_d=0.66, origin=(0.0, 0.0, 0.98)))
@@ -57,6 +63,4 @@ def generate(params):
 
     bt.group(upper, "torso", hull, kind="turret", weapon=1)
     objs = upper + legs
-    bt.finish(objs)
-    bt.check_fit(objs, *bt.collider(30, 32, 30), "trasher")
     return objs

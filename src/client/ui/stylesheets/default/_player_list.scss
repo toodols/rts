@@ -1,8 +1,8 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 // `.roster-title` extends `.heading`, which _main.scss declares.
-@use "main" as *;
+@use "../../../../client_shared/stylesheets/main" as *;
 
 // The player list (T): a plate docked to the right edge, halfway down, over the battlefield. Your side comes first as
 // cards with their banks, the enemy after as slimmer rows. Each card carries its team's colour down its left edge.

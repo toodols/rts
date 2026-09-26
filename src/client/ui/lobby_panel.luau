@@ -1,6 +1,8 @@
 -- The panel over the middle of the screen while the game is waiting to begin (see shared/game_phase.luau): what it is
 -- waiting for, or the countdown once everyone is ready, and every player with how far along they are: still on their
--- way from the lobby that started the game, loading, choosing where in their start area to start, or ready. It is gone once the game is playing.
+-- way from the lobby that started the game, loading, choosing where in their start area to start, or ready. It is gone
+-- once the game is playing. A campaign mission, whose player starts where it says (Shared.campaign), begins as soon as
+-- they have loaded, so then it shows only while someone is still on their way.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -10,6 +12,11 @@ local Workspace = game:GetService "Workspace"
 local React = require(ReplicatedStorage.Packages.react)
 
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
+local mission_state = require(ReplicatedStorage.Shared.mission_state)
+local seating = require(ReplicatedStorage.Shared.seating)
+
+local format = require(ReplicatedStorage.ClientShared.format)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 local local_player = Players.LocalPlayer
 
@@ -24,7 +31,7 @@ local function rows(): { Row }
 	local result: { Row } = {}
 	for _, player in Players:GetPlayers() do
 		-- someone who came only to watch has nothing to choose, and nobody waits on them
-		if player:GetAttribute "spectator" == true then
+		if seating.is_spectator(player) then
 			table.insert(
 				result,
 				{ name = player.DisplayName, status = "WATCHING", ready = true, you = player == local_player }
@@ -62,18 +69,12 @@ end
 -- Redraws whenever anything the panel shows may have changed: the phase, a player arriving or leaving, loading or
 -- choosing a start, and each second of the countdown.
 local function use_lobby(): (game_phase.Phase, number?, { Row })
-	local _, bump = React.useState(0)
-	local function redraw()
-		bump(function(count: number): number
-			return count + 1
-		end)
-	end
-
-	React.useEffect(function()
-		local connections: { RBXScriptConnection } = game_phase.changed(redraw)
+	use_store.use_changes(function(redraw: () -> ()): () -> ()
+		local connections: { RBXScriptConnection } = {}
+		local stops = { game_phase.changed(redraw), mission_state.subscribe_mission(redraw) }
 		local function watch(player: Player)
-			table.insert(connections, player:GetAttributeChangedSignal(game_phase.START_ATTRIBUTE):Connect(redraw))
-			table.insert(connections, player:GetAttributeChangedSignal(game_phase.LOADED_ATTRIBUTE):Connect(redraw))
+			table.insert(stops, game_phase.start_changed(player, redraw))
+			table.insert(stops, game_phase.loaded_changed(player, redraw))
 		end
 		for _, player in Players:GetPlayers() do
 			watch(player)
@@ -106,8 +107,11 @@ local function use_lobby(): (game_phase.Phase, number?, { Row })
 			for _, connection in connections do
 				connection:Disconnect()
 			end
+			for _, stop in stops do
+				stop()
+			end
 		end
-	end, {})
+	end)
 
 	return game_phase.phase(), seconds_left(), rows()
 end
@@ -117,12 +121,15 @@ local function LobbyPanel()
 	if phase == "playing" or phase == "ended" then
 		return nil
 	end
+	if mission_state.mission() ~= nil and #game_phase.awaiting() == 0 then
+		return nil
+	end
 
 	local mine = game_phase.start_of(local_player)
 	local title = if seconds ~= nil then `STARTING IN {seconds}` else "WAITING FOR PLAYERS"
 	local hint = if seconds ~= nil
 		then "Click to move your start"
-		elseif local_player:GetAttribute "spectator" == true then "Spectating"
+		elseif seating.is_spectator(local_player) then "Spectating"
 		elseif mine == nil then "Pick a start in your area"
 		elseif #game_phase.awaiting() > 0 then "Waiting for players"
 		else "Waiting for players"
@@ -136,7 +143,7 @@ local function LobbyPanel()
 			Name = React.createElement("TextLabel", {
 				[React.Tag] = if row.you then "lobby-name you grow" else "lobby-name grow",
 				LayoutOrder = 1,
-				Text = row.name,
+				Text = format.escape(row.name),
 			}),
 			Status = React.createElement("TextLabel", {
 				[React.Tag] = "lobby-status",

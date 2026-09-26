@@ -1,20 +1,26 @@
-"""unit_defs `agitator` (corpun): plasma artillery, 2x2x2 cells (8x8x8 studs). Under 100 triangles.
+"""unit_defs `agitator` (corpun): plasma artillery. Under 100 triangles.
 
 The tower line's sloped plinth, broad and low, under a squat eight-sided armored dome with a bustle at the
 back and one long gun lobbing forward and up out of a dark mantlet: a gunmetal barrel with a jacket at its
 root and a heavy muzzle brake, the plasma glowing at its tip. The whole head yaws with weapon 1.
 """
 
-from . import defense_a_common as d
+from .shared import defense_a as d
+from .shared import palette
 
-KEY = "agitator"
+CATEGORY = "entity"
+DEF = "agitator"
+MOUNTS = {
+    1: {"pivot": (0, 1.5, 0), "muzzle": (0, 3.3376, 5.901)},
+}
 SWIVEL_Z = 1.5
 ELEV = 32.0
 
 
 def generate(params):
+    w = params["collider"]["width"]
     base = d.Parts()
-    base.loft([d.square(7.8, 0.0), d.square(6.0, SWIVEL_Z)], side="trim", top="body")
+    base.loft([d.square(w - 0.2, 0.0), d.square(6.0, SWIVEL_Z)], side="trim", top="body")
 
     head = d.Parts()
     fr = d.Frame()
@@ -29,6 +35,6 @@ def generate(params):
     head.block_f(gun, 0.0, 0.0, 3.55, 4.15, (1.2, 0.82), (1.1, 0.74), tags={"all": "trim"})
     head.cone_f(gun, 4, 0.34, 4.15, 0.45)
 
-    objects = d.base_objects(base, KEY, "trim")
-    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), KEY, glow_color=d.PLASMA_GLOW)
+    objects = d.base_objects(base, "trim", params["color"])
+    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), params["color"], glow_color=palette.AMBER)
     return objects

@@ -33,7 +33,10 @@ local SHIP_ASPECT = 0.38
 local AIR_ASPECT = 0.85
 
 local function is_builder(def: EntityDef): boolean
-	return def.build_options ~= nil or def.repairing or def.reclaiming or def.assisting
+	return #unit_defs.build_options(def) > 0
+		or unit_defs.does(def, "repair")
+		or unit_defs.does(def, "reclaim")
+		or unit_defs.does(def, "assist")
 end
 
 -- The width and length of the biggest rectangle of this proportion that fits inside a circle of `radius`,
@@ -266,7 +269,7 @@ local function build(model: Model, def: EntityDef)
 		build_aircraft(model, def, radius, height)
 	elseif unit_defs.rides_surface(def) then
 		build_hull(model, def, radius, height, SHIP_ASPECT, false)
-	elseif def.vehicle == true then
+	elseif unit_defs.is_vehicle(def) then
 		build_hull(model, def, radius, height, VEHICLE_ASPECT, true)
 	else
 		build_bot(model, def, radius, height)

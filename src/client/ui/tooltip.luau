@@ -11,6 +11,8 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local React = require(ReplicatedStorage.Packages.react)
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 
+local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
+
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 
 -- How far from the panel's edge the card stands.
@@ -19,8 +21,8 @@ local GAP = 10
 -- Where tooltips go: the HUD's ScreenGui.
 local Layer = React.createContext(nil :: Instance?)
 
--- `divider` draws a rule above the row, to set off a total from what it adds up.
-export type Row = { label: string, value: string, tag: string?, divider: boolean? }
+-- `divider` draws a rule above the row, to set off a total from what it adds up; `headline` is unit_facts.Row's.
+export type Row = unit_facts.Row
 
 export type Content = {
 	title: string,

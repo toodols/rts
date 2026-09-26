@@ -1,0 +1,22 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Actions -----------------------------------------------------------------------------------------------------
+
+.room-actions {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: space(3);
+}
+
+.status {
+	height: auto;
+	color: var(--TextDim);
+	font-size: 13px;
+
+	&.warning {
+		color: $caution;
+	}
+}

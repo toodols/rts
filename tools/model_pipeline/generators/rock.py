@@ -6,22 +6,21 @@ rock on the map is the same MeshPart: a craggy stone and two chips at its foot, 
 
 import random
 
-from . import common
-from . import reclaimable_common
+from .shared import common
+from .shared import reclaimable
 
-MAX_TRIANGLES = 60
-
-ROCK_COLOR = (0.439, 0.416, 0.384, 1.0)  # 112, 106, 98, the defs' colour
+CATEGORY = "reclaimable"
+DEF = "rock"
 
 
 def generate(params):
     rng = random.Random(params.get("seed", 11))
     # the first, the stone, is the footprint the model is centred on
     pieces = [
-        reclaimable_common.lump("stone", (0.85, 0.7, 0.62), (0.0, 0.0, 0.36), rng, 0.22, flatten=0.35),
-        reclaimable_common.lump("chip_e", (0.36, 0.3, 0.3), (0.72, 0.36, 0.05), rng, 0.2),
-        reclaimable_common.lump("chip_w", (0.28, 0.32, 0.22), (-0.62, -0.5, 0.0), rng, 0.2),
+        reclaimable.lump("stone", (0.85, 0.7, 0.62), (0.0, 0.0, 0.36), rng, 0.22, flatten=0.35),
+        reclaimable.lump("chip_e", (0.36, 0.3, 0.3), (0.72, 0.36, 0.05), rng, 0.2),
+        reclaimable.lump("chip_w", (0.28, 0.32, 0.22), (-0.62, -0.5, 0.0), rng, 0.2),
     ]
     for obj in pieces:
-        common.apply_material(obj, "rock_stone", ROCK_COLOR, roughness=0.9)
+        common.paint(obj, params["color"])
     return pieces

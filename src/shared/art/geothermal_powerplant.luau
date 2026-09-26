@@ -6,7 +6,7 @@ return {
 	parts = {
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 1.25, 0 }, size = { 7.9, 2.5, 7.9 }, hash = "c6285059796dd00a", mesh = "rbxassetid://78544583861480" },
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 1.75, 0 }, size = { 5.2, 1.7, 5.2 }, hash = "95a4bbb79b88d6b9", mesh = "rbxassetid://139713363202641" },
-		{ group = "base", color = { 0.839, 0.431, 0.243 }, offset = { 0, 4.25, 0 }, size = { 3.4, 3.3, 2.9445 }, hash = "f783c627b9c885ae", team = true, mesh = "rbxassetid://134713803098485" },
+		{ group = "base", color = { 0.8392, 0.4314, 0.2431 }, offset = { 0, 4.25, 0 }, size = { 3.4, 3.3, 2.9445 }, hash = "f783c627b9c885ae", team = true, mesh = "rbxassetid://134713803098485" },
 		{ group = "base", color = { 1, 0.24, 0.05 }, offset = { 0, 3.625, 0 }, size = { 2.8, 4.55, 4.9753 }, hash = "c44b29f325cb6a36", neon = true, mesh = "rbxassetid://70574426452212" },
 	},
 }

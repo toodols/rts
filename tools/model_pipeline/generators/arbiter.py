@@ -1,16 +1,22 @@
-"""unit_defs/bot_t2.luau `arbiter` (corhrk): Cortex's heavy rocket bot, capsule(26, 31, 33) -- 1.5 studs of radius,
-2.8 tall, at most 100 triangles. A small hunched walker on reverse-jointed legs, carrying a launcher box far bigger
+"""unit_defs/bot_t2.luau `arbiter` (corhrk): Cortex's heavy rocket bot, at most 100 triangles. A small hunched walker on reverse-jointed legs, carrying a launcher box far bigger
 than itself on its back: team-coloured sides, a dark lid with four glowing rocket cells facing the sky, since its
 rockets climb straight up before diving onto their target. A squat sensor head peers out under the box. The body
 and launcher turn together on the hips to aim.
 """
 
-from . import bot_t2_common as bt
-from .bot_t2_common import FRONT, UP, hring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import FRONT, UP, hring
+
+CATEGORY = "entity"
+DEF = "arbiter"
+MOUNTS = {
+    1: {"pivot": (0, 1.3084, 0.0978), "muzzle": (-0.2989, 0.6844, 1.0272)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("arbiter", bt.rgb(196, 140, 84), glow=(1.0, 0.55, 0.15, 1.0), collider=bt.collider(26, 31, 33))
+    bot = bt.Bot("arbiter", params["color"], glow=palette.HOT_ORANGE)
 
     # reverse-jointed legs: ankle, a knee bent backward, hip
     leg = bt.sweep_faces([hring(0.5, 0.0, 0.18, 0.3, 0.34), hring(0.6, 0.34, 0.78, 0.36, 0.4),

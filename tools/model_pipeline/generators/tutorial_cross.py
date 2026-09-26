@@ -4,13 +4,10 @@
 
 import math
 
-from . import tutorial_common as tc
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = tc.MAX_TRIANGLES
-RECENTRE = False
-
-FILL_COLOR = (0.90, 0.18, 0.16, 1.0)
-RIM_COLOR = (0.38, 0.04, 0.04, 1.0)
+CATEGORY = "hud"
 
 
 def generate(params):
@@ -22,4 +19,4 @@ def generate(params):
     )
     c = s = math.sqrt(0.5)
     polygon = [(x * c - y * s, x * s + y * c) for x, y in plus]
-    return tc.outlined_badge("cross", polygon, FILL_COLOR, RIM_COLOR, rim=0.14, depth=0.4)
+    return ic.badge("cross", polygon, palette.CROSS_FILL, palette.CROSS_RIM, rim=0.14, depth=0.4)

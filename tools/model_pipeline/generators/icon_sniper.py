@@ -1,9 +1,10 @@
-"""HUD icon: sniper rifles, one long round with streaks behind it. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: sniper rifles, one long round with streaks behind it. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     casing = ic.poly(((-1.35, -0.3), (0.35, -0.3), (0.62, -0.19), (0.62, 0.19), (0.35, 0.3), (-1.35, 0.3)))
@@ -13,8 +14,8 @@ def generate(params):
     return ic.build(
         "sniper",
         [
-            ic.layer(ic.place(streaks, angle=angle), ic.ICON),
-            ic.layer(ic.place([casing], angle=angle), ic.ICON),
-            ic.layer(ic.place([tip], angle=angle), ic.ICON),
+            ic.layer(ic.place(streaks, angle=angle), palette.ICON_FILL),
+            ic.layer(ic.place([casing], angle=angle), palette.ICON_FILL),
+            ic.layer(ic.place([tip], angle=angle), palette.ICON_FILL),
         ],
     )

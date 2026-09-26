@@ -1,79 +1,39 @@
--- The steps a campaign mission guides its player through, and which of them the player is on (the cards that show them
--- are ui/tutorial.luau).
+--!strict
+-- The guide of the campaign mission being played, and which of its steps the player is on (the cards that show them are
+-- ui/tutorial.luau). Each mission's guide is data in Client.missions: its steps, and what it says once they are done.
 --
--- The tutorial is the first campaign mission (Shared.campaign), played on a map of its own. While this game is it,
--- the player is walked through TUTORIAL_STEPS one at a time, and the HUD is pared down to what they have been shown so
--- far (`shown`). Other missions guide more lightly: the overlook suggests a few things to do (OVERLOOK_STEPS), on the
--- full HUD, and the counterattack likewise (COUNTERATTACK_STEPS). STEPS_BY_MISSION says which missions guide at all.
--- Each step offers a few ways of doing one thing, a card each; doing it any of those ways marks that card done,
--- and `TUTORIAL.advance_seconds` later the next step begins. A card can be the wrong way (`mark` "cross"): shown so
--- the player knows not to, and never done. Past the last step the tutorial is finished, and says so.
+-- While this game is a mission with a guide, the player is walked through its steps one at a time. Each step offers a
+-- few ways of doing one thing, a card each; doing it any of those ways (or every one, for a step that says so) marks
+-- it done, and ADVANCE_SECONDS later the next step begins. A card can be the wrong way (`mark` "cross"): shown so the
+-- player knows not to, and never done. A guide that stops short (its `is_over`) skips the steps left. Past the last
+-- step the guide says what is left to do, if anything. A step that looks over at something moves the view there, and
+-- once the steps stop doing so it goes back to where it was before (Client.missions' `look_back`). A mission's hard
+-- mode (mission_state.hard) guides not at all.
 --
--- A step is data: its cards, and a `watch` that starts looking for them to be done. Adding a step is adding an entry
--- to a mission's steps (and, for a card that looks like none before it, how the card is drawn, in ui/tutorial.luau).
+-- What a guide keeps off the HUD until one of its steps has taught it (a step's `reveals`) is `shown`. What the HUD
+-- points at for the step is `build_target` and `command_target`, and what its cards say to do first or next, with
+-- what is selected and what the cursor is doing, is `hint`.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local RunService = game:GetService "RunService"
-local Workspace = game:GetService "Workspace"
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
-local map_state = require(ReplicatedStorage.Shared.map_state)
-local metal_spots = require(ReplicatedStorage.Shared.metal_spots)
-local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local map_state = require(ReplicatedStorage.Shared.map_state)
+local mission_state = require(ReplicatedStorage.Shared.mission_state)
+local signal = require(ReplicatedStorage.Shared.signal)
 
-local camera = require(ReplicatedStorage.Client.camera)
-local input = require(ReplicatedStorage.Client.input)
-local mission = require(ReplicatedStorage.Client.mission)
-local selection = require(ReplicatedStorage.Client.selection)
-local tutorial_marker = require(ReplicatedStorage.Client.tutorial_marker)
+local missions = require(ReplicatedStorage.Client.missions)
+local map_events = require(ReplicatedStorage.Client.map_events)
 local world = require(ReplicatedStorage.Client.world)
+local selection = require(ReplicatedStorage.Client.selection)
+local command_state = require(ReplicatedStorage.Client.command_state)
 
-type EntityId = types.EntityId
+type Step = missions.Step
+type Feature = missions.Feature
 
-export type Card = {
-	-- what ui/tutorial.luau draws it as, and what `watch` calls it when it is done
-	id: string,
-	caption: string,
-	-- a way to do it ("check"), or a way not to ("cross"), which is never done
-	mark: "check" | "cross",
-	-- For a card that is done once an income reaches `goal` a second: which resource, whose colour its meter is in.
-	-- Its progress is then the income itself, a number in text, which the card shows against the goal rather than as
-	-- a count.
-	rate: { resource: "metal" | "energy", goal: number }?,
-}
-
--- Something the tutorial keeps off the HUD until a step has taught what it is for.
-export type Feature = "economy" | "weapons"
-
-export type Step = {
-	id: string,
-	title: string,
-	cards: { Card },
-	-- For a step that builds something: what has to be selected to build it (a def name), and what to click in the
-	-- build menu, which the menu then points out.
-	builder: string?,
-	build: string?,
-	-- what the card says instead of pointing at the build menu, once what it asks for is being placed
-	placing_hint: string?,
-	-- For a step that uses a command: which of the commands list's modes (input.commands) to click, which the list
-	-- then points out, and what the card says instead once that mode is on.
-	command: string?,
-	command_hint: string?,
-	-- what the HUD shows from the moment the step is done: "economy" for the metal and energy bar, "weapons" for what
-	-- a unit or building fights with in the selection panel
-	reveals: Feature?,
-	-- said in place of the usual word while the next step is on its way
-	done_note: string?,
-	-- whether every one of its ways ("check" cards) has to be done before the next step, rather than any one
-	every_card: boolean?,
-	-- Starts looking for the step's cards to be done, calling `complete` with a card's id when one is, and `report`
-	-- with a card's id and how far along it is ("2/3") for a card that counts. Returns a function that stops.
-	watch: (complete: (card: string) -> (), report: (card: string, text: string) -> ()) -> () -> (),
-}
-
--- Starts looking for a step's cards to be done (see Step's `watch`).
-type Watch = (complete: (card: string) -> (), report: (card: string, text: string) -> ()) -> () -> ()
+-- What the cards of the step say to do before what they ask can be done (select something first), or with `next`,
+-- what to do now that it has been started (where to click, once a building is being placed).
+export type Hint = { text: string, next: boolean }
 
 export type State = {
 	-- whether this game is a mission that guides its player at all
@@ -90,667 +50,10 @@ export type State = {
 	progress: { [string]: string },
 }
 
-local TUTORIAL = campaign.TUTORIAL
-local OVERLOOK = campaign.OVERLOOK
-local COUNTERATTACK = campaign.COUNTERATTACK
--- How wide the ring on each of the counterattack's guard wrecks is.
-local WRECK_RING = 4
--- How often the steps that wait on something on the field look again, in seconds.
-local CHECK_SECONDS = 0.25
--- How near a metal spot's middle an extractor has to stand to be on it.
-local SPOT_REACH = 4
--- How wide the ring round the boulder is.
-local BOULDER_RING = 26
--- How wide the ring on the overlook's cliff edge is.
-local EDGE_RING = 11
--- The Workspace attribute the server names the mission's enemy team in (server/missions.luau).
-local ENEMY_TEAM_ATTRIBUTE = "campaign_enemy_team"
+-- How long a step waits, once it is done, before the next begins.
+local ADVANCE_SECONDS = 3
 
-local team_updated: RemoteEvent = ReplicatedStorage.Shared.TeamUpdated
-
--- Your team's metal and energy revenue, a second's worth, as the server last sent them (as the resource bar shows them).
--- Listened for from the moment this is required, as the resource bar does, so that no update goes unheard.
-local revenue = { metal = 0, energy = 0 }
-team_updated.OnClientEvent:Connect(function(team: any)
-	if typeof(team) ~= "table" then
-		return
-	end
-	if typeof(team.metal_revenue) == "number" then
-		revenue.metal = team.metal_revenue
-	end
-	if typeof(team.energy_revenue) == "number" then
-		revenue.energy = team.energy_revenue
-	end
-end)
-
--- Your commander, if it is on the field.
-local function my_commander(): Model?
-	for _, model in world.all() do
-		if world.is_mine(model) and model:GetAttribute "def_name" == "commander" then
-			return model
-		end
-	end
-	return nil
-end
-
-local function commander_id(): EntityId?
-	local model = my_commander()
-	return if model ~= nil then world.id_of(model) else nil
-end
-
--- How many of `def_name` are yours: finished ones only, or with `blueprints` those still going up as well.
-local function count_mine(def_name: string, blueprints: boolean): number
-	local count = 0
-	for _, model in world.all() do
-		if
-			world.is_mine(model)
-			and model:GetAttribute "def_name" == def_name
-			and (blueprints or model:GetAttribute "state" == "active")
-		then
-			count += 1
-		end
-	end
-	return count
-end
-
--- The metal spots on your side: west of `x`.
-local function my_metal_spots(x: number): { Vector3 }
-	local result: { Vector3 } = {}
-	for _, spot in metal_spots.all() do
-		if spot.center.X < x then
-			table.insert(result, spot.center)
-		end
-	end
-	return result
-end
-
--- Whether one of your finished metal extractors stands on `spot`; a blueprint does not count yet.
-local function extractor_on(spot: Vector3): boolean
-	for _, model in world.all() do
-		if
-			world.is_mine(model)
-			and model:GetAttribute "def_name" == "metal_extractor"
-			and model:GetAttribute "state" == "active"
-		then
-			local at = world.position_of(model)
-			if Vector2.new(at.X - spot.X, at.Z - spot.Z).Magnitude <= SPOT_REACH then
-				return true
-			end
-		end
-	end
-	return false
-end
-
--- How many things the mission's enemy has left standing, finished or not; nil until the server has said which team it
--- is. Wrecks belong to nobody, so what has died is not counted.
-local function enemy_left(): number?
-	local enemy = Workspace:GetAttribute(ENEMY_TEAM_ATTRIBUTE)
-	if typeof(enemy) ~= "number" then
-		return nil
-	end
-	local count = 0
-	for _, model in world.all() do
-		if model:GetAttribute "team" == enemy then
-			count += 1
-		end
-	end
-	return count
-end
-
--- Whether the boulder still blocks the pass.
-local function boulder_standing(): boolean
-	for _, model in world.all() do
-		if model:GetAttribute "def_name" == "tutorial_boulder" then
-			return true
-		end
-	end
-	return false
-end
-
--- Calls `check` now and every CHECK_SECONDS until stopped: how the steps that wait on the field keep an eye on it.
-local function every_check(check: () -> ()): () -> ()
-	local waited = 0
-	local connection = RunService.Heartbeat:Connect(function(delta: number)
-		waited += delta
-		if waited >= CHECK_SECONDS then
-			waited = 0
-			check()
-		end
-	end)
-	check()
-	return function()
-		connection:Disconnect()
-	end
-end
-
--- A step's `watch` that counts: `card` is done once `count` reaches `goal`, and reports how far it has got meanwhile.
-local function watch_count(
-	card: string,
-	goal: number,
-	count: () -> number
-): (complete: (card: string) -> (), report: (card: string, text: string) -> ()) -> () -> ()
-	return function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-		return every_check(function()
-			local have = math.min(count(), goal)
-			report(card, `{have}/{goal}`)
-			if have >= goal then
-				complete(card)
-			end
-		end)
-	end
-end
-
--- Which buttons of the build menu get to `def_name`, in words: its category's, and then its own if the category's
--- button does not place it already. The categories are input's, so they are always the menu's own.
-local function build_path(def_name: string): string
-	local name = unit_defs.get(def_name).display_name
-	for _, tab in input.build_tabs do
-		if tab.keys[def_name] == nil then
-			continue
-		end
-		if table.find(tab.primary, def_name) ~= nil then
-			return `click {tab.name} in the build menu`
-		end
-		return `click {tab.name} and then {name} in the build menu`
-	end
-	return `click {name} in the build menu`
-end
-
-local function within_reach(position: Vector3): boolean
-	local target = TUTORIAL.move_target
-	return Vector2.new(position.X - target.X, position.Z - target.Y).Magnitude <= TUTORIAL.move_tolerance
-end
-
--- Marks each metal spot west of `x`, your side, until a finished extractor stands on it, and looks over at them; calls
--- `check` with how many have one and how many there are, now and every CHECK_SECONDS. Returns a function that stops.
-local function mark_spots(x: number, check: (taken: number, total: number) -> ()): () -> ()
-	local spots = my_metal_spots(x)
-	local hide_markers: { [number]: () -> () } = {}
-	local middle = Vector3.zero
-	for index, spot in spots do
-		hide_markers[index] = tutorial_marker.show(Vector2.new(spot.X, spot.Z), SPOT_REACH + 2)
-		middle += spot / #spots
-	end
-	if #spots > 0 then
-		camera.glide_to(middle)
-	end
-	local stop = every_check(function()
-		local taken = 0
-		for index, spot in spots do
-			if extractor_on(spot) then
-				taken += 1
-				local hide = hide_markers[index]
-				if hide ~= nil then
-					hide()
-					hide_markers[index] = nil
-				end
-			end
-		end
-		check(taken, #spots)
-	end)
-	return function()
-		stop()
-		for _, hide in hide_markers do
-			hide()
-		end
-	end
-end
-
--- A step's `watch` that is done once a finished extractor stands on every metal spot west of `x`, your side. Each spot is
--- marked until one does.
-local function watch_extractors(x: number): Watch
-	return function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-		return mark_spots(x, function(taken: number, total: number)
-			report("extractors", `{taken}/{total}`)
-			if taken >= total then
-				complete "extractors"
-			end
-		end)
-	end
-end
-
--- A step's `watch` that only marks the metal spots west of `x` until each has an extractor, for a step whose cards ask
--- for what they bring in rather than for the extractors themselves. It is never done.
-local function watch_spots(x: number): Watch
-	return function(): () -> ()
-		return mark_spots(x, function() end)
-	end
-end
-
--- A step's `watch` that counts what has been destroyed of the most the enemy has been seen to have, and is done once it
--- has nothing left; the server ends the game in victory then. It looks over at the enemy, at `enemy_at`, first.
-local function watch_destroy(enemy_at: Vector2): Watch
-	return function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-		camera.glide_to(Vector3.new(enemy_at.X, 0, enemy_at.Y))
-		local most = 0
-		return every_check(function()
-			local left = enemy_left()
-			if left == nil then
-				return
-			end
-			most = math.max(most, left)
-			if most == 0 then
-				return
-			end
-			report("destroy", `{most - left}/{most}`)
-			if left == 0 then
-				complete "destroy"
-			end
-		end)
-	end
-end
-
--- A step's `watch` for a card with a `rate`: reports your revenue of its resource a second, and is done once it reaches
--- the goal as the resource bar shows it, rounded to a whole number.
-local function watch_rate(card: Card): Watch
-	local rate = card.rate :: { resource: "metal" | "energy", goal: number }
-	return function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-		return every_check(function()
-			local have = revenue[rate.resource]
-			report(card.id, string.format("%.1f", have))
-			if math.floor(have + 0.5) >= rate.goal then
-				complete(card.id)
-			end
-		end)
-	end
-end
-
--- A step's `watch` that runs every one of `watches` at once.
-local function watch_all(watches: { Watch }): Watch
-	return function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-		local stops: { () -> () } = {}
-		for _, watch in watches do
-			table.insert(stops, watch(complete, report))
-		end
-		return function()
-			for _, stop in stops do
-				stop()
-			end
-		end
-	end
-end
-
--- How many of your finished thugs stand at the overlook's cliff edge, on the plateau.
-local function thugs_at_edge(): number
-	local count = 0
-	for _, model in world.all() do
-		if
-			world.is_mine(model)
-			and model:GetAttribute "def_name" == "thug"
-			and model:GetAttribute "state" == "active"
-		then
-			local at = world.position_of(model)
-			local edge = campaign.overlook_edge_at(at.Z)
-			if at.X <= edge + 1 and at.X >= edge - OVERLOOK.edge_depth then
-				count += 1
-			end
-		end
-	end
-	return count
-end
-
-local TUTORIAL_STEPS: { Step } = table.freeze({
-	{
-		id = "camera",
-		title = "Move the camera",
-		cards = {
-			{ id = "wasd", caption = "WASD does not move the camera", mark = "cross" },
-			{ id = "arrows", caption = "Use the arrow keys", mark = "check" },
-			{ id = "middle_drag", caption = "Or hold the middle mouse button and drag", mark = "check" },
-		},
-		watch = function(complete: (card: string) -> ()): () -> ()
-			-- W, A, S and D only show that they do not pan here, rather than starting the commands they are bound to
-			input.suppress_keys({ Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D })
-			local stop = camera.subscribe_pan(function(method: camera.PanMethod)
-				complete(if method == "keys" then "arrows" else "middle_drag")
-			end)
-			return function()
-				stop()
-				input.suppress_keys({})
-			end
-		end,
-	},
-	{
-		id = "select",
-		title = "Select your commander",
-		cards = {
-			{ id = "box_select", caption = "Drag a box over it with the left mouse button", mark = "check" },
-			{ id = "click_select", caption = "Or left click it", mark = "check" },
-		},
-		watch = function(complete: (card: string) -> ()): () -> ()
-			-- it may have been panned out of sight in the step before
-			local commander = my_commander()
-			if commander ~= nil then
-				camera.glide_to(world.position_of(commander))
-			end
-			return input.subscribe_select(function(method: input.SelectMethod, ids: { EntityId })
-				local id = commander_id()
-				if id ~= nil and table.find(ids, id) ~= nil and selection.contains(id) then
-					complete(if method == "box" then "box_select" else "click_select")
-				end
-			end)
-		end,
-	},
-	{
-		id = "move",
-		title = "Move your commander",
-		cards = {
-			{ id = "right_click", caption = "Right click the marker to send your commander there", mark = "check" },
-		},
-		-- Done once the commander stands at the marker, however it got there. Sending it there says it is on its way.
-		watch = function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-			local target = TUTORIAL.move_target
-			local hide_marker = tutorial_marker.show(target, TUTORIAL.move_tolerance)
-			-- look between the commander and the marker, so both are in view
-			local commander = my_commander()
-			local target_point = Vector3.new(target.X, 0, target.Y)
-			if commander ~= nil then
-				camera.glide_to((world.position_of(commander) + target_point) / 2)
-			else
-				camera.glide_to(target_point)
-			end
-			local stop_watching_moves = input.subscribe_move(function(ids: { EntityId }, positions: { Vector3 })
-				local id = commander_id()
-				local index = if id ~= nil then table.find(ids, id) else nil
-				if index ~= nil and within_reach(positions[index]) then
-					report("right_click", "On its way...")
-				end
-			end)
-			local arrival = RunService.Heartbeat:Connect(function()
-				local model = my_commander()
-				if model ~= nil and within_reach(world.position_of(model)) then
-					complete "right_click"
-				end
-			end)
-			return function()
-				hide_marker()
-				stop_watching_moves()
-				arrival:Disconnect()
-			end
-		end,
-	},
-	{
-		id = "extractors",
-		title = "Build metal extractors",
-		cards = {
-			{
-				id = "extractors",
-				caption = `Metal Extractors mine metal. With your commander selected, {build_path "metal_extractor"}, then click each marked metal spot`,
-				mark = "check",
-			},
-		},
-		builder = "commander",
-		build = "metal_extractor",
-		placing_hint = "Now click a marked metal spot",
-		watch = watch_extractors(TUTORIAL.chokepoint.X),
-	},
-	{
-		id = "solars",
-		title = "Build solar collectors",
-		cards = {
-			{
-				id = "solars",
-				caption = `Solar Collectors make energy. With your commander selected, {build_path "solar_collector"}, then place {TUTORIAL.solars} of them`,
-				mark = "check",
-			},
-		},
-		builder = "commander",
-		build = "solar_collector",
-		placing_hint = "Now click on open ground to place it",
-		reveals = "economy",
-		done_note = "Your metal and energy are now shown at the top of the screen",
-		watch = watch_count("solars", TUTORIAL.solars, function(): number
-			return count_mine("solar_collector", false)
-		end),
-	},
-	{
-		id = "bot_lab",
-		title = "Build a Bot Lab",
-		cards = {
-			{
-				id = "bot_lab",
-				caption = `A Bot Lab makes your army. With your commander selected, {build_path "bot_lab"}, then place it`,
-				mark = "check",
-			},
-		},
-		builder = "commander",
-		build = "bot_lab",
-		placing_hint = "Now click on open ground to place it",
-		watch = watch_count("bot_lab", 1, function(): number
-			return count_mine("bot_lab", false)
-		end),
-	},
-	{
-		id = "grunts",
-		title = "Make Grunts",
-		cards = {
-			{
-				id = "grunts",
-				caption = `Select your Bot Lab and click Grunt in its build menu {TUTORIAL.grunts} times`,
-				mark = "check",
-			},
-		},
-		builder = "bot_lab",
-		build = "grunt",
-		reveals = "weapons",
-		done_note = "Select a unit to see its weapons in the panel at the bottom left",
-		watch = watch_count("grunts", TUTORIAL.grunts, function(): number
-			return count_mine("grunt", false)
-		end),
-	},
-	{
-		id = "dgun",
-		title = "Clear the pass",
-		builder = "commander",
-		command = "disintegrator",
-		command_hint = "Now click the boulder",
-		cards = {
-			{
-				id = "dgun",
-				caption = "Move your commander towards the boulder, then press D to use your Disintegrator Gun on the boulder.",
-				mark = "check",
-			},
-		},
-		-- Done once the boulder is gone, however that came about.
-		watch = function(complete: (card: string) -> (), _report: (card: string, text: string) -> ()): () -> ()
-			local pass = TUTORIAL.chokepoint
-			local hide_marker = tutorial_marker.show(pass, BOULDER_RING)
-			camera.glide_to(Vector3.new(pass.X, 0, pass.Y))
-			local stop = every_check(function()
-				if boulder_standing() == false then
-					complete "dgun"
-				end
-			end)
-			return function()
-				stop()
-				hide_marker()
-			end
-		end,
-	},
-	{
-		id = "destroy",
-		title = "Destroy the enemy",
-		cards = {
-			{
-				id = "destroy",
-				caption = "Take your Grunts and commander through the pass and destroy everything the enemy has",
-				mark = "check",
-			},
-		},
-		watch = watch_destroy(TUTORIAL.enemy_start),
-	},
-})
-
--- The overlook's income cards: the metal the commander and an extractor on each of the player's spots make together,
--- and the energy.
-local OVERLOOK_METAL: Card = table.freeze({
-	id = "metal",
-	caption = "Metal income: Metal Extractors on the marked spots",
-	mark = "check",
-	rate = table.freeze({ resource = "metal", goal = OVERLOOK.metal }),
-})
-local OVERLOOK_ENERGY: Card = table.freeze({
-	id = "energy",
-	caption = "Energy income: Solar Collectors or Wind Turbines",
-	mark = "check",
-	rate = table.freeze({ resource = "energy", goal = OVERLOOK.energy }),
-})
-
--- The overlook's: a few suggestions, on the full HUD.
-local OVERLOOK_STEPS: { Step } = table.freeze({
-	{
-		id = "economy",
-		title = "Develop your economy",
-		cards = { OVERLOOK_METAL, OVERLOOK_ENERGY },
-		every_card = true,
-		builder = "commander",
-		build = "metal_extractor",
-		placing_hint = "Now click a marked metal spot",
-		watch = watch_all({ watch_spots(OVERLOOK.edge_x), watch_rate(OVERLOOK_METAL), watch_rate(OVERLOOK_ENERGY) }),
-	},
-	{
-		id = "high_ground",
-		title = "Take the high ground",
-		cards = {
-			{
-				id = "edge_thugs",
-				caption = "Thugs at the cliff edge outrange the guards below",
-				mark = "check",
-			},
-		},
-		build = "thug",
-		-- Done once enough of your thugs stand at the edge. The edge in front of the enemy is marked.
-		watch = function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-			local edge = Vector2.new(campaign.overlook_edge_at(0) - OVERLOOK.edge_depth / 2, 0)
-			local hide_marker = tutorial_marker.show(edge, EDGE_RING)
-			camera.glide_to(Vector3.new(edge.X, 0, edge.Y))
-			local stop = watch_count("edge_thugs", OVERLOOK.edge_thugs, thugs_at_edge)(complete, report)
-			return function()
-				stop()
-				hide_marker()
-			end
-		end,
-	},
-	{
-		id = "destroy",
-		title = "Destroy the enemy",
-		cards = {
-			{ id = "destroy", caption = "Every enemy unit and building", mark = "check" },
-		},
-		watch = watch_destroy(OVERLOOK.enemy_start),
-	},
-})
-
--- How many finished guards of yours stand below the overlook's cliff, where the old base's wrecks lie: those raised.
-local function guards_raised(): number
-	local raised = 0
-	for _, model in world.all() do
-		if
-			world.is_mine(model)
-			and model:GetAttribute "def_name" == "guard"
-			and model:GetAttribute "state" == "active"
-			and world.position_of(model).X > OVERLOOK.edge_x
-		then
-			raised += 1
-		end
-	end
-	return raised
-end
-
--- The guard wrecks lying below the overlook's cliff, by model.
-local function guard_wrecks(): { Model }
-	local wrecks: { Model } = {}
-	for _, model in world.all() do
-		if
-			model:GetAttribute "kind" == "wreck"
-			and model:GetAttribute "def_name" == "guard"
-			and world.position_of(model).X > OVERLOOK.edge_x
-		then
-			table.insert(wrecks, model)
-		end
-	end
-	return wrecks
-end
-
--- A number the server publishes for the counterattack (campaign.COUNTERATTACK_ATTRIBUTES), or 0 while it has not.
-local function wave_attribute(name: string): number
-	local value = Workspace:GetAttribute(name)
-	return if typeof(value) == "number" then value else 0
-end
-
--- The counterattack's: a few suggestions, on the full HUD. The old base's guards are asked for only until the first
--- wave arrives.
-local COUNTERATTACK_STEPS: { Step } = table.freeze({
-	{
-		id = "raise",
-		title = "Raise the old guns",
-		cards = {
-			{ id = "guards", caption = "Resurrect the wrecked Guards", mark = "check" },
-		},
-		builder = "graverobber",
-		command = "resurrect",
-		command_hint = "Now click a marked wreck",
-		-- Done once every guard of the old base is yours, or the enemy is here. Each guard wreck is marked while it lies
-		-- there.
-		watch = function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-			local goal = COUNTERATTACK.old_guards
-			local hide_markers: { [Model]: () -> () } = {}
-			local stop = every_check(function()
-				local lying: { [Model]: boolean } = {}
-				for _, wreck in guard_wrecks() do
-					lying[wreck] = true
-					if hide_markers[wreck] == nil then
-						local at = world.position_of(wreck)
-						hide_markers[wreck] = tutorial_marker.show(Vector2.new(at.X, at.Z), WRECK_RING)
-					end
-				end
-				for wreck, hide in hide_markers do
-					if lying[wreck] ~= true then
-						hide()
-						hide_markers[wreck] = nil
-					end
-				end
-				local raised = math.min(guards_raised(), goal)
-				report("guards", `{raised}/{goal}`)
-				if raised >= goal or wave_attribute(campaign.COUNTERATTACK_ATTRIBUTES.wave) > 0 then
-					complete "guards"
-				end
-			end)
-			return function()
-				stop()
-				for _, hide in hide_markers do
-					hide()
-				end
-			end
-		end,
-	},
-	{
-		id = "hold",
-		title = "Hold the heights",
-		cards = {
-			{ id = "waves", caption = "Destroy every wave", mark = "check" },
-		},
-		watch = function(complete: (card: string) -> (), report: (card: string, text: string) -> ()): () -> ()
-			local names = campaign.COUNTERATTACK_ATTRIBUTES
-			return every_check(function()
-				local wave, waves = wave_attribute(names.wave), wave_attribute(names.waves)
-				report("waves", `{wave}/{waves}`)
-				if waves > 0 and wave >= waves and wave_attribute(names.enemies_left) == 0 then
-					complete "waves"
-				end
-			end)
-		end,
-	},
-})
-
--- The missions that guide their player, and through what.
-local STEPS_BY_MISSION: { [string]: { Step } } = table.freeze({
-	tutorial = TUTORIAL_STEPS,
-	overlook = OVERLOOK_STEPS,
-	counterattack = COUNTERATTACK_STEPS,
-})
-
-local state: State = table.freeze({
+local INACTIVE: State = table.freeze({
 	active = false,
 	mission = nil,
 	step = 1,
@@ -758,7 +61,9 @@ local state: State = table.freeze({
 	advancing = false,
 	progress = table.freeze({}),
 })
-local listeners: { (state: State) -> () } = {}
+
+local state: State = INACTIVE
+local changed = signal.new() :: signal.Signal<State>
 -- Stops the current step's watching.
 local stop_step: (() -> ())? = nil
 -- Bumped whenever the step changes, so that what an old step set going does nothing once it has gone.
@@ -766,31 +71,25 @@ local generation = 0
 
 local function set_state(next_state: State)
 	state = table.freeze(next_state)
-	for _, listener in table.clone(listeners) do
-		listener(state)
-	end
-end
-
-local function subscribe(listener: (state: State) -> ()): () -> ()
-	table.insert(listeners, listener)
-	return function()
-		local index = table.find(listeners, listener)
-		if index ~= nil then
-			table.remove(listeners, index)
-		end
-	end
+	changed.fire(state)
 end
 
 local function get(): State
 	return state
 end
 
--- The steps of the mission being guided through; none outside one.
-local function steps(): { Step }
-	return STEPS_BY_MISSION[state.mission or ""] or {}
+-- The guide of the mission being guided through; none outside one.
+local function guide(): missions.Guide?
+	return if state.mission ~= nil then missions.guide_of(state.mission) else nil
 end
 
--- The step being shown, while it is still to be done: nil outside the tutorial, once it is finished, and while the
+-- The steps of the mission being guided through; none outside one.
+local function steps(): { Step }
+	local current = guide()
+	return if current ~= nil then current.steps else {}
+end
+
+-- The step being shown, while it is still to be done: nil outside a guided mission, once it is finished, and while the
 -- next step is on its way.
 local function current_step(): Step?
 	if state.active == false or state.advancing then
@@ -799,34 +98,104 @@ local function current_step(): Step?
 	return steps()[state.step]
 end
 
+-- What is left to do once every step of the mission being guided through is done, if it says: nil before then.
+local function objective(): missions.Objective?
+	local current = guide()
+	if state.active == false or current == nil or current.steps[state.step] ~= nil then
+		return nil
+	end
+	return current.objective
+end
+
 -- Which command the commands list should point out right now, if any.
 local function command_target(): string?
 	local step = current_step()
-	return if step ~= nil then step.command else nil
+	local click = if step ~= nil then step.click else nil
+	return if click ~= nil and click.kind == "command" then click.mode else nil
 end
 
 -- What the build menu should point out right now, if anything.
 local function build_target(): string?
 	local step = current_step()
-	return if step ~= nil then step.build else nil
+	local click = if step ~= nil then step.click else nil
+	return if click ~= nil and click.kind == "build" then click.def_name else nil
 end
 
--- Whether `feature` is shown on the HUD: always, unless a step of the mission being guided through reveals it (only the
--- tutorial's do), and then once that step has been done.
-local function shown(feature: Feature): boolean
-	if state.active == false then
-		return true
-	end
-	local revealed_later = false
-	for index, step in steps() do
-		if step.reveals == feature then
-			if index < state.step or (index == state.step and state.advancing) then
-				return true
-			end
-			revealed_later = true
+-- Whether something of `def_name` is selected.
+local function is_selected(def_name: string): boolean
+	for _, id in selection.get() do
+		local def = world.def_of_id(id)
+		if def ~= nil and def.name == def_name then
+			return true
 		end
 	end
-	return revealed_later == false
+	return false
+end
+
+-- the hint last handed out, handed out again for as long as it says the same, so that nothing renders again for it
+local last_hint: Hint? = nil
+
+-- What the cards of the step being shown say to do first or next right now, if anything: select what the step needs
+-- selected while it does and it is not, or, once what it asks to be clicked has been, what to do next.
+local function hint(): Hint?
+	local step = current_step()
+	if step == nil then
+		return nil
+	end
+	local found: Hint? = nil
+	local selecting = step.select
+	local click = step.click
+	if
+		selecting ~= nil
+		and (selecting.until_card == nil or state.completed[selecting.until_card] ~= true)
+		and is_selected(selecting.def_name) == false
+	then
+		local def = unit_defs.get(selecting.def_name)
+		local name = if unit_defs.is_commander(def) then "commander" else def.display_name
+		found = { text = `First select your {name}`, next = false }
+	elseif click ~= nil and click.next ~= nil then
+		local clicked = if click.kind == "build"
+			then command_state.placing() == click.def_name
+			else command_state.mode() == click.mode
+		found = if clicked then { text = click.next, next = true } else nil
+	end
+	if found ~= nil and last_hint ~= nil and found.text == last_hint.text and found.next == last_hint.next then
+		return last_hint
+	end
+	last_hint = found
+	return found
+end
+
+-- Calls `listener` whenever what `hint` says could have changed, until the returned function is called.
+local function subscribe_hint(listener: () -> ()): () -> ()
+	local stops = {
+		changed.subscribe(listener),
+		selection.subscribe(listener),
+		command_state.subscribe(listener),
+	}
+	return function()
+		for _, stop in stops do
+			stop()
+		end
+	end
+end
+
+-- Whether `feature` is shown on the HUD: always, unless the guide of the mission being played has a step that reveals
+-- it, and then only once the player is being guided past that step. A hard mode, which does not guide, shows it all.
+local function shown(feature: Feature): boolean
+	local playing = missions.current()
+	local playing_guide = if playing ~= nil and mission_state.hard() == false then missions.guide_of(playing) else nil
+	if playing_guide == nil then
+		return true
+	end
+	for index, step in playing_guide.steps do
+		if step.reveals ~= feature then
+			continue
+		end
+		local guided_here = state.active and state.mission == playing
+		return guided_here and (index < state.step or (index == state.step and state.advancing))
+	end
+	return true
 end
 
 local function leave_step()
@@ -838,8 +207,11 @@ local function leave_step()
 	end
 end
 
+-- Goes on to step `index` of `mission_id`'s. The view, if a step before moved it, goes back to where it was unless this
+-- one moves it at once.
 local function go_to(mission_id: string, index: number)
 	leave_step()
+	missions.begin_step_view()
 	local this_generation = generation
 	set_state({
 		active = true,
@@ -850,8 +222,10 @@ local function go_to(mission_id: string, index: number)
 		progress = table.freeze({}),
 	})
 
-	local step = steps()[index]
+	local current = missions.guide_of(mission_id) :: missions.Guide
+	local step = current.steps[index]
 	if step == nil then
+		missions.look_back()
 		return
 	end
 	local function complete(card: string)
@@ -879,7 +253,7 @@ local function go_to(mission_id: string, index: number)
 			progress = state.progress,
 		})
 		if was_advancing == false and done then
-			task.delay(TUTORIAL.advance_seconds, function()
+			task.delay(ADVANCE_SECONDS, function()
 				if generation == this_generation then
 					go_to(mission_id, index + 1)
 				end
@@ -901,7 +275,27 @@ local function go_to(mission_id: string, index: number)
 			progress = table.freeze(progress),
 		})
 	end
-	stop_step = step.watch(complete, report)
+	local stop_watch = step.watch(complete, report)
+	missions.look_back()
+	local is_over = current.is_over
+	if is_over == nil then
+		stop_step = stop_watch
+		return
+	end
+	local stop_over = missions.every_check(function()
+		if is_over() then
+			-- deferred, as this may be running inside go_to itself
+			task.defer(function()
+				if generation == this_generation then
+					go_to(mission_id, #current.steps + 1)
+				end
+			end)
+		end
+	end)
+	stop_step = function()
+		stop_watch()
+		stop_over()
+	end
 end
 
 -- Whether this side has built `mission_id`'s map yet. The server names the mission before it loads the map, and a
@@ -913,9 +307,11 @@ local function map_built(mission_id: string): boolean
 end
 
 -- Starts guiding the player from the first step when this game becomes a mission that guides, or begins it again (the
--- server's load_mission), once its map is built, and stops when it stops being one.
+-- server's load_mission), once its map is built, and stops when it stops being one. Its hard mode does not guide.
 local function follow_mission(current: string?)
-	if current ~= nil and STEPS_BY_MISSION[current] ~= nil then
+	-- where the view was on the map before is nothing to go back to
+	missions.forget_view()
+	if current ~= nil and missions.guide_of(current) ~= nil and mission_state.hard() == false then
 		if map_built(current) then
 			go_to(current, 1)
 		else
@@ -923,35 +319,32 @@ local function follow_mission(current: string?)
 		end
 	elseif state.active then
 		leave_step()
-		set_state({
-			active = false,
-			mission = nil,
-			step = 1,
-			completed = table.freeze({}),
-			advancing = false,
-			progress = table.freeze({}),
-		})
+		set_state(INACTIVE)
 	end
-end
-
-local function init()
-	mission.subscribe(follow_mission)
-	follow_mission(mission.current())
 end
 
 -- The map was replaced: the mission being guided through, if any, begins again on the new one.
 local function rebuild()
-	follow_mission(mission.current())
+	follow_mission(missions.current())
+end
+
+local function init()
+	missions.subscribe(follow_mission)
+	map_events.on_rebuilt(rebuild)
+	follow_mission(missions.current())
 end
 
 return table.freeze({
 	init = init,
-	rebuild = rebuild,
+	guide = guide,
 	steps = steps,
 	get = get,
 	current_step = current_step,
+	objective = objective,
 	build_target = build_target,
 	command_target = command_target,
+	hint = hint,
+	subscribe_hint = subscribe_hint,
 	shown = shown,
-	subscribe = subscribe,
+	subscribe = changed.subscribe,
 })

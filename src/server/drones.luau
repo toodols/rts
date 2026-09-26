@@ -14,9 +14,14 @@ local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local state = require(script.Parent.state)
 local movement = require(script.Parent.movement)
-local combat = require(script.Parent.combat)
-local docking = require(script.Parent.docking)
+local shot_rules = require(script.Parent.shot_rules)
+local targeting = require(script.Parent.targeting)
+local control = require(script.Parent.control)
 local stockpiles = require(script.Parent.stockpiles)
+local spatial = require(script.Parent.spatial)
+local alliances = require(script.Parent.alliances)
+local deaths = require(script.Parent.deaths)
+local orders = require(script.Parent.orders)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -50,40 +55,38 @@ local function spawn(carrier: Entity, def: types.EntityDef, spec: types.Carrier,
 	local drone_def = unit_defs.get(spec.drone)
 	local at = perch(carrier, def, drone_def, index, spec.count)
 	local drone = state.create_entity(spec.drone, carrier.team, at, carrier.facing, "active")
-	docking.set(drone.id, true)
+	control.dock(drone.id, true)
 	return { id = drone.id }
 end
 
--- The nearest enemy the drones can fight, in range of the carrier.
+-- The nearest enemy the drones can fight, in range of the carrier, and not hanging from a transport.
 local function find_target(carrier: Entity, spec: types.Carrier, drone_def: types.EntityDef): Entity?
-	local weapons = drone_def.weapons
 	local best: Entity? = nil
 	local best_distance = spec.engage_range
-	for _, other in state.all() do
-		local can_hit = weapons == nil
-		if can_hit == false then
-			for _, weapon in weapons :: { types.Weapon } do
-				if combat.can_target(weapon, other) then
-					can_hit = true
-					break
-				end
-			end
+	local position = carrier.position
+	spatial.each_target(position.X, position.Z, best_distance, alliances.root_of(carrier.team), function(other: Entity)
+		if state.carrier_of(other.id) ~= nil then
+			return nil
 		end
-		if combat.is_enemy(carrier, other) and can_hit and other.kind ~= "wreck" then
+		if
+			targeting.is_enemy(carrier, other)
+			and (drone_def.weapons == nil or shot_rules.reach_against(drone_def, other) ~= nil)
+		then
 			local distance = geometry.distance_2d(carrier.position, other.position)
-			if distance <= best_distance and combat.spots(other, distance) then
+			if distance <= best_distance and targeting.spots(other, distance) then
 				best = other
 				best_distance = distance
 			end
 		end
-	end
+		return nil
+	end)
 	return best
 end
 
 local function serve(carrier: Entity, def: types.EntityDef, spec: types.Carrier, delta: number)
 	-- the next drone is built whatever the ones out are doing
-	carrier.drone_stockpile, carrier.drone_stockpile_progress =
-		stockpiles.grow(carrier.team, spec.stockpile, carrier.drone_stockpile, carrier.drone_stockpile_progress, delta)
+	local reserve = carrier.drone_stockpile :: types.Stocked
+	stockpiles.grow(carrier, spec.stockpile, reserve, delta)
 
 	local slots = carriers[carrier.id]
 	if slots == nil then
@@ -101,14 +104,11 @@ local function serve(carrier: Entity, def: types.EntityDef, spec: types.Carrier,
 
 	for index, slot in slots do
 		local drone = if slot.id ~= nil then state.get(slot.id) else nil
-		if drone == nil or drone.alive == false then
+		if drone == nil then
 			-- shot down, it is spent; the place is filled from the stockpile, if there is one ready
-			if slot.id ~= nil then
-				docking.forget(slot.id)
-				slot.id = nil
-			end
-			if carrier.drone_stockpile >= 1 then
-				carrier.drone_stockpile -= 1
+			slot.id = nil
+			if reserve.held >= 1 then
+				reserve.held -= 1
 				slots[index] = spawn(carrier, def, spec, index)
 			end
 			continue
@@ -116,13 +116,13 @@ local function serve(carrier: Entity, def: types.EntityDef, spec: types.Carrier,
 
 		local seat = perch(carrier, def, drone_def, index, spec.count)
 		if target ~= nil then
-			docking.set(drone.id, false)
+			control.dock(drone.id, false)
 			local first = drone.orders[1]
 			if first == nil or first.kind ~= "attack" or first.target_id ~= target.id then
-				drone.orders = { { kind = "attack", position = nil, target_id = target.id } }
+				orders.issue(drone, { { kind = "attack", position = nil, target_id = target.id } }, false, false)
 			end
-		elseif docking.is_docked(drone.id) then
-			-- parked: carried along with the carrier
+		elseif control.mode_of(drone) == "docked" then
+			-- parked: carried along with the carrier, as cargo hangs from a transport
 			drone.position = seat
 			drone.velocity = Vector3.zero
 			drone.facing = carrier.facing
@@ -133,52 +133,46 @@ local function serve(carrier: Entity, def: types.EntityDef, spec: types.Carrier,
 			geometry.distance_2d(drone.position, seat) <= PARK_RADIUS
 			and math.abs(drone.position.Y - seat.Y) <= PARK_HEIGHT
 		then
-			docking.set(drone.id, true)
-			drone.orders = {}
+			control.dock(drone.id, true)
+			orders.issue(drone, {}, false, false)
 			drone.position = seat
 			drone.velocity = Vector3.zero
 		else
 			-- nothing to fight: back to the perch, which moves with the carrier
-			drone.orders = { { kind = "move", position = seat, target_id = nil } }
+			orders.push_move(drone, seat, false)
 			movement.set_hover(drone, seat.Y)
 		end
 	end
 end
 
--- Serves every carrier, and sends its drones down with it if it is gone. Runs once a tick, after the movement
--- goals are cleared and before orders read them.
+-- Serves every carrier that can act (`control.can_act`): one that is stunned builds, sends and mends nothing, and its
+-- drones stay as they are until it comes round. Runs once a tick, after the movement goals are cleared and before
+-- orders read them. A carrier may be a unit, like the Mantis, or a building, like the Rampart.
 local function tick(delta: number)
 	for _, entity in state.all() do
-		-- a carrier may be a unit, like the Mantis, or a building, like the Rampart
-		if
-			entity.alive == false
-			or (entity.kind ~= "unit" and entity.kind ~= "building")
-			or entity.state ~= "active"
-		then
-			continue
-		end
-		local def = unit_defs.of(entity)
-		if def.carrier ~= nil then
+		local def = entity.def
+		if def.carrier ~= nil and control.can_act(entity) then
 			serve(entity, def, def.carrier, delta)
 		end
 	end
+end
 
-	for carrier_id, slots in carriers do
-		local carrier = state.get(carrier_id)
-		if carrier ~= nil and carrier.alive then
-			continue
+-- A carrier that is gone takes its drones with it.
+local function forget(carrier_id: EntityId)
+	local slots = carriers[carrier_id]
+	if slots == nil then
+		return
+	end
+	carriers[carrier_id] = nil
+	for _, slot in slots do
+		local drone = if slot.id ~= nil then state.get(slot.id) else nil
+		if drone ~= nil then
+			deaths.destroy(drone, "removed")
 		end
-		for _, slot in slots do
-			local drone = if slot.id ~= nil then state.get(slot.id) else nil
-			if drone ~= nil then
-				docking.forget(drone.id)
-				state.mark_dead(drone)
-			end
-		end
-		carriers[carrier_id] = nil
 	end
 end
 
 return table.freeze({
+	forget = forget,
 	tick = tick,
 })

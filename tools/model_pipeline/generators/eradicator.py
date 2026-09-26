@@ -1,4 +1,4 @@
-"""unit_defs `eradicator` (corerad): a heavy anti-air battery, 2x2x2 cells (8x8x8 studs) but squat, as BAR's is
+"""unit_defs `eradicator` (corerad): a heavy anti-air battery, but squat, as BAR's is
 (55 x 36 x 48 elmos). Under 100 triangles.
 
 A low, wide sloped bunker, and on it a broad armored turret with two dark yoke plates holding one big
@@ -6,17 +6,22 @@ launcher block pitched up at the sky: eight lit missile cells in two rows across
 four. The whole head yaws with weapon 1.
 """
 
-from . import defense_a_common as d
+from .shared import defense_a as d
 
-KEY = "eradicator"
+CATEGORY = "entity"
+DEF = "eradicator"
+MOUNTS = {
+    1: {"pivot": (0, 1.6, 0), "muzzle": (-2.15, 0, 2.55)},
+}
 SWIVEL_Z = 1.6
 ELEV = 35.0
 
 
 def generate(params):
+    w = params["collider"]["width"]
     base = d.Parts()
     # the tower line's sloped plinth, broad and low: dark walls, a gunmetal deck
-    base.loft([d.square(7.8, 0.0), d.square(6.0, SWIVEL_Z)], side="trim", top="body")
+    base.loft([d.square(w - 0.2, 0.0), d.square(6.0, SWIVEL_Z)], side="trim", top="body")
 
     head = d.Parts()
     fr = d.Frame()
@@ -38,6 +43,6 @@ def generate(params):
         for u in (-0.4, 0.4):
             head.quad_f(pod, x, 1.755, u, 0.5, 0.5)
 
-    objects = d.base_objects(base, KEY, "trim")
-    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), KEY)
+    objects = d.base_objects(base, "trim", params["color"])
+    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), params["color"])
     return objects

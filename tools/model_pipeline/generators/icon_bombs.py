@@ -1,9 +1,10 @@
-"""HUD icon: bombs, an aerial bomb falling nose first, with motion lines. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: bombs, an aerial bomb falling nose first, with motion lines. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     body = ic.teardrop(0.0, -0.6, 0.86, 2.2, angle=90.0, segments=16)
@@ -13,7 +14,7 @@ def generate(params):
     return ic.build(
         "bombs",
         [
-            ic.layer(ic.place(lines, shift, angle), ic.ICON),
-            ic.layer(ic.place([fins, body], shift, angle), ic.ICON),
+            ic.layer(ic.place(lines, shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([fins, body], shift, angle), palette.ICON_FILL),
         ],
     )

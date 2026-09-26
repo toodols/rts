@@ -1,3 +1,4 @@
+--!strict
 -- The flight of a rocket, shared so that the server, which decides what it hits, and the client, which
 -- draws it, fly it exactly the same way without one having to stream the other its position.
 --
@@ -14,10 +15,13 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
 type ProjectileParams = types.ProjectileParams
+type ProjectileDelivery = types.ProjectileDelivery
+type Arc = types.Arc
 
 local TORPEDO_DEPTH = 0.6
 local TORPEDO_CLEARANCE = 0.3
@@ -29,13 +33,46 @@ local TORPEDO_DIVE_SPEED = 8
 -- turns hard at the last moment, so a hit is likely but never certain.
 local HOMING_LEAD = 0.7
 -- What a homing projectile falls under once its guidance runs out: Spring's map gravity, 130 elmos a second squared.
-local UNGUIDED_GRAVITY = 130 / config.ELMOS_PER_STUD
+local UNGUIDED_GRAVITY = 130 / world_scale.ELMOS_PER_STUD
 -- A homing projectile with a limited `guidance_time` that comes within this many studs of what it is steering for and
 -- then finds itself getting further away has flown past it, and loses its lock: it falls away rather than coming round
 -- to try again.
 local LOCK_LOSS_RANGE = 6
+-- A shot that has flown this long is gone, whatever it hit; a missile, which climbs and crosses the map, only after
+-- MISSILE_MAX_AGE.
+local MAX_AGE = 30
+local MISSILE_MAX_AGE = 120
+-- How fast a missile turns onto a new heading, as the fraction of the turn it makes in a second's flight. A faster
+-- missile turns faster still, so that it never swings wider than MISSILE_TURN_RADIUS studs: at one rate for all, the
+-- Juggernaut's, three times as fast as the rest, came out of its dive late and landed well past what it was fired at.
+local MISSILE_TURN_RATE = 6
+local MISSILE_TURN_RADIUS = 12.5
+-- How fast a homing projectile turns, in radians a second, where its weapon does not say.
+local HOMING_TURN_RATE = 4
+-- The chance an anti-air missile misses whatever its target does: it is fired to pass just clear of it, and falls away
+-- once it has. A homing missile does not otherwise miss something that stays in its reach, so without this every one
+-- would be certain to hit.
+local HOMING_MISS_CHANCE = 0.1
+
+-- What one shot is launched with beyond what its weapon's delivery says, which is worked out for each shot as it is
+-- fired (projectiles.launch) and flown the same by the server and every client: how fast it leaves its launcher, its
+-- projectile's `speed` but for a shell on the medium arc, which is launched slower; and for a homing one, how many
+-- seconds it is guided for, after which it stops steering and falls as BAR's does at the end of its `flighttime`
+-- (nil for one guided as long as it flies), and where it steers for off its target's middle: nothing for most shots,
+-- and just clear of its collider for the few that are to miss (HOMING_MISS_CHANCE). A lofted one
+-- (`StraightDelivery.loft`) also has the height above its target it steers for at first, and the seconds over which
+-- that sinks onto the target.
+export type Shot = {
+	speed: number,
+	guidance_time: number?,
+	aim_offset: Vector3?,
+	loft_height: number?,
+	loft_time: number?,
+}
 
 export type Flight = {
+	-- the shot it was launched as
+	shot: Shot,
 	position: Vector3,
 	velocity: Vector3,
 	-- seconds since launch
@@ -53,39 +90,42 @@ export type Flight = {
 	lost_lock: boolean?,
 }
 
--- A rocket is launched along `direction`; a missile ignores it and is launched straight up, toward `aim`. A rocket
--- also keeps `inherited`, the velocity of what let it go, which is how a bomb goes on with its bomber's speed.
+-- A shot of `delivery` is launched along `direction`; a missile ignores it and is launched straight up, toward `aim`.
+-- A rocket also keeps `inherited`, the velocity of what let it go, which is how a bomb goes on with its bomber's speed.
 local function launch(
 	from: Vector3,
 	direction: Vector3,
-	params: ProjectileParams,
+	delivery: ProjectileDelivery,
+	shot: Shot,
 	aim: Vector3?,
 	inherited: Vector3?
 ): Flight
-	local missile = params.missile
-	if missile ~= nil and aim ~= nil then
+	if delivery.kind == "missile" and aim ~= nil then
 		return {
+			shot = shot,
 			position = from,
-			velocity = Vector3.yAxis * params.speed,
+			velocity = Vector3.yAxis * shot.speed,
 			age = 0,
 			phase = "climb",
 			target = aim,
-			ceiling = math.max(from.Y, aim.Y) + missile.climb,
+			ceiling = math.max(from.Y, aim.Y) + delivery.climb,
 		}
 	end
-	if params.torpedo == true then
+	if delivery.kind == "torpedo" then
 		local level = Vector3.new(direction.X, 0, direction.Z)
 		return {
+			shot = shot,
 			position = from,
-			velocity = (if level.Magnitude > 1e-3 then level.Unit else Vector3.zAxis) * params.speed,
+			velocity = (if level.Magnitude > 1e-3 then level.Unit else Vector3.zAxis) * shot.speed,
 			age = 0,
 			target = aim,
-			speed = params.speed,
+			speed = shot.speed,
 		}
 	end
 	return {
+		shot = shot,
 		position = from,
-		velocity = direction.Unit * params.speed + (inherited or Vector3.zero),
+		velocity = direction.Unit * shot.speed + (inherited or Vector3.zero),
 		age = 0,
 	}
 end
@@ -105,10 +145,10 @@ end
 
 -- The direction to launch at, how long the flight takes, and the speed to launch at, for a shell with no thrust to land
 -- on `to` from `from`. At its full speed a shell has only two angles that reach a target, the low one and the high
--- one, and `params.arc` picks between them. The medium arc is the angle halfway between the two, which at full
+-- one, and `arc` picks between them. The medium arc is the angle halfway between the two, which at full
 -- speed would carry the shell past the target, so it is launched slower, at just the speed that lands it there. A
 -- target too far for the shell's speed gets the angle that carries it furthest, at full speed, instead.
-local function aim(from: Vector3, to: Vector3, params: ProjectileParams): (Vector3, number, number)
+local function aim(from: Vector3, to: Vector3, params: ProjectileParams, arc: Arc): (Vector3, number, number)
 	local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
 	local distance = flat.Magnitude
 	local speed = params.speed
@@ -126,9 +166,9 @@ local function aim(from: Vector3, to: Vector3, params: ProjectileParams): (Vecto
 		local root = math.sqrt(discriminant)
 		local low = (speed * speed - root) / (gravity * distance)
 		local high = (speed * speed + root) / (gravity * distance)
-		if params.arc == "high" then
+		if arc == "high" then
 			slope = high
-		elseif params.arc == "medium" then
+		elseif arc == "medium" then
 			slope = math.tan((math.atan(low) + math.atan(high)) / 2)
 			-- the speed that lands a shell launched at this angle on the target: d = v cos(a) t and
 			-- rise = v sin(a) t - g t^2 / 2 solve to v^2 = g d^2 (1 + slope^2) / (2 (d slope - rise))
@@ -168,7 +208,7 @@ end
 local function step_missile(
 	flight: Flight,
 	params: ProjectileParams,
-	missile: types.Missile,
+	dive_angle: number,
 	target: Vector3,
 	delta: number
 )
@@ -179,7 +219,7 @@ local function step_missile(
 	end
 	if flight.phase == "cruise" then
 		local across = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
-		if across.Magnitude * math.tan(missile.dive_angle) <= position.Y - target.Y then
+		if across.Magnitude * math.tan(dive_angle) <= position.Y - target.Y then
 			flight.phase = "dive"
 		else
 			desired = if across.Magnitude > 1e-3 then across.Unit else desired
@@ -191,17 +231,17 @@ local function step_missile(
 	end
 
 	flight.age += delta
-	local rate = math.max(config.MISSILE_TURN_RATE, params.speed / config.MISSILE_TURN_RADIUS)
+	local rate = math.max(MISSILE_TURN_RATE, params.speed / MISSILE_TURN_RADIUS)
 	local turned = flight.velocity.Unit:Lerp(desired, math.min(1, rate * delta))
 	flight.velocity = (if turned.Magnitude > 1e-3 then turned.Unit else desired) * params.speed
 	flight.position += flight.velocity * delta
 end
 
 -- Turns a homing projectile's flight toward a target at `target_position` moving at `target_velocity`, for `delta`
--- seconds, the way BAR's missiles steer: it aims HOMING_LEAD of the way ahead of the target, and turns toward that
--- at its weapon's turn rate, a fixed number of radians a second however far off it is, straight onto it once it is
--- within one step's turn. Its speed is left as it was. It steers for `params.aim_offset` off the target's middle,
--- if the shot has one. Once its `guidance_time` is up, or it has flown past what it steers for and lost its lock, it no
+-- seconds, the way BAR's missiles steer: it aims HOMING_LEAD of the way ahead of the target, and turns toward that at
+-- its weapon's turn rate, a fixed number of radians a second however far off it is, straight onto it once it is within
+-- one step's turn. Its speed is left as it was. It steers for its shot's `aim_offset` off the target's middle, if the
+-- shot has one. Once the shot's `guidance_time` is up, or it has flown past what it steers for and lost its lock, it no
 -- longer steers at all (`step` lets it fall).
 local function home(
 	flight: Flight,
@@ -210,17 +250,23 @@ local function home(
 	target_velocity: Vector3,
 	delta: number
 )
-	if flight.lost_lock == true or flight.age > (params.guidance_time or math.huge) then
+	local shot = flight.shot
+	if flight.lost_lock == true or flight.age > (shot.guidance_time or math.huge) then
 		return
 	end
 	local speed = flight.velocity.Magnitude
 	if speed < 1e-3 then
 		return
 	end
-	target_position += params.aim_offset or Vector3.zero
+	target_position += shot.aim_offset or Vector3.zero
+	-- a lofted one steers for a point above the target that sinks onto it as the flight goes (StraightDelivery.loft)
+	local loft_height, loft_time = shot.loft_height, shot.loft_time
+	if loft_height ~= nil and loft_time ~= nil and loft_time > 0 then
+		target_position += Vector3.new(0, loft_height * math.max(0, 1 - flight.age / loft_time), 0)
+	end
 	local distance = (target_position - flight.position).Magnitude
 	local nearest = flight.nearest or math.huge
-	if params.guidance_time ~= nil and nearest <= LOCK_LOSS_RANGE and distance > nearest then
+	if shot.guidance_time ~= nil and nearest <= LOCK_LOSS_RANGE and distance > nearest then
 		flight.lost_lock = true
 		return
 	end
@@ -232,7 +278,7 @@ local function home(
 	wanted = wanted.Unit
 	local heading = flight.velocity / speed
 	local off = math.acos(math.clamp(heading:Dot(wanted), -1, 1))
-	local most = (params.turn_rate or config.HOMING_TURN_RATE) * delta
+	local most = (params.turn_rate or HOMING_TURN_RATE) * delta
 	if off <= most then
 		flight.velocity = wanted * speed
 		return
@@ -242,19 +288,24 @@ local function home(
 		-- straight away from it: any way round will do
 		axis = heading:Cross(if math.abs(heading.Y) < 0.9 then Vector3.yAxis else Vector3.xAxis)
 	end
-	flight.velocity = CFrame.fromAxisAngle(axis.Unit, most):VectorToWorldSpace(heading) * speed
+	-- turned `most` about the axis (Rodrigues' formula), in plain Vector3 arithmetic rather than through a CFrame, whose
+	-- 32-bit insides the headless arena (tools/ai_arena) cannot match to the last bit, as it matches a Vector3's
+	local k = axis.Unit
+	local cos, sin = math.cos(most), math.sin(most)
+	local turned = heading * cos + k:Cross(heading) * sin + k * (k:Dot(heading) * (1 - cos))
+	flight.velocity = turned * speed
 end
 
 -- The depths a torpedo may run at at (x, z), shallowest and deepest. Where the water is too shallow to hold it the
 -- two are the same, and the sea floor is above them.
 local function torpedo_band(x: number, z: number): (number, number)
-	local top = config.WATER_LEVEL - TORPEDO_DEPTH
+	local top = ground_levels.WATER_LEVEL - TORPEDO_DEPTH
 	return top, math.min(top, heightmap.height_at(x, z) + TORPEDO_CLEARANCE)
 end
 
 -- Whether the water at (x, z) is deep enough for a torpedo to run through.
 local function torpedo_runs_at(x: number, z: number): boolean
-	return heightmap.height_at(x, z) + TORPEDO_CLEARANCE <= config.WATER_LEVEL - TORPEDO_DEPTH
+	return heightmap.height_at(x, z) + TORPEDO_CLEARANCE <= ground_levels.WATER_LEVEL - TORPEDO_DEPTH
 end
 
 -- Advances a torpedo by `delta` seconds, in place. It goes where its velocity points along the level, whatever
@@ -280,15 +331,15 @@ local function step_torpedo(flight: Flight, params: ProjectileParams, delta: num
 	flight.velocity = heading * speed + Vector3.yAxis * (rise / delta)
 end
 
--- Advances a flight by `delta` seconds, in place.
-local function step(flight: Flight, params: ProjectileParams, delta: number)
-	local missile = params.missile
+-- Advances a flight of a shot of `delivery` by `delta` seconds, in place.
+local function step(flight: Flight, delivery: ProjectileDelivery, delta: number)
+	local params = delivery.projectile
 	local target = flight.target
-	if missile ~= nil and target ~= nil then
-		step_missile(flight, params, missile, target, delta)
+	if delivery.kind == "missile" and target ~= nil then
+		step_missile(flight, params, delivery.dive_angle, target, delta)
 		return
 	end
-	if params.torpedo == true then
+	if delivery.kind == "torpedo" then
 		step_torpedo(flight, params, delta)
 		return
 	end
@@ -304,7 +355,8 @@ local function step(flight: Flight, params: ProjectileParams, delta: number)
 		local kept = 1 / (1 + params.drag * flight.velocity.Magnitude * delta)
 		flight.velocity = flight.velocity * kept - Vector3.new(0, params.gravity * delta, 0)
 	end
-	if params.homing == true and (flight.lost_lock == true or flight.age > (params.guidance_time or math.huge)) then
+	local homes = delivery.kind == "straight" and delivery.guidance == "homes"
+	if homes and (flight.lost_lock == true or flight.age > (flight.shot.guidance_time or math.huge)) then
 		flight.velocity -= Vector3.new(0, UNGUIDED_GRAVITY * delta, 0)
 	end
 	flight.position += flight.velocity * delta
@@ -320,13 +372,14 @@ local function reach(speed: number, gravity: number, drop: number): number
 	return speed / gravity * math.sqrt(under)
 end
 
--- How far `range` reaches when a shell of `params` is fired from `from` at `to`. A weapon's range is what it reaches
+-- How far `range` reaches when a shot of `delivery` is fired from `from` at `to`. A weapon's range is what it reaches
 -- over level ground; from higher up a shell carries further and at something higher up it falls short, by as much
--- as the arc's own reach changes. Only what arcs is changed by it: a rocket or a beam has its range as it is.
-local function range_to(range: number, from: Vector3, to: Vector3, params: ProjectileParams): number
-	if params.arc == nil or params.gravity <= 0 then
+-- as the arc's own reach changes. Only what is lobbed is changed by it: a rocket or a beam has its range as it is.
+local function range_to(range: number, from: Vector3, to: Vector3, delivery: types.Delivery): number
+	if delivery.kind ~= "lobbed" or delivery.projectile.gravity <= 0 then
 		return range
 	end
+	local params = delivery.projectile
 	local level = reach(params.speed, params.gravity, 0)
 	local here = reach(params.speed, params.gravity, from.Y - to.Y)
 	return math.max(0, range + here - level)
@@ -335,8 +388,8 @@ end
 -- The points a shell with no thrust passes through on its way from `from` to `to`, about `spacing` studs apart along
 -- the ground and not counting the last, which is `to` itself. It is the path `aim` sends it along, before any
 -- inaccuracy. It is what says whether the ground gets in the way of a shell that arcs.
-local function trajectory(from: Vector3, to: Vector3, params: ProjectileParams, spacing: number): { Vector3 }
-	local direction, flight_time, speed = aim(from, to, params)
+local function trajectory(from: Vector3, to: Vector3, params: ProjectileParams, arc: Arc, spacing: number): { Vector3 }
+	local direction, flight_time, speed = aim(from, to, params, arc)
 	local velocity = direction * speed
 	local flat = Vector2.new(to.X - from.X, to.Z - from.Z).Magnitude
 	local count = math.max(1, math.ceil(flat / spacing))
@@ -348,10 +401,35 @@ local function trajectory(from: Vector3, to: Vector3, params: ProjectileParams, 
 	return points
 end
 
+-- The points a lofted missile (StraightDelivery.loft) passes about on its way from `from` to `to`, `spacing` studs
+-- apart along the ground and not counting the last. It leaves toward a point `loft` times the distance above `to`,
+-- which sinks onto `to` as it goes, so its path is near enough the parabola that leaves along that line and comes
+-- down on `to`: `loft` times the distance, times t(1 - t), above the straight line, t going from 0 to 1 along it.
+-- It is what says whether the ground gets in the way of one.
+local function loft_path(from: Vector3, to: Vector3, loft: number, spacing: number): { Vector3 }
+	local distance = (to - from).Magnitude
+	local flat = Vector2.new(to.X - from.X, to.Z - from.Z).Magnitude
+	local count = math.max(1, math.ceil(flat / spacing))
+	local points = {}
+	for index = 1, count - 1 do
+		local t = index / count
+		table.insert(points, from:Lerp(to, t) + Vector3.new(0, loft * distance * t * (1 - t), 0))
+	end
+	return points
+end
+
+-- How long a shot of `delivery` flies at the most before it goes off wherever it is.
+local function max_age(delivery: ProjectileDelivery): number
+	return if delivery.kind == "missile" then MISSILE_MAX_AGE else MAX_AGE
+end
+
 return table.freeze({
+	HOMING_MISS_CHANCE = HOMING_MISS_CHANCE,
 	launch = launch,
+	max_age = max_age,
 	fall_time = fall_time,
 	trajectory = trajectory,
+	loft_path = loft_path,
 	range_to = range_to,
 	aim = aim,
 	time_to_reach = time_to_reach,

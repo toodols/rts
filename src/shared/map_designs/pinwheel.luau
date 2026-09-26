@@ -1,3 +1,4 @@
+--!strict
 -- Pinwheel: made for a free for all. Four arms of land spiral out from a hub in the middle to a rim of land round the
 -- edge, and between each two a lake spirals the same way, so the map turns like a pinwheel and every arm is the same
 -- as the others turned a quarter. Each arm has two starts, one out toward the rim and one in toward the hub, so it
@@ -128,16 +129,18 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "pinwheel",
+	display_name = "Pinwheel",
 	description = "Four spiral arms, for a free for all",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return STARTS[(slot - 1) % 4 + 1]
-	end,
+	starts = STARTS,
 	start_boxes = BOXES,
 	metal_layers = nil,
 	metal_spots = SPOTS,
-	geo_spots = VENTS,
+	geo_spots = function(): { Vector2 }
+		return VENTS
+	end,
 	reclaimables = nil,
 	wrecks = nil,
 	theme = THEME,

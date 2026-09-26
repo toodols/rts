@@ -1,27 +1,24 @@
--- What covers the screen while the game is paused (see server/pause.luau): the whole screen dimmed, with PAUSED across
+-- What covers the screen while the game is paused (the `paused` switch, see shared/switches.luau): the whole screen dimmed, with PAUSED across
 -- the middle. It only dims: clicks go through to the world, so what is on the field can still be selected and looked at.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local Workspace = game:GetService "Workspace"
 
 local React = require(ReplicatedStorage.Packages.react)
 
--- The server's pause attribute on Workspace, kept live.
-local function use_paused(): boolean
-	local paused, set_paused = React.useState(Workspace:GetAttribute "paused" == true)
-	React.useEffect(function()
-		local connection = Workspace:GetAttributeChangedSignal("paused"):Connect(function()
-			set_paused(Workspace:GetAttribute "paused" == true)
-		end)
-		return function()
-			connection:Disconnect()
-		end
-	end, {})
-	return paused
+local switches = require(ReplicatedStorage.Shared.switches)
+
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
+
+local function paused(): boolean
+	return switches.is_on "paused"
+end
+
+local function paused_changed(listener: () -> ()): () -> ()
+	return switches.changed("paused", listener)
 end
 
 local function PauseOverlay()
-	if use_paused() == false then
+	if use_store.use_store(paused, paused_changed) == false then
 		return nil
 	end
 	return React.createElement("Frame", {

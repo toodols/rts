@@ -1,16 +1,32 @@
--- What the designed maps (see init.luau) are drawn with: shapes of ground, the symmetries that keep them fair, and a
--- random stream of their own, so that everything laid out on them is the same on the server, on every client and in
--- the lobby's picture of them.
+-- What the maps made for this game (see init.luau) are drawn with: shapes of ground, the symmetries that keep them fair,
+-- the ring the generated maps put their starts on, the sea they share, and a random stream of their own, so that
+-- everything laid out on them is the same on the server, on every client and in the lobby's picture of them.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local map_types = require(ReplicatedStorage.Shared.map_types)
 
 type StartBox = map_types.StartBox
 type FixedMetalSpot = map_types.FixedMetalSpot
 
--- What a rich spot is worth, as metal_spots' own rich spots are; an ordinary one is left nil for the ordinary amount.
-local RICH = 4.0
+-- How big the maps generated from a seed are: 192 cells, 768 studs, a side, three times the 256 the map used to be.
+local GENERATED_SIZE = Vector2.new(192 * world_scale.CELL_STUDS, 192 * world_scale.CELL_STUDS)
+
+-- The generated maps put their starts on a ring around the middle, a quarter of the way round from one to the next,
+-- so that nobody opens inside anybody else: start 1 east, 2 south, 3 west and 4 north.
+local RING_SLOTS = 4
+local RING_RADIUS = 210
+-- Where there are four boxes on the ring, the second is the one across from the first, so a game of two starts on
+-- opposite sides.
+local RING_OPPOSITE_FIRST = { 1, 3, 2, 4 }
+
+-- The sea the generated maps stand in: its bed, which every island and coast rises from, deep enough for ships and above
+-- the terrain floor; how ragged its coasts are; and the ripple over everything.
+local SEA_FLOOR = -14
+local COAST_FREQUENCY = 0.03
+local RIPPLE = 0.5
+local RIPPLE_FREQUENCY = 0.08
 
 local function smoothstep(t: number): number
 	local clamped = math.clamp(t, 0, 1)
@@ -75,6 +91,40 @@ local function quartered(points: { Vector2 }): { Vector2 }
 	return out
 end
 
+-- The angle of the ring's `slot`, in radians about the middle.
+local function ring_angle(slot: number): number
+	return (slot - 1) * (math.pi * 2 / RING_SLOTS)
+end
+
+-- Where the ring's `slot` is, `radius` studs out from the middle.
+local function ring_point(slot: number, radius: number): Vector2
+	local angle = ring_angle(slot)
+	return Vector2.new(math.cos(angle), math.sin(angle)) * radius
+end
+
+-- The ring's four starts, `radius` studs out.
+local function ring_starts(radius: number): { Vector2 }
+	local out: { Vector2 } = {}
+	for slot = 1, RING_SLOTS do
+		table.insert(out, ring_point(slot, radius))
+	end
+	return out
+end
+
+-- A square around each of the four starts on a ring of `radius`, `half` studs out each way, the opposite one second.
+local function ring_boxes(radius: number, half: number): { StartBox }
+	local boxes: { StartBox } = {}
+	for _, slot in RING_OPPOSITE_FIRST do
+		table.insert(boxes, box_around(ring_point(slot, radius), half))
+	end
+	return boxes
+end
+
+-- The sea's ripple at (x, z), laid over all of the ground of a generated map.
+local function ripple(x: number, z: number, seed: number): number
+	return math.noise(x * RIPPLE_FREQUENCY, z * RIPPLE_FREQUENCY, seed + 3.7) * RIPPLE
+end
+
 -- Metal spots at `ordinary` and rich ones at `rich`.
 local function spots(ordinary: { Vector2 }, rich: { Vector2 }?): { FixedMetalSpot }
 	local out: { FixedMetalSpot } = {}
@@ -83,7 +133,7 @@ local function spots(ordinary: { Vector2 }, rich: { Vector2 }?): { FixedMetalSpo
 	end
 	if rich ~= nil then
 		for _, at in rich do
-			table.insert(out, { position = at, multiplier = RICH })
+			table.insert(out, { position = at, multiplier = map_types.RICH_MULTIPLIER })
 		end
 	end
 	return out
@@ -192,7 +242,15 @@ local function stream(seed: number): Stream
 end
 
 return table.freeze({
-	RICH = RICH,
+	GENERATED_SIZE = GENERATED_SIZE,
+	RING_RADIUS = RING_RADIUS,
+	SEA_FLOOR = SEA_FLOOR,
+	COAST_FREQUENCY = COAST_FREQUENCY,
+	ring_angle = ring_angle,
+	ring_point = ring_point,
+	ring_starts = ring_starts,
+	ring_boxes = ring_boxes,
+	ripple = ripple,
 	smoothstep = smoothstep,
 	lerp = lerp,
 	noise = noise,

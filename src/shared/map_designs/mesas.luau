@@ -1,3 +1,4 @@
+--!strict
 -- Mesas: a desert floor with tall, flat-topped mesas standing out of it, their sides sheer all the way round, so that
 -- nothing that walks or drives can get up one. Their tops hold the rich metal, and the one in the middle a vent as
 -- well, for whoever carries a builder up there, or flies one: a transport, or an aircraft that builds. Once up, a mesa
@@ -127,16 +128,18 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "mesas",
+	display_name = "Mesas",
 	description = "Desert mesas with rich metal on top",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 58), kit.box_around(-WEST_START, 58) },
 	metal_layers = nil,
 	metal_spots = SPOTS,
-	geo_spots = { Vector2.new(0, 0) },
+	geo_spots = function(): { Vector2 }
+		return { Vector2.new(0, 0) }
+	end,
 	reclaimables = nil,
 	wrecks = nil,
 	theme = THEME,

@@ -1,15 +1,22 @@
-"""unit_defs/bot_t2.luau `fatboy`: the heavy plasma bot, capsule(60, 60, 60) -- 2.7 studs of radius, 5.45 tall, at
+"""unit_defs/bot_t2.luau `fatboy`: the heavy plasma bot, at
 most 100 triangles. Its silhouette is its name: a big round octagonal belly, team-coloured above the belt, waddling on two
 short stumpy legs with flared feet, with one fat plasma cannon on a housing on its back, reaching forward over its
 head to a flared, glowing muzzle. The whole body turns on the hips to aim.
 """
 
-from . import bot_t2_common as bt
-from .bot_t2_common import FRONT, UP, hring, oring, vring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import FRONT, UP, hring, oring, vring
+
+CATEGORY = "entity"
+DEF = "fatboy"
+MOUNTS = {
+    1: {"pivot": (0, 1.8182, 0), "muzzle": (0.4673, 2.8121, 2.7273)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("fatboy", bt.rgb(226, 178, 74), glow=(0.2, 0.7, 1.0, 1.0), collider=bt.collider(60, 60, 60))
+    bot = bt.Bot("fatboy", params["color"], glow=palette.HEAVY_PLASMA)
 
     # stumpy legs flaring into broad feet, their tops buried in the belly
     leg = bt.sweep_faces([hring(1.12, -0.12, 0.0, 1.05, 1.4), hring(1.08, 0.0, 0.4, 0.62, 0.72),

@@ -2,21 +2,20 @@
 -- shade, the haze, a tint over everything, and whatever weather is falling. It is only how things look, lit here on each
 -- client, and nothing in the game reads any of it.
 --
--- The scene as the server lights it without a map's say (see server/lighting.luau) is taken as it stands when this
--- starts, before anything here has touched it, and whatever the map leaves nil is put back to that; so a map that sets
--- nothing looks exactly as maps always have.
+-- What a map leaves nil is atmosphere.DEFAULT's, which the server fills in; what neither says is put back to the scene
+-- as it stands when this starts, before anything here has touched it.
 --
 -- The weather is a few particle emitters, each a box carried along with the camera: one in the air between the camera
 -- and the ground it looks at, for what falls, and one lying on the ground it looks at, for what the weather does there
 -- (rain splashing, snow and dust blown along, mist). However many units are on screen they cost the same few thousand
 -- particles, and everything is drawn bigger and faster the farther out the camera is, so it reads the same at any zoom.
--- It drifts with the wind (the `wind` attribute of Workspace, see server/wind.luau), and it comes and goes in gusts: a
+-- It drifts with the wind (as the server blows it, see server/wind.luau), and it comes and goes in gusts: a
 -- slow swell and ebb that thickens what falls, drives it harder and, for some weather, darkens or clouds the whole view
 -- while it lasts.
 --
 -- The wind is also Roblox's own here (Workspace.GlobalWind), which sways the grass on the terrain, on every map, BAR's
--- too: the game's wind eased toward as the wind readout eases toward it, so the grass leans the way the turbines turn
--- and the rain blows, and swings round with them as the wind changes rather than jumping.
+-- too: the game's wind as it is drawn (Client.wind), which the wind readout shows, so the grass leans the way the
+-- turbines turn and the rain blows, and swings round with them as the wind changes rather than jumping.
 
 local Lighting = game:GetService "Lighting"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -24,348 +23,28 @@ local RunService = game:GetService "RunService"
 local Workspace = game:GetService "Workspace"
 
 local atmosphere = require(ReplicatedStorage.Shared.atmosphere)
-local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+
+local rts_camera = require(ReplicatedStorage.Client.camera)
+local wind = require(ReplicatedStorage.Client.wind)
+local world_fx = require(ReplicatedStorage.Client.world_fx)
+local weather_looks = require(ReplicatedStorage.Client.weather_looks)
 
 -- what a map asks for (not the Atmosphere instance, which is Roblox's haze)
 type Settings = atmosphere.Atmosphere
-type Weather = atmosphere.Weather
-
-local RENDER_STEP = "rts_weather"
-local CORRECTION_NAME = "Atmospherics"
-
--- One emitter's worth of weather, as it is seen from the ordinary height of the camera (config.CAMERA_HEIGHT); from
--- higher up it is all drawn bigger and moves faster by as much as the ground is farther away, so that it looks the
--- same on screen at any zoom.
---
--- `in_air` layers fill the air between the camera and the ground and move by `fall`, in studs a second, pushed sideways
--- by `drift` times the wind. The others lie on the ground where the camera looks, `height` studs deep, and blow along
--- the ground the way the wind does, at `flow` studs a second and `drift` times the wind more.
---
--- `rate` is how many a second on an ordinary day, `size` is across, and `squash` draws it out along the way it moves
--- (as ParticleEmitter.Squash), so that rain falls in streaks. `turn` is how many degrees a second it tumbles, and
--- `glow` how much it lights itself. `gust` is how much the gusts swell it: at 0.5 it runs from half as much as usual,
--- and half as fast a push from the wind, to half as much again.
-type Layer = {
-	texture: string,
-	color: Color3,
-	transparency: NumberSequence,
-	size: NumberSequence,
-	squash: number,
-	lifetime: NumberRange,
-	in_air: boolean,
-	fall: Vector3,
-	flow: number,
-	height: number,
-	spread: number,
-	drift: number,
-	rate: number,
-	turn: number,
-	glow: number,
-	gust: number,
-	-- lies along the way it moves, as rain does, rather than facing the camera
-	streaks: boolean,
-	-- how much its squash varies at random either way, so that flakes are not all the same shape
-	squash_give: number,
-	-- for the air layers, how deep a box between the camera and the ground they fill, as a share of the distance to the
-	-- ground; shallower keeps them off the lens, where they would be drawn huge
-	depth: number,
-}
-
--- A kind of weather: its layers, and what a gust does to the whole view at its height: tints it toward `gust_tint` by
--- `gust_tinting`, and brightens it and changes its contrast by those amounts.
-type Look = {
-	layers: { Layer },
-	gust_tint: Color3,
-	gust_tinting: number,
-	gust_brightness: number,
-	gust_contrast: number,
-}
+type Layer = weather_looks.Layer
+type Look = weather_looks.Look
 
 -- The air layers fill a box between the camera and the ground it looks at: its middle SLAB_SHARE of the way out along
--- the line of sight, as wide as the view there and SLAB_MARGIN more, so the edges are not bare, and as deep (unless a
--- layer says otherwise) and as tall as those shares of that distance. The particles are born anywhere in it, so they
+-- the line of sight, as wide as the view there and SLAB_MARGIN more, so the edges are not bare, and as deep as its
+-- layer says (weather_looks.Layer.depth) and as tall as those shares of that distance. The particles are born anywhere in it, so they
 -- are spread over the whole of the ground in view rather than bunched near the lens.
 local SLAB_SHARE = 0.6
 local SLAB_MARGIN = 1.3
-local SLAB_DEPTH = 0.9
 local SLAB_HEIGHT = 0.45
 
-local SQUARE = "rbxasset://textures/particles/SquareParticle.png"
-local SPARK = "rbxasset://textures/particles/sparkles_main.dds"
-local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
--- a soft round dot, fading from its middle, which drawn out at random and tumbling makes a flake
-local SOFT = "rbxasset://textures/particles/explosion01_implosion_main.dds"
-
--- Fades in as it appears and out before it goes, `solid` at its most solid, so that nothing pops in or out of the air.
-local function fading(solid: number): NumberSequence
-	return NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.15, solid),
-		NumberSequenceKeypoint.new(0.8, solid),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-end
-
--- `size` across, give or take up to `give` at random, the same all its life.
-local function varied(size: number, give: number): NumberSequence
-	return NumberSequence.new({
-		NumberSequenceKeypoint.new(0, size, give),
-		NumberSequenceKeypoint.new(1, size, give),
-	})
-end
-
--- A layer with nothing set but the look of what it gives off, for the kinds below to fill in.
-local function layer(fields: { [string]: any }): Layer
-	local made: { [string]: any } = {
-		squash = 0,
-		in_air = true,
-		fall = Vector3.zero,
-		flow = 0,
-		height = 1,
-		spread = 0,
-		drift = 0,
-		turn = 0,
-		glow = 0,
-		gust = 0,
-		streaks = false,
-		squash_give = 0,
-		depth = SLAB_DEPTH,
-	}
-	for key, value in fields do
-		made[key] = value
-	end
-	return table.freeze(made) :: any
-end
-
-local LOOKS: { [Weather]: Look } = {
-	-- streaks of rain through the air, and splashes where it lands; a downpour darkens and cools the view
-	rain = {
-		layers = {
-			layer({
-				-- a square drawn out as far as Squash goes, lying along its fall: a fine streak some two studs long and
-				-- an eighth of one across from the ordinary height, brighter and bluer than any ground it falls on
-				texture = SQUARE,
-				color = Color3.fromRGB(218, 232, 250),
-				transparency = fading(0.25),
-				size = varied(0.6, 0.12),
-				squash = 3,
-				lifetime = NumberRange.new(0.45, 0.6),
-				fall = Vector3.new(0, -70, 0),
-				spread = 2,
-				-- blown hard enough that the slant shows from above: some thirty degrees off the upright in a fresh
-				-- wind, and near half way over in a gale
-				drift = 3,
-				rate = 1400,
-				glow = 0.2,
-				gust = 0.45,
-				streaks = true,
-			}),
-			layer({
-				texture = SPARK,
-				color = Color3.fromRGB(226, 234, 244),
-				transparency = NumberSequence.new(0.25, 1),
-				size = NumberSequence.new(0.35, 0.9),
-				lifetime = NumberRange.new(0.12, 0.2),
-				in_air = false,
-				height = 0.6,
-				rate = 900,
-				glow = 0.3,
-				gust = 0.45,
-			}),
-		},
-		gust_tint = Color3.fromRGB(176, 188, 204),
-		gust_tinting = 0.35,
-		gust_brightness = -0.04,
-		gust_contrast = 0.04,
-	},
-	-- flakes tumbling down, and spindrift blown along the ground; a gust whites out the view
-	snow = {
-		layers = {
-			layer({
-				-- a little blue-grey, so the flakes still show against snow on the ground
-				texture = SPARK,
-				color = Color3.fromRGB(214, 226, 242),
-				transparency = fading(0),
-				size = varied(0.8, 0.4),
-				lifetime = NumberRange.new(1.6, 2.2),
-				fall = Vector3.new(0, -12, 0),
-				spread = 18,
-				drift = 1.8,
-				rate = 700,
-				turn = 90,
-				glow = 0.4,
-				gust = 0.55,
-			}),
-			layer({
-				texture = SMOKE,
-				color = Color3.fromRGB(240, 246, 255),
-				transparency = fading(0.6),
-				size = NumberSequence.new(10, 18),
-				lifetime = NumberRange.new(2, 3),
-				in_air = false,
-				flow = 10,
-				height = 4,
-				spread = 10,
-				drift = 1.6,
-				rate = 40,
-				turn = 25,
-				glow = 0.3,
-				gust = 0.8,
-			}),
-		},
-		gust_tint = Color3.fromRGB(236, 244, 255),
-		gust_tinting = 0.3,
-		gust_brightness = 0.1,
-		gust_contrast = -0.15,
-	},
-	-- grit streaking through the air, and clouds of dust rolling over the ground; a gust browns out the view
-	dust = {
-		layers = {
-			layer({
-				-- darker and greyer than sand, so it shows against it
-				texture = SQUARE,
-				color = Color3.fromRGB(150, 118, 82),
-				transparency = fading(0.15),
-				size = varied(0.35, 0.15),
-				squash = 3,
-				lifetime = NumberRange.new(0.8, 1.2),
-				fall = Vector3.new(0, -4, 0),
-				spread = 6,
-				drift = 3.5,
-				rate = 700,
-				gust = 0.8,
-				streaks = true,
-			}),
-			layer({
-				-- long, low wisps racing along the ground, a darker ochre than the sand
-				texture = SMOKE,
-				color = Color3.fromRGB(156, 122, 84),
-				transparency = fading(0.4),
-				size = NumberSequence.new(20, 34),
-				squash = -1.5,
-				lifetime = NumberRange.new(2, 3),
-				in_air = false,
-				flow = 22,
-				height = 6,
-				spread = 8,
-				drift = 2.5,
-				rate = 70,
-				turn = 20,
-				gust = 0.85,
-			}),
-		},
-		gust_tint = Color3.fromRGB(236, 196, 146),
-		gust_tinting = 0.5,
-		gust_brightness = 0,
-		gust_contrast = -0.12,
-	},
-	-- pale flakes of ash drifting down, and a thin grey smoke over the ground
-	ash = {
-		layers = {
-			layer({
-				-- pale, as falling ash is, so it shows against dark ground: soft flakes, each drawn out its own way and
-				-- some fainter than others, tumbling as they fall, and kept back from the lens
-				texture = SOFT,
-				color = Color3.fromRGB(222, 218, 212),
-				transparency = NumberSequence.new({
-					NumberSequenceKeypoint.new(0, 1),
-					NumberSequenceKeypoint.new(0.15, 0.3, 0.25),
-					NumberSequenceKeypoint.new(0.8, 0.3, 0.25),
-					NumberSequenceKeypoint.new(1, 1),
-				}),
-				size = varied(0.5, 0.25),
-				squash_give = 1.2,
-				depth = 0.55,
-				lifetime = NumberRange.new(1.8, 2.4),
-				fall = Vector3.new(0, -9, 0),
-				spread = 20,
-				drift = 1.4,
-				rate = 420,
-				turn = 160,
-				gust = 0.4,
-			}),
-			layer({
-				texture = SMOKE,
-				color = Color3.fromRGB(120, 116, 112),
-				transparency = fading(0.75),
-				size = NumberSequence.new(18, 28),
-				lifetime = NumberRange.new(4, 6),
-				in_air = false,
-				flow = 3,
-				height = 6,
-				spread = 10,
-				drift = 0.6,
-				rate = 18,
-				turn = 10,
-				gust = 0.3,
-			}),
-		},
-		gust_tint = Color3.fromRGB(200, 196, 190),
-		gust_tinting = 0.2,
-		gust_brightness = -0.03,
-		gust_contrast = 0,
-	},
-	-- glowing embers rising off the ground, and sparks thrown up where they start; a gust reddens the view
-	embers = {
-		layers = {
-			layer({
-				texture = SPARK,
-				color = Color3.fromRGB(255, 140, 52),
-				transparency = fading(0),
-				size = NumberSequence.new(0.8, 0.3),
-				lifetime = NumberRange.new(1.6, 2.4),
-				fall = Vector3.new(0, 9, 0),
-				spread = 30,
-				drift = 1.2,
-				rate = 320,
-				turn = 120,
-				glow = 1,
-				gust = 0.5,
-			}),
-			layer({
-				texture = SPARK,
-				color = Color3.fromRGB(255, 180, 90),
-				transparency = NumberSequence.new(0, 1),
-				size = NumberSequence.new(0.6, 0.2),
-				lifetime = NumberRange.new(0.4, 0.8),
-				in_air = false,
-				flow = 4,
-				height = 2,
-				spread = 40,
-				drift = 0.5,
-				rate = 160,
-				glow = 1,
-				gust = 0.6,
-			}),
-		},
-		gust_tint = Color3.fromRGB(255, 214, 190),
-		gust_tinting = 0.3,
-		gust_brightness = 0.02,
-		gust_contrast = 0.03,
-	},
-}
-
--- Mist lying low over the ground, in the colour the map gives it: slow, soft and thin enough that whatever stands in it
--- shows through, so it settles in the low ground and leaves the high standing out of it.
-local function mist_layer(color: Color3): Layer
-	return layer({
-		texture = SMOKE,
-		color = color,
-		transparency = fading(0.8),
-		size = NumberSequence.new(40, 60),
-		lifetime = NumberRange.new(7, 10),
-		in_air = false,
-		flow = 1.5,
-		height = 8,
-		spread = 20,
-		drift = 0.25,
-		rate = 9,
-		turn = 6,
-		gust = 0.25,
-	})
-end
-local MIST_COLOR = Color3.fromRGB(214, 218, 222)
+local RENDER_STEP = "rts_weather"
+local CORRECTION_NAME = "Atmospherics"
 
 -- The ground layers lie on a patch as wide as the view where the camera looks and GROUND_MARGIN more, reaching
 -- GROUND_REACH of the way to that point beyond it and GROUND_REACH short of it, since the far half of the view covers
@@ -373,7 +52,7 @@ local MIST_COLOR = Color3.fromRGB(214, 218, 222)
 local GROUND_MARGIN = 1.5
 local GROUND_REACH = 1.1
 -- How far the camera looks to the ground at its ordinary height, which is the distance the looks above are for.
-local REFERENCE_DISTANCE = config.CAMERA_HEIGHT / math.sin(math.rad(-config.CAMERA_PITCH))
+local REFERENCE_DISTANCE = rts_camera.CAMERA_HEIGHT / math.sin(math.rad(-rts_camera.CAMERA_PITCH))
 -- How much the zoom has to change before the particles are resized for it, as a share.
 local RESCALE_STEP = 0.08
 -- The biggest a particle is drawn (ParticleEmitter.Size stops at 100), and the most times as many as usual given off
@@ -394,16 +73,14 @@ local MAX_PART_SIZE = 2048
 -- ten or twenty seconds.
 local GUST_INTERVAL = 0.1
 local GUST_PACE = 0.07
--- The wind eases toward the one the server sends, closing most of the gap in a couple of these, as the wind readout
--- does (see ui/wind_block.luau). Roblox's wind is the game's times GRASS_WIND, which sways the grass about as hard as
--- the wind turns the turbines: gently in a light air, hard in a gale; it is only set again once it has moved this much.
-local WIND_EASE_SECONDS = 1
+-- Roblox's wind is the game's as drawn (Client.wind) times GRASS_WIND, which sways the grass about as hard as the wind
+-- turns the turbines: gently in a light air, hard in a gale; it is only set again once it has moved this much.
 local GRASS_WIND = 1.6
 local GRASS_MIN_CHANGE = 0.1
 
 -- The scene as it was lit before anything here touched it.
-local lighting_base: { [string]: any } = {}
-local atmosphere_base: { [string]: any }? = nil
+local lighting_base: LightingLook? = nil
+local haze_base: HazeLook? = nil
 -- what the map asks for now, and whether a change to it is already waiting to be lit
 local current: Settings = {}
 local refresh_pending = false
@@ -432,51 +109,73 @@ local gust_seed = math.random() * 100
 -- the colour correction the map asks for, which the gusts move away from and back to
 local correction_base = { tint = Color3.new(1, 1, 1), saturation = 0, contrast = 0 }
 
-local LIGHTING_FIELDS: { [string]: string } = {
-	clock_time = "ClockTime",
-	latitude = "GeographicLatitude",
-	brightness = "Brightness",
-	exposure = "ExposureCompensation",
-	ambient = "Ambient",
-	outdoor_ambient = "OutdoorAmbient",
-	sun_color = "ColorShift_Top",
+-- How Lighting lights the scene, of what a map may set.
+type LightingLook = {
+	clock_time: number,
+	latitude: number,
+	brightness: number,
+	exposure: number,
+	ambient: Color3,
+	outdoor_ambient: Color3,
+	sun_color: Color3,
 }
 
-local ATMOSPHERE_FIELDS: { [string]: string } = {
-	haze_color = "Color",
-	decay_color = "Decay",
-	density = "Density",
-	haze = "Haze",
-	glare = "Glare",
+-- How the haze (the Atmosphere) hangs over the distance, of what a map may set.
+type HazeLook = {
+	haze_color: Color3,
+	decay_color: Color3,
+	density: number,
+	haze: number,
+	glare: number,
 }
 
--- Sets each of `instance`'s properties named in `fields` to what `given` says for it, or else back to `base`.
-local function dress(
-	instance: Instance,
-	fields: { [string]: string },
-	given: { [string]: any },
-	base: { [string]: any }
-)
-	for field, property in fields do
-		local value = given[field]
-		if value == nil then
-			value = base[property]
-		end
-		if value ~= nil then
-			(instance :: any)[property] = value
-		end
-	end
+local function lighting_now(): LightingLook
+	return {
+		clock_time = Lighting.ClockTime,
+		latitude = Lighting.GeographicLatitude,
+		brightness = Lighting.Brightness,
+		exposure = Lighting.ExposureCompensation,
+		ambient = Lighting.Ambient,
+		outdoor_ambient = Lighting.OutdoorAmbient,
+		sun_color = Lighting.ColorShift_Top,
+	}
+end
+
+local function haze_now(haze: Atmosphere): HazeLook
+	return {
+		haze_color = haze.Color,
+		decay_color = haze.Decay,
+		density = haze.Density,
+		haze = haze.Haze,
+		glare = haze.Glare,
+	}
+end
+
+-- Lights the scene as `given` says, and as `base` has it for what `given` leaves nil.
+local function light(given: Settings, base: LightingLook)
+	Lighting.ClockTime = given.clock_time or base.clock_time
+	Lighting.GeographicLatitude = given.latitude or base.latitude
+	Lighting.Brightness = given.brightness or base.brightness
+	Lighting.ExposureCompensation = given.exposure or base.exposure
+	Lighting.Ambient = given.ambient or base.ambient
+	Lighting.OutdoorAmbient = given.outdoor_ambient or base.outdoor_ambient
+	Lighting.ColorShift_Top = given.sun_color or base.sun_color
+end
+
+-- Hangs `haze` as `given` says, and as `base` has it for what `given` leaves nil.
+local function hang_haze(haze: Atmosphere, given: Settings, base: HazeLook)
+	haze.Color = given.haze_color or base.haze_color
+	haze.Decay = given.decay_color or base.decay_color
+	haze.Density = given.density or base.density
+	haze.Haze = given.haze or base.haze
+	haze.Glare = given.glare or base.glare
 end
 
 -- The haze the server hung in Lighting, with what it was like before this touched it taken the first time it is seen.
 local function find_haze(): Atmosphere?
 	local found = Lighting:FindFirstChildOfClass "Atmosphere"
-	if found ~= nil and atmosphere_base == nil then
-		local base = {}
-		for _, property in ATMOSPHERE_FIELDS do
-			base[property] = (found :: any)[property]
-		end
-		atmosphere_base = base
+	if found ~= nil and haze_base == nil then
+		haze_base = haze_now(found)
 	end
 	return found
 end
@@ -495,14 +194,14 @@ local function correct(given: Settings)
 		end
 		return
 	end
-	local correction = existing :: ColorCorrectionEffect?
-	if correction == nil then
-		local made = Instance.new "ColorCorrectionEffect"
-		made.Name = CORRECTION_NAME
-		made.Parent = Lighting
-		correction = made
+	local correction: ColorCorrectionEffect
+	if existing ~= nil then
+		correction = existing :: ColorCorrectionEffect
+	else
+		correction = Instance.new "ColorCorrectionEffect"
+		correction.Name = CORRECTION_NAME
+		correction.Parent = Lighting
 	end
-	assert(correction ~= nil)
 	correction.TintColor = correction_base.tint
 	correction.Saturation = correction_base.saturation
 	correction.Contrast = correction_base.contrast
@@ -517,24 +216,12 @@ local function scaled(sequence: NumberSequence, by: number): NumberSequence
 	return NumberSequence.new(points)
 end
 
--- The wind the server sends, as it lies over the ground, in studs a second.
-local function wind_sent(): Vector3
-	local wind = Workspace:GetAttribute "wind"
-	return if typeof(wind) == "Vector2" then Vector3.new(wind.X, 0, wind.Y) else Vector3.zero
-end
-
--- the wind as it is drawn, eased toward the one sent, and what Roblox's wind was last set to from it
-local eased_wind = Vector3.zero
+-- what Roblox's wind was last set to
 local grass_wind = Vector3.zero
 
-local function wind_now(): Vector3
-	return eased_wind
-end
-
--- Eases the wind toward the one sent, and Roblox's with it.
-local function ease_wind(delta: number)
-	eased_wind = eased_wind:Lerp(wind_sent(), 1 - math.exp(-delta / WIND_EASE_SECONDS))
-	local grass = eased_wind * GRASS_WIND
+-- Roblox's wind, after the game's as it is drawn.
+local function sway_grass()
+	local grass = wind.now() * GRASS_WIND
 	if (grass - grass_wind).Magnitude >= GRASS_MIN_CHANGE then
 		grass_wind = grass
 		Workspace.GlobalWind = grass
@@ -590,7 +277,7 @@ end
 -- of that when there is none, so that calm rain falls in short strokes rather than long needles.
 local function squash_now(each: Layer): number
 	local fall = each.fall.Magnitude
-	local push = (wind_now() * each.drift).Magnitude
+	local push = (wind.now() * each.drift).Magnitude
 	local windy = if fall > 1e-3 then math.clamp(push / fall, 0, 1) else 1
 	return each.squash * (STILL_SQUASH + (1 - STILL_SQUASH) * windy)
 end
@@ -598,15 +285,15 @@ end
 -- The way a layer's particles go now, in studs a second at the ordinary zoom: its own fall or flow, pushed by the wind,
 -- all as hard as the gust drives it.
 local function velocity_of(each: Layer): Vector3
-	local wind = wind_now()
-	local push = wind * each.drift * gusting(each.gust)
+	local blowing = wind.now()
+	local push = blowing * each.drift * gusting(each.gust)
 	if each.in_air and each.streaks then
 		return streak_velocity(each, push)
 	end
 	if each.in_air then
 		return fall_on_screen(each) + push
 	end
-	local along = if wind.Magnitude > 1e-3 then wind.Unit else Vector3.new(1, 0, 0)
+	local along = if blowing.Magnitude > 1e-3 then blowing.Unit else Vector3.new(1, 0, 0)
 	return along * each.flow * gusting(each.gust) + push
 end
 
@@ -733,13 +420,7 @@ local function carry(delta: number)
 end
 
 local function start_layer(each: Layer, amount: number): Running
-	local part = Instance.new "Part"
-	part.Name = "Weather"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
+	local part = world_fx.part "Weather"
 	part.Transparency = 1
 	local made = Instance.new "ParticleEmitter"
 	made.Shape = Enum.ParticleEmitterShape.Box
@@ -778,12 +459,12 @@ end
 -- give off changes, and otherwise only how much of it they give off is changed.
 local function weather(given: Settings)
 	local kind = given.weather
-	local look = if kind ~= nil then LOOKS[kind] else nil
+	local look = if kind ~= nil then weather_looks.LOOKS[kind] else nil
 	if kind ~= nil and look == nil then
 		warn(`there is no weather "{kind}"`)
 	end
 	local mist = math.max(given.mist or 0, 0)
-	local mist_color = given.mist_color or MIST_COLOR
+	local mist_color = given.mist_color or weather_looks.MIST_COLOR
 	if look == nil and mist <= 0 then
 		stop_weather()
 		return
@@ -798,7 +479,7 @@ local function weather(given: Settings)
 			end
 		end
 		if mist > 0 then
-			table.insert(running, start_layer(mist_layer(mist_color), mist))
+			table.insert(running, start_layer(weather_looks.mist_layer(mist_color), mist))
 		end
 		running_key = key
 		running_look = look
@@ -819,10 +500,12 @@ end
 local function refresh()
 	refresh_pending = false
 	local given = atmosphere.read()
-	dress(Lighting, LIGHTING_FIELDS, given :: any, lighting_base)
+	if lighting_base ~= nil then
+		light(given, lighting_base)
+	end
 	local found = find_haze()
-	if found ~= nil and atmosphere_base ~= nil then
-		dress(found, ATMOSPHERE_FIELDS, given :: any, atmosphere_base)
+	if found ~= nil and haze_base ~= nil then
+		hang_haze(found, given, haze_base)
 	end
 	current = given
 	correct(given)
@@ -838,20 +521,12 @@ local function refresh_soon()
 end
 
 local function init()
-	for _, property in LIGHTING_FIELDS do
-		lighting_base[property] = (Lighting :: any)[property]
-	end
+	lighting_base = lighting_now()
 	find_haze()
 	refresh()
-	-- starting where the wind is, rather than swinging up to it from a calm
-	eased_wind = wind_sent()
-	RunService.Heartbeat:Connect(ease_wind)
+	RunService.Heartbeat:Connect(sway_grass)
 	-- the wind is read afresh as the gusts are followed, so a change to it needs nothing here
-	Workspace.AttributeChanged:Connect(function(attribute: string)
-		if atmosphere.is_attribute(attribute) then
-			refresh_soon()
-		end
-	end)
+	atmosphere.changed(refresh_soon)
 	-- the haze, should it only get here after this has started
 	Lighting.ChildAdded:Connect(function(child: Instance)
 		if child:IsA "Atmosphere" then

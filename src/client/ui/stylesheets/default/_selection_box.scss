@@ -1,5 +1,5 @@
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // A targeting marquee: square, thin, and lit rather than a translucent bubble.
 .selection-box {

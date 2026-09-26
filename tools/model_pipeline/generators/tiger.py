@@ -1,19 +1,22 @@
 """unit_defs/vehicle_t2.luau `tiger` (BAR's correap): Cortex's heavy assault tank.
 
 A low, wide tracked hull with a steep glacis and heavy team-colour armor over both tracks, and a broad sloped
-turret carrying twin cannons -- the fast-firing gun that makes it good at most jobs. Collider capsule(34, 34,
-38): radius 1.727, height 3.09 studs. 100-triangle budget.
-"""
+turret carrying twin cannons -- the fast-firing gun that makes it good at most jobs."""
 
-from . import common
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import palette
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(176, 122, 88)
+CATEGORY = "entity"
+DEF = "tiger"
+MOUNTS = {
+    1: {"pivot": (0, 1.3222, -0.0544), "muzzle": (-0.2836, 0.2453, 1.7817)},
+}
 
 
 def generate(params):
-    radius, height = v.collider(34, 34, 38)
-    m = v.Mats("tiger", tuple(params.get("accent_color", ACCENT)))
+    radius = params["collider"]["radius"]
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
 
     L, W = 2.84, 1.9  # hull footprint, fitted in the collider circle
@@ -54,12 +57,12 @@ def generate(params):
 
     # Turret about its swivel point (10 tris), guns separate so they can be dark (28 tris).
     pivot = (0.0, 0.05, deck_z)
-    turret = v.block("turret_shell", 1.04, 1.3, 0.46, origin=(0.0, 0.1, 0.0), top=(0.76, 0.8), top_offset=(0.0, 0.14))
+    turret = common.block("turret_shell", 1.04, 1.3, 0.46, top=(0.76, 0.8), top_offset=(0.0, 0.14), at=(0.0, 0.1, 0.0), drop=('bottom',))
     m.accent(turret)
     turret = common.merge("turret", [turret], origin=pivot)
     objects.append(common.art_group(turret, "turret_1", pivot=True, kind="turret", weapon=1))
 
-    guns = [v.block("mantlet", 0.46, 0.24, 0.3, origin=(0.0, -0.58, 0.06), drop=("bottom", "back"))]
+    guns = [common.block("mantlet", 0.46, 0.24, 0.3, at=(0.0, -0.58, 0.06), drop=("bottom", "back"))]
     reach = radius - pivot[1] - 0.04
     for side in (-1, 1):
         barrel, _ = v.rod(f"barrel_{side}", 0.075, reach - 0.66, (side * 0.14, -0.66, 0.22))
@@ -69,5 +72,4 @@ def generate(params):
     gun_block = common.merge("guns", guns, origin=pivot)
     objects.append(common.art_group(gun_block, "turret_1", kind="turret", weapon=1))
 
-    v.check_fit(objects, radius, height, "tiger")
     return objects

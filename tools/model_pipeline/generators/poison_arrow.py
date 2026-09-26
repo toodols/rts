@@ -2,19 +2,22 @@
 
 A boat-nosed hull that drives along the sea floor: a pointed prow, buoyancy pontoons along both flanks (the
 team accent), a snorkel at the back, and a big low hexagonal turret with one long, heavy cannon ending in a
-fat muzzle brake -- slow and hard-hitting. Collider capsule(44, 35, 53): radius 2.41, height 3.18 studs.
-100-triangle budget.
-"""
+fat muzzle brake -- slow and hard-hitting."""
 
-from . import common
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import palette
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(150, 176, 120)
+CATEGORY = "entity"
+DEF = "poison_arrow"
+MOUNTS = {
+    1: {"pivot": (0, 1.5699, -0.235), "muzzle": (-0.0841, 0.3181, 2.5373)},
+}
 
 
 def generate(params):
-    radius, height = v.collider(44, 35, 53)
-    m = v.Mats("poison_arrow", tuple(params.get("accent_color", ACCENT)))
+    radius = params["collider"]["radius"]
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
 
     top_z = 1.12
@@ -66,5 +69,4 @@ def generate(params):
     gun = common.merge("gun", [barrel, brake], origin=pivot)
     objects.append(common.art_group(gun, "turret_1", kind="turret", weapon=1))
 
-    v.check_fit(objects, radius, height, "poison_arrow")
     return objects

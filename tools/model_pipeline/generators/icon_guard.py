@@ -1,9 +1,10 @@
-"""HUD icon: the Guard order, a heater shield with a line round its face. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: the Guard order, a heater shield with a line round its face. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def shield_points():
     right = [(0.0, -1.95)]
@@ -24,7 +25,7 @@ def generate(params):
     return ic.build(
         "guard",
         [
-            ic.layer([shield], ic.ICON),
-            ic.layer([face], ic.ICON),
+            ic.layer([shield], palette.ICON_FILL),
+            ic.layer([face], palette.ICON_FILL),
         ],
     )

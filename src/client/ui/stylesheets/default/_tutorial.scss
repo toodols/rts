@@ -1,8 +1,8 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 // `.tutorial-title` extends `.heading`, which _main.scss declares.
-@use "main" as *;
+@use "../../../../client_shared/stylesheets/main" as *;
 
 // The tutorial's cards (ui/tutorial.luau): across the top middle of the screen, the step's title over a row of cards,
 // one per way of doing it. It only shows; clicks go through it to the field.
@@ -318,3 +318,100 @@
 	padding: space(4) space(10);
 }
 
+
+// The counterattack's resurrect demonstrations: the Resurrect command as the commands list shows it, lit once clicked;
+// the circle dragged out over the wrecks, in resurrect's colour, filling once let go; and the wrecks, a little smaller
+// than a demonstration's unit so that three fit.
+.tutorial-demo-command {
+	position: absolute;
+	width: 140px;
+	height: 28px;
+	@include cell;
+	@include stack(row, space(2));
+	align-items: center;
+	padding: 0 space(2);
+	z-index: 1;
+
+	&.active {
+		background-color: $steel-lit;
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.tutorial-demo-circle {
+	position: absolute;
+	border-radius: 50%;
+	border: 2px solid var(--Resurrect);
+	background-color: veil($resurrect, 0.12);
+	z-index: 2;
+
+	&.ordered {
+		background-color: veil($resurrect, 0.35);
+	}
+}
+
+.tutorial-demo-wreck {
+	position: absolute;
+	width: 48px;
+	height: 48px;
+	background-color: transparent;
+	z-index: 1;
+}
+
+// What is left to do once a mission's steps are done.
+.tutorial-objective {
+	@include plate;
+	width: auto;
+	height: auto;
+	@include stack(column, space(1));
+	align-items: center;
+	padding: space(3) space(10);
+	outline: 1px solid $edge;
+}
+
+// A mission's waves (ui/wave_block.luau), above its step: the time to the next and which it is, big enough to read at
+// a glance.
+.wave-box {
+	@include plate;
+	width: auto;
+	height: auto;
+	@include stack(row, space(5));
+	align-items: center;
+	padding: space(2) space(6);
+	outline: 1px solid color.mix($danger, $edge, 50%);
+}
+
+.wave-readout {
+	width: auto;
+	height: auto;
+	@include stack(column, 0);
+	align-items: center;
+}
+
+.wave-caption {
+	@include caption;
+	width: auto;
+	height: auto;
+	font-size: 13px;
+	font-weight: bold;
+	text-align: center;
+}
+
+.wave-value {
+	@extend .readout;
+	width: auto;
+	height: auto;
+	color: var(--Text);
+	font-size: 30px;
+	text-align: center;
+
+	&.danger {
+		color: var(--Danger);
+	}
+}
+
+.wave-divider {
+	width: 2px;
+	height: 44px;
+	background-image: linear-gradient(180deg, transparent, $edge 35%, $edge 65%, transparent);
+}

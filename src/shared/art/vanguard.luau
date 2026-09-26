@@ -6,7 +6,7 @@ return {
 		leg_back_right = { pivot = { -1.0569, 3.3925, -1.0133 }, kind = "leg", axis = { 0, 1, 0 }, swing = 0.25, phase = 0, stride = 1.969 },
 		leg_front_left = { pivot = { 1.0569, 3.3925, 1.0133 }, kind = "leg", axis = { 0, 1, 0 }, swing = 0.25, phase = 0, stride = 1.969 },
 		leg_back_left = { pivot = { 1.0569, 3.3925, -1.0133 }, kind = "leg", axis = { 0, 1, 0 }, swing = 0.25, phase = 0.5, stride = 1.969 },
-		turret = { pivot = { 0, 4.3237, -0.1067 }, kind = "turret", weapon = 1, muzzle = { -0.1832, 0.6519, 3.0612 } },
+		turret = { pivot = { 0, 4.3237, -0.1067 }, kind = "turret", weapon = 1 },
 	},
 	parts = {
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 3.4922, 0 }, size = { 3.1003, 1.663, 2.9865 }, hash = "7042dc5c30e258aa", mesh = "rbxassetid://140551462024167" },

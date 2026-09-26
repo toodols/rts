@@ -1,29 +1,32 @@
--- Placement mode: after picking a building from a construction_bot's menu the cursor carries a ghost
--- of that building until it is placed or cancelled.
+-- The ghost of the building being placed (command_state's "placing"): the cursor carries it, a box of the space it
+-- will take with its model inside, coloured by whether it fits where it is, until it is placed or put down.
 --
--- The validity check here is a client-side preview only. The server re-runs the real check in
--- `placement` before it creates anything, so a disagreement costs a rejected order, not an exploit.
+-- Where it goes and whether it fits there are judged by the same rules the server's `placement` judges by
+-- (shared/placement_rules), from the models the client can see (client/occupants.luau).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local Workspace = game:GetService "Workspace"
 
+local signal = require(ReplicatedStorage.Shared.signal)
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
-local spots = require(ReplicatedStorage.Shared.spots)
 local geometry = require(ReplicatedStorage.Shared.geometry)
+local placement_rules = require(ReplicatedStorage.Shared.placement_rules)
 
-local world = require(ReplicatedStorage.Client.world)
+local occupants = require(ReplicatedStorage.Client.occupants)
 local markers = require(ReplicatedStorage.Client.markers)
-local unlocks = require(ReplicatedStorage.Client.unlocks)
+local command_state = require(ReplicatedStorage.Client.command_state)
+local world_fx = require(ReplicatedStorage.Client.world_fx)
+
+local palette = require(ReplicatedStorage.ClientShared.palette)
 
 type EntityId = types.EntityId
 
-local VALID_COLOR = Color3.fromRGB(120, 220, 140)
-local INVALID_COLOR = Color3.fromRGB(226, 96, 84)
+local VALID_COLOR = palette.gain
+local INVALID_COLOR = palette.danger
 
-local current_def: string? = nil
+-- the building the ghost is of, while there is one
+local ghost_def: string? = nil
 -- Kept between placements: the next building picked up faces the way the last one was turned.
 local facing = 0
 local ghost: Part? = nil
@@ -31,176 +34,48 @@ local ghost: Part? = nil
 -- what it will occupy. There is none for a building that has no model yet.
 local ghost_model: Model? = nil
 local ghost_model_valid: boolean? = nil
-local listeners: { (def_name: string?) -> () } = {}
 -- Why the ghost cannot be built where it is, or nil while it can, for the note under the cursor.
 local problem: string? = nil
-local problem_listeners: { (problem: string?) -> () } = {}
+local problem_changed = signal.new() :: signal.Signal<string?>
 -- Boxes drawn at the other places a dragged line or grid would put a building.
 local preview_parts: { Part } = {}
 -- Most buildings a single drag may lay out.
 local MAX_LAYOUT = 100
-
-local function notify()
-	for _, listener in listeners do
-		listener(current_def)
-	end
-end
-
-local function subscribe(listener: (def_name: string?) -> ()): () -> ()
-	table.insert(listeners, listener)
-	return function()
-		local index = table.find(listeners, listener)
-		if index ~= nil then
-			table.remove(listeners, index)
-		end
-	end
-end
 
 local function set_problem(next_problem: string?)
 	if next_problem == problem then
 		return
 	end
 	problem = next_problem
-	for _, listener in problem_listeners do
-		listener(problem)
-	end
-end
-
-local function subscribe_problem(listener: (problem: string?) -> ()): () -> ()
-	table.insert(problem_listeners, listener)
-	return function()
-		local index = table.find(problem_listeners, listener)
-		if index ~= nil then
-			table.remove(problem_listeners, index)
-		end
-	end
+	problem_changed.fire(problem)
 end
 
 local function get_problem(): string?
 	return problem
 end
 
--- Where spot-bound buildings stand or are queued to be built, from what the client can see: the
--- buildings themselves, and the build orders every unit publishes in its `path`.
-local TAKEN_RADIUS = 1.5
+-- What the note under the cursor says of each thing wrong with a place.
+local PROBLEM_TEXT: { [placement_rules.Problem]: string } = table.freeze({
+	outside_map = "Outside the map",
+	off_grid = "Off the building grid",
+	needs_metal_spot = "Requires a metal spot",
+	needs_geo_vent = "Requires a geothermal vent",
+	too_steep = "Requires flat terrain",
+	needs_water = "Can only be built on water",
+	needs_deeper_water = "Requires deeper water",
+	no_water = "Cannot be built on water",
+	too_deep = "Water is too deep",
+	blocked = "Something is in the way",
+})
 
--- Whether `model` is what `placing_def_name` is built over in place (`EntityDef.upgrades`), a T1 mex under a T2 one
--- or a geothermal plant under an advanced one: it does not count as taking its spot, mirroring the server's
--- placement.is_upgrade_target.
-local function is_upgrade_target(placing_def_name: string, model: Model): boolean
-	local other_def_name = model:GetAttribute "def_name"
-	return model:GetAttribute "kind" == "building"
-		and typeof(other_def_name) == "string"
-		and spots.upgrades(unit_defs.get(placing_def_name), other_def_name)
-end
-
-local function taken_positions(placing_def_name: string, builder_id: EntityId?): { Vector2 }
-	local taken = {}
-	for _, model in world.all() do
-		if model:GetAttribute "kind" == "building" and is_upgrade_target(placing_def_name, model) == false then
-			local def_name = model:GetAttribute "def_name"
-			local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
-			if def ~= nil and spots.for_def(def) ~= nil then
-				local position = world.position_of(model)
-				table.insert(taken, Vector2.new(position.X, position.Z))
-			end
-		end
-
-		-- only this builder's own queued mexes take their spot, mirroring the server's placement.spot_taken:
-		-- it skips spots it has already queued, but may snap onto ones other builders have queued
-		if builder_id ~= nil and world.id_of(model) ~= builder_id then
-			continue
-		end
-
-		local path = model:GetAttribute "path"
-		if typeof(path) == "string" and path ~= "" then
-			for _, step in string.split(path, ";") do
-				local fields = string.split(step, ",")
-				local queued = if fields[1] == "build" and fields[4] ~= nil then unit_defs.defs[fields[4]] else nil
-				local x = tonumber(fields[2])
-				local z = tonumber(fields[3])
-				if queued ~= nil and spots.for_def(queued) ~= nil and x ~= nil and z ~= nil then
-					table.insert(taken, Vector2.new(x, z))
-				end
-			end
-		end
-	end
-	return taken
-end
-
--- Mirrors placement.can_place using only what the client can see, saying why not: nil when it fits, otherwise
--- what is wrong with the place, as the note under the cursor puts it.
+-- What is wrong with the place, as the note under the cursor puts it, or nil when the building fits there.
 local function placement_problem(def_name: string, position: Vector3, yaw: number): string?
-	local def = unit_defs.get(def_name)
-	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), yaw)
-
-	if
-		heightmap.in_bounds(position.X - half.X, position.Z - half.Y) == false
-		or heightmap.in_bounds(position.X + half.X, position.Z + half.Y) == false
-	then
-		return "Outside the map"
-	end
-
-	if def.kind == "building" then
-		local grid_x, grid_z = geometry.snap_center(position.X, position.Z, half, config.CELL_STUDS)
-		if math.abs(grid_x - position.X) > 0.01 or math.abs(grid_z - position.Z) > 0.01 then
-			return "Off the building grid"
-		end
-	end
-
-	local bound_to = spots.for_def(def)
-	if bound_to ~= nil and bound_to.nearest(position.X, position.Z, 0.5) == nil then
-		return if def.requires_geo_spot == true then "Requires a geothermal vent" else "Requires a metal spot"
-	end
-
-	local lowest, highest = heightmap.height_range(position.X, position.Z, half.X, half.Y)
-	if highest - lowest > config.MAX_BUILD_SLOPE_STUDS then
-		return "Requires flat terrain"
-	end
-	local shallowest = math.max(0, config.WATER_LEVEL - highest)
-	local deepest = math.max(0, config.WATER_LEVEL - lowest)
-	if unit_defs.tolerates_water(def, shallowest, deepest) == false then
-		local min_depth = def.min_water_depth
-		if min_depth ~= nil and shallowest < min_depth then
-			-- some of it is on dry land, or it is in water but not deep enough to float
-			return if shallowest <= 0 then "Can only be built on water" else "Requires deeper water"
-		end
-		return if def.max_water_depth <= 0 then "Cannot be built on water" else "Water is too deep"
-	end
-
-	for _, model in world.all() do
-		local other_def_name = model:GetAttribute "def_name"
-		if typeof(other_def_name) ~= "string" then
-			continue
-		end
-		local other_def = unit_defs.defs[other_def_name]
-		if other_def == nil then
-			continue
-		end
-		-- wrecks and reclaimables, and your own units that can move, are cleared off by the builder when it gets there
-		local other_kind = model:GetAttribute "kind"
-		if
-			other_kind == "wreck"
-			or other_kind == "reclaimable"
-			or (other_kind == "unit" and model:GetAttribute "state" == "active" and other_def.max_speed ~= nil and world.is_mine(
-				model
-			))
-			or is_upgrade_target(def_name, model)
-		then
-			continue
-		end
-		local other_yaw = select(2, model:GetPivot():ToOrientation())
-		local other_half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(other_def), other_yaw)
-		if geometry.aabb_overlap(position, half, world.position_of(model), other_half, 0) then
-			return "Something is in the way"
-		end
-	end
-
-	return nil
+	local problem_here = placement_rules.problem(occupants.ALL, def_name, position, yaw, nil)
+	return if problem_here ~= nil then PROBLEM_TEXT[problem_here] else nil
 end
 
 local function can_place(def_name: string, position: Vector3, yaw: number): boolean
-	return placement_problem(def_name, position, yaw) == nil
+	return placement_rules.problem(occupants.ALL, def_name, position, yaw, nil) == nil
 end
 
 local function clear_preview()
@@ -223,22 +98,13 @@ local function destroy_ghost()
 	end
 end
 
--- Nothing the player has not unlocked can be picked up, whichever way it was asked for (the menu or a key).
-local function enter(def_name: string)
-	local def = unit_defs.defs[def_name]
-	if def == nil or def.kind ~= "building" or unlocks.is_unlocked(def_name) == false then
-		return
-	end
+local function show_ghost(def_name: string)
+	local def = unit_defs.get(def_name)
 	destroy_ghost()
-	current_def = def_name
+	ghost_def = def_name
 
 	local collider = def.collider
-	local part = Instance.new "Part"
-	part.Name = "PlacementGhost"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
+	local part = world_fx.part "PlacementGhost"
 	part.Transparency = 0.5
 	part.Material = Enum.Material.ForceField
 	if collider.shape == "box" then
@@ -246,33 +112,35 @@ local function enter(def_name: string)
 	else
 		part.Size = Vector3.new(collider.radius * 2, collider.height, collider.radius * 2)
 	end
-	part.Parent = Workspace:FindFirstChild "Effects" or Workspace
+	part.Parent = world_fx.folder()
 	ghost = part
 
 	-- with the model showing what it looks like, the box is only there to show the space it takes
-	local model = markers.make_ghost_model(def_name, VALID_COLOR, unit_defs.collider_height(def))
+	local model = world_fx.ghost_model(def_name, VALID_COLOR, unit_defs.collider_height(def))
 	if model ~= nil then
-		model.Parent = Workspace:FindFirstChild "Effects" or Workspace
+		model.Parent = world_fx.folder()
 		ghost_model = model
 		part.Transparency = 0.8
 	end
-
-	notify()
 end
 
-local function exit()
-	if current_def == nil then
+local function hide_ghost()
+	if ghost_def == nil then
 		return
 	end
-	current_def = nil
+	ghost_def = nil
 	destroy_ghost()
 	markers.hide_lock()
 	set_problem(nil)
-	notify()
 end
 
-local function active(): string?
-	return current_def
+-- The ghost follows what is being placed.
+local function on_placing(def_name: string?)
+	if def_name == nil then
+		hide_ghost()
+	else
+		show_ghost(def_name)
+	end
 end
 
 -- Turns the ghost a quarter turn: +1 is counterclockwise seen from above, -1 clockwise.
@@ -290,11 +158,11 @@ end
 -- geothermal vent is never laid out: it only takes the one place.
 local function layout(def_name: string, from: Vector3, to: Vector3, as_grid: boolean): { Vector3 }
 	local def = unit_defs.get(def_name)
-	if spots.for_def(def) ~= nil then
+	if def.spot ~= nil then
 		return { from }
 	end
 
-	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
+	local half = placement_rules.footprint(def, facing)
 	local step_x = half.X * 2
 	local step_z = half.Y * 2
 	local dx = to.X - from.X
@@ -312,7 +180,6 @@ local function layout(def_name: string, from: Vector3, to: Vector3, as_grid: boo
 	end
 
 	local centers: { Vector3 } = {}
-	local half_height = unit_defs.collider_height(def) / 2
 	for row = 0, more_z do
 		for column = 0, more_x do
 			if #centers >= MAX_LAYOUT then
@@ -320,7 +187,7 @@ local function layout(def_name: string, from: Vector3, to: Vector3, as_grid: boo
 			end
 			local x = from.X + column * step_x * sign_x
 			local z = from.Z + row * step_z * sign_z
-			table.insert(centers, Vector3.new(x, unit_defs.surface_height(def, x, z) + half_height, z))
+			table.insert(centers, placement_rules.ground_center(def, x, z))
 		end
 	end
 	return centers
@@ -330,7 +197,7 @@ end
 -- by whether a building fits there.
 local function show_layout(centers: { Vector3 })
 	local part = ghost
-	local def_name = current_def
+	local def_name = ghost_def
 	if part == nil or def_name == nil then
 		return
 	end
@@ -339,16 +206,11 @@ local function show_layout(centers: { Vector3 })
 		(table.remove(preview_parts) :: Part):Destroy()
 	end
 	while #preview_parts < extra do
-		local box = Instance.new "Part"
-		box.Name = "PlacementLayout"
-		box.Anchored = true
-		box.CanCollide = false
-		box.CanQuery = false
-		box.CanTouch = false
+		local box = world_fx.part "PlacementLayout"
 		box.Transparency = 0.5
 		box.Material = Enum.Material.ForceField
 		box.Size = part.Size
-		box.Parent = Workspace:FindFirstChild "Effects" or Workspace
+		box.Parent = world_fx.folder()
 		table.insert(preview_parts, box)
 	end
 	for index = 1, extra do
@@ -363,7 +225,7 @@ end
 -- the client would send, or nil when there is nothing to place. `builder_id` is the unit that would be
 -- sent to build it: only its own queued mexes are treated as taking their spot, not other builders'.
 local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolean)
-	local def_name = current_def
+	local def_name = ghost_def
 	local part = ghost
 	if def_name == nil or part == nil or point == nil then
 		markers.hide_lock()
@@ -372,34 +234,21 @@ local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolea
 	end
 
 	local def = unit_defs.get(def_name)
-	-- a spot-bound building snaps onto the nearest spot of its kind, as it will on the server
-	local x = point.X
-	local z = point.Z
-	local locked: Vector3? = nil
-	local bound_to = spots.for_def(def)
-	if bound_to ~= nil then
-		local taken = taken_positions(def_name, builder_id)
-		locked = bound_to.nearest(x, z, config.METAL_SPOT_SNAP, function(spot: Vector3): boolean
-			for _, at in taken do
-				if (at - Vector2.new(spot.X, spot.Z)).Magnitude < TAKEN_RADIUS then
-					return true
-				end
-			end
-			return false
-		end)
-	end
-	if locked ~= nil then
+	-- it goes where it will on the server: a spot-bound building onto the nearest free spot of its kind, and anything
+	-- else onto the building grid
+	local resolved =
+		placement_rules.resolve_center(occupants.ALL, def, point.X, point.Z, facing, occupants.queued_spots(builder_id))
+	if resolved ~= nil and def.spot ~= nil then
 		-- show which spot the cursor has locked onto, since it may be some way off
-		markers.show_lock(heightmap.ground_position(x, z), locked)
-		x = locked.X
-		z = locked.Z
+		markers.show_lock(
+			heightmap.ground_position(point.X, point.Z),
+			heightmap.ground_position(resolved.X, resolved.Z)
+		)
 	else
 		markers.hide_lock()
-		-- everything else snaps onto the building grid, as it will on the server
-		local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
-		x, z = geometry.snap_center(x, z, half, config.CELL_STUDS)
 	end
-	local center = Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
+	-- with no spot free near enough it is shown on the grid under the cursor, as somewhere it cannot go
+	local center = if resolved ~= nil then resolved else placement_rules.grid_center(def, point.X, point.Z, facing)
 	local reason = placement_problem(def_name, center, facing)
 	local valid = reason == nil
 	set_problem(reason)
@@ -424,10 +273,12 @@ local function update(point: Vector3?, builder_id: EntityId?): (Vector3?, boolea
 	return center, valid
 end
 
+local function init()
+	command_state.subscribe_placing(on_placing)
+end
+
 return table.freeze({
-	enter = enter,
-	exit = exit,
-	active = active,
+	init = init,
 	rotate = rotate,
 	get_facing = get_facing,
 	update = update,
@@ -435,7 +286,6 @@ return table.freeze({
 	show_layout = show_layout,
 	clear_preview = clear_preview,
 	can_place = can_place,
-	subscribe = subscribe,
-	subscribe_problem = subscribe_problem,
+	subscribe_problem = problem_changed.subscribe,
 	get_problem = get_problem,
 })

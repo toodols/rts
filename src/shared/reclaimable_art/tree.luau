@@ -5,6 +5,6 @@ return {
 	},
 	parts = {
 		{ group = "base", color = { 0.361, 0.259, 0.173 }, offset = { 0, 1, 0 }, size = { 0.3636, 2, 0.3636 }, hash = "cd307a46d587f26e", mesh = "rbxassetid://71440019174472" },
-		{ group = "base", color = { 0.275, 0.408, 0.204 }, offset = { 0, 3.5455, 0 }, size = { 1.8182, 3.8182, 1.8182 }, hash = "9ce184dac03c9818", mesh = "rbxassetid://99729248417001" },
+		{ group = "base", color = { 0.2745, 0.4078, 0.2039 }, offset = { 0, 3.5455, 0 }, size = { 1.8182, 3.8182, 1.8182 }, hash = "9ce184dac03c9818", mesh = "rbxassetid://99729248417001" },
 	},
 }

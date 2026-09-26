@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `air_lab` (BAR corap): a 3x1x3 cell (12 x 4 x 12 stud) aircraft factory.
+"""unit_defs/factory.luau `air_lab` (BAR corap): an aircraft factory.
 
 A flat apron with a team-coloured hexagonal landing pad marked with a yellow H, a low hangar with a raked front
 across the back, and two sloped nanolathe blocks on the front corners whose arms lean in over the front edge,
@@ -8,17 +8,22 @@ corner spins (common.art_group kind="spin"), poking a little above the 4-stud bo
 
 import math
 
-from . import common
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "air_lab"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"height": 5.0}
 
 
 def generate(params):
-    k = fc.Kit("airlab")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     trim, body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     floor = 0.12
 
     # A flat tarmac apron, only its top: its edges are too thin to see.
-    footing = fc.Shape().quad((-6, -6, floor), (6, -6, floor), (6, 6, floor), (-6, 6, floor), normal=(0, 0, 1))
+    footing = fc.Shape().quad((-hw, -hl, floor), (hw, -hl, floor), (hw, hl, floor), (-hw, hl, floor), normal=(0, 0, 1))
 
     # Landing pad: a flat hexagon in the team colour with a yellow H.
     cy, z = -0.9, floor + 0.02
@@ -48,16 +53,16 @@ def generate(params):
     mast_top = 4.4
     trim.path([(mx, my, hangar_top - 0.2), (mx, my, mast_top)], 0.3)
     paddle = fc.Shape().hull((-0.35, 0.35, -0.12, 0.12), (-1.2, 1.2, -0.2, 0.3), 0.0, 0.6)
-    radar = k.trim(paddle.build("radar"))
+    radar = common.trim_mat(paddle.build("radar"))
     radar.location = (mx, my, mast_top)
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.trim(trim.build("trim")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.trim_mat(trim.build("trim")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
         common.art_group(radar, "radar", pivot=True, kind="spin", axis=(0.0, 0.0, 1.0), speed=1.5),
     ]
-    return fc.finish(objs)
+    return objs

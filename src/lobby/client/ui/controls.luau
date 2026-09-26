@@ -1,3 +1,4 @@
+--!strict
 -- The lobby's buttons. Each is a TextButton with no text of its own and its label in a TextLabel inside it, as the
 -- HUD's cells are: the cell's face is a gradient, which outlass makes a UIGradient on the button, and a UIGradient
 -- tints its object's own text as well as its background - white text over the cell's dark gradient comes out nearly
@@ -11,6 +12,9 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local TweenService = game:GetService "TweenService"
 
 local React = require(ReplicatedStorage.Packages.react)
+
+-- An element's properties: strict mode cannot type a table of them that mixes tags, properties and handlers.
+type Props = { [any]: any }
 
 -- The sheen's gradient carries a band of light across its middle, and is slid from a width left of the button to a
 -- width right of it, where it stays parked, out of sight.
@@ -72,42 +76,46 @@ local function Button(props: {
 	elseif selected then
 		tag ..= " selected"
 	end
-	return React.createElement("TextButton", {
-		[React.Tag] = tag,
-		LayoutOrder = props.LayoutOrder,
-		Text = "",
-		AutoButtonColor = false,
-		Interactable = not locked,
-		[React.Event.Activated] = props.on_press,
-		[React.Event.MouseEnter] = if command then sweep else nil,
-		[React.Event.SelectionGained] = if command
-			then function()
-				set_selected(true)
-				sweep()
-			end
-			else nil,
-		[React.Event.SelectionLost] = if command
-			then function()
-				set_selected(false)
-			end
-			else nil,
-	}, {
-		Label = React.createElement("TextLabel", {
-			[React.Tag] = `{props.kind}-label`,
-			Text = props.label,
-		}),
-		Rail = if command then React.createElement("Frame", { [React.Tag] = "button-rail" }) else nil,
-		Sheen = if command
-			then React.createElement("Frame", { [React.Tag] = "button-sheen" }, {
-				Band = React.createElement("UIGradient", {
-					Transparency = SHEEN_BAND,
-					Rotation = SHEEN_ROTATION,
-					Offset = SHEEN_PARKED,
-					ref = sheen_ref,
-				}),
-			})
-			else nil,
-	})
+	return React.createElement(
+		"TextButton",
+		{
+			[React.Tag] = tag,
+			LayoutOrder = props.LayoutOrder,
+			Text = "",
+			AutoButtonColor = false,
+			Interactable = not locked,
+			[React.Event.Activated] = props.on_press,
+			[React.Event.MouseEnter] = if command then sweep else nil,
+			[React.Event.SelectionGained] = if command
+				then function()
+					set_selected(true)
+					sweep()
+				end
+				else nil,
+			[React.Event.SelectionLost] = if command
+				then function()
+					set_selected(false)
+				end
+				else nil,
+		} :: Props,
+		{
+			Label = React.createElement("TextLabel", {
+				[React.Tag] = `{props.kind}-label`,
+				Text = props.label,
+			}),
+			Rail = if command then React.createElement("Frame", { [React.Tag] = "button-rail" }) else nil,
+			Sheen = if command
+				then React.createElement("Frame", { [React.Tag] = "button-sheen" }, {
+					Band = React.createElement("UIGradient", {
+						Transparency = SHEEN_BAND,
+						Rotation = SHEEN_ROTATION,
+						Offset = SHEEN_PARKED,
+						ref = sheen_ref,
+					}),
+				})
+				else nil,
+		}
+	)
 end
 
 return table.freeze({

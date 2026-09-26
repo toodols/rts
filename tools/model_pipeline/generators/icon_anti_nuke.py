@@ -1,9 +1,10 @@
-"""HUD icon: anti-nukes, a radiation trefoil struck through by a prohibition sign. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: anti-nukes, a radiation trefoil struck through by a prohibition sign. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     blades = [ic.arc_band(0.0, 0.0, 0.36, 1.1, a - 30.0, a + 30.0, 5) for a in (30.0, 150.0, 270.0)]
@@ -11,8 +12,8 @@ def generate(params):
     return ic.build(
         "anti_nuke",
         [
-            ic.layer([ic.circle(0.0, 0.0, 1.55, 28)], ic.ICON, rim=None),
-            ic.layer(blades + [ic.circle(0.0, 0.0, 0.23, 10)], ic.OUTLINE, rim=None),
-            ic.layer(sign, ic.ICON),
+            ic.layer([ic.circle(0.0, 0.0, 1.55, 28)], palette.ICON_FILL, rim=None),
+            ic.layer(blades + [ic.circle(0.0, 0.0, 0.23, 10)], palette.ICON_OUTLINE, rim=None),
+            ic.layer(sign, palette.ICON_FILL),
         ],
     )

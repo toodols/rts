@@ -1,6 +1,7 @@
--- The tutorial's finger on the button it wants clicked: a tag standing off one side of the button, toward the middle of
--- the screen, bobbing toward it. Its parent is the button; it is styled by `.tutorial-pointer` (and the button lit by
--- `.tutorial-highlight`), and placed here rather than in the stylesheet, since it moves.
+-- The tutorial's finger on the button it wants clicked (Client.tutorial's `build_target` and `command_target`): the
+-- button lit (`lit`), and a CLICK tag standing off one side of it, toward the middle of the screen, bobbing toward it.
+-- Its parent is the button; it is styled by `.tutorial-pointer` (and the button by `.tutorial-highlight`), and placed
+-- here rather than in the stylesheet, since it moves.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
@@ -15,7 +16,12 @@ local GAP = 8
 local BOB = 6
 local RATE = 1.5
 
-local function TutorialPointer(props: { text: string, side: Side? })
+-- The tags of a button, `tag`, lit when it is the one pointed at.
+local function lit(tag: string, pointed: boolean): string
+	return if pointed then `{tag} tutorial-highlight` else tag
+end
+
+local function TutorialPointer(props: { side: Side })
 	local offset, set_offset = React.useBinding(0)
 	React.useEffect(function()
 		local began = os.clock()
@@ -33,10 +39,11 @@ local function TutorialPointer(props: { text: string, side: Side? })
 		Position = offset:map(function(x: number): UDim2
 			return if right then UDim2.new(1, GAP + BOB - x, 0.5, 0) else UDim2.new(0, -GAP - BOB + x, 0.5, 0)
 		end),
-		Text = props.text,
+		Text = "CLICK",
 	})
 end
 
 return table.freeze({
+	lit = lit,
 	TutorialPointer = TutorialPointer,
 })

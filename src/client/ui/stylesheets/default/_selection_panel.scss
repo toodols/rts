@@ -1,9 +1,9 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 // `.selection-name` extends `.heading`, which _main.scss declares: an @extend only reaches
 // the stylesheet it is written in and the ones that stylesheet loads.
-@use "main" as *;
+@use "../../../../client_shared/stylesheets/main" as *;
 
 // The row along the bottom left that holds the selection panel and, after it, the command panel.
 .bottom-left {
@@ -100,13 +100,13 @@
 	left: 0;
 	top: 0;
 
-	&-good {
+	&-healthy {
 		@include meter($gain);
 	}
 	&-worn {
 		@include meter($caution);
 	}
-	&-critical {
+	&-low {
 		@include meter($danger);
 	}
 	&-blueprint {

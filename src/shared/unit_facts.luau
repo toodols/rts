@@ -1,3 +1,4 @@
+--!strict
 -- What a def's numbers come to, in words and figures, for whatever shows them: the HUD's selection panel (its loadout
 -- rows and their tooltips) and the lobby's encyclopedia, which lays the same facts out in full. Only the facts are
 -- here, as rows of a label and a value; how each is drawn is its screen's business. Every figure is read off the def,
@@ -5,19 +6,19 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local config = require(ReplicatedStorage.Shared.config)
 local types = require(ReplicatedStorage.Shared.types)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local weapon_kinds = require(ReplicatedStorage.Shared.weapon_kinds)
 
 type EntityDef = types.EntityDef
 type Weapon = types.Weapon
 type ManualWeapon = types.ManualWeapon
 
 -- One fact: what it is and how much. `tag` is a tone class for the value ("metal", "energy", "weapon", ...), and
--- `divider` sets a row off from those above it, as a total is from what it adds up. The same shape as tooltip.Row.
-export type Row = { label: string, value: string, tag: string?, divider: boolean? }
-
--- The gap between the shots of a burst for a weapon that does not give its own, as combat has it.
-local DEFAULT_BURST_INTERVAL = 0.1
+-- `divider` sets a row off from those above it, as a total is from what it adds up. A tooltip's rows are these.
+-- `headline` marks a weapon's damage a second and its range, which a screen that shows them large, as the
+-- encyclopedia's weapon cards do, leaves out of its rows.
+export type Row = { label: string, value: string, tag: string?, divider: boolean?, headline: boolean? }
 
 -- A number as a readout: whole when it is big enough that the fraction would be noise, one place otherwise.
 local function figure(value: number): string
@@ -40,61 +41,10 @@ local function studs(value: number): string
 	return `{figure(value)} studs`
 end
 
--- What each WeaponKind is called, the short code on its slot, and its icon.
-local KINDS: { [types.WeaponKind]: { name: string, slot: string, icon: string } } = {
-	heat_ray = { name = "HEAT RAY", slot = "HRY", icon = "icon_heat_ray" },
-	flamethrower = { name = "FLAMETHROWER", slot = "FLM", icon = "icon_flamethrower" },
-	shotgun = { name = "SHOTGUN", slot = "SHG", icon = "icon_shotgun" },
-	sniper = { name = "SNIPER RIFLE", slot = "SNP", icon = "icon_sniper" },
-	machine_gun = { name = "MACHINE GUN", slot = "MG", icon = "icon_machine_gun" },
-	depth_charge = { name = "DEPTH CHARGES", slot = "DPC", icon = "icon_depth_charge" },
-	flak = { name = "FLAK", slot = "FLK", icon = "icon_flak" },
-}
-
--- A weapon's name, from what it is, since a def's weapons have none of their own, the short code on its slot, and
--- its icon (Shared.ui_art).
+-- A weapon's name, the short code on its slot, and its icon (Shared.ui_art), all its kind's.
 local function weapon_kind(weapon: Weapon): (string, string, string)
-	local projectile = weapon.projectile
-	local name, slot, icon
-	local kind = if weapon.kind ~= nil then KINDS[weapon.kind] else nil
-	if kind ~= nil then
-		name, slot, icon = kind.name, kind.slot, kind.icon
-	elseif weapon.anti_nuke then
-		name, slot, icon = "ANTI-NUKE", "ABM", "icon_anti_nuke"
-	elseif weapon.lightning ~= nil then
-		name, slot, icon = "LIGHTNING GUN", "LTN", "icon_lightning"
-	elseif weapon.paralyze_time ~= nil and projectile ~= nil and projectile.dropped then
-		name, slot, icon = "EMP BOMBS", "EMP", "icon_emp"
-	elseif weapon.paralyze_time ~= nil and projectile ~= nil and projectile.missile ~= nil then
-		name, slot, icon = "EMP MISSILE", "EMP", "icon_emp"
-	elseif weapon.paralyze_time ~= nil and weapon.beam_time ~= nil then
-		name, slot, icon = "EMP LASER", "EMP", "icon_emp"
-	elseif projectile ~= nil and projectile.pierce then
-		name, slot, icon = "GAUSS CANNON", "GSS", "icon_gauss"
-	elseif projectile ~= nil and projectile.nuclear then
-		name, slot, icon = "NUCLEAR MISSILE", "NUK", "icon_nuke"
-	elseif projectile ~= nil and projectile.torpedo then
-		name, slot, icon = "TORPEDO", "TRP", "icon_torpedo"
-	elseif projectile ~= nil and projectile.dropped then
-		name, slot, icon = "BOMBS", "BMB", "icon_bombs"
-	elseif weapon.beam_time ~= nil then
-		name, slot, icon = "LASER", "LSR", "icon_laser"
-	elseif projectile ~= nil and projectile.plasma then
-		name, slot, icon = "PLASMA CANNON", "PLS", "icon_plasma_cannon"
-	elseif projectile ~= nil and (projectile.missile ~= nil or projectile.homing) then
-		name, slot, icon = "MISSILES", "MSL", "icon_missile"
-	elseif projectile ~= nil and projectile.thrust_time <= 0 and projectile.acceleration <= 0 then
-		-- a shell: nothing drives it once it leaves the barrel
-		name, slot, icon = "CANNON", "CNN", "icon_cannon"
-	elseif projectile ~= nil then
-		name, slot, icon = "ROCKETS", "RKT", "icon_rocket"
-	else
-		name, slot, icon = "GUN", "GUN", "icon_machine_gun"
-	end
-	if weapon.anti_air and not weapon.anti_nuke then
-		return `AA {name}`, "AA", "icon_anti_air"
-	end
-	return name, slot, icon
+	local kind = weapon_kinds.get(weapon.kind)
+	return kind.name, kind.slot, kind.icon
 end
 
 -- A weapon's damage a second while it keeps firing: a whole burst, the gaps within it and the reload after it. One
@@ -102,16 +52,28 @@ end
 -- however short its reload: the Thor's EMP missile reloads in 3 seconds but is built in 65.
 local function weapon_dps(weapon: Weapon): number
 	local shots = math.max(1, weapon.burst_count or 1)
-	local cycle = weapon.reload + (shots - 1) * (weapon.burst_interval or DEFAULT_BURST_INTERVAL)
+	local cycle = weapon.reload + (shots - 1) * unit_defs.burst_interval(weapon)
 	if weapon.stockpile ~= nil then
 		cycle = math.max(cycle, weapon.stockpile.build_time)
 	end
 	return weapon.damage * shots / math.max(cycle, 1e-3)
 end
 
+-- The damage a second of all of `def`'s weapons together, or nil if it has none that does damage. An EMP weapon's
+-- damage only stuns and an anti-nuke only shoots down missiles, so neither counts.
+local function damage_dps(def: EntityDef): number?
+	local total: number? = nil
+	for _, weapon in def.weapons or {} :: { Weapon } do
+		if weapon.paralyze_time == nil and unit_defs.is_anti_nuke(weapon) == false then
+			total = (total or 0) + weapon_dps(weapon)
+		end
+	end
+	return total
+end
+
 -- What a weapon can shoot at, in a word or two.
 local function targets_text(weapon: Weapon): string
-	if weapon.anti_nuke then
+	if unit_defs.is_anti_nuke(weapon) then
 		return "Nuclear missiles"
 	elseif weapon.target_layer == "air" then
 		return "Air"
@@ -126,7 +88,7 @@ local function weapon_rows(weapon: Weapon): ({ Row }, { string })
 	-- an EMP weapon's damage is EMP, which stuns and does not hurt
 	local dealt = if weapon.paralyze_time ~= nil then "EMP" else "Damage"
 	local rows: { Row } = {
-		{ label = `{dealt} a second`, value = figure(weapon_dps(weapon)), tag = "weapon" },
+		{ label = `{dealt} a second`, value = figure(weapon_dps(weapon)), tag = "weapon", headline = true },
 		{ label = `{dealt} a shot`, value = figure(weapon.damage) },
 	}
 	if weapon.paralyze_time ~= nil then
@@ -136,12 +98,12 @@ local function weapon_rows(weapon: Weapon): ({ Row }, { string })
 	if burst ~= nil and burst > 1 then
 		table.insert(rows, {
 			label = "Burst",
-			value = `{burst} shots, {seconds(weapon.burst_interval or DEFAULT_BURST_INTERVAL)} apart`,
+			value = `{burst} shots, {seconds(unit_defs.burst_interval(weapon))} apart`,
 		})
 	end
 	table.insert(rows, { label = "Reload", value = seconds(weapon.reload) })
-	table.insert(rows, { label = "Range", value = studs(weapon.range) })
-	local projectile = weapon.projectile
+	table.insert(rows, { label = "Range", value = studs(weapon.range), headline = true })
+	local projectile = unit_defs.projectile_of(weapon)
 	if projectile ~= nil and projectile.aoe_radius > 0 then
 		table.insert(rows, { label = "Blast radius", value = studs(projectile.aoe_radius) })
 	end
@@ -153,7 +115,7 @@ local function weapon_rows(weapon: Weapon): ({ Row }, { string })
 		local per = if burst ~= nil and burst > 1 then "burst" else "shot"
 		table.insert(rows, { label = `Energy a {per}`, value = figure(weapon.energy_per_shot), tag = "energy" })
 	end
-	local lightning = weapon.lightning
+	local lightning = if weapon.delivery.kind == "beam" then weapon.delivery.lightning else nil
 	if lightning ~= nil then
 		table.insert(rows, {
 			label = "Sparks",
@@ -161,8 +123,9 @@ local function weapon_rows(weapon: Weapon): ({ Row }, { string })
 		})
 	end
 	table.insert(rows, { label = "Targets", value = targets_text(weapon) })
-	if not weapon.anti_air and not weapon.anti_nuke and weapon.target_layer ~= "ground" then
-		table.insert(rows, { label = "Vs air", value = `{math.round(config.NON_AA_AIR_DAMAGE_FRACTION * 100)}%` })
+	local kind = weapon_kinds.get(weapon.kind)
+	if kind.anti_air ~= true and kind.anti_nuke ~= true and weapon.target_layer ~= "ground" then
+		table.insert(rows, { label = "Vs air", value = `{math.round(weapon_kinds.NON_AA_AIR_DAMAGE_FRACTION * 100)}%` })
 	end
 	local stockpile = weapon.stockpile
 	if stockpile ~= nil then
@@ -177,7 +140,7 @@ local function weapon_rows(weapon: Weapon): ({ Row }, { string })
 	if weapon.weapon_group ~= nil then
 		table.insert(notes, "Shared reload")
 	end
-	if projectile ~= nil and projectile.pierce then
+	if kind.pierces == true then
 		table.insert(notes, "Passes through")
 	end
 	return rows, notes
@@ -193,7 +156,7 @@ local MANUAL_WEAPON = table.freeze({
 
 local function manual_weapon_rows(manual: ManualWeapon): { Row }
 	return {
-		{ label = "Range", value = studs(manual.range) },
+		{ label = "Range", value = studs(manual.range), headline = true },
 		{ label = "Strip width", value = studs(manual.radius * 2) },
 		{ label = "Reload", value = seconds(manual.reload) },
 		{ label = "Energy a shot", value = figure(manual.energy_per_shot), tag = "energy" },
@@ -203,31 +166,35 @@ end
 -- Which of a builder's jobs `def` does, in words.
 local function build_jobs(def: EntityDef): { string }
 	local jobs: { string } = {}
-	if def.build_options ~= nil and #def.build_options > 0 then
+	if #unit_defs.build_options(def) > 0 then
 		table.insert(jobs, "Build")
 	end
-	if def.assisting then
+	if unit_defs.does(def, "assist") then
 		table.insert(jobs, "Assist")
 	end
-	if def.repairing then
+	if unit_defs.does(def, "repair") then
 		table.insert(jobs, "Repair")
 	end
-	if def.reclaiming then
+	if unit_defs.does(def, "reclaim") then
 		table.insert(jobs, "Reclaim")
 	end
-	if def.resurrecting then
+	if unit_defs.does(def, "resurrect") then
 		table.insert(jobs, "Resurrect")
 	end
 	return jobs
 end
 
--- What building takes and what it reaches, and which of a builder's jobs it does.
+-- What building takes and what it reaches, and which of a builder's jobs it does; nothing for what does not build.
 local function build_rows(def: EntityDef): { Row }
+	local builder = def.builder
+	if builder == nil then
+		return {}
+	end
 	local rows: { Row } = {
-		{ label = "Buildpower", value = `{def.buildpower}/s`, tag = "buildpower" },
+		{ label = "Buildpower", value = `{builder.buildpower}/s`, tag = "buildpower" },
 	}
-	if def.build_range ~= nil then
-		table.insert(rows, { label = "Build range", value = studs(def.build_range) })
+	if builder.range ~= nil then
+		table.insert(rows, { label = "Build range", value = studs(builder.range) })
 	end
 	local jobs = build_jobs(def)
 	if #jobs > 0 then
@@ -241,11 +208,13 @@ end
 -- nothing.
 local function def_rows(def: EntityDef): { Row }
 	local rows: { Row } = {
-		{ label = "Health", value = figure(def.health) },
 		{ label = "Metal cost", value = figure(def.metal_cost), tag = "metal" },
 		{ label = "Energy cost", value = figure(def.energy_cost), tag = "energy" },
 		{ label = "Buildpower cost", value = figure(def.buildpower_cost), tag = "buildpower" },
 	}
+	if def.health ~= nil then
+		table.insert(rows, 1, { label = "Health", value = figure(def.health) })
+	end
 	local function add(label: string, value: string, tag: string?)
 		table.insert(rows, { label = label, value = value, tag = tag })
 	end
@@ -262,10 +231,8 @@ local function def_rows(def: EntityDef): { Row }
 			add("Turn rate", `{figure(math.deg(air.wings.turn_rate))}°/s`)
 		end
 	end
-	if def.buildpower ~= nil then
-		for _, row in build_rows(def) do
-			table.insert(rows, row)
-		end
+	for _, row in build_rows(def) do
+		table.insert(rows, row)
 	end
 	if def.metal_income ~= nil then
 		add("Makes metal", `+{figure(def.metal_income)}/s`, "metal")
@@ -326,18 +293,215 @@ local function def_rows(def: EntityDef): { Row }
 	return rows
 end
 
+-- The few facts about `def` that a glance wants, for a card over something in the HUD: what it costs, how tough it is,
+-- and whichever of these it has: how fast it goes, how hard it builds, what it makes, how far it shoots, what it carries.
+local function summary_rows(def: EntityDef): { Row }
+	local rows: { Row } = {
+		{ label = "Metal cost", value = figure(def.metal_cost), tag = "metal" },
+		{ label = "Energy cost", value = figure(def.energy_cost), tag = "energy" },
+	}
+	if def.health ~= nil then
+		table.insert(rows, 1, { label = "Health", value = figure(def.health) })
+	end
+	local function add(label: string, value: string, tag: string?)
+		table.insert(rows, { label = label, value = value, tag = tag })
+	end
+	if def.max_speed ~= nil and def.max_speed > 0 then
+		add("Speed", `{studs(def.max_speed)}/s`)
+	end
+	if def.builder ~= nil then
+		add("Buildpower", `{def.builder.buildpower}/s`, "buildpower")
+	end
+	if def.metal_income ~= nil then
+		add("Makes metal", `+{figure(def.metal_income)}/s`, "metal")
+	end
+	if def.energy_income ~= nil then
+		add("Makes energy", `+{figure(def.energy_income)}/s`, "energy")
+	end
+	local range = unit_defs.attack_range(def)
+	if range ~= nil then
+		add("Range", studs(range), "weapon")
+	end
+	local transport = def.transport
+	if transport ~= nil then
+		add("Carries", `{transport.capacity} {transport.carries}`)
+	end
+	return rows
+end
+
+-- What `def` is mostly for, as a tone class for a card over it: fighting, building, or making energy or metal.
+local function tone(def: EntityDef): string
+	if unit_defs.attack_range(def) ~= nil then
+		return "weapon"
+	elseif def.builder ~= nil then
+		return "build"
+	elseif def.energy_income ~= nil then
+		return "energy"
+	elseif def.metal_income ~= nil then
+		return "metal"
+	end
+	return "plain"
+end
+
+-- What sort of thing `def` is, in a word or two each, as the encyclopedia's chips under a name show it. Only what the
+-- def says outright.
+local function kinds(def: EntityDef): { string }
+	local found: { string } = {}
+	local function add(kind: string)
+		table.insert(found, kind)
+	end
+	if unit_defs.is_commander(def) then
+		add "COMMANDER"
+	end
+	if unit_defs.is_drone(def) then
+		add "DRONE"
+	end
+	if def.air ~= nil then
+		add "AIRCRAFT"
+	elseif unit_defs.is_submarine(def) then
+		add "SUBMARINE"
+	elseif unit_defs.floats(def) then
+		add(if def.kind == "building" then "ON WATER" else "SHIP")
+	elseif def.footing.water == "hover" then
+		add "HOVER"
+	elseif def.kind == "building" then
+		add "BUILDING"
+	end
+	if unit_defs.is_factory(def) then
+		add "FACTORY"
+	elseif def.builder ~= nil then
+		add "BUILDER"
+	end
+	local anti_air, anti_nuke, emp = false, false, false
+	for _, weapon in def.weapons or {} :: { Weapon } do
+		anti_air = anti_air or unit_defs.is_anti_air(weapon)
+		anti_nuke = anti_nuke or unit_defs.is_anti_nuke(weapon)
+		emp = emp or weapon.paralyze_time ~= nil
+	end
+	if anti_nuke then
+		add "ANTI-NUKE"
+	elseif anti_air then
+		add "ANTI-AIR"
+	end
+	if emp then
+		add "EMP"
+	end
+	if def.transport ~= nil then
+		add "TRANSPORT"
+	end
+	if def.carrier ~= nil then
+		add "CARRIER"
+	end
+	if def.shield ~= nil then
+		add "SHIELD"
+	end
+	if def.stealth == true then
+		add "STEALTH"
+	end
+	return found
+end
+
+-- The layer every one of `def`'s weapons is held to, if they all are to the same one.
+local function only_layer(def: EntityDef): types.TargetLayer?
+	local weapons = def.weapons
+	if weapons == nil or #weapons == 0 then
+		return nil
+	end
+	local layer: types.TargetLayer? = weapons[1].target_layer
+	for _, weapon in weapons do
+		if weapon.target_layer ~= layer then
+			return nil
+		end
+	end
+	return layer
+end
+
+-- What is worth knowing about `def` at a glance that its figures alone do not make plain, each a short sentence: where
+-- it can be built, what its weapons can be turned on and how they are fired, what it makes, carries and resists, and
+-- that it goes off when destroyed. The build menu, an unlock's card and the encyclopedia show these before anything
+-- written for it (shared/unit_descriptions).
+local function notes(def: EntityDef): { string }
+	local found: { string } = {}
+	local function add(note: string)
+		table.insert(found, note)
+	end
+	if def.spot == "metal" then
+		add "Metal spots only."
+	elseif def.spot == "geo" then
+		add "Vents only."
+	elseif def.kind == "building" and unit_defs.floats(def) then
+		add "Water only."
+	end
+	local layer = only_layer(def)
+	if layer == "air" then
+		add "Air only."
+	elseif layer == "ground" then
+		add "Ground only."
+	end
+	-- what the weapons that cost energy to fire cost, each
+	local manual, stockpile, energy = false, nil :: number?, {} :: { number }
+	for _, weapon in def.weapons or {} :: { Weapon } do
+		manual = manual or weapon.manual_fire == true
+		if weapon.stockpile ~= nil then
+			stockpile = math.max(stockpile or 0, weapon.stockpile.limit)
+		end
+		if weapon.energy_per_shot > 0 then
+			table.insert(energy, weapon.energy_per_shot)
+		end
+	end
+	if manual then
+		add "Manual fire."
+	end
+	if stockpile ~= nil then
+		add(`Stockpiles {stockpile}.`)
+	end
+	if #energy == 1 then
+		add(`{figure(energy[1])} energy per shot.`)
+	elseif #energy > 1 then
+		add "Costs energy per shot."
+	end
+	local conversion = def.energy_conversion
+	if conversion ~= nil then
+		add(`{figure(conversion.energy_per_second)} energy/s into {figure(conversion.metal_per_second)} metal/s.`)
+	end
+	local transport = def.transport
+	if transport ~= nil then
+		add(`Carries {transport.capacity} {transport.carries} {if transport.capacity == 1 then "unit" else "units"}.`)
+	end
+	if def.carrier ~= nil then
+		add "Launches drones."
+	end
+	if def.stealth == true then
+		add "Stealth."
+	end
+	if def.autoheal ~= nil then
+		add "Self-repairs."
+	end
+	if def.emp_resistance == 1 then
+		add "Immune to EMP."
+	end
+	if def.death_explosion ~= nil then
+		add "Explodes when destroyed."
+	end
+	return found
+end
+
 return table.freeze({
-	DEFAULT_BURST_INTERVAL = DEFAULT_BURST_INTERVAL,
 	MANUAL_WEAPON = MANUAL_WEAPON,
 	figure = figure,
 	seconds = seconds,
 	studs = studs,
 	weapon_kind = weapon_kind,
 	weapon_dps = weapon_dps,
+	damage_dps = damage_dps,
+	kinds = kinds,
+	notes = notes,
 	targets_text = targets_text,
 	weapon_rows = weapon_rows,
 	manual_weapon_rows = manual_weapon_rows,
 	build_jobs = build_jobs,
 	build_rows = build_rows,
 	def_rows = def_rows,
+	summary_rows = summary_rows,
+	tone = tone,
 })

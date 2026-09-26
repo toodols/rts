@@ -1,9 +1,15 @@
+--!strict
 -- Footprint maths on the ground plane. Buildings are only ever placed on quarter turns, so every
 -- footprint stays axis aligned and overlap tests reduce to 2D AABB tests.
 
 local function snap_facing(facing: number): number
 	local quarter = math.pi / 2
 	return math.round(facing / quarter) * quarter
+end
+
+-- `angle`, in radians, brought into [-pi, pi): the same turn, the short way round.
+local function wrap_angle(angle: number): number
+	return (angle + math.pi) % (2 * math.pi) - math.pi
 end
 
 -- Swaps a footprint's axes when it is turned a quarter turn off north.
@@ -107,6 +113,7 @@ local function points_along_path(path: { Vector3 }, count: number): { Vector3 }
 end
 
 return table.freeze({
+	wrap_angle = wrap_angle,
 	snap_facing = snap_facing,
 	rotated_half_extents = rotated_half_extents,
 	aabb_overlap = aabb_overlap,

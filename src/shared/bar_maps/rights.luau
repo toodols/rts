@@ -9,7 +9,10 @@
 -- set `status` to "permitted" and `evidence` to that file. A remake needs the original's maker too, since what it
 -- remakes is theirs.
 --
--- The makers are as each map's own mapinfo.lua names them.
+-- The makers are as each map's own mapinfo.lua names them. This is the one place they are kept: the importer credits
+-- them from here (tools/bar_maps/import_bar_maps.py, through tools/game_data.luau).
+
+local map_names = require(script.Parent.names)
 
 export type Status = "unlicensed" | "permitted"
 
@@ -146,14 +149,19 @@ local RIGHTS: { [string]: Rights } = {
 	},
 }
 
--- The rights to the map called `name`; a map with none recorded is unlicensed.
+-- Every map has its rights recorded, and nothing that is not a map does.
+for _, name in map_names do
+	assert(RIGHTS[name] ~= nil, `bar_maps/rights has nothing for the map {name}`)
+end
+for name in RIGHTS do
+	assert(table.find(map_names, name) ~= nil, `bar_maps/rights has an entry for {name}, which is no map (names.luau)`)
+end
+
+-- The rights to the map called `name`.
 local function of(name: string): Rights
-	return RIGHTS[name] or {
-		authors = {},
-		original_authors = {},
-		status = "unlicensed",
-		evidence = nil,
-	}
+	local rights = RIGHTS[name]
+	assert(rights ~= nil, `no rights are recorded for the map {name}`)
+	return rights
 end
 
 -- The makers of the map called `name`, as they are to be credited: "A, B (original by C)". The contact details in

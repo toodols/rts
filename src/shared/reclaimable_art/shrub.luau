@@ -4,6 +4,6 @@ return {
 		base = { pivot = { 0, 0, 0 } },
 	},
 	parts = {
-		{ group = "base", color = { 0.345, 0.471, 0.22 }, offset = { 0.0626, 0.4093, 0.0719 }, size = { 2.0566, 0.8186, 2.0381 }, hash = "635e434b55f9ebe8", mesh = "rbxassetid://97920816356793" },
+		{ group = "base", color = { 0.3451, 0.4706, 0.2196 }, offset = { -0.0084, 0.4093, 0.1784 }, size = { 2.0566, 0.8186, 2.0381 }, hash = "635e434b55f9ebe8", mesh = "rbxassetid://97920816356793" },
 	},
 }

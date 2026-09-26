@@ -1,5 +1,5 @@
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // Bars floating over entities. Where one sits on the screen is set from code every frame, so nothing
 // here positions it; this is only what it looks like.
@@ -62,7 +62,7 @@
 		@include meter($buildpower);
 	}
 
-	&.health.mid {
+	&.health.worn {
 		@include meter($caution);
 	}
 

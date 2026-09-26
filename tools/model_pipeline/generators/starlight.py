@@ -2,26 +2,30 @@
 
 A broad tracked hull carrying the tachyon gun up high: a diamond-turned pedestal (the Pulsar's core in little)
 under a team-coloured housing, out of which runs the Pulsar's own accelerator barrel at a fraction of its size --
-dark, ringed by two glowing coils, with a glowing tip (tachyon_common) -- since the two fire the same weapon.
-Collider capsule(39, 49, 39): radius 1.773, height 4.455 studs. 100-triangle budget.
-
+dark, ringed by two glowing coils, with a glowing tip (shared/tachyon) -- since the two fire the same weapon.
 The housing, barrel and glowing coils are three objects in piece "turret_1", turning about the pedestal's axis
 with weapon 1's aim.
 """
 
 import math
 
-from . import common
-from . import defense_b_common as d
-from . import tachyon_common as t
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import defense_b as d
+from .shared import palette
+from .shared import tachyon as t
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(120, 150, 196)
+CATEGORY = "entity"
+DEF = "starlight"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"length": 3.6}
+MOUNTS = {
+    1: {"pivot": (0, 2.4508, 0.0267), "muzzle": (0, 0.346, 1.7727)},
+}
 
 
 def generate(params):
-    radius, height = v.collider(39, 49, 39)
-    m = v.Mats("starlight", tuple(params.get("accent_color", ACCENT)))
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
 
     L, W = 2.6, 2.3  # hull footprint, fitted in the collider circle
@@ -72,18 +76,16 @@ def generate(params):
         along = (-out[1] * 0.07, out[0] * 0.07, 0.0)
         up = (-out[0] * (r0 - r1) * 0.4, -out[1] * (r0 - r1) * 0.4, h * 0.4)
         strip = d.panel("conduit", (out[0] * mid_r, pivot_y + out[1] * mid_r, deck_z + h * 0.5), along, up)
-        objects.append(m.glow(strip, color=t.GLOW, name="tachyon"))
+        objects.append(m.glow(strip, palette.TACHYON))
 
     # The housing, team-coloured, swivelling on the pedestal's axis (10 tris).
     swivel = (0.0, pivot_y, ped_top)
-    housing = v.block("housing", 0.95, 1.0, 0.52, origin=(0.0, pivot_y + 0.08, ped_top), top=(0.72, 0.58),
-                      top_offset=(0.0, 0.11))
+    housing = common.block("housing", 0.95, 1.0, 0.52, top=(0.72, 0.58), top_offset=(0.0, 0.11), at=(0.0, pivot_y + 0.08, ped_top), drop=('bottom',))
     m.accent(housing)
 
     # The Pulsar's accelerator barrel at 0.16 of its size, its breech buried in the housing (40 tris).
     breech = (0.0, pivot_y - 0.3, ped_top + 0.24)
-    barrel, lit = t.barrel(breech, scale=0.16, trim=m.trim,
-                           glow=lambda o: m.glow(o, color=t.GLOW, name="tachyon"))
+    barrel, lit = t.barrel(breech, scale=0.16)
 
     head = d.merged("head", [housing], origin=swivel)
     dark = d.merged("head_dark", [barrel], origin=swivel)
@@ -92,5 +94,4 @@ def generate(params):
     objects.append(common.art_group(dark, "turret_1"))
     objects.append(common.art_group(shine, "turret_1"))
 
-    v.check_fit(objects, radius, height, "starlight")
     return objects

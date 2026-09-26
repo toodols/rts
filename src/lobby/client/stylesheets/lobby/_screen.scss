@@ -1,0 +1,132 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Screen -------------------------------------------------------------------------------------------------
+
+// Between the scene and the menus: the scene is left clear on the right, where the commander stands, and shaded
+// toward the left, under the list, so the text there reads against anything the camera passes over. In a lobby the
+// panels cover the whole width, so the scene is only a setting and is shaded evenly.
+.backdrop {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
+	background-image: linear-gradient(
+		90deg,
+		veil($void, 0.88) 0%,
+		veil($void, 0.7) 45%,
+		veil($void, 0.1) 72%,
+		transparent 100%
+	);
+	pointer-events: none;
+
+	&.room-view {
+		background-color: veil($void, 0.55);
+		background-image: none;
+	}
+}
+
+// The edges of the screen darkened, as a lens does, so the eye settles in the middle.
+.vignette {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
+}
+
+.backdrop-rail {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: $rail;
+	background-image: linear-gradient(90deg, transparent 0%, $accent 30%, $accent 70%, transparent 100%);
+}
+
+// Everything the player uses, at the size it was drawn for, scaled as a whole to the screen (see use_viewport).
+.shell {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 1240px;
+	height: 720px;
+	@include stack(column, space(3));
+}
+
+// Browsing, the list keeps to the left and leaves the right of the screen to the scene.
+.shell.browsing > .body > .browser {
+	width: 800px;
+}
+
+// The title, straight over the scene rather than on a plate, the way a game's menu is lettered.
+.header {
+	width: 100%;
+	height: 72px;
+	@include stack(row, space(4));
+	align-items: center;
+	padding: 0 space(1);
+}
+
+.header-titles {
+	height: auto;
+	@include stack(column, space(1));
+}
+
+.header-title {
+	width: 100%;
+	height: 40px;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 34px;
+	text-align: left;
+	-webkit-text-stroke: 3px veil($void, 0.9);
+}
+
+.header-subtitle {
+	@include caption;
+	width: 100%;
+	height: 18px;
+	color: var(--Accent);
+	font-family: RobotoMono;
+	font-size: 13px;
+	-webkit-text-stroke: 2px veil($void, 0.8);
+}
+
+// The lobby's plates are glass rather than steel: the scene shows through them, dimmed, so the menus are part of the
+// world instead of a page in front of it.
+.panel {
+	// no colour under the gradient: the image is painted over it, so any colour there would only thicken the glass
+	background-color: transparent;
+	background-image: linear-gradient(180deg, veil($steel-lit, 0.75) 0%, veil($steel, 0.62) 6%, veil($void, 0.78) 100%);
+	opacity: 1;
+	outline: 1px solid veil($edge, 0.6);
+}
+
+// Takes the rest of the column. `height: 0` is only there for outlass: the idiomatic `flex: 1; min-height: 0` (or a
+// bare `flex-grow: 1`) leaves the height unset, which outlass turns into AutomaticSize.Y - sized to the content, so a
+// list never scrolls - where a browser lets the flex layout decide it. Same meaning in CSS, so it stays harmless there.
+.body {
+	width: 100%;
+	height: 0;
+	flex: 1;
+}
+
+// Something the player should know, like a request the server turned down: along the bottom, in the danger red.
+.notice {
+	position: absolute;
+	bottom: space(8);
+	left: 50%;
+	transform: translateX(-50%);
+	width: auto;
+	height: auto;
+	padding: space(2) space(5);
+	background-color: veil($void, 0.92);
+	outline: 1px solid var(--Danger);
+	color: var(--Text);
+	font-family: RobotoMono;
+	font-size: 13px;
+	z-index: 10;
+}

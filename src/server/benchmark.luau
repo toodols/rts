@@ -1,3 +1,4 @@
+--!strict
 -- Automated performance scenarios for /benchmark: each spawns a batch of real entities in a corner
 -- of the map, warps the simulation under them for a fixed number of ticks while the profiler
 -- measures it, kills everything it made, and moves on to the next. Warping (rather than waiting
@@ -6,56 +7,63 @@
 -- back for analysis, not read off the console as it happens.
 --
 -- Entities are created directly with state.create_entity, not through the normal build/command
--- path, so none of this costs metal or energy and none of it depends on a player being present.
--- Teams 90001/90002 are reserved for it and are never allied with anyone, so combat scenarios fight
--- for real.
+-- path, so none of it depends on a player being present. Its two teams, made the first time it runs
+-- and kept for every run after, are allied with nobody, so combat scenarios fight for real, and have
+-- no economy (economy.set_unlimited): what is measured is what the work costs to simulate, not how
+-- quickly an economy runs dry.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
+local tick_rate = require(ReplicatedStorage.Shared.tick_rate)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local surface = require(ReplicatedStorage.Shared.surface)
+local switches = require(ReplicatedStorage.Shared.switches)
 
 local state = require(script.Parent.state)
+local orders = require(script.Parent.orders)
+local deaths = require(script.Parent.deaths)
 local profiler = require(script.Parent.profiler)
 local production = require(script.Parent.production)
 local transport = require(script.Parent.transport)
 local scavengers = require(script.Parent.scavengers)
 local warp = require(script.Parent.warp)
+local players = require(script.Parent.players)
+local economy = require(script.Parent.economy)
 
+type Entity = types.Entity
 type EntityId = types.EntityId
 type TeamId = types.TeamId
 type Order = types.Order
 
-local TEAM_A: TeamId = 90001
-local TEAM_B: TeamId = 90002
+-- The benchmark's two teams, once it has run.
+local benchmark_teams: { a: TeamId, b: TeamId }? = nil
 
--- Tucked into a corner, well clear of where a player's start ever is, so a benchmark run never
--- litters a live game near anyone's base. The bounding box is swept clean of everything - any team,
--- any kind, wrecks included - between scenarios, since combat leaves wrecks that the set of ids a
--- setup spawned would not otherwise catch.
+-- Tucked into a corner, well clear of where a player's start ever is, so a benchmark run never litters a live game near
+-- anyone's base. The bounding box, ARENA_SPAN across from its corner, is swept clean of everything - any team, any kind,
+-- wrecks included - between scenarios, since combat leaves wrecks that the set of ids a setup spawned would not
+-- otherwise catch.
 --
--- Every scenario only ever offsets inward from these two (ARENA_X - n, ARENA_Z - n), never out past
--- them, so resolve_arena() below can move the corner itself without anything else needing to change.
+-- Every scenario only ever offsets inward from the corner (`corner.x - n`, `corner.z - n`), never out past it, so
+-- `resolve_arena` below can move the corner itself without anything else needing to change.
 local ARENA_MARGIN = 60
 local ARENA_SPAN = 420
--- set by resolve_arena() at the start of every run, from the map as it is then
-local ARENA_X = 0
-local ARENA_Z = 0
-local ARENA_MIN_X = ARENA_X - ARENA_SPAN
-local ARENA_MIN_Z = ARENA_Z - ARENA_SPAN
 
--- How far inward each retry step moves the corner along its own diagonal, and how many tries before
--- giving up on finding dry land at all.
+-- How far inward each retry step moves the corner along its own diagonal, and how many tries before giving up on
+-- finding dry land at all.
 local ARENA_RETRY_STEP = 60
 local ARENA_RETRY_LIMIT = 10
 
--- Whether the arena's whole footprint, corner at (x, z), is dry enough to spawn land units on: a
--- coarse sample of the corner, the far inward corner of the footprint, and its centre. A map preset
--- can just as easily put ocean in the corner this used to assume was always safe, and a land unit
--- (max_water_depth 0, most of them) spawned in water it cannot tolerate drowns within moments of
--- existing - exactly what happened to the "idle" scenario's grunts.
+-- The arena's corner, set by resolve_arena() at the start of every run, from the map as it is then.
+local corner = { x = 0, z = 0 }
+
+local running = false
+
+-- Whether the arena's whole footprint, corner at (x, z), is dry enough to spawn land units on: a coarse sample of the
+-- corner, the far inward corner of the footprint, and its centre. A map preset can just as easily put ocean in the
+-- corner this used to assume was always safe, and a land unit (whose footing's max_depth is 0, most of them) spawned in
+-- water it cannot tolerate drowns within moments of existing - exactly what happened to the "idle" scenario's grunts.
 local function arena_is_dry(x: number, z: number): boolean
 	for _, sample in
 		{
@@ -73,66 +81,80 @@ local function arena_is_dry(x: number, z: number): boolean
 	return true
 end
 
--- Moves the arena's corner inward along its own diagonal, up to ARENA_RETRY_LIMIT tries, until its
--- footprint tests dry. Called at the start of every run, since the map may have been replaced since the last.
--- Returns a warning line for the report (rather than logging it directly) if nothing dry was found at all, so the
--- whole benchmark still comes out as the one message run() promises, not an extra print ahead of it.
+-- Moves the arena's corner inward along its own diagonal, up to ARENA_RETRY_LIMIT tries, until its footprint tests dry.
+-- Called at the start of every run, since the map may have been replaced since the last. Returns a warning line for the
+-- report (rather than logging it directly) if nothing dry was found at all, so the whole benchmark still comes out as
+-- the one message run() promises, not an extra print ahead of it.
 local function resolve_arena(): string?
 	local half_x, half_z = heightmap.half_extents()
 	for attempt = 0, ARENA_RETRY_LIMIT do
 		local x = half_x - ARENA_MARGIN - attempt * ARENA_RETRY_STEP
 		local z = half_z - ARENA_MARGIN - attempt * ARENA_RETRY_STEP
 		if arena_is_dry(x, z) then
-			ARENA_X = x
-			ARENA_Z = z
-			ARENA_MIN_X = x - ARENA_SPAN
-			ARENA_MIN_Z = z - ARENA_SPAN
+			corner.x = x
+			corner.z = z
 			return nil
 		end
 	end
-	ARENA_X = half_x - ARENA_MARGIN
-	ARENA_Z = half_z - ARENA_MARGIN
-	ARENA_MIN_X = ARENA_X - ARENA_SPAN
-	ARENA_MIN_Z = ARENA_Z - ARENA_SPAN
+	corner.x = half_x - ARENA_MARGIN
+	corner.z = half_z - ARENA_MARGIN
 	return "No dry spot found for the benchmark arena along its usual corner; results may include drowning"
 end
-
-local running = false
 
 -- Kills everything standing in the arena's bounding box, whoever it belongs to.
 local function clear_arena()
 	for _, entity in state.all() do
 		if
 			entity.alive
-			and entity.position.X >= ARENA_MIN_X
-			and entity.position.X <= ARENA_X
-			and entity.position.Z >= ARENA_MIN_Z
-			and entity.position.Z <= ARENA_Z
+			and entity.position.X >= corner.x - ARENA_SPAN
+			and entity.position.X <= corner.x
+			and entity.position.Z >= corner.z - ARENA_SPAN
+			and entity.position.Z <= corner.z
 		then
-			state.mark_dead(entity)
+			deaths.destroy(entity, "removed")
 		end
 	end
 end
 
--- Generous enough that production, construction and resurrection never stall on affordability
--- partway through a scenario - a late-game team's stockpile, not a fresh one's - since what is being
--- measured is what that work costs to simulate, not how quickly a starting economy runs dry.
-local BENCHMARK_RESOURCES = 1e7
-
-local function ensure_team(team_id: TeamId)
-	if state.get_team(team_id) == nil then
-		local team = state.create_team(team_id)
-		team.name = `Benchmark {team_id}`
-		team.metal = BENCHMARK_RESOURCES
-		team.energy = BENCHMARK_RESOURCES
-		team.metal_capacity = BENCHMARK_RESOURCES
-		team.energy_capacity = BENCHMARK_RESOURCES
-	end
+-- The benchmark's two teams, made the first time it runs.
+local function sides(): { a: TeamId, b: TeamId }
+	local made: { a: TeamId, b: TeamId } = benchmark_teams
+		or { a = players.create_team "Benchmark A", b = players.create_team "Benchmark B" }
+	benchmark_teams = made
+	economy.set_unlimited(made.a, true)
+	economy.set_unlimited(made.b, true)
+	return made
 end
 
--- Places `count` of `def_name` in a grid starting at (origin_x, origin_z), `spacing` studs apart,
--- `columns` wide, each with `orders` (a fresh copy per unit, since orders mutate as they run).
-local function grid_spawn(
+-- One order of `kind` to `position`, for units to be given as they are put down.
+local function heading(kind: types.OrderKind, position: Vector3): { Order }
+	return { { kind = kind, position = position } }
+end
+
+-- `count` things of `def_name` in a grid starting at (origin_x, origin_z), `spacing` studs apart, `columns` wide, each
+-- made by `make` from its index (from 0) and where it rests; their ids.
+local function grid(
+	def_name: string,
+	origin_x: number,
+	origin_z: number,
+	count: number,
+	spacing: number,
+	columns: number,
+	make: (index: number, position: Vector3) -> Entity
+): { EntityId }
+	local def = unit_defs.get(def_name)
+	local ids = {}
+	for index = 0, count - 1 do
+		local x = origin_x + (index % columns) * spacing
+		local z = origin_z + (index // columns) * spacing
+		table.insert(ids, make(index, Vector3.new(x, surface.height(def, x, z), z)).id)
+	end
+	return ids
+end
+
+-- Finished `def_name`s of `team_id` in a grid (`grid`), each given `given` (orders mutate as they run, so each has its
+-- own copy).
+local function units(
 	def_name: string,
 	team_id: TeamId,
 	origin_x: number,
@@ -140,31 +162,29 @@ local function grid_spawn(
 	count: number,
 	spacing: number,
 	columns: number,
-	facing: number,
-	orders: { Order }?
+	given: { Order }?
 ): { EntityId }
-	local def = unit_defs.get(def_name)
-	local ids = {}
-	for i = 0, count - 1 do
-		local row = i // columns
-		local col = i % columns
-		local x = origin_x + col * spacing
-		local z = origin_z + row * spacing
-		local y = unit_defs.surface_height(def, x, z)
-		local entity = state.create_entity(def_name, team_id, Vector3.new(x, y, z), facing, "active")
-		if orders ~= nil then
-			entity.orders = table.clone(orders)
+	return grid(
+		def_name,
+		origin_x,
+		origin_z,
+		count,
+		spacing,
+		columns,
+		function(_index: number, position: Vector3): Entity
+			local entity = state.create_entity(def_name, team_id, position, 0, "active")
+			if given ~= nil then
+				orders.issue(entity, given, false, false)
+			end
+			return entity
 		end
-		table.insert(ids, entity.id)
-	end
-	state.flush()
-	return ids
+	)
 end
 
--- Like grid_spawn, but each unit's order targets one of `target_ids` in turn (cycling if there are
--- fewer targets than units), for reclaim/resurrect/assist - anything that needs a specific per-unit
--- target rather than one shared order.
-local function grid_spawn_targeting(
+-- Like `units`, but each one's order of `kind` targets one of `target_ids` in turn (cycling if there are fewer targets
+-- than units), for reclaim/resurrect/assist - anything that needs a specific per-unit target rather than one shared
+-- order.
+local function units_targeting(
 	def_name: string,
 	team_id: TeamId,
 	origin_x: number,
@@ -175,27 +195,23 @@ local function grid_spawn_targeting(
 	kind: types.OrderKind,
 	target_ids: { EntityId }
 ): { EntityId }
-	local def = unit_defs.get(def_name)
-	local ids = {}
-	for i = 0, count - 1 do
-		local row = i // columns
-		local col = i % columns
-		local x = origin_x + col * spacing
-		local z = origin_z + row * spacing
-		local y = unit_defs.surface_height(def, x, z)
-		local entity = state.create_entity(def_name, team_id, Vector3.new(x, y, z), 0, "active")
-		local target_id = target_ids[(i % #target_ids) + 1]
-		entity.orders = { { kind = kind, target_id = target_id } }
-		table.insert(ids, entity.id)
-	end
-	state.flush()
-	return ids
+	return grid(
+		def_name,
+		origin_x,
+		origin_z,
+		count,
+		spacing,
+		columns,
+		function(index: number, position: Vector3): Entity
+			local entity = state.create_entity(def_name, team_id, position, 0, "active")
+			orders.issue(entity, { { kind = kind, target_id = target_ids[(index % #target_ids) + 1] } }, false, false)
+			return entity
+		end
+	)
 end
 
--- Wrecks of `def_name` in a grid: a real source entity is made active, wrecked on the spot, and
--- thrown away - state.create_wreck only ever reads a source's def, position and facing, so this is
--- the same wreck a real death leaves, without needing one.
-local function spawn_wreck_grid(
+-- Wrecks of `def_name` in a grid, the same wreck a real death leaves.
+local function wrecks(
 	def_name: string,
 	origin_x: number,
 	origin_z: number,
@@ -203,25 +219,21 @@ local function spawn_wreck_grid(
 	spacing: number,
 	columns: number
 ): { EntityId }
-	local def = unit_defs.get(def_name)
-	local ids = {}
-	for i = 0, count - 1 do
-		local row = i // columns
-		local col = i % columns
-		local x = origin_x + col * spacing
-		local z = origin_z + row * spacing
-		local y = unit_defs.surface_height(def, x, z)
-		local source = state.create_entity(def_name, 0, Vector3.new(x, y, z), 0, "active")
-		local wreck = state.create_wreck(source)
-		state.mark_dead(source)
-		table.insert(ids, wreck.id)
-	end
-	state.flush()
-	return ids
+	return grid(
+		def_name,
+		origin_x,
+		origin_z,
+		count,
+		spacing,
+		columns,
+		function(_index: number, position: Vector3): Entity
+			return state.create_wreck(def_name, position, 0)
+		end
+	)
 end
 
 -- Blueprints of `def_name` in a grid, already standing (not travelled to), at 0 progress.
-local function spawn_blueprint_grid(
+local function blueprints(
 	def_name: string,
 	team_id: TeamId,
 	origin_x: number,
@@ -230,222 +242,164 @@ local function spawn_blueprint_grid(
 	spacing: number,
 	columns: number
 ): { EntityId }
-	local def = unit_defs.get(def_name)
-	local ids = {}
-	for i = 0, count - 1 do
-		local row = i // columns
-		local col = i % columns
-		local x = origin_x + col * spacing
-		local z = origin_z + row * spacing
-		local y = unit_defs.surface_height(def, x, z)
-		local entity = state.create_entity(def_name, team_id, Vector3.new(x, y, z), 0, "blueprint")
-		table.insert(ids, entity.id)
+	return grid(
+		def_name,
+		origin_x,
+		origin_z,
+		count,
+		spacing,
+		columns,
+		function(_index: number, position: Vector3): Entity
+			return state.create_entity(def_name, team_id, position, 0, "blueprint")
+		end
+	)
+end
+
+-- What scenarios are made of ----------------------------------------------------------------------------------------
+
+-- `count` of `def_name` for each of `team_a` and `team_b`, `spacing` apart and `columns` wide, round `center_a` and `center_b`,
+-- each side fighting its way to the other's.
+local function armies_fighting(
+	team_a: TeamId,
+	team_b: TeamId,
+	def_name: string,
+	center_a: Vector3,
+	center_b: Vector3,
+	count: number,
+	spacing: number,
+	columns: number
+)
+	units(def_name, team_a, center_a.X, center_a.Z, count, spacing, columns, heading("fight", center_b))
+	units(def_name, team_b, center_b.X, center_b.Z, count, spacing, columns, heading("fight", center_a))
+end
+
+-- `count` bot labs of `team`, 20 apart and 4 wide from (x, z), each queued 30 grunts deep.
+local function labs_producing(team: TeamId, x: number, z: number, count: number)
+	for _, id in units("bot_lab", team, x, z, count, 20, 4, nil) do
+		local factory = state.get(id)
+		if factory ~= nil then
+			for _ = 1, 30 do
+				production.enqueue(factory, "grunt")
+			end
+		end
 	end
-	state.flush()
-	return ids
+end
+
+-- `count` bot lab blueprints of `team`, 12 apart and `columns` wide from (x, z), each assisted by its own construction
+-- bot from the moment it appears, the bots in the same grid just in front.
+local function assisted_blueprints(team: TeamId, x: number, z: number, count: number, columns: number)
+	local sites = blueprints("bot_lab", team, x, z, count, 12, columns)
+	units_targeting("construction_bot", team, x, z + 20, count, 12, columns, "assist", sites)
+end
+
+-- `count` transports of `team` from `from`, each carrying two grunts put down `cargo_z` in front of them, and moving to
+-- `to`.
+local function loaded_transports(team: TeamId, from: Vector3, to: Vector3, count: number, cargo_z: number)
+	local transport_ids = units("hercules", team, from.X, from.Z, count, 15, 10, heading("move", to))
+	local cargo_ids = units("grunt", team, from.X, from.Z + cargo_z, count * 2, 8, 20, nil)
+	for index, transport_id in transport_ids do
+		local carrier = state.get(transport_id)
+		local first = state.get(cargo_ids[index * 2 - 1])
+		local second = state.get(cargo_ids[index * 2])
+		if carrier ~= nil and first ~= nil then
+			transport.load(carrier, first)
+		end
+		if carrier ~= nil and second ~= nil then
+			transport.load(carrier, second)
+		end
+	end
 end
 
 export type Scenario = {
 	name: string,
 	description: string,
-	-- how many simulation steps the scenario runs for, measured in ticks rather than wall-clock
-	-- seconds, so a run is the same length regardless of how fast warp manages to go
+	-- how many simulation steps the scenario runs for, measured in ticks rather than wall-clock seconds, so a run is the
+	-- same length regardless of how fast warp manages to go
 	ticks: number,
-	setup: () -> (),
-	-- run after clear_arena(), for anything a scenario made that could have wandered outside the
-	-- bounding box by the time it is torn down - a scavenger beacon's own hunters, say
+	-- puts the scenario down for the benchmark's two teams
+	setup: (a: TeamId, b: TeamId) -> (),
+	-- run after clear_arena(), for anything a scenario made that could have wandered outside the bounding box by the
+	-- time it is torn down - a scavenger beacon's own hunters, say
 	teardown: (() -> ())?,
 }
-
--- Kills every scavenger-team entity, anywhere on the map, not just in the arena: a beacon's hunters
--- roam toward whatever they are hunting and can end up outside the bounding box clear_arena sweeps,
--- and a beacon left alive would otherwise go on making more of them for every scenario after it -
--- exactly what happened to a later /benchmark run's "idle" scenario, whose grunts a previous run's
--- surviving beacon had been hunting the whole time.
-local function clear_scavengers()
-	for _, entity in state.all() do
-		if entity.alive and entity.team == config.SCAVENGER_TEAM then
-			state.mark_dead(entity)
-		end
-	end
-end
 
 local SCENARIOS: { Scenario } = {
 	{
 		name = "idle",
 		description = "900 idle grunts, scattered, doing nothing",
 		ticks = 100,
-		setup = function()
-			ensure_team(TEAM_A)
-			grid_spawn("grunt", TEAM_A, ARENA_X - 260, ARENA_Z - 260, 900, 8, 30, 0, nil)
+		setup = function(a: TeamId, _b: TeamId)
+			units("grunt", a, corner.x - 260, corner.z - 260, 900, 8, 30, nil)
 		end,
 	},
 	{
 		name = "melee",
 		description = "350 v 350 grunts, closing in and fighting to the death",
 		ticks = 200,
-		setup = function()
-			ensure_team(TEAM_A)
-			ensure_team(TEAM_B)
-			local center_a = Vector3.new(ARENA_X - 320, 0, ARENA_Z - 160)
-			local center_b = Vector3.new(ARENA_X - 160, 0, ARENA_Z - 320)
-			grid_spawn(
-				"grunt",
-				TEAM_A,
-				center_a.X,
-				center_a.Z,
-				350,
-				7,
-				19,
-				0,
-				{ { kind = "fight", position = center_b } }
-			)
-			grid_spawn(
-				"grunt",
-				TEAM_B,
-				center_b.X,
-				center_b.Z,
-				350,
-				7,
-				19,
-				0,
-				{ { kind = "fight", position = center_a } }
-			)
+		setup = function(a: TeamId, b: TeamId)
+			local center_a = Vector3.new(corner.x - 320, 0, corner.z - 160)
+			local center_b = Vector3.new(corner.x - 160, 0, corner.z - 320)
+			armies_fighting(a, b, "grunt", center_a, center_b, 350, 7, 19)
 		end,
 	},
 	{
 		name = "ranged",
 		description = "220 v 220 aggravators (rockets), closing in and fighting to the death",
 		ticks = 200,
-		setup = function()
-			ensure_team(TEAM_A)
-			ensure_team(TEAM_B)
-			local center_a = Vector3.new(ARENA_X - 330, 0, ARENA_Z - 170)
-			local center_b = Vector3.new(ARENA_X - 170, 0, ARENA_Z - 330)
-			grid_spawn(
-				"aggravator",
-				TEAM_A,
-				center_a.X,
-				center_a.Z,
-				220,
-				9,
-				15,
-				0,
-				{ { kind = "fight", position = center_b } }
-			)
-			grid_spawn(
-				"aggravator",
-				TEAM_B,
-				center_b.X,
-				center_b.Z,
-				220,
-				9,
-				15,
-				0,
-				{ { kind = "fight", position = center_a } }
-			)
+		setup = function(a: TeamId, b: TeamId)
+			local center_a = Vector3.new(corner.x - 330, 0, corner.z - 170)
+			local center_b = Vector3.new(corner.x - 170, 0, corner.z - 330)
+			armies_fighting(a, b, "aggravator", center_a, center_b, 220, 9, 15)
 		end,
 	},
 	{
 		name = "movement",
 		description = "900 ticks, all given the same far move order at once",
 		ticks = 160,
-		setup = function()
-			ensure_team(TEAM_A)
-			local from_x, from_z = ARENA_X - 350, ARENA_Z - 350
-			local target = heightmap.ground_position(ARENA_X, ARENA_Z)
-			grid_spawn("tick", TEAM_A, from_x, from_z, 900, 6, 30, 0, { { kind = "move", position = target } })
+		setup = function(a: TeamId, _b: TeamId)
+			local target = heightmap.ground_position(corner.x, corner.z)
+			units("tick", a, corner.x - 350, corner.z - 350, 900, 6, 30, heading("move", target))
 		end,
 	},
 	{
 		name = "production",
 		description = "16 bot labs, each queued 30 grunts deep, building continuously",
 		ticks = 200,
-		setup = function()
-			ensure_team(TEAM_A)
-			local ids = grid_spawn("bot_lab", TEAM_A, ARENA_X - 200, ARENA_Z - 200, 16, 20, 4, 0, nil)
-			for _, id in ids do
-				local factory = state.get(id)
-				if factory ~= nil then
-					for _ = 1, 30 do
-						production.enqueue(factory, "grunt")
-					end
-				end
-			end
+		setup = function(a: TeamId, _b: TeamId)
+			labs_producing(a, corner.x - 200, corner.z - 200, 16)
 		end,
 	},
 	{
 		name = "construction",
 		description = "180 blueprints, each assisted by its own construction_bot from the moment it appears",
 		ticks = 200,
-		setup = function()
-			ensure_team(TEAM_A)
-			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 320, ARENA_Z - 320, 180, 12, 13)
-			grid_spawn_targeting(
-				"construction_bot",
-				TEAM_A,
-				ARENA_X - 320,
-				ARENA_Z - 300,
-				180,
-				12,
-				13,
-				"assist",
-				blueprints
-			)
+		setup = function(a: TeamId, _b: TeamId)
+			assisted_blueprints(a, corner.x - 320, corner.z - 320, 180, 13)
 		end,
 	},
 	{
 		name = "reclaim_resurrect",
 		description = "300 wrecks; 45 graverobbers reclaiming half of them, 45 resurrecting the other half",
 		ticks = 200,
-		setup = function()
-			ensure_team(TEAM_A)
-			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 350, ARENA_Z - 350, 300, 6, 18)
-			local half = #wrecks // 2
+		setup = function(a: TeamId, _b: TeamId)
+			local lying = wrecks("grunt", corner.x - 350, corner.z - 350, 300, 6, 18)
+			local half = #lying // 2
 			local to_reclaim, to_resurrect = {}, {}
-			for i, id in wrecks do
-				if i <= half then
-					table.insert(to_reclaim, id)
-				else
-					table.insert(to_resurrect, id)
-				end
+			for index, id in lying do
+				table.insert(if index <= half then to_reclaim else to_resurrect, id)
 			end
-			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 350, ARENA_Z - 320, 45, 12, 12, "reclaim", to_reclaim)
-			grid_spawn_targeting(
-				"graverobber",
-				TEAM_A,
-				ARENA_X - 200,
-				ARENA_Z - 320,
-				45,
-				12,
-				12,
-				"resurrect",
-				to_resurrect
-			)
+			units_targeting("graverobber", a, corner.x - 350, corner.z - 320, 45, 12, 12, "reclaim", to_reclaim)
+			units_targeting("graverobber", a, corner.x - 200, corner.z - 320, 45, 12, 12, "resurrect", to_resurrect)
 		end,
 	},
 	{
 		name = "transport",
 		description = "70 loaded transports shuttling between two points",
 		ticks = 160,
-		setup = function()
-			ensure_team(TEAM_A)
-			local from = Vector3.new(ARENA_X - 350, 0, ARENA_Z - 350)
-			local to = Vector3.new(ARENA_X - 50, 0, ARENA_Z - 50)
-			local transport_ids =
-				grid_spawn("hercules", TEAM_A, from.X, from.Z, 70, 15, 10, 0, { { kind = "move", position = to } })
-			local cargo_ids = grid_spawn("grunt", TEAM_A, from.X, from.Z + 200, 140, 8, 20, 0, nil)
-			for i, transport_id in transport_ids do
-				local carrier = state.get(transport_id)
-				local first = state.get(cargo_ids[i * 2 - 1])
-				local second = state.get(cargo_ids[i * 2])
-				if carrier ~= nil and first ~= nil then
-					transport.load(carrier, first)
-				end
-				if carrier ~= nil and second ~= nil then
-					transport.load(carrier, second)
-				end
-			end
+		setup = function(a: TeamId, _b: TeamId)
+			local from = Vector3.new(corner.x - 350, 0, corner.z - 350)
+			local to = Vector3.new(corner.x - 50, 0, corner.z - 50)
+			loaded_transports(a, from, to, 70, 200)
 		end,
 	},
 	{
@@ -454,108 +408,33 @@ local SCENARIOS: { Scenario } = {
 			.. "building and reclaiming, loaded transports, and an active scavenger beacon, all at once",
 		ticks = 400,
 		teardown = function()
-			clear_scavengers()
-			scavengers.set_enabled(false)
+			scavengers.clear()
+			switches.set("scavengers", false)
 		end,
-		setup = function()
-			ensure_team(TEAM_A)
-			ensure_team(TEAM_B)
+		setup = function(a: TeamId, b: TeamId)
+			local center_a = Vector3.new(corner.x - 300, 0, corner.z - 100)
+			local center_b = Vector3.new(corner.x - 100, 0, corner.z - 300)
+			armies_fighting(a, b, "grunt", center_a, center_b, 100, 7, 10)
+			units("aggravator", a, center_a.X - 100, center_a.Z, 50, 9, 10, heading("fight", center_b))
+			units("aggravator", b, center_b.X, center_b.Z - 100, 50, 9, 10, heading("fight", center_a))
 
-			local center_a = Vector3.new(ARENA_X - 300, 0, ARENA_Z - 100)
-			local center_b = Vector3.new(ARENA_X - 100, 0, ARENA_Z - 300)
-			grid_spawn(
-				"grunt",
-				TEAM_A,
-				center_a.X,
-				center_a.Z,
-				100,
-				7,
+			labs_producing(a, corner.x - 400, corner.z - 400, 4)
+			assisted_blueprints(a, corner.x - 400, corner.z - 320, 40, 10)
+			local lying = wrecks("grunt", corner.x - 400, corner.z - 280, 60, 6, 15)
+			units_targeting("graverobber", a, corner.x - 400, corner.z - 260, 20, 12, 10, "reclaim", lying)
+			loaded_transports(
+				a,
+				Vector3.new(corner.x - 400, 0, corner.z - 240),
+				Vector3.new(corner.x - 50, 0, corner.z - 50),
 				10,
-				0,
-				{ { kind = "fight", position = center_b } }
-			)
-			grid_spawn(
-				"grunt",
-				TEAM_B,
-				center_b.X,
-				center_b.Z,
-				100,
-				7,
-				10,
-				0,
-				{ { kind = "fight", position = center_a } }
-			)
-			grid_spawn(
-				"aggravator",
-				TEAM_A,
-				center_a.X - 100,
-				center_a.Z,
-				50,
-				9,
-				10,
-				0,
-				{ { kind = "fight", position = center_b } }
-			)
-			grid_spawn(
-				"aggravator",
-				TEAM_B,
-				center_b.X,
-				center_b.Z - 100,
-				50,
-				9,
-				10,
-				0,
-				{ { kind = "fight", position = center_a } }
+				30
 			)
 
-			local factories = grid_spawn("bot_lab", TEAM_A, ARENA_X - 400, ARENA_Z - 400, 4, 20, 4, 0, nil)
-			for _, id in factories do
-				local factory = state.get(id)
-				if factory ~= nil then
-					for _ = 1, 30 do
-						production.enqueue(factory, "grunt")
-					end
-				end
-			end
-
-			local blueprints = spawn_blueprint_grid("bot_lab", TEAM_A, ARENA_X - 400, ARENA_Z - 320, 40, 12, 10)
-			grid_spawn_targeting(
-				"construction_bot",
-				TEAM_A,
-				ARENA_X - 400,
-				ARENA_Z - 300,
-				40,
-				12,
-				10,
-				"assist",
-				blueprints
-			)
-
-			local wrecks = spawn_wreck_grid("grunt", ARENA_X - 400, ARENA_Z - 280, 60, 6, 15)
-			grid_spawn_targeting("graverobber", TEAM_A, ARENA_X - 400, ARENA_Z - 260, 20, 12, 10, "reclaim", wrecks)
-
-			local from = Vector3.new(ARENA_X - 400, 0, ARENA_Z - 240)
-			local to = Vector3.new(ARENA_X - 50, 0, ARENA_Z - 50)
-			local transport_ids =
-				grid_spawn("hercules", TEAM_A, from.X, from.Z, 10, 15, 10, 0, { { kind = "move", position = to } })
-			local cargo_ids = grid_spawn("grunt", TEAM_A, from.X, from.Z + 30, 20, 8, 20, 0, nil)
-			for i, transport_id in transport_ids do
-				local carrier = state.get(transport_id)
-				local first = state.get(cargo_ids[i * 2 - 1])
-				local second = state.get(cargo_ids[i * 2])
-				if carrier ~= nil and first ~= nil then
-					transport.load(carrier, first)
-				end
-				if carrier ~= nil and second ~= nil then
-					transport.load(carrier, second)
-				end
-			end
-
-			-- on for exactly this scenario's window; the benchmark keeps it off the rest of the time
-			-- (see run()) so a fresh beacon never spawns on its own natural schedule mid-scenario and
-			-- hunts down units a scenario never meant to have an enemy at all
-			scavengers.set_enabled(true)
-			scavengers.force_beacon(ARENA_X - 50, ARENA_Z - 400)
+			-- on for exactly this scenario's window; the benchmark keeps it off the rest of the time (see run()) so a
+			-- fresh beacon never spawns on its own natural schedule mid-scenario and hunts down units a scenario never
+			-- meant to have an enemy at all
+			switches.set("scavengers", true)
+			scavengers.force_beacon(corner.x - 50, corner.z - 400)
 		end,
 	},
 }
@@ -582,6 +461,10 @@ local function run(log: (string) -> ())
 	end
 	running = true
 	local started_at = os.clock()
+	-- the scavengers are kept off and the simulation warped for the run, and both are put back as they were once it is
+	-- over, however it ended
+	local was_enabled = switches.is_on "scavengers"
+	local was_remaining = warp.ticks_remaining()
 
 	local ok, err = pcall(function()
 		local lines: { string } = { `Benchmark: {#SCENARIOS} scenarios` }
@@ -593,27 +476,24 @@ local function run(log: (string) -> ())
 		-- in case a previous run was interrupted partway through and left its own debris behind, a
 		-- surviving scavenger beacon included
 		clear_arena()
-		clear_scavengers()
+		scavengers.clear()
 
 		-- off for every scenario but "mixed" (which turns it back on for exactly its own window),
 		-- so a beacon can never spawn on its own natural schedule mid-scenario and go hunting units
-		-- a scenario never meant to have an enemy at all; restored to whatever it actually was once
-		-- every scenario is done, win or not
-		local was_enabled = scavengers.is_enabled()
-		scavengers.set_enabled(false)
+		-- a scenario never meant to have an enemy at all
+		switches.set("scavengers", false)
 
 		-- warped for the whole run so every scenario is measured over a fixed number of ticks
-		-- rather than however many ticks real time happens to buy it - restored to whatever it
-		-- actually was once every scenario is done, win or not, same as scavengers above
-		local was_remaining = warp.ticks_remaining()
+		-- rather than however many ticks real time happens to buy it
 		warp.start(nil)
 
-		task.wait(config.TICK_DELTA * 3)
+		task.wait(tick_rate.TICK_DELTA * 3)
 
+		local teams_of_run = sides()
 		for _, scenario in SCENARIOS do
-			scenario.setup()
+			scenario.setup(teams_of_run.a, teams_of_run.b)
 			-- let the spawn itself settle for a tick before the clock starts
-			task.wait(config.TICK_DELTA)
+			task.wait(tick_rate.TICK_DELTA)
 			profiler.reset()
 			repeat
 				task.wait()
@@ -621,7 +501,6 @@ local function run(log: (string) -> ())
 
 			local steps = profiler.step_count()
 			local elapsed = profiler.elapsed_since_reset()
-			profiler.sample_entities()
 			local entities = profiler.entity_report()
 
 			table.insert(lines, "")
@@ -630,7 +509,7 @@ local function run(log: (string) -> ())
 				lines,
 				`  {steps} steps over {string.format("%.2f", elapsed)}s ({string.format(
 					"%.2f",
-					steps * config.TICK_DELTA
+					steps * tick_rate.TICK_DELTA
 				)}s sim time)`
 			)
 			table.insert(lines, `  entities at end: {entities.total}`)
@@ -647,11 +526,8 @@ local function run(log: (string) -> ())
 			end
 			-- give the normal step loop a couple of ticks to actually reap what was just killed
 			-- before the next scenario's counts start from a clean slate
-			task.wait(config.TICK_DELTA * 3)
+			task.wait(tick_rate.TICK_DELTA * 3)
 		end
-
-		scavengers.set_enabled(was_enabled)
-		warp.start(was_remaining)
 
 		table.insert(lines, "")
 		-- wall-clock, not sim time: with every scenario now warped to a fixed tick count (see
@@ -662,6 +538,8 @@ local function run(log: (string) -> ())
 		log(table.concat(lines, "\n"))
 	end)
 
+	switches.set("scavengers", was_enabled)
+	warp.start(was_remaining)
 	running = false
 	if not ok then
 		error(err, 0)

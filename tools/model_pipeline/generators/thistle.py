@@ -1,20 +1,25 @@
-"""unit_defs `thistle` (corrl): a light anti-air missile tower, 1x2x1 cells (4x8x4 studs). Under 100 triangles.
+"""unit_defs `thistle` (corrl): a light anti-air missile tower. Under 100 triangles.
 
 The tower line's sloped plinth and tapered column, topped by a missile yoke: a small armored cab between
 two four-cell missile pods, pitched steeply up. The whole head yaws with weapon 1.
 """
 
-from . import defense_a_common as d
+from .shared import defense_a as d
 
-KEY = "thistle"
+CATEGORY = "entity"
+DEF = "thistle"
+MOUNTS = {
+    1: {"pivot": (0, 4.4, 0), "muzzle": (-0.53, 1.3665, 0.9706)},
+}
 SWIVEL_Z = 4.4
 POD_ELEV = 42.0
 
 
 def generate(params):
+    w = params["collider"]["width"]
     base = d.Parts()
     # the tower line's sloped plinth and tapered column
-    base.loft([d.square(3.9, 0.0), d.square(2.9, 1.1)], side="trim", top="trim")
+    base.loft([d.square(w - 0.1, 0.0), d.square(2.9, 1.1)], side="trim", top="trim")
     base.loft([d.square(1.4, 1.1), d.square(1.1, SWIVEL_Z)], side="body")
 
     head = d.Parts()
@@ -33,6 +38,6 @@ def generate(params):
             for u in (-0.16, 0.16):
                 head.quad_f(pod, x, 1.005, u, 0.17, 0.17)
 
-    objects = d.base_objects(base, KEY, "trim")
-    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), KEY)
+    objects = d.base_objects(base, "trim", params["color"])
+    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), params["color"])
     return objects

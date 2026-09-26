@@ -1,20 +1,22 @@
 """unit_defs/air_t1.luau `valiant` (BAR corveng): a light anti-air fighter.
 
-Collider capsule(36, 30, 40): radius 40/22 = 1.82 studs, height 30/11 = 1.82 across and 2.73 tall. Built as a
+Built as a
 faceted low-poly dart, about fifty triangles: a diamond-section fuselage with sharp chines, a cockpit canopy
 facet, one cropped-delta wing panel (the team-coloured accent) that is thick at the root and knife-edged at the
 rim, twin outward-canted fins, a homing missile under each wing and a glowing exhaust face. Nothing moves: the
 fighter's weapon has no turret, it just points the plane.
 """
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(196, 96, 80)
-RADIUS, HEIGHT = 40 / 22, 30 / 11
+CATEGORY = "entity"
+DEF = "valiant"
 
 
 def generate(params):
+    accent = params["color"]
     zc = 1.25  # fuselage centreline, about the middle of the collider
     objects = []
 
@@ -45,7 +47,7 @@ def generate(params):
         (-1.30, 1.02, zw - 0.08),
         (-1.30, 0.62, zw - 0.08),
     ], top=(0.0, 0.45, zw + 0.13), bottom=(0.0, 0.45, zw - 0.16))
-    air.accent_mat(wing, "valiant", ACCENT)
+    common.accent_mat(wing, accent)
     objects.append(wing)
 
     # Twin fins canted outward, each a tetrahedron: root leading edge, root trailing edge, tip, and a point
@@ -58,7 +60,7 @@ def generate(params):
             (side * 0.44, 1.58, zc + 0.72),
             (side * 0.08, 1.30, zc + 0.22),
         )
-        air.accent_mat(fin, "valiant", ACCENT)
+        common.accent_mat(fin, accent)
         objects.append(fin)
 
     # A homing missile slung under each wing: a long dark spike.
@@ -79,9 +81,7 @@ def generate(params):
     glow = air.poly("exhaust", [
         (0.17, y, zc), (0.0, y, zc + 0.11), (-0.17, y, zc), (0.0, y, zc - 0.11),
     ], [(0, 1, 2, 3)], facing=(0.0, 1.0, 0.0))
-    air.glow_mat(glow)
+    common.glow_mat(glow, palette.JET_EXHAUST)
     objects.append(glow)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "valiant")
     return objects

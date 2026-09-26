@@ -2,12 +2,14 @@
 -- sun, the colour of the light and of the shade, the haze over the distance, a tint over the whole view, and the
 -- weather falling through it. None of it changes anything a unit can do or see; it is only how the map is dressed.
 --
--- Each map may set its own (`map_presets`). The server sets them when the map is built and they reach the clients as
--- attributes of Workspace, as the wind and the tide do, and each client lights its own view from them (see
--- client/atmospherics.luau). Whatever a map leaves nil is left as the scene is lit without one (see
--- server/lighting.luau), so a map that sets none, as none of BAR's do, looks exactly as maps always have.
+-- Each map may set its own (`map_presets`), over DEFAULT, which is how a map that sets none looks, as none of BAR's do.
+-- The server sets them when the map is built and they reach the clients as replicated fields (shared/replicated.luau),
+-- as the wind and the tide do, and each client lights its own view from them (see client/atmospherics.luau). What neither the map nor
+-- DEFAULT says is left as the place is lit.
 
-local Workspace = game:GetService "Workspace"
+local ReplicatedStorage = game:GetService "ReplicatedStorage"
+
+local replicated = require(ReplicatedStorage.Shared.replicated)
 
 -- What falls through the view: rain in streaks splashing on the ground, snow in flakes with spindrift blown along the
 -- ground, dust blown in grit and in clouds low over the ground, pale ash drifting down, or glowing embers rising. Every
@@ -46,58 +48,80 @@ export type Atmosphere = {
 	mist_color: Color3?,
 }
 
-local PREFIX = "atmosphere_"
+-- The late-afternoon light every map has unless it says otherwise: the sun fairly high, a cool grey-blue shade, and a
+-- haze over the distance of the horizon's colour, which the fog fades into (server/lighting.luau).
+local DEFAULT: Atmosphere = table.freeze({
+	clock_time = 15.5,
+	latitude = 20,
+	brightness = 2,
+	exposure = -0.1,
+	ambient = Color3.fromRGB(88, 96, 110),
+	outdoor_ambient = Color3.fromRGB(104, 114, 130),
+	haze_color = Color3.fromRGB(108, 124, 142),
+	decay_color = Color3.fromRGB(84, 96, 112),
+	density = 0.32,
+	haze = 1.4,
+	glare = 0.15,
+})
 
--- Every field and the type its attribute holds, so the server writes and the clients read the same set.
-local FIELDS: { [string]: string } = {
-	clock_time = "number",
-	latitude = "number",
-	brightness = "number",
-	exposure = "number",
-	ambient = "Color3",
-	outdoor_ambient = "Color3",
-	sun_color = "Color3",
-	haze_color = "Color3",
-	decay_color = "Color3",
-	density = "number",
-	haze = "number",
-	glare = "number",
-	tint = "Color3",
-	saturation = "number",
-	contrast = "number",
-	weather = "string",
-	weather_amount = "number",
-	mist = "number",
-	mist_color = "Color3",
+-- Every field and the codec its value is replicated with, so the server writes and the clients read the same set.
+local CODECS: { [string]: replicated.Codec<any> } = {
+	clock_time = replicated.NUMBER,
+	latitude = replicated.NUMBER,
+	brightness = replicated.NUMBER,
+	exposure = replicated.NUMBER,
+	ambient = replicated.COLOR3,
+	outdoor_ambient = replicated.COLOR3,
+	sun_color = replicated.COLOR3,
+	haze_color = replicated.COLOR3,
+	decay_color = replicated.COLOR3,
+	density = replicated.NUMBER,
+	haze = replicated.NUMBER,
+	glare = replicated.NUMBER,
+	tint = replicated.COLOR3,
+	saturation = replicated.NUMBER,
+	contrast = replicated.NUMBER,
+	weather = replicated.STRING,
+	weather_amount = replicated.NUMBER,
+	mist = replicated.NUMBER,
+	mist_color = replicated.COLOR3,
 }
+local FIELDS: { [string]: replicated.WorldField<any> } = {}
+for field, codec in CODECS do
+	FIELDS[field] = replicated.world("atmosphere", field, codec)
+end
 
--- Sets them all from `atmosphere`, clearing any it leaves out, as a map does when it is built; nil clears the lot.
+-- Sets them all from `atmosphere`, and what it leaves out from DEFAULT, as a map does when it is built.
 local function apply(atmosphere: Atmosphere?)
 	local given = (atmosphere or {}) :: { [string]: any }
-	for field in FIELDS do
-		Workspace:SetAttribute(PREFIX .. field, given[field])
+	local defaults = DEFAULT :: { [string]: any }
+	for name, field in FIELDS do
+		local value = given[name]
+		field.set(if value ~= nil then value else defaults[name])
 	end
 end
 
 -- What is set now, with whatever is not, or is not the type it should be, left nil.
 local function read(): Atmosphere
 	local found: { [string]: any } = {}
-	for field, kind in FIELDS do
-		local value = Workspace:GetAttribute(PREFIX .. field)
-		if typeof(value) == kind then
-			found[field] = value
-		end
+	for name, field in FIELDS do
+		found[name] = field.get()
 	end
 	return found :: Atmosphere
 end
 
--- Whether `attribute`, a Workspace attribute's name, is one of these, so a client can follow them as they change.
-local function is_attribute(attribute: string): boolean
-	return string.sub(attribute, 1, #PREFIX) == PREFIX and FIELDS[string.sub(attribute, #PREFIX + 1)] ~= nil
+-- Calls `listener` whenever any of it changes, until the returned function is called.
+local function changed(listener: () -> ()): () -> ()
+	local all: { replicated.WorldField<any> } = {}
+	for _, field in FIELDS do
+		table.insert(all, field)
+	end
+	return replicated.any_changed(all, listener)
 end
 
 return table.freeze({
+	DEFAULT = DEFAULT,
 	apply = apply,
 	read = read,
-	is_attribute = is_attribute,
+	changed = changed,
 })

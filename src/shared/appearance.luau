@@ -1,11 +1,14 @@
+--!strict
 -- How an entity's model is painted for what it is: a blueprint, a wreck, or finished and in its team's colours.
--- The server paints the models it builds (instances.luau) and the client paints the art it builds itself
--- (src/client/art.luau), and both take it from here so that the two always agree.
+-- The server paints the models it builds (instances.luau) and the clients paint the art they build themselves
+-- (src/client/art.luau, and every picture and the lobby's scene through ClientShared.art_models), and all take it from
+-- here so that they always agree: `team_tint` is the one way a team part is coloured.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local config = require(ReplicatedStorage.Shared.config)
+local teams = require(ReplicatedStorage.Shared.teams)
 local types = require(ReplicatedStorage.Shared.types)
+local game_modes = require(ReplicatedStorage.Shared.game_modes)
 
 local BLUEPRINT_TRANSPARENCY = 0
 local BLUEPRINT_MATERIAL = Enum.Material.ForceField
@@ -13,19 +16,32 @@ local WRECK_COLOR = Color3.fromRGB(96, 88, 80)
 local WRECK_TRANSPARENCY = 0.15
 local WRECK_MATERIAL = Enum.Material.CorrodedMetal
 
-local TEAM_COLORS: { [number]: Color3 } = {
-	[0] = Color3.fromRGB(140, 140, 140),
-	[1] = Color3.fromRGB(86, 148, 224),
-	[2] = Color3.fromRGB(214, 92, 84),
-	[config.SCAVENGER_TEAM] = Color3.fromRGB(160, 84, 214),
+-- No team's, like a rock's, and the scavengers'.
+local NEUTRAL_COLOR = Color3.fromRGB(140, 140, 140)
+local SCAVENGER_COLOR = Color3.fromRGB(160, 84, 214)
+-- The players' teams', from team 1, a colour for every team the largest mode seats, each clear of the others, of the
+-- neutral grey and of the scavengers' purple. Any team past them, like a mission's own, takes them round again.
+local TEAM_PALETTE: { Color3 } = {
+	Color3.fromRGB(86, 148, 224), -- blue
+	Color3.fromRGB(214, 92, 84), -- red
+	Color3.fromRGB(98, 180, 90), -- green
+	Color3.fromRGB(226, 196, 74), -- yellow
+	Color3.fromRGB(232, 138, 54), -- orange
+	Color3.fromRGB(70, 196, 206), -- cyan
+	Color3.fromRGB(226, 112, 176), -- pink
+	Color3.fromRGB(228, 228, 228), -- white
+	Color3.fromRGB(150, 100, 60), -- brown
+	Color3.fromRGB(170, 214, 76), -- lime
 }
+assert(#TEAM_PALETTE >= game_modes.LARGEST_CAPACITY, "every team a mode seats needs a colour of its own")
 
 local function team_color(team: types.TeamId): Color3
-	local color = TEAM_COLORS[team]
-	if color == nil then
-		return TEAM_COLORS[0]
+	if team == teams.SCAVENGER then
+		return SCAVENGER_COLOR
+	elseif teams.is_playable(team) == false then
+		return NEUTRAL_COLOR
 	end
-	return color
+	return TEAM_PALETTE[(team - 1) % #TEAM_PALETTE + 1]
 end
 
 -- What a blueprint's every part is tinted: its team's colour, leaning a little toward the def's own.

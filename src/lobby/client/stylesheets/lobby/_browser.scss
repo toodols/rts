@@ -1,0 +1,137 @@
+@use "sass:color";
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Browser -------------------------------------------------------------------------------------------------
+
+.browser {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(3));
+}
+
+.lobby-columns {
+	width: 100%;
+	height: 18px;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(2);
+}
+
+.column-name {
+	@include caption;
+	font-family: RobotoMono;
+	font-size: 10px;
+}
+
+// The header's stand-in for the join buttons, so the columns above line up with the rows below.
+.join-space {
+	width: 96px;
+	height: 1px;
+}
+
+.lobby-list {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+}
+
+.lobby-row {
+	width: 100%;
+	height: 60px;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(2);
+	background-color: veil($steel-raised, 0.8);
+	background-image: linear-gradient(90deg, veil(white, 0.06), veil(black, 0.2));
+	outline: 1px solid veil($edge, 0.7);
+	transition: outline-color $fast $ease-out;
+
+	// lit, face and all (see .button)
+	&:hover {
+		background-color: veil($steel-lit, 0.85);
+		background-image: linear-gradient(90deg, veil($accent, 0.14), veil(black, 0.15));
+		outline: 1px solid $accent;
+
+		.lobby-host {
+			color: $accent;
+		}
+	}
+}
+
+.lobby-thumb {
+	width: 76px;
+	height: 48px;
+	background-color: $void;
+	outline: 1px solid color.adjust($edge, $lightness: -20%);
+
+	&.blank {
+		height: 1px;
+		background-color: transparent;
+		outline: none;
+	}
+}
+
+.lobby-cell {
+	height: auto;
+	text-align: left;
+
+	&.host {
+		flex-grow: 1;
+		@include stack(column, space(1));
+	}
+	&.mode {
+		width: 110px;
+		color: var(--Accent);
+	}
+	&.map {
+		width: 190px;
+		@include stack(column, 0);
+	}
+	&.players {
+		width: 80px;
+		text-align: right;
+	}
+	&.players.full {
+		color: var(--Danger);
+	}
+
+	// the column headings, over the tone the cells below them take
+	&.column-name {
+		color: var(--TextDim);
+	}
+}
+
+.lobby-host {
+	width: 100%;
+	height: 20px;
+	font-size: 15px;
+	font-weight: bold;
+	text-align: left;
+	transition: color $fast $ease-out;
+}
+
+.lobby-map-name,
+.lobby-map-size {
+	width: 100%;
+	height: 18px;
+	text-align: left;
+}
+
+.lobby-map-size {
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+// Nothing to join: a wide empty bay, the way an empty seat is drawn, so it reads as room for a lobby.
+.empty {
+	width: 100%;
+	height: 160px;
+	background-color: veil($void, 0.4);
+	outline: 1px solid veil($edge, 0.8);
+	color: var(--TextDim);
+	font-family: Michroma;
+	font-size: 14px;
+}

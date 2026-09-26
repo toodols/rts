@@ -1,3 +1,4 @@
+--!strict
 -- The ways a game can be set up, and what a lobby hands the game server when it starts one.
 --
 -- A mode is scavengers (everyone on one side against them, at a difficulty), a team game of N against N, a free for
@@ -13,14 +14,25 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
 
-export type ModeKind = "scavengers" | "teams" | "ffa" | "campaign"
+-- The groups a lobby's host picks a mode from.
+export type ModeGroup = "scavengers" | "teams" | "ffa"
 
+-- A mode is data: what the lobby shows and seats by, and the rules the game server plays it by, which the systems that
+-- keep them read (`difficulty`, `eliminates`, `rated`, `mission`), so that nothing asks what kind of mode it is.
 export type Mode = {
 	-- what is sent and stored, like "scav_hard", "2v2" or "ffa"
 	id: string,
-	kind: ModeKind,
-	-- what the lobby shows
+	-- the group a lobby offers it in; nil for a campaign mode, which no lobby's host can pick (see `mission`)
+	group: ModeGroup?,
+	-- its name, and what its chip in its group says, where the group's caption already says the rest
 	label: string,
+	chip_label: string,
+	-- what the lobby's browser and title call it
+	lobby_label: string,
+	-- whether each player picks the side they sit on, as in a team game, rather than taking whichever seat is free
+	picks_sides: boolean,
+	-- what the lobby calls a side: numbered after it for a mode whose players pick one, or else the one group of seats
+	side_label: string,
 	-- how many sides the players are seated on: 1 against the scavengers, 2 in a team game, one each in a free for all
 	sides: number,
 	-- how many players each side seats; a free for all has one to a side and as many sides as it seats players
@@ -29,12 +41,23 @@ export type Mode = {
 	capacity: number,
 	-- the fewest players it can start with
 	minimum: number,
-	-- the scavengers' difficulty, for a scavengers mode
+	-- whether every side must be manned for it to start, as a team game's must
+	every_side_manned: boolean,
+	-- the scavengers' difficulty, for a mode they play in (see server/match.luau); they are off in any other
 	difficulty: string?,
+	-- whether a side is put out by what it loses, by the match's end mode, until one is left (server/conquest.luau)
+	eliminates: boolean,
+	-- whether a game of it is rated (server/ratings.luau)
+	rated: boolean,
 	-- the mission played, for a campaign mode: an id from campaign.MISSIONS. A campaign mode is never offered in the
 	-- lobby's list of modes; the campaign screen starts it, on the mission's own map, for one player or for a co-op
-	-- lobby, whose players are all on one side, allied, up to the mission's `coop`.
+	-- lobby, whose players are all on one side, up to the mission's `coop`: allied, or on one team (`shares_team`).
 	mission: string?,
+	-- whether a campaign mode plays its mission's hard mode (campaign.Mission's `hard_mode`)
+	hard: boolean,
+	-- whether the players on a side all share one team, rather than each having a team of their own: those of a mission
+	-- played together whose `coop_kind` is "shared" (server/match.luau)
+	shares_team: boolean,
 }
 
 -- How a team game or a free for all is won: which sides are out (see server/conquest.luau). A side is an alliance, the
@@ -53,11 +76,13 @@ export type EndModeOption = {
 export type Difficulty = {
 	id: string,
 	label: string,
-	-- How long the scavengers take to reach full strength, as a multiple of config.SCAVENGER_GAME_LENGTH (80
-	-- minutes). Their strength follows the game's progress, so a shorter game is a harder one.
+	-- How long the scavengers take to reach full strength, as a multiple of their game length (server/scavengers/
+	-- settings.luau's GAME_LENGTH, 80 minutes). Their strength follows the game's progress, so a shorter game is a harder
+	-- one.
 	pace: number,
 	-- What everything the scavengers field has in health, as a multiple of its def's: their units, their defences and
-	-- their boss. Their beacons grow tougher with the progress instead (config.SCAVENGER_BEACON_HEALTH_GROWTH).
+	-- their boss. Their beacons grow tougher with the progress instead (server/scavengers/settings.luau's
+	-- BEACON_HEALTH_GROWTH).
 	health: number,
 }
 
@@ -84,22 +109,22 @@ export type Match = {
 	end_mode: EndMode,
 }
 
-local END_MODES: { EndModeOption } = {
-	{ id = "commanders", label = "Coms dead" },
-	{ id = "builders", label = "Builders dead" },
-	{ id = "units", label = "All dead" },
-	{ id = "never", label = "Never" },
-}
+local END_MODES: { EndModeOption } = table.freeze({
+	table.freeze({ id = "commanders" :: EndMode, label = "Coms dead" }),
+	table.freeze({ id = "builders" :: EndMode, label = "Builders dead" }),
+	table.freeze({ id = "units" :: EndMode, label = "All dead" }),
+	table.freeze({ id = "never" :: EndMode, label = "Never" }),
+})
 
 local DEFAULT_END_MODE: EndMode = "commanders"
 
-local DIFFICULTIES: { Difficulty } = {
+local DIFFICULTIES: { Difficulty } = table.freeze({
 	-- 80, 64, 52 and 40 minutes
-	{ id = "easy", label = "Easy", pace = 1, health = 1 },
-	{ id = "normal", label = "Normal", pace = 0.8, health = 2 },
-	{ id = "hard", label = "Hard", pace = 0.65, health = 3 },
-	{ id = "brutal", label = "Brutal", pace = 0.5, health = 5 },
-}
+	table.freeze({ id = "easy", label = "Easy", pace = 1, health = 1 }),
+	table.freeze({ id = "normal", label = "Normal", pace = 0.8, health = 2 }),
+	table.freeze({ id = "hard", label = "Hard", pace = 0.65, health = 3 }),
+	table.freeze({ id = "brutal", label = "Brutal", pace = 0.5, health = 5 }),
+})
 
 -- The side a spectator sits on, and how many a lobby has room for besides its players.
 local SPECTATOR_SIDE = 0
@@ -132,104 +157,149 @@ local MODES: { Mode } = {}
 for _, difficulty in DIFFICULTIES do
 	table.insert(MODES, {
 		id = `scav_{difficulty.id}`,
-		kind = "scavengers" :: ModeKind,
+		group = "scavengers" :: ModeGroup,
 		label = `Scav {difficulty.label}`,
+		chip_label = difficulty.label,
+		lobby_label = `Scav {difficulty.label}`,
+		picks_sides = false,
+		side_label = "AGAINST THE SCAVENGERS",
 		sides = 1,
 		per_side = SCAVENGER_CAPACITY,
 		capacity = SCAVENGER_CAPACITY,
 		minimum = 1,
+		every_side_manned = false,
 		difficulty = difficulty.id,
+		eliminates = false,
+		rated = false,
 		mission = nil,
+		hard = false,
+		shares_team = false,
 	})
 end
 for size = 1, LARGEST_TEAM do
 	table.insert(MODES, {
 		id = `{size}v{size}`,
-		kind = "teams" :: ModeKind,
+		group = "teams" :: ModeGroup,
 		label = `{size}v{size}`,
+		chip_label = `{size}v{size}`,
+		lobby_label = `{size}v{size}`,
+		picks_sides = true,
+		side_label = "TEAM",
 		sides = 2,
 		per_side = size,
 		capacity = size * 2,
 		-- one a side at least, so there is someone to play against
 		minimum = 2,
+		every_side_manned = true,
 		difficulty = nil,
+		eliminates = true,
+		rated = true,
 		mission = nil,
+		hard = false,
+		shares_team = false,
 	})
 end
 table.insert(MODES, {
 	id = "ffa",
-	kind = "ffa" :: ModeKind,
+	group = "ffa" :: ModeGroup,
 	label = "FFA",
+	chip_label = "FFA",
+	lobby_label = "FFA",
+	picks_sides = false,
+	side_label = "EVERY PLAYER FOR THEMSELVES",
 	sides = FFA_CAPACITY,
 	per_side = 1,
 	capacity = FFA_CAPACITY,
 	minimum = 2,
+	every_side_manned = false,
 	difficulty = nil,
+	eliminates = true,
+	rated = false,
 	mission = nil,
+	hard = false,
+	shares_team = false,
 })
+-- each mission's, and its hard mode's for one that has one ("campaign_overlook_hard")
 for _, mission in campaign.MISSIONS do
-	table.insert(MODES, {
-		id = `campaign_{mission.id}`,
-		kind = "campaign" :: ModeKind,
-		label = mission.label,
-		sides = 1,
-		per_side = mission.coop or 1,
-		capacity = mission.coop or 1,
-		minimum = 1,
-		difficulty = nil,
-		mission = mission.id,
-	})
+	local shares_team = mission.coop_kind == "shared"
+	for _, hard in { false, true } do
+		if hard and mission.hard_mode == false then
+			continue
+		end
+		local label = if hard then `{mission.label} (Hard)` else mission.label
+		table.insert(MODES, {
+			id = `campaign_{campaign.key(mission.id, hard)}`,
+			group = nil,
+			label = label,
+			chip_label = label,
+			-- a lobby only ever plays one together
+			lobby_label = `Co-op: {label}`,
+			picks_sides = false,
+			side_label = if shares_team then "CO-OP: SHARED TEAM" else "CO-OP: ALLIED",
+			sides = 1,
+			per_side = mission.coop or 1,
+			capacity = mission.coop or 1,
+			minimum = 1,
+			every_side_manned = false,
+			difficulty = nil,
+			eliminates = false,
+			rated = false,
+			mission = mission.id,
+			hard = hard :: boolean,
+			shares_team = shares_team,
+		})
+	end
 end
 
 local mode_by_id: { [string]: Mode } = {}
+-- The most players any mode seats, and so the most teams a match has for its players.
+local LARGEST_CAPACITY = 0
 for _, mode in MODES do
+	table.freeze(mode)
 	mode_by_id[mode.id] = mode
+	LARGEST_CAPACITY = math.max(LARGEST_CAPACITY, mode.capacity)
 end
+table.freeze(MODES)
 
 local DEFAULT_MODE = "scav_normal"
 
+local end_mode_by_id: { [string]: EndMode } = {}
+for _, option in END_MODES do
+	end_mode_by_id[option.id] = option.id
+end
+
 -- `value` as an end mode, or nil if it is not one.
 local function end_mode(value: any): EndMode?
-	for _, option in END_MODES do
-		if option.id == value then
-			return option.id
-		end
-	end
-	return nil
+	return if typeof(value) == "string" then end_mode_by_id[value] else nil
 end
 
 local function get(id: string): Mode?
 	return mode_by_id[id]
 end
 
--- The campaign mode that plays `mission_id`.
-local function campaign_mode(mission_id: string): Mode?
-	return mode_by_id[`campaign_{mission_id}`]
+-- What the lobby calls the mode `mode_id`; an id that is no mode is shown as it is.
+local function label_of(mode_id: string): string
+	local mode = mode_by_id[mode_id]
+	return if mode ~= nil then mode.lobby_label else mode_id
+end
+
+-- The campaign mode that plays `mission_id`, in its hard mode for `hard`; nil for a hard mode it has not got.
+local function campaign_mode(mission_id: string, hard: boolean): Mode?
+	return mode_by_id[`campaign_{campaign.key(mission_id, hard)}`]
 end
 
 local function difficulty(id: string): Difficulty?
 	return difficulty_by_id[id]
 end
 
--- The mode of `kind`, for team games of `per_side` a side and for scavengers at `difficulty_id`.
-local function find(kind: ModeKind, per_side: number?, difficulty_id: string?): Mode?
-	for _, mode in MODES do
-		if mode.kind ~= kind then
-			continue
-		end
-		if kind == "teams" and mode.per_side ~= per_side then
-			continue
-		end
-		if kind == "scavengers" and mode.difficulty ~= difficulty_id then
-			continue
-		end
-		return mode
-	end
-	return nil
-end
-
 local function is_spectator(seat: Seat): boolean
 	return seat.side == SPECTATOR_SIDE
+end
+
+-- Whether a seat in `mode` can be on `side`: watching, or one of its sides. Anything else, a fraction, NaN or a side
+-- past its last, is not, whoever asks for it.
+local function has_side(mode: Mode, side: number): boolean
+	return side == SPECTATOR_SIDE or (side >= 1 and side <= mode.sides and side == math.floor(side))
 end
 
 -- How many of `seats` are players, and not spectators.
@@ -254,7 +324,7 @@ local function can_start(mode: Mode, seats: { Seat }): (boolean, string?)
 	if player_count(seats) < mode.minimum then
 		return false, if mode.minimum == 1 then "Nobody is seated" else `Needs {mode.minimum} players`
 	end
-	if mode.kind == "teams" then
+	if mode.every_side_manned then
 		local manned: { [number]: boolean } = {}
 		for _, seat in seats do
 			if is_spectator(seat) == false then
@@ -283,9 +353,35 @@ local function bonus_of(match: Match, user_id: number): number
 	return match.bonuses[tostring(user_id)] or 0
 end
 
--- A match as a plain table of strings and numbers, for the MemoryStore.
-local function encode(match: Match): { [string]: any }
-	local seats = {}
+-- A new match of `mode_id` on the map `preset`, seated as `seats`, with everything else as a new lobby has it: the
+-- default seed, no bonuses, no ally griefing and BAR's default end mode.
+local function new_match(mode_id: string, preset: string, seats: { Seat }): Match
+	return {
+		mode = mode_id,
+		preset = preset,
+		seed = DEFAULT_SEED,
+		seats = seats,
+		bonuses = {},
+		ally_griefing = false,
+		end_mode = DEFAULT_END_MODE,
+	}
+end
+
+-- The match that plays the campaign mission the key `mission_key` names (campaign.key: its id, or its hard mode's) for
+-- `seats`, everyone on the one side: on the mission's map, as the campaign screen, a co-op lobby, a vote to go on and a
+-- Studio playtest all start it. Nil for no such mission.
+local function mission_match(mission_key: string, seats: { Seat }): Match?
+	local mission, hard = campaign.parse_key(mission_key)
+	local mode = if mission ~= nil then campaign_mode(mission.id, hard) else nil
+	if mode == nil or mission == nil then
+		return nil
+	end
+	return new_match(mode.id, mission.preset, seats)
+end
+
+-- A copy of `match`, sharing nothing with it, so that changing one leaves the other as it was.
+local function copy(match: Match): Match
+	local seats: { Seat } = {}
 	for _, seat in match.seats do
 		table.insert(seats, { user_id = seat.user_id, name = seat.name, side = seat.side })
 	end
@@ -300,6 +396,11 @@ local function encode(match: Match): { [string]: any }
 	}
 end
 
+-- A match as a plain table of strings and numbers, for the MemoryStore.
+local function encode(match: Match): { [string]: any }
+	return copy(match) :: any
+end
+
 -- The match a table read from the MemoryStore holds, or nil if it is not one.
 local function decode(value: any): Match?
 	if typeof(value) ~= "table" then
@@ -308,12 +409,18 @@ local function decode(value: any): Match?
 	if typeof(value.mode) ~= "string" or typeof(value.preset) ~= "string" or typeof(value.seed) ~= "number" then
 		return nil
 	end
-	if mode_by_id[value.mode] == nil or typeof(value.seats) ~= "table" then
+	local mode = mode_by_id[value.mode]
+	if mode == nil or typeof(value.seats) ~= "table" then
 		return nil
 	end
 	local seats: { Seat } = {}
 	for _, seat in value.seats do
-		if typeof(seat) ~= "table" or typeof(seat.user_id) ~= "number" or typeof(seat.side) ~= "number" then
+		if
+			typeof(seat) ~= "table"
+			or typeof(seat.user_id) ~= "number"
+			or typeof(seat.side) ~= "number"
+			or has_side(mode, seat.side) == false
+		then
 			return nil
 		end
 		table.insert(seats, {
@@ -322,14 +429,15 @@ local function decode(value: any): Match?
 			side = seat.side,
 		})
 	end
-	-- a match stored before there were bonuses has none, and one from when they were by side has none of these
+	local chosen_end = end_mode(value.end_mode)
+	if typeof(value.bonuses) ~= "table" or typeof(value.ally_griefing) ~= "boolean" or chosen_end == nil then
+		return nil
+	end
 	local bonuses: { [string]: number } = {}
-	if typeof(value.bonuses) == "table" then
-		for _, seat in seats do
-			local percent = clamp_bonus(value.bonuses[tostring(seat.user_id)])
-			if percent ~= 0 then
-				bonuses[tostring(seat.user_id)] = percent
-			end
+	for _, seat in seats do
+		local percent = clamp_bonus(value.bonuses[tostring(seat.user_id)])
+		if percent ~= 0 then
+			bonuses[tostring(seat.user_id)] = percent
 		end
 	end
 	return table.freeze({
@@ -338,10 +446,8 @@ local function decode(value: any): Match?
 		seed = value.seed,
 		seats = seats,
 		bonuses = table.freeze(bonuses),
-		-- a match stored before it could be chosen has it off
-		ally_griefing = value.ally_griefing == true,
-		-- and one stored before it could be chosen ends as BAR's games do by default
-		end_mode = end_mode(value.end_mode) or DEFAULT_END_MODE,
+		ally_griefing = value.ally_griefing,
+		end_mode = chosen_end :: EndMode,
 	})
 end
 
@@ -354,22 +460,27 @@ return table.freeze({
 	DEFAULT_SEED = DEFAULT_SEED,
 	SPECTATOR_SIDE = SPECTATOR_SIDE,
 	SPECTATOR_CAPACITY = SPECTATOR_CAPACITY,
+	LARGEST_CAPACITY = LARGEST_CAPACITY,
 	MATCH_STORE = MATCH_STORE,
 	MATCH_TTL = MATCH_TTL,
 	BONUS_MIN = BONUS_MIN,
 	BONUS_MAX = BONUS_MAX,
 	BONUS_STEP = BONUS_STEP,
 	get = get,
+	label_of = label_of,
 	end_mode = end_mode,
 	clamp_bonus = clamp_bonus,
 	bonus_of = bonus_of,
 	difficulty = difficulty,
 	campaign_mode = campaign_mode,
-	find = find,
+	mission_match = mission_match,
 	can_start = can_start,
 	is_spectator = is_spectator,
+	has_side = has_side,
 	player_count = player_count,
 	spectator_count = spectator_count,
+	new_match = new_match,
+	copy = copy,
 	encode = encode,
 	decode = decode,
 })

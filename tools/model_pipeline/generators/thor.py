@@ -1,6 +1,6 @@
 """unit_defs/t3.luau `thor` (BAR armthor): Armada's experimental lightning tank.
 
-Collider capsule(58, 34, 58): radius 58/22 = 2.64 studs, height 34/11 = 3.09. Held to 100 triangles. After BAR's
+Held to 100 triangles. After BAR's
 model: a broad, flat armoured hull riding on four separate track pods, one at each corner, with glowing blue panels
 along their tops, a squat team-coloured turret in the middle carrying the twin tesla barrels of the lightning cannon,
 and an EMP emitter jutting from each flank.
@@ -9,18 +9,22 @@ The turret and its barrels are one piece following weapon 1's aim (the lightning
 is the static base.
 """
 
-from . import common
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import palette
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(110, 140, 210)
-# Armada's tesla blue, the glow panels on BAR's model
-TESLA = (0.35, 0.65, 1.0, 1.0)
+CATEGORY = "entity"
 DEF = "thor"
+# Armada's tesla blue, the glow panels on BAR's model
+DEF = "thor"
+MOUNTS = {
+    1: {"pivot": (0, 1.5111, -0.1767), "muzzle": (-0.5791, 0.3535, 2.8131)},
+}
 
 
 def generate(params):
-    radius, height = v.collider(58, 34, 58)
-    m = v.Mats(DEF, tuple(params.get("accent_color", ACCENT)))
+    radius = params["collider"]["radius"]
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
 
     hl = 1.9  # half the hull's length, fitted in the collider circle with the pods
@@ -44,7 +48,7 @@ def generate(params):
             z = pod_h + 0.01
             panel = v.decal(f"panel_{side}_{end}", [(x - 0.22, y - 0.42, z), (x + 0.22, y - 0.42, z),
                                                      (x + 0.22, y + 0.42, z), (x - 0.22, y + 0.42, z)])
-            objects.append(m.glow(panel, TESLA, "tesla"))
+            objects.append(m.glow(panel, palette.ELECTRIC_BLUE))
 
     # The EMP emitters: a short three-sided barrel out of each flank, over the gap between the pods (7 tris each).
     for side in (-1, 1):
@@ -54,10 +58,10 @@ def generate(params):
     # Turret about its swivel point (10 tris), with the twin tesla barrels, thick at the breech and tapering to the
     # muzzle, reaching as far as the collider lets them at any yaw (10 tris each), and a glowing coil plate on top.
     pivot = (0.0, 0.15, deck_z)
-    shell = v.block("turret_shell", 1.5, 1.7, 0.6, origin=(0.0, 0.0, 0.0), top=(1.1, 1.2), top_offset=(0.0, 0.12))
+    shell = common.block("turret_shell", 1.5, 1.7, 0.6, top=(1.1, 1.2), top_offset=(0.0, 0.12), at=(0.0, 0.0, 0.0), drop=('bottom',))
     m.accent(shell)
     coil = v.decal("coil", [(-0.35, -0.3, 0.61), (0.35, -0.3, 0.61), (0.35, 0.35, 0.61), (-0.35, 0.35, 0.61)])
-    m.glow(coil, TESLA, "tesla")
+    m.glow(coil, palette.ELECTRIC_BLUE)
     reach = radius - abs(pivot[1]) - 0.08
     parts = [shell, coil]
     for side in (-1, 1):
@@ -70,5 +74,4 @@ def generate(params):
         objects.append(common.art_group(turret_part, "turret_1", kind="turret", weapon=1))
     common.art_group(objects[-len(parts)], "turret_1", pivot=True, kind="turret", weapon=1)
 
-    v.check_fit(objects, radius, height, DEF)
     return objects

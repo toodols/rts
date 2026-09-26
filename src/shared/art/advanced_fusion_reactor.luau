@@ -8,7 +8,7 @@ return {
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 1.12, 0 }, size = { 15.52, 2.24, 15.52 }, hash = "1b8f103bb3b27482", mesh = "rbxassetid://140269353568354" },
 		{ group = "base", color = { 1, 0.82, 0.25 }, offset = { 0, 7.04, 0 }, size = { 4.5255, 6.4, 4.5255 }, hash = "87e93622b8f25712", neon = true, mesh = "rbxassetid://131178048511592" },
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 7.2, 0 }, size = { 12.32, 9.92, 12.32 }, hash = "21f45ed9fff303cd", mesh = "rbxassetid://123654849742977" },
-		{ group = "base", color = { 0.91, 0.784, 0.361 }, offset = { 0, 7.04, 0 }, size = { 10.88, 0.8, 9.4224 }, hash = "328fc1e29fa2a803", team = true, mesh = "rbxassetid://71050054189412" },
-		{ group = "ring_meridian", color = { 0.91, 0.784, 0.361 }, offset = { 0, 0, 0 }, size = { 9.28, 8.0367, 0.8 }, hash = "47e4f560a38ff884", team = true, mesh = "rbxassetid://122143764378344" },
+		{ group = "base", color = { 0.9098, 0.7843, 0.3608 }, offset = { 0, 7.04, 0 }, size = { 10.88, 0.8, 9.4224 }, hash = "328fc1e29fa2a803", team = true, mesh = "rbxassetid://71050054189412" },
+		{ group = "ring_meridian", color = { 0.9098, 0.7843, 0.3608 }, offset = { 0, 0, 0 }, size = { 9.28, 8.0367, 0.8 }, hash = "47e4f560a38ff884", team = true, mesh = "rbxassetid://122143764378344" },
 	},
 }

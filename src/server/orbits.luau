@@ -11,7 +11,9 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+
+local rng = require(script.Parent.rng)
 
 type Entity = types.Entity
 type EntityDef = types.EntityDef
@@ -40,18 +42,26 @@ local GUNSHIP_STEP_MIN = math.rad(25)
 local GUNSHIP_STEP_MAX = math.rad(70)
 -- How near its spot a gunship has to be to count as there, in studs: well before it would slow to a stop on it.
 local GUNSHIP_ARRIVED = 4
+-- A builder picks a new spot every ORBIT_BUILD_REPICK seconds or so, and a gunship every ORBIT_GUNSHIP_REPICK, each
+-- give or take ORBIT_REPICK_JITTER of that. The ring runs from ORBIT_INNER to ORBIT_OUTER of how far it reaches, and
+-- each pick is the best of ORBIT_CANDIDATES spots.
+local ORBIT_BUILD_REPICK = 4
+local ORBIT_GUNSHIP_REPICK = 2
+local ORBIT_REPICK_JITTER = 0.5
+local ORBIT_INNER = 0.55
+local ORBIT_OUTER = 0.8
+local ORBIT_CANDIDATES = 10
 
 local stations: { [EntityId]: Station } = {}
 -- who holds a spot round each thing
 local round: { [EntityId]: { [EntityId]: true } } = {}
 local tick_count = 0
-local random = Random.new()
 
 -- Whether something of `def` keeps a spot in a ring, rather than stopping in reach: an aircraft that hovers. One on
 -- wings circles anyway, and a drone stays with its carrier.
 local function orbits(def: EntityDef): boolean
 	local aircraft = def.air
-	return aircraft ~= nil and aircraft.wings == nil and def.drone ~= true
+	return aircraft ~= nil and aircraft.wings == nil and unit_defs.is_drone(def) == false
 end
 
 local function forget(entity_id: EntityId)
@@ -102,12 +112,12 @@ end
 -- Moves `station` to the roomiest of a handful of spots near `angle`, between `inner` and `outer` from the middle.
 local function pick(entity_id: EntityId, station: Station, role: Role, angle: number, inner: number, outer: number)
 	local best_room = -math.huge
-	for _ = 1, config.ORBIT_CANDIDATES do
+	for _ = 1, ORBIT_CANDIDATES do
 		local candidate_angle = if role == "gunship"
-			then angle + station.turn * random:NextNumber(GUNSHIP_STEP_MIN, GUNSHIP_STEP_MAX)
-			else angle + random:NextNumber(-BUILD_WINDOW, BUILD_WINDOW)
+			then angle + station.turn * rng.stream("orbits"):NextNumber(GUNSHIP_STEP_MIN, GUNSHIP_STEP_MAX)
+			else angle + rng.stream("orbits"):NextNumber(-BUILD_WINDOW, BUILD_WINDOW)
 		-- evenly over the ring's area, not bunched at its inner edge
-		local candidate_radius = math.sqrt(random:NextNumber(inner * inner, outer * outer))
+		local candidate_radius = math.sqrt(rng.stream("orbits"):NextNumber(inner * inner, outer * outer))
 		local room = room_at(entity_id, station.target_id, offset_of(candidate_angle, candidate_radius))
 		if room > best_room then
 			best_room = room
@@ -140,7 +150,7 @@ local function station_point(
 			angle = angle,
 			radius = math.clamp(Vector3.new(away.X, 0, away.Z).Magnitude, inner, outer),
 			remaining = 0,
-			turn = if random:NextNumber() < 0.5 then -1 else 1,
+			turn = if rng.stream("orbits"):NextNumber() < 0.5 then -1 else 1,
 			seen = tick_count,
 		}
 		station = new_station
@@ -165,8 +175,8 @@ local function station_point(
 	if held.remaining <= 0 then
 		-- a gunship moves on from where it has got to, a builder from where it meant to be
 		pick(entity.id, held, role, if role == "gunship" then angle else held.angle, inner, outer)
-		local every = if role == "gunship" then config.ORBIT_GUNSHIP_REPICK else config.ORBIT_BUILD_REPICK
-		held.remaining = every * (1 + random:NextNumber(-config.ORBIT_REPICK_JITTER, config.ORBIT_REPICK_JITTER))
+		local every = if role == "gunship" then ORBIT_GUNSHIP_REPICK else ORBIT_BUILD_REPICK
+		held.remaining = every * (1 + rng.stream("orbits"):NextNumber(-ORBIT_REPICK_JITTER, ORBIT_REPICK_JITTER))
 	end
 	-- the ring can be narrower than it was, for something that reaches less far now
 	held.radius = math.clamp(held.radius, inner, outer)
@@ -174,8 +184,10 @@ local function station_point(
 end
 
 return table.freeze({
+	ORBIT_INNER = ORBIT_INNER,
+	ORBIT_OUTER = ORBIT_OUTER,
+	forget = forget,
 	orbits = orbits,
 	station_point = station_point,
 	begin_tick = begin_tick,
-	forget = forget,
 })

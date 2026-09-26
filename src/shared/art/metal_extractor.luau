@@ -8,6 +8,6 @@ return {
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.4, 0 }, size = { 4.3, 0.8, 3.7239 }, hash = "dcf2069be8d8c035", mesh = "rbxassetid://109376452519731" },
 		{ group = "base", color = { 1, 0.55, 0.18 }, offset = { 0, 0.81, 0 }, size = { 2.0785, 0, 2.4 }, hash = "55aaaf17758aae5d", neon = true, mesh = "rbxassetid://132261855272547" },
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.875, -0.4526 }, size = { 4.0355, 1.75, 3.4949 }, hash = "b3df36a618374475", mesh = "rbxassetid://78099050255913" },
-		{ group = "drill", color = { 0.588, 0.627, 0.69 }, offset = { -0.0236, 0.4647, 0.3019 }, size = { 3.3003, 0.9706, 3.032 }, hash = "0e87e64cde12eb9c", team = true, mesh = "rbxassetid://82630898986173" },
+		{ group = "drill", color = { 0.5882, 0.6275, 0.6902 }, offset = { -0.0236, 0.4647, 0.3019 }, size = { 3.3003, 0.9706, 3.032 }, hash = "0e87e64cde12eb9c", team = true, mesh = "rbxassetid://82630898986173" },
 	},
 }

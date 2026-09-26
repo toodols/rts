@@ -14,15 +14,12 @@ import random
 import bmesh
 import mathutils
 
-from . import common
+from .shared import common
+from .shared import palette
 
-MAX_TRIANGLES = 250
-RECENTRE = False
-
+CATEGORY = "prop"
+DEF = "tutorial_boulder"
 SIZE = (44.0, 36.0, 28.0)  # Blender (x, y, z)
-
-ROCK_COLOR = (0.47, 0.45, 0.42, 1.0)
-DARK_ROCK_COLOR = (0.31, 0.27, 0.23, 1.0)
 
 
 def lump(name, subdivisions, radii, centre, rng, rough, flatten=0.0):
@@ -70,10 +67,10 @@ def generate(params):
         lump("rubble_5", 1, (2.2, 2.0, 1.8), (-6.0, -14.5, 0.3), rng, 0.2),
     ]
     for obj in crags:
-        common.apply_material(obj, "boulder_rock", ROCK_COLOR, roughness=0.9)
+        common.paint(obj, palette.BOULDER)
     for obj in rubble + crags[1::3]:
         obj.data.materials.clear()
-        common.apply_material(obj, "boulder_rubble", DARK_ROCK_COLOR, roughness=0.9)
+        common.paint(obj, palette.BOULDER_RUBBLE)
     objs = crags + rubble
 
     # stretch to the size the map expects, the footprint centred on the origin and the base on the ground

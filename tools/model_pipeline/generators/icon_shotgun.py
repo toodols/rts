@@ -1,11 +1,12 @@
-"""HUD icon: shotguns, a shotgun shell, its pellets spreading out of its mouth. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: shotguns, a shotgun shell, its pellets spreading out of its mouth. Written to src/shared/ui_art/ (see shared/icon)."""
 
 import math
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     base = ic.rect(-0.55, -1.62, 0.55, -1.4)
@@ -19,8 +20,8 @@ def generate(params):
     return ic.build(
         "shotgun",
         [
-            ic.layer(ic.place(pellets, shift, angle, scale), ic.ICON),
-            ic.layer(ic.place([hull], shift, angle, scale), ic.ICON),
-            ic.layer(ic.place([brass, base], shift, angle, scale), ic.ICON),
+            ic.layer(ic.place(pellets, shift, angle, scale), palette.ICON_FILL),
+            ic.layer(ic.place([hull], shift, angle, scale), palette.ICON_FILL),
+            ic.layer(ic.place([brass, base], shift, angle, scale), palette.ICON_FILL),
         ],
     )

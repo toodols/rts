@@ -1,0 +1,1949 @@
+{
+  "advanced_air_lab": {
+    "blender": "5.2.0 LTS",
+    "digest": "9b980174422aecbf",
+    "hashes": [
+      "8aefcd3e88d116fe",
+      "78dcf161d9a127a2",
+      "7e445f363d7d6e61",
+      "b8c37f4e2ba61118",
+      "ff30489f04ce9ad6",
+      "bdcc5442cf15213d"
+    ],
+    "inputs": "d7df82fa31abb6e7",
+    "module": "src/shared/art/advanced_air_lab.luau",
+    "pending": []
+  },
+  "advanced_bot_lab": {
+    "blender": "5.2.0 LTS",
+    "digest": "39b2cc0441018b63",
+    "hashes": [
+      "6262de3b46ef717b",
+      "0f6f812b3bfa00ed",
+      "15cfd352ec2745e9",
+      "28668dd3acc84878",
+      "ef56f10ec0f8531a"
+    ],
+    "inputs": "29c2dd2150840543",
+    "module": "src/shared/art/advanced_bot_lab.luau",
+    "pending": []
+  },
+  "advanced_construction_bot": {
+    "blender": "5.2.0 LTS",
+    "digest": "4dc22baaef18f216",
+    "hashes": [
+      "4c251f2ef1df6043",
+      "1d52cafc8b33e33a",
+      "3e5865acd18dc7d3",
+      "c383fb16b2922dcc",
+      "177b537b912f59e4",
+      "3ad669455c830e7b"
+    ],
+    "inputs": "e14cd69f86f5e1a8",
+    "module": "src/shared/art/advanced_construction_bot.luau",
+    "pending": []
+  },
+  "advanced_construction_turret": {
+    "blender": "5.2.0 LTS",
+    "digest": "cff0c6b175dcaa30",
+    "hashes": [
+      "679d0543aead4d6c",
+      "50b860bc7a8414fa",
+      "4afcf62cb11a0ff8",
+      "a1b631fae3f14d6e"
+    ],
+    "inputs": "3e7e9602324b73a0",
+    "module": "src/shared/art/advanced_construction_turret.luau",
+    "pending": []
+  },
+  "advanced_construction_vehicle": {
+    "blender": "5.2.0 LTS",
+    "digest": "acb201df6c266cd9",
+    "hashes": [
+      "1f579b00dce73c86",
+      "6204e9089b7230bb",
+      "0077aa8d04b8372d",
+      "1c962166407f318e",
+      "ab818b6c71457b3a",
+      "7d1b3071bd1d0ca7"
+    ],
+    "inputs": "2ac5f2e549a0e3da",
+    "module": "src/shared/art/advanced_construction_vehicle.luau",
+    "pending": []
+  },
+  "advanced_energy_converter": {
+    "blender": "5.2.0 LTS",
+    "digest": "5f138abe29c53967",
+    "hashes": [
+      "75f794dc950a33c5",
+      "fceb8815f9551d8d",
+      "1084ecb015a13fae",
+      "51198bec2ae0a843"
+    ],
+    "inputs": "100ff80f6d7d3fbb",
+    "module": "src/shared/art/advanced_energy_converter.luau",
+    "pending": []
+  },
+  "advanced_fusion_reactor": {
+    "blender": "5.2.0 LTS",
+    "digest": "045c2dc6b93adf50",
+    "hashes": [
+      "1b8f103bb3b27482",
+      "87e93622b8f25712",
+      "21f45ed9fff303cd",
+      "328fc1e29fa2a803",
+      "47e4f560a38ff884"
+    ],
+    "inputs": "5a830241f0e4ff09",
+    "module": "src/shared/art/advanced_fusion_reactor.luau",
+    "pending": []
+  },
+  "advanced_geothermal_powerplant": {
+    "blender": "5.2.0 LTS",
+    "digest": "6c90cce0f0ded988",
+    "hashes": [
+      "aee6a4e309b4fece",
+      "bf7b810b0ab46cca",
+      "5edef3f73d0378be",
+      "d01a2632d8f232fa"
+    ],
+    "inputs": "0e576a0edb60f20b",
+    "module": "src/shared/art/advanced_geothermal_powerplant.luau",
+    "pending": []
+  },
+  "advanced_metal_extractor": {
+    "blender": "5.2.0 LTS",
+    "digest": "358211ff2fede90a",
+    "hashes": [
+      "682c9c05cc74828d",
+      "d1d13ff24d9597f1",
+      "c350b2fc920e4b72",
+      "bb623994fd66f234",
+      "7be778ad6d47610b"
+    ],
+    "inputs": "a071a2ba7af985e5",
+    "module": "src/shared/art/advanced_metal_extractor.luau",
+    "pending": []
+  },
+  "advanced_shipyard": {
+    "blender": "5.2.0 LTS",
+    "digest": "a1a1cf9ad9b13140",
+    "hashes": [
+      "e276023dc4d944c9",
+      "f38f7cd2609cc8b6",
+      "56f64a26748d7802",
+      "4ff29373df3553ea",
+      "207062b964d7bc19"
+    ],
+    "inputs": "0adfe89526bf9ef4",
+    "module": "src/shared/art/advanced_shipyard.luau",
+    "pending": []
+  },
+  "advanced_solar_collector": {
+    "blender": "5.2.0 LTS",
+    "digest": "79d0ac0bf1aed93a",
+    "hashes": [
+      "d0671ac2b768eb4f",
+      "9b41eb6137d01e38",
+      "9182ac4f325e3316",
+      "78c02a5e122af7de",
+      "645ca61aa5c0507c"
+    ],
+    "inputs": "52c73074996db79a",
+    "module": "src/shared/art/advanced_solar_collector.luau",
+    "pending": []
+  },
+  "advanced_vehicle_lab": {
+    "blender": "5.2.0 LTS",
+    "digest": "57eb7e58fd8979ed",
+    "hashes": [
+      "871297c3b32fb982",
+      "f66bbcca68e42416",
+      "cbae409359e1ac14",
+      "4b61ba50bda2debe",
+      "b7f56eb4b14873cd"
+    ],
+    "inputs": "f83d79c1eb189656",
+    "module": "src/shared/art/advanced_vehicle_lab.luau",
+    "pending": []
+  },
+  "aggravator": {
+    "blender": "5.2.0 LTS",
+    "digest": "afd5357d1ca56088",
+    "hashes": [
+      "485cc593aa704520",
+      "8a02f9f6303d74cb",
+      "d37e2bffc5347997",
+      "f17fb4a44441c20f",
+      "4b99ce825c75181c",
+      "f66b029a85f33419"
+    ],
+    "inputs": "8bf8956ebeb7adaa",
+    "module": "src/shared/art/aggravator.luau",
+    "pending": []
+  },
+  "agitator": {
+    "blender": "5.2.0 LTS",
+    "digest": "fa6d51aca8c7fb3b",
+    "hashes": [
+      "d1ef1faf14e06067",
+      "b7bca41d2b351e61",
+      "ce6ef298ea3d42b5",
+      "9f04bb08f431050b",
+      "d14c7f72214aadf5",
+      "d0f7e8787cf70e48"
+    ],
+    "inputs": "c26a4083f03000e7",
+    "module": "src/shared/art/agitator.luau",
+    "pending": []
+  },
+  "air_lab": {
+    "blender": "5.2.0 LTS",
+    "digest": "1feebf30511cc29b",
+    "hashes": [
+      "826d0ee4f8630b5a",
+      "c3d1b72f26db058e",
+      "d2789482fd5c171b",
+      "6ef3051d6f4236ac",
+      "6a11205d28715449",
+      "83296fa7055ee1bf"
+    ],
+    "inputs": "161d98c4362f3db5",
+    "module": "src/shared/art/air_lab.luau",
+    "pending": []
+  },
+  "apocalypse": {
+    "blender": "5.2.0 LTS",
+    "digest": "d415c0e07441a8f0",
+    "hashes": [
+      "cfc0673bdd66a240",
+      "dbe4c13e6c1aad05",
+      "aea807e52448b0b9",
+      "4cc5e8e4109303b1",
+      "c950fadffa5ab681"
+    ],
+    "inputs": "113dae3d25fe5ecb",
+    "module": "src/shared/art/apocalypse.luau",
+    "pending": []
+  },
+  "arbiter": {
+    "blender": "5.2.0 LTS",
+    "digest": "d403b5e12a5ffc48",
+    "hashes": [
+      "234ed464b2819f0f",
+      "127c1f7c788a1a77",
+      "411e5125f5296c56",
+      "f8fa791f8daf4327",
+      "b8eb9973cb89918d"
+    ],
+    "inputs": "e3d65d51ca10e4d0",
+    "module": "src/shared/art/arbiter.luau",
+    "pending": []
+  },
+  "behemoth": {
+    "blender": "5.2.0 LTS",
+    "digest": "b71df8ad9ea78160",
+    "hashes": [
+      "bdc54526c6c995e7",
+      "42ceaf0d0c799428",
+      "51f825e5f525f8f5",
+      "a0c6f89a43557740",
+      "51f825e5f525f8f5",
+      "f9449f51bd72bba6",
+      "013e9f14535d2a0b",
+      "bfe84682b1a4a418",
+      "013e9f14535d2a0b",
+      "3c8c31325ef5ba78",
+      "be1fd5ccd6f47181",
+      "fdfd6a1f4390ed34",
+      "c347fb046f631fd5"
+    ],
+    "inputs": "e6f879919cc3127d",
+    "module": "src/shared/art/behemoth.luau",
+    "pending": []
+  },
+  "birdeater": {
+    "blender": "5.2.0 LTS",
+    "digest": "dd22b31e97290dbf",
+    "hashes": [
+      "285b89441d9c7241",
+      "76d98483ec1f155c",
+      "ad9f13e0273a292c",
+      "cc31dbb1888d19f9",
+      "311bb6c99c44f0de",
+      "1f2ca3d26a651967",
+      "58a47d50f9d238f3",
+      "38dee58cf6dae415"
+    ],
+    "inputs": "bde4b9c8b6b11c1b",
+    "module": "src/shared/art/birdeater.luau",
+    "pending": []
+  },
+  "bot_lab": {
+    "blender": "5.2.0 LTS",
+    "digest": "c01a979934886b1c",
+    "hashes": [
+      "d4a4680f94f79161",
+      "f8e6d51937123d5d",
+      "4e95671850ffd8de",
+      "252760df06979c82",
+      "a6c930399bbc7173"
+    ],
+    "inputs": "1da22de8726fbaa7",
+    "module": "src/shared/art/bot_lab.luau",
+    "pending": []
+  },
+  "brute": {
+    "blender": "5.2.0 LTS",
+    "digest": "78c2ffaee156c713",
+    "hashes": [
+      "47b6b6fd337bdfce",
+      "b0a1336242487a10",
+      "d8f8e8b085bbff93",
+      "ccf5b550e38a61bf",
+      "b3c0a6a7c8612943"
+    ],
+    "inputs": "edfab8cfa56b0136",
+    "module": "src/shared/art/brute.luau",
+    "pending": []
+  },
+  "buccaneer": {
+    "blender": "5.2.0 LTS",
+    "digest": "d828805dfd8c9f8f",
+    "hashes": [
+      "063f82c7db497693",
+      "50b15076977387e7",
+      "894ae434344714a5",
+      "54ffa07b5743bd46",
+      "5f0a157142ce8686",
+      "adb2244b076f6362"
+    ],
+    "inputs": "48b8e377dfe7e4a9",
+    "module": "src/shared/art/buccaneer.luau",
+    "pending": []
+  },
+  "calamity": {
+    "blender": "5.2.0 LTS",
+    "digest": "fb98761ee8a6c8ac",
+    "hashes": [
+      "786e1fa642d4c883",
+      "82d9bf03c8e9d5e4",
+      "6ccb315b2afa586e",
+      "c27acc99fd85da62",
+      "e30517edc3cc5281",
+      "23f23afa515da487"
+    ],
+    "inputs": "10904a8977fc1962",
+    "module": "src/shared/art/calamity.luau",
+    "pending": []
+  },
+  "catalyst": {
+    "blender": "5.2.0 LTS",
+    "digest": "81fb9860cb8b2bc5",
+    "hashes": [
+      "594828b2856da64c",
+      "bbf1d643078c99fd",
+      "bad3207196986d37",
+      "f33b13ea240f9a78",
+      "93b90d7a813b34d5",
+      "90efaf44f3eeed49"
+    ],
+    "inputs": "a13194a493abf9e8",
+    "module": "src/shared/art/catalyst.luau",
+    "pending": []
+  },
+  "centurion": {
+    "blender": "5.2.0 LTS",
+    "digest": "cdfb393316e0e7a0",
+    "hashes": [
+      "22c635341f9f14f0",
+      "61508582d1c09a9a",
+      "0c23f1f90e724530",
+      "5bbcac7bfef16c9d",
+      "cf7108fda69f64e7",
+      "1e5fb119166b5e86",
+      "5edca2347d10ecd5",
+      "1e5fb119166b5e86"
+    ],
+    "inputs": "d0bdff0dedbcb883",
+    "module": "src/shared/art/centurion.luau",
+    "pending": []
+  },
+  "commander": {
+    "blender": "5.2.0 LTS",
+    "digest": "e54bf443901e042a",
+    "hashes": [
+      "4ed711aca26c50dc",
+      "1b2441cc76401a44",
+      "c151687b2ccd235b",
+      "19bb2cf9611dcd0c",
+      "19bb2cf9611dcd0c",
+      "022a3256c8db3bbf",
+      "022a3256c8db3bbf"
+    ],
+    "inputs": "951dc4f62947e7b9",
+    "module": "src/shared/art/commander.luau",
+    "pending": []
+  },
+  "construction_aircraft": {
+    "blender": "5.2.0 LTS",
+    "digest": "53c0429c823d0e57",
+    "hashes": [
+      "1237577e336b5f19",
+      "8d552547ec95a533",
+      "d85f865648f2760f",
+      "679c6a2eef8060ff",
+      "8f0e1dd2bdff717c",
+      "a864070c2a20beae"
+    ],
+    "inputs": "6e70830b5e0af6d9",
+    "module": "src/shared/art/construction_aircraft.luau",
+    "pending": []
+  },
+  "construction_bot": {
+    "blender": "5.2.0 LTS",
+    "digest": "5b666113936008b8",
+    "hashes": [
+      "d9f2e8d938cc79d5",
+      "beb56cf1a66b9da9",
+      "8d98839c2f67a62a",
+      "1326d36e430aa651",
+      "f3fd836e5781976d",
+      "08da24e08405f25f"
+    ],
+    "inputs": "aee278cf3b7b0d3b",
+    "module": "src/shared/art/construction_bot.luau",
+    "pending": []
+  },
+  "construction_hovercraft": {
+    "blender": "5.2.0 LTS",
+    "digest": "e352d61ca6c0ab93",
+    "hashes": [
+      "f562e3f277ff4977",
+      "bcc03f26e93aebf2",
+      "01f02828cbf04a15",
+      "3f2da16c304b5abb",
+      "397b4a6388c07472",
+      "9248b6d9c5e64e02"
+    ],
+    "inputs": "17e84d390e92157a",
+    "module": "src/shared/art/construction_hovercraft.luau",
+    "pending": []
+  },
+  "construction_ship": {
+    "blender": "5.2.0 LTS",
+    "digest": "817fcaebaad03fa7",
+    "hashes": [
+      "ca8274398ef5d083",
+      "f535f04c32cf3e58",
+      "f1c07ee385263b42",
+      "ff1f3e7ccb71779f",
+      "64d495b685312d22",
+      "7583e1d765413d4d",
+      "8cc1731824eefcbf"
+    ],
+    "inputs": "779951217e37b608",
+    "module": "src/shared/art/construction_ship.luau",
+    "pending": []
+  },
+  "construction_turret": {
+    "blender": "5.2.0 LTS",
+    "digest": "bc90da1ac62d157f",
+    "hashes": [
+      "679d0543aead4d6c",
+      "1fa46cc23a207f49",
+      "e17e39d6f4b29581",
+      "29c5edc0b3b67f20"
+    ],
+    "inputs": "d8650f6fd70a6179",
+    "module": "src/shared/art/construction_turret.luau",
+    "pending": []
+  },
+  "construction_vehicle": {
+    "blender": "5.2.0 LTS",
+    "digest": "5e2c6f4f6e68fc41",
+    "hashes": [
+      "1781a42c104b543e",
+      "8d2e661a3363336a",
+      "fe6d7becd6ff3f51",
+      "2369ac13e1fbc91b",
+      "7457707d38b5f793",
+      "4c43b91927cd760e"
+    ],
+    "inputs": "dfe44db9cc1a07ae",
+    "module": "src/shared/art/construction_vehicle.luau",
+    "pending": []
+  },
+  "drone": {
+    "blender": "5.2.0 LTS",
+    "digest": "b2092563b4a9f550",
+    "hashes": [
+      "b530be5fb03105c1",
+      "b62b68f129cb3f30",
+      "a526b4dc10f2da89",
+      "f33fc64f019c3afb",
+      "ad055ed754f302ab",
+      "a3b241b4748309da"
+    ],
+    "inputs": "709bea5142e131f6",
+    "module": "src/shared/art/drone.luau",
+    "pending": []
+  },
+  "energy_converter": {
+    "blender": "5.2.0 LTS",
+    "digest": "5e45e0131662da30",
+    "hashes": [
+      "2ed13dfcae9d24d0",
+      "1d1386a1cf154f1c",
+      "bb57c7d8db1d99a8"
+    ],
+    "inputs": "7f77393c616d3ae1",
+    "module": "src/shared/art/energy_converter.luau",
+    "pending": []
+  },
+  "energy_storage": {
+    "blender": "5.2.0 LTS",
+    "digest": "5dda1b131db0d82c",
+    "hashes": [
+      "00810930f2fa5f55",
+      "20f79fd3b31d6e8b",
+      "85709a607e24878c"
+    ],
+    "inputs": "dac7a6735b916f19",
+    "module": "src/shared/art/energy_storage.luau",
+    "pending": []
+  },
+  "epic_energy_converter": {
+    "blender": "5.2.0 LTS",
+    "digest": "7a485f085e6305bf",
+    "hashes": [
+      "1eab6d4e3345014b",
+      "69bcaedce1fa5ed3",
+      "849335a341ea9eb7",
+      "3d8cbdc5991c7484"
+    ],
+    "inputs": "9fec1d1871cec214",
+    "module": "src/shared/art/epic_energy_converter.luau",
+    "pending": []
+  },
+  "epic_fusion_reactor": {
+    "blender": "5.2.0 LTS",
+    "digest": "d097fe3e238f33da",
+    "hashes": [
+      "ad088b3c07b08ab8",
+      "a15a3fe3cd77bcf0",
+      "de8381fb7208ae53",
+      "da342c23704249b7",
+      "dfe6bf3589c5e92f",
+      "580370a23e221885"
+    ],
+    "inputs": "a611f662e1f87166",
+    "module": "src/shared/art/epic_fusion_reactor.luau",
+    "pending": []
+  },
+  "eradicator": {
+    "blender": "5.2.0 LTS",
+    "digest": "97584069127a66fb",
+    "hashes": [
+      "02ca8e59063ab971",
+      "b7bca41d2b351e61",
+      "cabba33d7562e0a7",
+      "f34b865a66cff00c",
+      "3eba500262676609"
+    ],
+    "inputs": "5cffd665146a199b",
+    "module": "src/shared/art/eradicator.luau",
+    "pending": []
+  },
+  "experimental_gantry": {
+    "blender": "5.2.0 LTS",
+    "digest": "5a31fe9fa0834daa",
+    "hashes": [
+      "03718fc78485217d",
+      "4820b219a83fff14",
+      "a5302e9d3e7d14dd",
+      "1430d45e534f0562",
+      "670e2bde1ac25715"
+    ],
+    "inputs": "b5e655fb3dca50c3",
+    "module": "src/shared/art/experimental_gantry.luau",
+    "pending": []
+  },
+  "fatboy": {
+    "blender": "5.2.0 LTS",
+    "digest": "77b4dccc38d21e29",
+    "hashes": [
+      "0362cce5ff7eb370",
+      "463efb1afb8fab78",
+      "98b4c6277f14fbc0",
+      "b14f14c3768ef0ac",
+      "5764b34f05a97dc4"
+    ],
+    "inputs": "8448ceb4e0e515f2",
+    "module": "src/shared/art/fatboy.luau",
+    "pending": []
+  },
+  "fusion_reactor": {
+    "blender": "5.2.0 LTS",
+    "digest": "ab4a4de6a68dd2e1",
+    "hashes": [
+      "8780ea3e7acec95b",
+      "a59a70e7d37381b5",
+      "1c9064f3f225cc7f",
+      "b92cd6e76081f99c"
+    ],
+    "inputs": "5db352627495e3d1",
+    "module": "src/shared/art/fusion_reactor.luau",
+    "pending": []
+  },
+  "geothermal_powerplant": {
+    "blender": "5.2.0 LTS",
+    "digest": "1d4fc6fc3ed4019d",
+    "hashes": [
+      "c6285059796dd00a",
+      "95a4bbb79b88d6b9",
+      "f783c627b9c885ae",
+      "c44b29f325cb6a36"
+    ],
+    "inputs": "d39744f0da25deb8",
+    "module": "src/shared/art/geothermal_powerplant.luau",
+    "pending": []
+  },
+  "goon": {
+    "blender": "5.2.0 LTS",
+    "digest": "c6977930cd99f14f",
+    "hashes": [
+      "5ff270a2d0ffa293",
+      "2e695c5f912e274d",
+      "d4c46f628b1fa332",
+      "013566833bedc916",
+      "4e242d26b8e0cc54",
+      "3e1df24acddc2e4d",
+      "9ce0032b955ee81f"
+    ],
+    "inputs": "0d1d1ae3b4622b63",
+    "module": "src/shared/art/goon.luau",
+    "pending": []
+  },
+  "graverobber": {
+    "blender": "5.2.0 LTS",
+    "digest": "7d717b0ef84256d9",
+    "hashes": [
+      "97bd82710c5534ef",
+      "8bea95992f53c3a5",
+      "8c3d9a333996616c",
+      "1576c2f0a096a02c",
+      "46f79e5aa47893a4",
+      "59a5c89872918c6f"
+    ],
+    "inputs": "453a2ddf396ac209",
+    "module": "src/shared/art/graverobber.luau",
+    "pending": []
+  },
+  "grunt": {
+    "blender": "5.2.0 LTS",
+    "digest": "7b9df820bac5caa0",
+    "hashes": [
+      "174f605365e523ec",
+      "783a0f200679e477",
+      "9d3d0a11dc498d2e",
+      "be3d1cf0f95d85b3",
+      "d85a8d9246a63508",
+      "299f41d2310e2dc0"
+    ],
+    "inputs": "adf79550eb5cabc3",
+    "module": "src/shared/art/grunt.luau",
+    "pending": []
+  },
+  "guard": {
+    "blender": "5.2.0 LTS",
+    "digest": "4507f7793a2756d7",
+    "hashes": [
+      "95c56b91ff0fe291",
+      "f6492a0125bca8e3",
+      "59b11b70cb350127",
+      "bccf3528d7058076"
+    ],
+    "inputs": "8d98b33aedc130ad",
+    "module": "src/shared/art/guard.luau",
+    "pending": []
+  },
+  "gunslinger": {
+    "blender": "5.2.0 LTS",
+    "digest": "703867fa2389fcd7",
+    "hashes": [
+      "147b93ae4b8d207d",
+      "274fd102f42f7e35",
+      "e7dcf40aee0c53fd",
+      "dea5e3efc790174f",
+      "bd30af108251733c",
+      "1fe8015e69627309"
+    ],
+    "inputs": "712343af8a7a8d6f",
+    "module": "src/shared/art/gunslinger.luau",
+    "pending": []
+  },
+  "halberd": {
+    "blender": "5.2.0 LTS",
+    "digest": "d262a51773d5b4d0",
+    "hashes": [
+      "6f8814176fcdde99",
+      "541aee341bb1d202",
+      "b8cc780bc4825abb",
+      "273834be25e9f591",
+      "63f46b0db2957d4c",
+      "e8792a8b3de6a474"
+    ],
+    "inputs": "488a94ab16b85d0c",
+    "module": "src/shared/art/halberd.luau",
+    "pending": []
+  },
+  "hardened_energy_storage": {
+    "blender": "5.2.0 LTS",
+    "digest": "bd0ceeb539b14864",
+    "hashes": [
+      "904381ab35c1a453",
+      "0f31647301bdb948",
+      "4d941c42fbe4c36b",
+      "7b71dff07f221421"
+    ],
+    "inputs": "02907e5764a0f484",
+    "module": "src/shared/art/hardened_energy_storage.luau",
+    "pending": []
+  },
+  "hardened_metal_storage": {
+    "blender": "5.2.0 LTS",
+    "digest": "159d950908de95c7",
+    "hashes": [
+      "a2b1871a6cdc242d",
+      "09a3756f70c55232",
+      "79fed1d7b010354a"
+    ],
+    "inputs": "668e2ea64d2d269c",
+    "module": "src/shared/art/hardened_metal_storage.luau",
+    "pending": []
+  },
+  "hephaestus": {
+    "blender": "5.2.0 LTS",
+    "digest": "5b0023e7b9ecd155",
+    "hashes": [
+      "a1e5b3dee3182f64",
+      "4d2a4f2314e80139",
+      "b03a05c384da3d26",
+      "a64130d7bd1e096c",
+      "e9fadad756ed51ff",
+      "09f0107480b2baa5"
+    ],
+    "inputs": "2a3ba079c7696381",
+    "module": "src/shared/art/hephaestus.luau",
+    "pending": []
+  },
+  "hercules": {
+    "blender": "5.2.0 LTS",
+    "digest": "d988c9b5c55269e2",
+    "hashes": [
+      "03b9b28045dd3b83",
+      "e47e1b993a3e40ff",
+      "a03bacf2c6bf40bd",
+      "69c485eeb649acca",
+      "0da54c344cf210b3"
+    ],
+    "inputs": "601679058090ae0e",
+    "module": "src/shared/art/hercules.luau",
+    "pending": []
+  },
+  "herring": {
+    "blender": "5.2.0 LTS",
+    "digest": "17fdfefe524f864c",
+    "hashes": [
+      "2883ec3cc795989f",
+      "1b2f2f50075b6e33",
+      "68bc79d837a1849c",
+      "8fbefbf44cdc96ea",
+      "18a935d87ccd6386",
+      "ddb37ce1cd612fc0"
+    ],
+    "inputs": "552817f58011fbb6",
+    "module": "src/shared/art/herring.luau",
+    "pending": []
+  },
+  "hovercraft_platform": {
+    "blender": "5.2.0 LTS",
+    "digest": "e23d95be0db4403d",
+    "hashes": [
+      "d5e0227d6515309e",
+      "c303daea6913ae33",
+      "33e171dfcad5a74c",
+      "182d1ccf129be355",
+      "ec2a8407c6c5b9ea"
+    ],
+    "inputs": "2521a0931380058b",
+    "module": "src/shared/art/hovercraft_platform.luau",
+    "pending": []
+  },
+  "icon_anti_air": {
+    "blender": "5.2.0 LTS",
+    "digest": "ee9711cec58a2dd8",
+    "hashes": [
+      "56c0fc8233e779a7",
+      "85c032b4945022fc"
+    ],
+    "inputs": "c724d93549fc2d3d",
+    "module": "src/shared/ui_art/icon_anti_air.luau",
+    "pending": []
+  },
+  "icon_anti_nuke": {
+    "blender": "5.2.0 LTS",
+    "digest": "456d6e7383667bf2",
+    "hashes": [
+      "77a57bd06528299d",
+      "6a925cafbaeb51df"
+    ],
+    "inputs": "ee6bc28b39b46f79",
+    "module": "src/shared/ui_art/icon_anti_nuke.luau",
+    "pending": []
+  },
+  "icon_attack": {
+    "blender": "5.2.0 LTS",
+    "digest": "fd451540986974d2",
+    "hashes": [
+      "fac096282a410da8",
+      "232cd590c4a28ea6"
+    ],
+    "inputs": "5f6ef794bcc6096a",
+    "module": "src/shared/ui_art/icon_attack.luau",
+    "pending": []
+  },
+  "icon_bombs": {
+    "blender": "5.2.0 LTS",
+    "digest": "69c535553d2762b9",
+    "hashes": [
+      "c30d13e4fe3f925e",
+      "277a111d804bcedd"
+    ],
+    "inputs": "d13c37f685d3d59c",
+    "module": "src/shared/ui_art/icon_bombs.luau",
+    "pending": []
+  },
+  "icon_cannon": {
+    "blender": "5.2.0 LTS",
+    "digest": "092b073becfa9470",
+    "hashes": [
+      "72929101fc99ae34",
+      "097d1d8dfb27c612"
+    ],
+    "inputs": "d9d4ad2d3eefc86b",
+    "module": "src/shared/ui_art/icon_cannon.luau",
+    "pending": []
+  },
+  "icon_depth_charge": {
+    "blender": "5.2.0 LTS",
+    "digest": "b168fa164fd4ab20",
+    "hashes": [
+      "61d8911a98666000",
+      "318bdd7335d994b2"
+    ],
+    "inputs": "4f43ec1f44665ea9",
+    "module": "src/shared/ui_art/icon_depth_charge.luau",
+    "pending": []
+  },
+  "icon_disintegrator": {
+    "blender": "5.2.0 LTS",
+    "digest": "65c4dc7e534a57b2",
+    "hashes": [
+      "8a7b34a0fbb24ddd",
+      "5e7bb60780f8dd6c"
+    ],
+    "inputs": "a5b957beae41b2f9",
+    "module": "src/shared/ui_art/icon_disintegrator.luau",
+    "pending": []
+  },
+  "icon_emp": {
+    "blender": "5.2.0 LTS",
+    "digest": "b00cfcb2a62e1af9",
+    "hashes": [
+      "75c55c677865abb5",
+      "00fd211a1bdaef83"
+    ],
+    "inputs": "ce35f71809884bd3",
+    "module": "src/shared/ui_art/icon_emp.luau",
+    "pending": []
+  },
+  "icon_fight": {
+    "blender": "5.2.0 LTS",
+    "digest": "f20977e339c76c19",
+    "hashes": [
+      "3b8d3ff0fb338bd5",
+      "16f6ff6cf0f784db"
+    ],
+    "inputs": "af35369103f29724",
+    "module": "src/shared/ui_art/icon_fight.luau",
+    "pending": []
+  },
+  "icon_flak": {
+    "blender": "5.2.0 LTS",
+    "digest": "a12200f7de89d0d5",
+    "hashes": [
+      "21cffca540fd8aab",
+      "f9d966dd0c1ac643"
+    ],
+    "inputs": "d438a58028a1dd99",
+    "module": "src/shared/ui_art/icon_flak.luau",
+    "pending": []
+  },
+  "icon_flamethrower": {
+    "blender": "5.2.0 LTS",
+    "digest": "5f6922bfbc4a42b4",
+    "hashes": [
+      "924dc33878063b0d",
+      "71af966b449f47e7"
+    ],
+    "inputs": "7876a3f03311157c",
+    "module": "src/shared/ui_art/icon_flamethrower.luau",
+    "pending": []
+  },
+  "icon_gauss": {
+    "blender": "5.2.0 LTS",
+    "digest": "94fb0fe5229c786b",
+    "hashes": [
+      "e34e3f83e552a209",
+      "83bd2ade9085ed1c"
+    ],
+    "inputs": "f824e13b573fa943",
+    "module": "src/shared/ui_art/icon_gauss.luau",
+    "pending": []
+  },
+  "icon_guard": {
+    "blender": "5.2.0 LTS",
+    "digest": "78092ed68a1db413",
+    "hashes": [
+      "c32af98d697244a3",
+      "153055ab50f5f057"
+    ],
+    "inputs": "0ee7f9fe3ecfb2ea",
+    "module": "src/shared/ui_art/icon_guard.luau",
+    "pending": []
+  },
+  "icon_heat_ray": {
+    "blender": "5.2.0 LTS",
+    "digest": "79f4717857c5529b",
+    "hashes": [
+      "e208082262317ac2",
+      "8bca809f84e14799"
+    ],
+    "inputs": "aaa26387e8e10d02",
+    "module": "src/shared/ui_art/icon_heat_ray.luau",
+    "pending": []
+  },
+  "icon_laser": {
+    "blender": "5.2.0 LTS",
+    "digest": "fb9352836ea9131f",
+    "hashes": [
+      "04a8d9db3f54a3cd",
+      "61c557fb2a3d4e63"
+    ],
+    "inputs": "2a38e03ebde462b0",
+    "module": "src/shared/ui_art/icon_laser.luau",
+    "pending": []
+  },
+  "icon_lightning": {
+    "blender": "5.2.0 LTS",
+    "digest": "59730d49eae4d233",
+    "hashes": [
+      "802b0196185679fb",
+      "4e87d97de8f5d009"
+    ],
+    "inputs": "f3fbe329575b32e4",
+    "module": "src/shared/ui_art/icon_lightning.luau",
+    "pending": []
+  },
+  "icon_machine_gun": {
+    "blender": "5.2.0 LTS",
+    "digest": "4af17e1732773c72",
+    "hashes": [
+      "fe4db124a1fa13e1",
+      "ea5d44fc2d908e03"
+    ],
+    "inputs": "2f5bf27f4de18a3d",
+    "module": "src/shared/ui_art/icon_machine_gun.luau",
+    "pending": []
+  },
+  "icon_missile": {
+    "blender": "5.2.0 LTS",
+    "digest": "4acf59216a5adc5f",
+    "hashes": [
+      "50222e269e856f2f",
+      "f1d278b68775cc99"
+    ],
+    "inputs": "24978f0c21a5c903",
+    "module": "src/shared/ui_art/icon_missile.luau",
+    "pending": []
+  },
+  "icon_nuke": {
+    "blender": "5.2.0 LTS",
+    "digest": "8f8b924bb6c41670",
+    "hashes": [
+      "6fa36d9082f32cdc",
+      "1ab3e1311ba2007d"
+    ],
+    "inputs": "06b582e196a79c79",
+    "module": "src/shared/ui_art/icon_nuke.luau",
+    "pending": []
+  },
+  "icon_plasma_cannon": {
+    "blender": "5.2.0 LTS",
+    "digest": "80c4cee2b32b6a40",
+    "hashes": [
+      "063bb17ea7405f0e",
+      "acd0d177356159d3"
+    ],
+    "inputs": "a6d3eb169bf8bec8",
+    "module": "src/shared/ui_art/icon_plasma_cannon.luau",
+    "pending": []
+  },
+  "icon_reclaim": {
+    "blender": "5.2.0 LTS",
+    "digest": "a287b09722b16389",
+    "hashes": [
+      "e99425853d7f3f81",
+      "d4ce100480aa9a57"
+    ],
+    "inputs": "3d6f1c55a7593905",
+    "module": "src/shared/ui_art/icon_reclaim.luau",
+    "pending": []
+  },
+  "icon_repair": {
+    "blender": "5.2.0 LTS",
+    "digest": "e0b747d3de206334",
+    "hashes": [
+      "9abfa02311e7a9c1",
+      "37377c46ce133a27"
+    ],
+    "inputs": "7b48406478353738",
+    "module": "src/shared/ui_art/icon_repair.luau",
+    "pending": []
+  },
+  "icon_rocket": {
+    "blender": "5.2.0 LTS",
+    "digest": "b682df60b89382de",
+    "hashes": [
+      "2d02961bd81eda09",
+      "c8fa18f3a8d14ff2"
+    ],
+    "inputs": "e21c1ebb17a04cd7",
+    "module": "src/shared/ui_art/icon_rocket.luau",
+    "pending": []
+  },
+  "icon_shotgun": {
+    "blender": "5.2.0 LTS",
+    "digest": "23cf8c69a243bf3d",
+    "hashes": [
+      "34504edda6f07ad7",
+      "a34dabe1acbb5c2c"
+    ],
+    "inputs": "20f34f230373dea8",
+    "module": "src/shared/ui_art/icon_shotgun.luau",
+    "pending": []
+  },
+  "icon_sniper": {
+    "blender": "5.2.0 LTS",
+    "digest": "b6f09b8901eb0918",
+    "hashes": [
+      "f190e98763cbd956",
+      "3db695aa6a99a5ff"
+    ],
+    "inputs": "67bfdb0d8689cc0f",
+    "module": "src/shared/ui_art/icon_sniper.luau",
+    "pending": []
+  },
+  "icon_torpedo": {
+    "blender": "5.2.0 LTS",
+    "digest": "4b1401727f16e071",
+    "hashes": [
+      "16637f7093e84a22",
+      "9f1c033563807ca6"
+    ],
+    "inputs": "ed7affa7c3b258d6",
+    "module": "src/shared/ui_art/icon_torpedo.luau",
+    "pending": []
+  },
+  "incisor": {
+    "blender": "5.2.0 LTS",
+    "digest": "5597746b5e53a2eb",
+    "hashes": [
+      "51d7bac0814f8cbb",
+      "afda81460adf2975",
+      "072262c4bdf545f2",
+      "72f5d35bed314863",
+      "1067b1b8ef705d75",
+      "ccb57f2f7baa173e"
+    ],
+    "inputs": "c0df9835b4fd2eff",
+    "module": "src/shared/art/incisor.luau",
+    "pending": []
+  },
+  "janus": {
+    "blender": "5.2.0 LTS",
+    "digest": "9253b673611dc191",
+    "hashes": [
+      "c9d39c47affb6aaa",
+      "7c7e3c8f36c43c14",
+      "5315e651cfd796da",
+      "2d8452c0164f8180",
+      "9d8cdde2c00a5de6",
+      "2d8452c0164f8180",
+      "9d8cdde2c00a5de6"
+    ],
+    "inputs": "6418f9a941878605",
+    "module": "src/shared/art/janus.luau",
+    "pending": []
+  },
+  "juggernaut": {
+    "blender": "5.2.0 LTS",
+    "digest": "e62b898143533817",
+    "hashes": [
+      "028539f501e7f955",
+      "bbe5875f452bf693",
+      "3aaeeea1fb6d3fc7",
+      "56a2a22f119c305d",
+      "c5fe244c35066f21",
+      "a337585207f019fe"
+    ],
+    "inputs": "9ad1258edade7cc4",
+    "module": "src/shared/art/juggernaut.luau",
+    "pending": []
+  },
+  "lasher": {
+    "blender": "5.2.0 LTS",
+    "digest": "96311380025b998b",
+    "hashes": [
+      "d5fcd08c5f9adb9d",
+      "cd9e5e0f9175cdaa",
+      "bcf491a2fbc4cecb",
+      "ce1dea969ce70fd7",
+      "bcf491a2fbc4cecb",
+      "ce1dea969ce70fd7",
+      "6c0e802f0672204b",
+      "09caa1476af58a11"
+    ],
+    "inputs": "5a62a855b5292d9c",
+    "module": "src/shared/art/lasher.luau",
+    "pending": []
+  },
+  "mammoth": {
+    "blender": "5.2.0 LTS",
+    "digest": "6bfe9171520dde51",
+    "hashes": [
+      "0549fa337381a785",
+      "7fe44809f0d76153",
+      "f9a5caae44159a37",
+      "b5c6799e9a782eae",
+      "1d51578b61fe82cf"
+    ],
+    "inputs": "336a80d6a7224047",
+    "module": "src/shared/art/mammoth.luau",
+    "pending": []
+  },
+  "mantis": {
+    "blender": "5.2.0 LTS",
+    "digest": "5766f9ed56b6e69c",
+    "hashes": [
+      "861270705a6f66e1",
+      "63121547ec3582c8",
+      "5ab1064f018b9dc5",
+      "95eda6d0ee624e4b",
+      "375ca37565ce9954"
+    ],
+    "inputs": "3c7c690335c10d0d",
+    "module": "src/shared/art/mantis.luau",
+    "pending": []
+  },
+  "metal_extractor": {
+    "blender": "5.2.0 LTS",
+    "digest": "8dc5cd5e4cdf0b65",
+    "hashes": [
+      "dcf2069be8d8c035",
+      "55aaaf17758aae5d",
+      "b3df36a618374475",
+      "0e87e64cde12eb9c"
+    ],
+    "inputs": "1dc76a14aa80c9bb",
+    "module": "src/shared/art/metal_extractor.luau",
+    "pending": []
+  },
+  "metal_storage": {
+    "blender": "5.2.0 LTS",
+    "digest": "f27c0c9df19fc972",
+    "hashes": [
+      "0c9a9c6bfa8e22a6",
+      "c584076a8f0a6059",
+      "07129b540dcaa498"
+    ],
+    "inputs": "b38fa62d73ce12d8",
+    "module": "src/shared/art/metal_storage.luau",
+    "pending": []
+  },
+  "negotiator": {
+    "blender": "5.2.0 LTS",
+    "digest": "d6d59fac430f7b4d",
+    "hashes": [
+      "8bbe77a89c454c89",
+      "d2b412b6f28eddfc",
+      "9cebd956f5cc6043",
+      "28d12dbf1ac676c2",
+      "28d12dbf1ac676c2",
+      "28d12dbf1ac676c2",
+      "2a3eca626d42d919",
+      "26e0411306bf2339"
+    ],
+    "inputs": "ceae652722ed504c",
+    "module": "src/shared/art/negotiator.luau",
+    "pending": []
+  },
+  "orca": {
+    "blender": "5.2.0 LTS",
+    "digest": "a3292130084b020d",
+    "hashes": [
+      "feb3f4057944e5b7",
+      "2126c526f08f82fa",
+      "4ec37ff858e57392",
+      "385ec2d98f4be4fc",
+      "f51ab53354f94bf1"
+    ],
+    "inputs": "c00f6b8345b9f99f",
+    "module": "src/shared/art/orca.luau",
+    "pending": []
+  },
+  "overseer": {
+    "blender": "5.2.0 LTS",
+    "digest": "3f0a35877b682b3f",
+    "hashes": [
+      "48cd17d92b4d3bef",
+      "989935c8f30dae38",
+      "9c5262dd463f86a7",
+      "5f3d7c41745b5223",
+      "3f9b0436f9ddbfff"
+    ],
+    "inputs": "56543a7830cedc64",
+    "module": "src/shared/art/overseer.luau",
+    "pending": []
+  },
+  "persecutor": {
+    "blender": "5.2.0 LTS",
+    "digest": "783736ade46fc848",
+    "hashes": [
+      "418b9cc031b2a94a",
+      "f4fc945e21caa29a",
+      "a7b590f71bd0bc46",
+      "c07904e3511db45f",
+      "f09cd79f6b6776f4",
+      "ca9dcd085a1dc9f5"
+    ],
+    "inputs": "db25ba776d31fd3c",
+    "module": "src/shared/art/persecutor.luau",
+    "pending": []
+  },
+  "poison_arrow": {
+    "blender": "5.2.0 LTS",
+    "digest": "70c6f1eb448688c2",
+    "hashes": [
+      "626aa77f4641745e",
+      "72cf7913b492e078",
+      "4271c47da7e001b1",
+      "5996aaf406b4aff1",
+      "d26dbfdf765a19b9",
+      "4fea03f1c86c485d"
+    ],
+    "inputs": "71ac42e7aa7a3604",
+    "module": "src/shared/art/poison_arrow.luau",
+    "pending": []
+  },
+  "pool_donut_iced": {
+    "blender": "5.2.0 LTS",
+    "digest": "15da67f317b2a827",
+    "hashes": [
+      "b67666ab135a3b2b",
+      "a0087373924c7fc1"
+    ],
+    "inputs": "e92445d737f0a81e",
+    "module": "src/shared/art/pool_donut_iced.luau",
+    "pending": []
+  },
+  "pool_lifebuoy": {
+    "blender": "5.2.0 LTS",
+    "digest": "16356749125b61d2",
+    "hashes": [
+      "3a8eaf01239f9c9d",
+      "16dbad76769006b2"
+    ],
+    "inputs": "c95198afd4b608b2",
+    "module": "src/shared/art/pool_lifebuoy.luau",
+    "pending": []
+  },
+  "pounder": {
+    "blender": "5.2.0 LTS",
+    "digest": "38ffb6baaf71fba1",
+    "hashes": [
+      "b666421aa9db04a9",
+      "503c0d6b19039ec1",
+      "59e158b6df8f70f5",
+      "826bc23bac455f69",
+      "967355fd7c656815"
+    ],
+    "inputs": "c4e77c59ebff8ccd",
+    "module": "src/shared/art/pounder.luau",
+    "pending": []
+  },
+  "prevailer": {
+    "blender": "5.2.0 LTS",
+    "digest": "ef92748f91b44ad8",
+    "hashes": [
+      "2cc737cd5e8d7002",
+      "740e9af16dfd6cb2",
+      "c9132e5ca88a3f75",
+      "e08446807060a38b",
+      "5346331224a19982",
+      "94cb99ed29e792b0"
+    ],
+    "inputs": "e38c331652c6eda8",
+    "module": "src/shared/art/prevailer.luau",
+    "pending": []
+  },
+  "pulsar": {
+    "blender": "5.2.0 LTS",
+    "digest": "8c31e304a4a0fed7",
+    "hashes": [
+      "0dffa287911fb0fa",
+      "c610e72e81ac6aab",
+      "8b5f9cda1e5425ad",
+      "1436806127450813",
+      "705b7ee79bdbd5b2",
+      "2f964d7d7b15bd64"
+    ],
+    "inputs": "9b14885f2525cdf7",
+    "module": "src/shared/art/pulsar.luau",
+    "pending": []
+  },
+  "quaker": {
+    "blender": "5.2.0 LTS",
+    "digest": "9ab8e0c9ec315803",
+    "hashes": [
+      "1b144934a966dd10",
+      "7fcfebcc8506d950",
+      "4f0b660192cf6bed",
+      "c7da24e5d90998af",
+      "93ac880862f1c106",
+      "cade7da10a406611"
+    ],
+    "inputs": "a9fb138fe366c128",
+    "module": "src/shared/art/quaker.luau",
+    "pending": []
+  },
+  "rampart": {
+    "blender": "5.2.0 LTS",
+    "digest": "681c37ce5e6598d6",
+    "hashes": [
+      "2c46f6bbf8f6c112",
+      "0adf1854f8489c0d",
+      "aaa1e8e957ffec91",
+      "6cf26a03750ff967"
+    ],
+    "inputs": "8920b9882e3cfdfb",
+    "module": "src/shared/art/rampart.luau",
+    "pending": []
+  },
+  "rascal": {
+    "blender": "5.2.0 LTS",
+    "digest": "5457292f54a00ae9",
+    "hashes": [
+      "1f8a4d819e0f853b",
+      "08ac71abb8697f33",
+      "d75c57ed5068e8ed",
+      "08ac71abb8697f33",
+      "d75c57ed5068e8ed",
+      "7935eaa1e55501e5",
+      "b2c19a96f4315861",
+      "8eb4da685533f9c6"
+    ],
+    "inputs": "226491959fb9318f",
+    "module": "src/shared/art/rascal.luau",
+    "pending": []
+  },
+  "recluse": {
+    "blender": "5.2.0 LTS",
+    "digest": "034263bda0fdf2c8",
+    "hashes": [
+      "418a2626a881a22b",
+      "a15c8b6561176c9a",
+      "b4923847bc0da2a3",
+      "d4596bbb82bc0410",
+      "2f168a557ce11779",
+      "620b55197cdb7eff",
+      "e5f355a579542f79",
+      "9efcfea8d1a7423a"
+    ],
+    "inputs": "f9f3e389dd8dde21",
+    "module": "src/shared/art/recluse.luau",
+    "pending": []
+  },
+  "riptide": {
+    "blender": "5.2.0 LTS",
+    "digest": "8dc261e8959b5f19",
+    "hashes": [
+      "1707a3e943064271",
+      "ac2738564356620b",
+      "f689e0122c01ebc6",
+      "2c2f325693a77394",
+      "996bd3e6623d24c6",
+      "6727dcd522a7bcc6",
+      "0681e562978b946b"
+    ],
+    "inputs": "8ae233d32f63b660",
+    "module": "src/shared/art/riptide.luau",
+    "pending": []
+  },
+  "rubber_ducky": {
+    "blender": "5.2.0 LTS",
+    "digest": "9433ca2f83be6f55",
+    "hashes": [
+      "45b70a56c99bcd08",
+      "87c14e5537bc5687",
+      "916287dc558f65cf"
+    ],
+    "inputs": "db1c98fdb85a478c",
+    "module": "src/shared/art/rubber_ducky.luau",
+    "pending": []
+  },
+  "scavenger_beacon": {
+    "blender": "5.2.0 LTS",
+    "digest": "a24e59645495fd43",
+    "hashes": [
+      "bcc913632b999826",
+      "c5fbc30c2eada280",
+      "c36875dbbacc424e",
+      "b8aa9408812cc064"
+    ],
+    "inputs": "0f42b0287c20d270",
+    "module": "src/shared/art/scavenger_beacon.luau",
+    "pending": []
+  },
+  "scavenger_sea_beacon": {
+    "blender": "5.2.0 LTS",
+    "digest": "45149daccd4ad002",
+    "hashes": [
+      "75fb3524d9cf65bc",
+      "bb1b6f116f25d96e",
+      "dbb79fd1f9924a5f",
+      "15c9bbddb6b2fe3b"
+    ],
+    "inputs": "f142ef32d91e4aff",
+    "module": "src/shared/art/scavenger_sea_beacon.luau",
+    "pending": []
+  },
+  "scorpion": {
+    "blender": "5.2.0 LTS",
+    "digest": "f9bf8016a9881376",
+    "hashes": [
+      "bba8e5b03b06a331",
+      "bd76662fee48f845",
+      "f30e89a84ba47a83",
+      "302040357ae58169",
+      "15cbb6747e1e3f19",
+      "5251e57bb6d5df37"
+    ],
+    "inputs": "93d264cb0575760c",
+    "module": "src/shared/art/scorpion.luau",
+    "pending": []
+  },
+  "screamer": {
+    "blender": "5.2.0 LTS",
+    "digest": "5abb8b1ade875424",
+    "hashes": [
+      "a1041d0eeb596bb2",
+      "6186f3271b813b99",
+      "085a21485fc81dd9",
+      "822058cce512c6c9",
+      "9efadea546cca4e5"
+    ],
+    "inputs": "ffd1b29ee8b764ac",
+    "module": "src/shared/art/screamer.luau",
+    "pending": []
+  },
+  "sea_dragon": {
+    "blender": "5.2.0 LTS",
+    "digest": "e2857de70ddcdfcb",
+    "hashes": [
+      "d881890160e6523e",
+      "2b6e66eb1600045d",
+      "ac8e7ddc93c5d55e",
+      "f27557ce819ffdfa"
+    ],
+    "inputs": "7fea65b06aeae177",
+    "module": "src/shared/art/sea_dragon.luau",
+    "pending": []
+  },
+  "sharpshooter": {
+    "blender": "5.2.0 LTS",
+    "digest": "127c3e572f6ae192",
+    "hashes": [
+      "c226a6360d714ff6",
+      "440f1d2f4174d6f5",
+      "13256853a9c56438",
+      "7ae292c960dea188",
+      "c3d38355e9c72f71",
+      "4da839b06e89fc6b"
+    ],
+    "inputs": "b7b12b99194fe5e6",
+    "module": "src/shared/art/sharpshooter.luau",
+    "pending": []
+  },
+  "shipyard": {
+    "blender": "5.2.0 LTS",
+    "digest": "da9390c9eb6e9b71",
+    "hashes": [
+      "1dfad496e0d59a2d",
+      "f303107ffa364c87",
+      "70a2b0301646af3a",
+      "22c795031e3c26a7"
+    ],
+    "inputs": "7e9b96b895150e2d",
+    "module": "src/shared/art/shipyard.luau",
+    "pending": []
+  },
+  "shiva": {
+    "blender": "5.2.0 LTS",
+    "digest": "f319318cfbf19ee8",
+    "hashes": [
+      "c3f31616aa0ba87e",
+      "af530e37cd58c8f5",
+      "65288f36ef4a7f68",
+      "02dad25f73f5e204",
+      "935280508687f1d5"
+    ],
+    "inputs": "b613e2fde2e6411f",
+    "module": "src/shared/art/shiva.luau",
+    "pending": []
+  },
+  "shrub": {
+    "blender": "5.2.0 LTS",
+    "digest": "f076b9645df41ba1",
+    "hashes": [
+      "635e434b55f9ebe8"
+    ],
+    "inputs": "1bebb06c94fbce66",
+    "module": "src/shared/reclaimable_art/shrub.luau",
+    "pending": []
+  },
+  "solar_collector": {
+    "blender": "5.2.0 LTS",
+    "digest": "8bff3e67c32d1786",
+    "hashes": [
+      "4a0af772cd1048a2",
+      "627ce6bc604eef28",
+      "6b3d42f93ddd0d06",
+      "754fc4cdf56ff857",
+      "3341bad6932ae1dd"
+    ],
+    "inputs": "4fb2f44bb8f34eb7",
+    "module": "src/shared/art/solar_collector.luau",
+    "pending": []
+  },
+  "starlight": {
+    "blender": "5.2.0 LTS",
+    "digest": "42777485815825a5",
+    "hashes": [
+      "3cddf69b5c50c859",
+      "c56ce7277bd14177",
+      "180702786991e597",
+      "67ad21e88127dedd",
+      "c6066db5fd7b687c",
+      "7310a7832dd92957",
+      "a4f60b5ef811e50e",
+      "a0510bdc12a8b207"
+    ],
+    "inputs": "c033bab71cb5d7f2",
+    "module": "src/shared/art/starlight.luau",
+    "pending": []
+  },
+  "stiletto": {
+    "blender": "5.2.0 LTS",
+    "digest": "36b2847f3321a2bc",
+    "hashes": [
+      "ee536917a226a000",
+      "fef458e6bae99313",
+      "d02ac5048682649f",
+      "6ecb65e84b7968f0",
+      "39b61ccc7bb42275"
+    ],
+    "inputs": "7d375b06fde6fe03",
+    "module": "src/shared/art/stiletto.luau",
+    "pending": []
+  },
+  "sumo": {
+    "blender": "5.2.0 LTS",
+    "digest": "ee1b7bdacafdd876",
+    "hashes": [
+      "f4b9c79bd16d20ef",
+      "d72906a78a14c047",
+      "3f3730f284655610",
+      "bf3ddb64b481d9ca",
+      "aee63905ee51bd3c"
+    ],
+    "inputs": "b2d6aa84647403c7",
+    "module": "src/shared/art/sumo.luau",
+    "pending": []
+  },
+  "supporter": {
+    "blender": "5.2.0 LTS",
+    "digest": "1b2cae59b63be006",
+    "hashes": [
+      "c91727c2923d52a7",
+      "546aa13d639f7e57",
+      "7935a3d5092c08f7",
+      "3bdbd595dc172081",
+      "5ea5ab9065a4f964",
+      "5ea5ab9065a4f964"
+    ],
+    "inputs": "03624424a10e1f7e",
+    "module": "src/shared/art/supporter.luau",
+    "pending": []
+  },
+  "syracusia": {
+    "blender": "5.2.0 LTS",
+    "digest": "220027288f93b132",
+    "hashes": [
+      "edc453ef6aafb532",
+      "94f4940bb6fdf1a0",
+      "52a832013641cb3b",
+      "c7ceb617124508df",
+      "067ad7eb75632ea6",
+      "a5a7b6a137e47c5f",
+      "76b4ebd27daf35c6"
+    ],
+    "inputs": "69dd06e89357db5a",
+    "module": "src/shared/art/syracusia.luau",
+    "pending": []
+  },
+  "thistle": {
+    "blender": "5.2.0 LTS",
+    "digest": "d8ec9d3e0f725277",
+    "hashes": [
+      "711331b1dbfa9fd6",
+      "6883f21a8a3929e1",
+      "52eca9c756ceb5b4",
+      "192d0e7999cfaa2e",
+      "b6f8f963e6068781"
+    ],
+    "inputs": "9690f4263f1568af",
+    "module": "src/shared/art/thistle.luau",
+    "pending": []
+  },
+  "thor": {
+    "blender": "5.2.0 LTS",
+    "digest": "9af2dba1608e6784",
+    "hashes": [
+      "1e8da11d9d87d5a8",
+      "7a19088fbab23276",
+      "91eea061b8c1a350",
+      "02337127c947122c",
+      "62ce8a982606a6d8",
+      "9a3d8b857bd1a396"
+    ],
+    "inputs": "ce9271fa61a7e740",
+    "module": "src/shared/art/thor.luau",
+    "pending": []
+  },
+  "thug": {
+    "blender": "5.2.0 LTS",
+    "digest": "eb6c2212fdaba555",
+    "hashes": [
+      "d94c55b9078e79c8",
+      "03bc72a46b0fe7ae",
+      "2964f2100bccc5f0",
+      "8225100e619d9b34",
+      "ba5398a608b06f83",
+      "2941a8d8bbaef912"
+    ],
+    "inputs": "d8261dc224381231",
+    "module": "src/shared/art/thug.luau",
+    "pending": []
+  },
+  "tick": {
+    "blender": "5.2.0 LTS",
+    "digest": "53c2170b203c5564",
+    "hashes": [
+      "562178655241fe8a",
+      "accac69bd4c4aa93",
+      "efa9f4952defe5d5",
+      "2278e1878f20f785",
+      "caed1a302a67bce3",
+      "6d357fa6ed13d065",
+      "7b7b4d126d7bea85",
+      "95718ceb5cb6d850"
+    ],
+    "inputs": "3bfaadf5d8138695",
+    "module": "src/shared/art/tick.luau",
+    "pending": []
+  },
+  "tidal_generator": {
+    "blender": "5.2.0 LTS",
+    "digest": "6328654f721d8538",
+    "hashes": [
+      "1690ac768bd49a44",
+      "5796405714c4ac47",
+      "8e6409943f21d90a",
+      "d2c58a94d79550cc"
+    ],
+    "inputs": "bae20f7e13c22538",
+    "module": "src/shared/art/tidal_generator.luau",
+    "pending": []
+  },
+  "tiger": {
+    "blender": "5.2.0 LTS",
+    "digest": "291e29299a167aab",
+    "hashes": [
+      "ed9742a645cee827",
+      "92c4c86bd8be20f0",
+      "b2639747b9f15cc4",
+      "48d87fb02bd63433",
+      "c20f171163b8a017",
+      "f3491d6b2c035377"
+    ],
+    "inputs": "b498a5e14f01dbe2",
+    "module": "src/shared/art/tiger.luau",
+    "pending": []
+  },
+  "trasher": {
+    "blender": "5.2.0 LTS",
+    "digest": "4b8ce36d7f473128",
+    "hashes": [
+      "e242f385ef699790",
+      "dd9949116adcc7c2",
+      "115aff1e5fb14512",
+      "84abc2cc6ddc9b55",
+      "3e8a55d7cc767fe3",
+      "6140bcee6f58bdd4"
+    ],
+    "inputs": "44c3b6cd9d8be7f1",
+    "module": "src/shared/art/trasher.luau",
+    "pending": []
+  },
+  "tree": {
+    "blender": "5.2.0 LTS",
+    "digest": "07f69b95d52d1796",
+    "hashes": [
+      "cd307a46d587f26e",
+      "9ce184dac03c9818"
+    ],
+    "inputs": "a05d3eb4c8150e0d",
+    "module": "src/shared/reclaimable_art/tree.luau",
+    "pending": []
+  },
+  "tutorial_arrows": {
+    "blender": "5.2.0 LTS",
+    "digest": "599469460f65b58f",
+    "hashes": [
+      "9a047e3f6be3179e",
+      "96271c48173be9f0",
+      "9a047e3f6be3179e",
+      "da87d6848b26035e",
+      "9a047e3f6be3179e",
+      "e6244341039ea79b",
+      "9a047e3f6be3179e",
+      "13d9084c06133b9c"
+    ],
+    "inputs": "e1a43d9db1c15e7b",
+    "module": "src/shared/ui_art/tutorial_arrows.luau",
+    "pending": []
+  },
+  "tutorial_boulder": {
+    "blender": "5.2.0 LTS",
+    "digest": "759b5cdd73763956",
+    "hashes": [
+      "e082daec8fae2275",
+      "d0320e913d847a9b"
+    ],
+    "inputs": "3dbcdd0cdd50cdf2",
+    "module": "src/shared/art/tutorial_boulder.luau",
+    "pending": []
+  },
+  "tutorial_check": {
+    "blender": "5.2.0 LTS",
+    "digest": "addf7cde1f5e1f8f",
+    "hashes": [
+      "9bd20c0b9e34a72c",
+      "18365e68284dcb3e"
+    ],
+    "inputs": "1aefcb59847c0625",
+    "module": "src/shared/ui_art/tutorial_check.luau",
+    "pending": []
+  },
+  "tutorial_cross": {
+    "blender": "5.2.0 LTS",
+    "digest": "d3a95b08c5ae4b40",
+    "hashes": [
+      "4934d0b78b09c742",
+      "db145138916a85d5"
+    ],
+    "inputs": "e9102642f1f8e67e",
+    "module": "src/shared/ui_art/tutorial_cross.luau",
+    "pending": []
+  },
+  "tutorial_cursor": {
+    "blender": "5.2.0 LTS",
+    "digest": "eaaf1e85aaf6dbcb",
+    "hashes": [
+      "14524e3852444cb3",
+      "70d35ec3006f3433"
+    ],
+    "inputs": "5bfdc6809e5fa5e3",
+    "module": "src/shared/ui_art/tutorial_cursor.luau",
+    "pending": []
+  },
+  "tutorial_mouse": {
+    "blender": "5.2.0 LTS",
+    "digest": "286693b20f0a9786",
+    "hashes": [
+      "8efc7af22d302c04",
+      "113bbfd3adccd5a0",
+      "cac990c7d206993b",
+      "8a1b802cdb86c683"
+    ],
+    "inputs": "0b2d104c26a28a6f",
+    "module": "src/shared/ui_art/tutorial_mouse.luau",
+    "pending": []
+  },
+  "tutorial_wasd": {
+    "blender": "5.2.0 LTS",
+    "digest": "e91427c932d2a7e1",
+    "hashes": [
+      "9a047e3f6be3179e",
+      "7b6282784d66fd18",
+      "9a047e3f6be3179e",
+      "2e8eea63a78339e1",
+      "9a047e3f6be3179e",
+      "12dcc892a2948ec6",
+      "9a047e3f6be3179e",
+      "df80748b48f238b6"
+    ],
+    "inputs": "3780f0957f950982",
+    "module": "src/shared/ui_art/tutorial_wasd.luau",
+    "pending": []
+  },
+  "twin_guard": {
+    "blender": "5.2.0 LTS",
+    "digest": "865810410c4033d9",
+    "hashes": [
+      "95c56b91ff0fe291",
+      "46cf8b118de0175b",
+      "c5cdb30490e3f26c",
+      "e9b1e61b35295c1e",
+      "958647c30462ddb2",
+      "7dcd67625f4bf0bb"
+    ],
+    "inputs": "ec5fa0b7471efb05",
+    "module": "src/shared/art/twin_guard.luau",
+    "pending": []
+  },
+  "valiant": {
+    "blender": "5.2.0 LTS",
+    "digest": "5e20602675374d66",
+    "hashes": [
+      "9eaef7a68a0b9805",
+      "b7a0d365a7901336",
+      "368a4f3e1b1273b8",
+      "6f2dc0c222d37b20",
+      "7201a88726f37cd0"
+    ],
+    "inputs": "8e9b8df6501d821d",
+    "module": "src/shared/art/valiant.luau",
+    "pending": []
+  },
+  "vanguard": {
+    "blender": "5.2.0 LTS",
+    "digest": "d0a37f5b0133dccd",
+    "hashes": [
+      "7042dc5c30e258aa",
+      "d2d50a9090411616",
+      "b4a0396c14315ffa",
+      "d4e024f66919b563",
+      "ff8420e40c26745c",
+      "5f50ca1f86d01b10",
+      "bb115c9f9e269cd7",
+      "a547258192700702"
+    ],
+    "inputs": "9042d6fe295b25ae",
+    "module": "src/shared/art/vanguard.luau",
+    "pending": []
+  },
+  "vehicle_lab": {
+    "blender": "5.2.0 LTS",
+    "digest": "72a52c7bfacb059e",
+    "hashes": [
+      "2a34ed89cc0b0e2d",
+      "498204b485144a1e",
+      "a9b8a5847d0ea4ee",
+      "9cb234d1efff3441",
+      "174d2c3377c72c7f"
+    ],
+    "inputs": "9cc3289b974c6b7c",
+    "module": "src/shared/art/vehicle_lab.luau",
+    "pending": []
+  },
+  "warden": {
+    "blender": "5.2.0 LTS",
+    "digest": "2b8f9661a88e6d44",
+    "hashes": [
+      "7576fa5b0c84e2b3",
+      "a95030d9c2f950c2",
+      "64bf881bae3fe9df",
+      "d6b7ffcc334e4555"
+    ],
+    "inputs": "9b2e8df47abf0d05",
+    "module": "src/shared/art/warden.luau",
+    "pending": []
+  },
+  "whirlwind": {
+    "blender": "5.2.0 LTS",
+    "digest": "92bdfca6526ad38e",
+    "hashes": [
+      "13427bb4a8cad169",
+      "1082a4c423b6ae90",
+      "88df76e43b0d0fb3",
+      "80d60baea27df330",
+      "f1d51c8384d9efce"
+    ],
+    "inputs": "05cb3f810512b2e8",
+    "module": "src/shared/art/whirlwind.luau",
+    "pending": []
+  },
+  "wind_turbine": {
+    "blender": "5.2.0 LTS",
+    "digest": "e9212ba963bc4363",
+    "hashes": [
+      "a3bd1d3e7c376160",
+      "483786d708c8aa94",
+      "fc1ff22871adfe24",
+      "8f4a120ffc2a4355",
+      "2d4a1b7be285b672"
+    ],
+    "inputs": "b0d701f27569d343",
+    "module": "src/shared/art/wind_turbine.luau",
+    "pending": []
+  },
+  "wolverine": {
+    "blender": "5.2.0 LTS",
+    "digest": "f8b98f4e47996a02",
+    "hashes": [
+      "3a5ad667d2cae4eb",
+      "48182a08aec649b8",
+      "f70c20898efdc6c9",
+      "4bda94975a351e2e",
+      "9868694077443382",
+      "28835d8754110295"
+    ],
+    "inputs": "df521f9eb0f70df1",
+    "module": "src/shared/art/wolverine.luau",
+    "pending": []
+  }
+}

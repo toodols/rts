@@ -2,13 +2,13 @@
 return {
 	groups = {
 		base = { pivot = { 0, 0, 0 } },
-		turret_1 = { pivot = { 0, 0.6431, 0 }, kind = "turret", weapon = 1, muzzle = { 0, 0.1263, 1.2707 } },
+		turret_1 = { pivot = { 0, 0.6431, -0.0517 }, kind = "turret", weapon = 1 },
 	},
 	parts = {
-		{ group = "base", color = { 0.08, 0.08, 0.09 }, offset = { 0, 0.1608, 0.0517 }, size = { 1.6364, 0.2297, 2.624 }, hash = "5ff270a2d0ffa293", mesh = "rbxassetid://78923161041678" },
-		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.4593, 0.0041 }, size = { 1.44, 0.3675, 2.3091 }, hash = "2e695c5f912e274d", mesh = "rbxassetid://133102898269270" },
-		{ group = "base", color = { 0.6902, 0.4784, 0.3451 }, offset = { 0, 0.9459, -0.8884 }, size = { 0.8591, 0.8354, 0.2066 }, hash = "d4c46f628b1fa332", team = true, mesh = "rbxassetid://72009676636623" },
-		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.9459, -0.8884 }, size = { 0.5947, 0.6678, 0 }, hash = "013566833bedc916", mesh = "rbxassetid://87487092384387" },
+		{ group = "base", color = { 0.08, 0.08, 0.09 }, offset = { 0, 0.1608, 0 }, size = { 1.6364, 0.2297, 2.624 }, hash = "5ff270a2d0ffa293", mesh = "rbxassetid://78923161041678" },
+		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.4593, -0.0475 }, size = { 1.44, 0.3675, 2.3091 }, hash = "2e695c5f912e274d", mesh = "rbxassetid://133102898269270" },
+		{ group = "base", color = { 0.6902, 0.4784, 0.3451 }, offset = { 0, 0.9459, -0.9401 }, size = { 0.8591, 0.8354, 0.2066 }, hash = "d4c46f628b1fa332", team = true, mesh = "rbxassetid://72009676636623" },
+		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.9459, -0.9401 }, size = { 0.5947, 0.6678, 0 }, hash = "013566833bedc916", mesh = "rbxassetid://87487092384387" },
 		{ group = "turret_1", color = { 0.6902, 0.4784, 0.3451 }, offset = { 0, 0.1206, 0 }, size = { 0.5727, 0.2412, 0.6612 }, hash = "4e242d26b8e0cc54", team = true, mesh = "rbxassetid://89198556533653" },
 		{ group = "turret_1", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.1263, 0.6353 }, size = { 0.0818, 0.0919, 0.9814 }, hash = "3e1df24acddc2e4d", mesh = "rbxassetid://82802490480772" },
 		{ group = "turret_1", color = { 1, 0.95, 0.3 }, offset = { 0, 0.1263, 1.1983 }, size = { 0.1125, 0.1263, 0.1446 }, hash = "9ce0032b955ee81f", neon = true, mesh = "rbxassetid://113377631554371" },

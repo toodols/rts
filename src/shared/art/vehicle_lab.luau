@@ -7,7 +7,7 @@ return {
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.225, 0 }, size = { 12, 0.45, 12 }, hash = "2a34ed89cc0b0e2d", mesh = "rbxassetid://126441550467892" },
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 2.125, 0 }, size = { 12, 3.35, 11.6 }, hash = "498204b485144a1e", mesh = "rbxassetid://106375698832056" },
 		{ group = "base", color = { 0.4784, 0.5255, 0.5804 }, offset = { 0, 2.15, 0.15 }, size = { 10.2, 3.36, 11.3 }, hash = "a9b8a5847d0ea4ee", team = true, mesh = "rbxassetid://106692818678894" },
-		{ group = "base", color = { 0.886, 0.698, 0.29 }, offset = { 0, 2.6624, 3.95 }, size = { 9.8908, 4.3847, 3.9 }, hash = "9cb234d1efff3441", mesh = "rbxassetid://71194891992581" },
+		{ group = "base", color = { 0.95, 0.78, 0.12 }, offset = { 0, 2.6624, 3.95 }, size = { 9.8908, 4.3847, 3.9 }, hash = "9cb234d1efff3441", mesh = "rbxassetid://71194891992581" },
 		{ group = "base", color = { 0.35, 0.95, 0.75 }, offset = { 0, 3.2329, 5.1896 }, size = { 7.1104, 0.6333, 0.7985 }, hash = "174d2c3377c72c7f", neon = true, mesh = "rbxassetid://98760840070674" },
 	},
 }

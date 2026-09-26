@@ -4,19 +4,27 @@ A four-legged spider no taller than a Grunt's knee: a low wedge body with a team
 a single laser eye poking out the front, and four high-kneed legs splayed to the diagonals. The body
 turns as weapon 1's turret; each leg sweeps about its root as it walks.
 
-Collider capsule(20, 12, 20): radius 0.91, height 1.09 studs. Budget: 100 triangles.
+Budget: 100 triangles.
 """
 
 import math
 
-from . import bot_t1_common as bt
+from .shared import bot_t1 as bt
+from .shared import common
+from .shared import palette
 
-ACCENT = bt.rgb(150, 176, 120)
-GLOW = (1.0, 0.35, 0.2, 1.0)  # red scout eye
+CATEGORY = "entity"
+DEF = "tick"
+# its legs sweep about the vertical as it walks, carrying its splayed feet past the corners of its footprint
+ENVELOPE = {"width": 2.04, "length": 1.95}
+MOUNTS = {
+    1: {"pivot": (0, 0, 0), "muzzle": (0, 0.5783, 0.9091)},
+}
 
 
 def generate(params):
-    m = bt.Mats("tick", ACCENT, GLOW)
+    accent = params["color"]
+    m = common.Materials(accent, palette.SCOUT_EYE)
 
     upper = []
     body = m.body(bt.slab("body", 0.5, 0.64, 0.2, top_w=0.44, top_d=0.56, top_offset=(0.0, 0.02), origin=(0.0, 0.0, 0.36)))
@@ -49,6 +57,4 @@ def generate(params):
 
     bt.group(upper, "torso", body, kind="turret", weapon=1)
     objs = upper + legs
-    bt.finish(objs)
-    bt.check_fit(objs, *bt.collider(20, 12, 20), "tick")
     return objs

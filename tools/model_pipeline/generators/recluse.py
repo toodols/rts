@@ -1,5 +1,4 @@
-"""unit_defs/bot_t2.luau `recluse` (armsptk in BAR): the all-terrain rocket spider, capsule(42, 28, 42) -- 1.9
-studs of radius, 2.5 tall, at most 100 triangles. A low hexagonal body slung between four long ridged legs that
+"""unit_defs/bot_t2.luau `recluse` (armsptk in BAR): the all-terrain rocket spider, at most 100 triangles. A low hexagonal body slung between four long ridged legs that
 rise to high knees and come down to points far out on the diagonals, a pair of glowing eyes on its front, and a
 team-coloured rocket pod on its back with three glowing tubes for its three-rocket burst. The pod turns to aim;
 body and legs stay put.
@@ -7,12 +6,21 @@ body and legs stay put.
 
 import math
 
-from . import bot_t2_common as bt
-from .bot_t2_common import BACK, FRONT, UP, oring, tri_ring, vring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import FRONT, UP, oring, tri_ring, vring
+
+CATEGORY = "entity"
+DEF = "recluse"
+# its legs sweep about the vertical as it walks, carrying its splayed feet past the corners of its footprint
+ENVELOPE = {"width": 4.42, "length": 4.42}
+MOUNTS = {
+    1: {"pivot": (0, 1.6372, 0), "muzzle": (-0.6309, 0.1754, 0.8598)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("recluse", bt.rgb(150, 176, 120), glow=(1.0, 0.3, 0.2, 1.0), collider=bt.collider(42, 28, 42))
+    bot = bt.Bot("recluse", params["color"], glow=palette.SPIDER_EYE)
 
     # body: a low hexagon, widest at its middle; its top is hidden under the pod mount
     mid = oring(0.0, 0.0, 1.0, 0.95, 0.85, n=6, turn=0.0)

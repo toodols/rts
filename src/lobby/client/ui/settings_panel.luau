@@ -1,6 +1,7 @@
+--!strict
 -- The lobby's game mode, who may join it, whether allies' weapons hurt each other and, for a team game or a free for
 -- all, how it is won. The host changes them; everyone else sees them. A co-op lobby's mode is its campaign mission, and
--- it and ally griefing stay as the mission has them.
+-- stays as the mission has it; its host still picks ally griefing.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -13,8 +14,6 @@ local protocol = require(ReplicatedStorage.Lobby.protocol)
 local controls = require(script.Parent.controls)
 
 type Mode = game_modes.Mode
-
-local ACTIONS = protocol.ACTIONS
 
 local function Chip(props: {
 	label: string,
@@ -53,41 +52,36 @@ end
 
 local function SettingsPanel(props: {
 	mode: string,
-	visibility: string,
+	visibility: protocol.Visibility,
 	ally_griefing: boolean,
-	end_mode: string,
+	end_mode: game_modes.EndMode,
 	is_host: boolean,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 })
 	local locked = not props.is_host
 	local current = game_modes.get(props.mode)
 	-- a co-op lobby plays its mission, and nothing about the game can be changed
-	local mission = if current ~= nil and current.kind == "campaign" then current else nil
+	local mission = if current ~= nil and current.mission ~= nil then current else nil
 	local game_locked = locked or mission ~= nil
-	local by_kind: { [string]: { [string]: any } } = { scavengers = {}, teams = {}, ffa = {} }
+	local by_group: { [string]: { [string]: any } } = { scavengers = {}, teams = {}, ffa = {} }
 	for index, mode in game_modes.MODES do
-		-- a campaign mission is played from the campaign screen, never by a lobby
-		if by_kind[mode.kind] == nil then
+		-- a campaign mode is in no group: it is started from the campaign screen
+		local group = mode.group
+		if group == nil then
 			continue
 		end
-		local label = mode.label
-		if mode.kind == "scavengers" then
-			-- the group's caption already says scavengers
-			label = (game_modes.difficulty(mode.difficulty :: string) :: game_modes.Difficulty).label
-		end
-		by_kind[mode.kind][mode.id] = React.createElement(Chip, {
-			label = label,
+		by_group[group][mode.id] = React.createElement(Chip, {
+			label = mode.chip_label,
 			active = mode.id == props.mode,
 			locked = locked,
 			on_pick = function()
-				props.act(ACTIONS.set_mode, mode.id)
+				props.act("set_mode", mode.id)
 			end,
 			LayoutOrder = index,
 		})
 	end
-	-- only a team game or a free for all is won by putting the other sides out; the scavengers and a mission end their
-	-- own ways
-	local elimination = current ~= nil and (current.kind == "teams" or current.kind == "ffa")
+	-- only a mode that puts sides out is won by an end mode; the scavengers and a mission end their own ways
+	local elimination = current ~= nil and current.eliminates
 	local end_modes: { [string]: any } = {}
 	for index, option in game_modes.END_MODES do
 		end_modes[option.id] = React.createElement(Chip, {
@@ -95,7 +89,7 @@ local function SettingsPanel(props: {
 			active = option.id == props.end_mode,
 			locked = game_locked,
 			on_pick = function()
-				props.act(ACTIONS.set_end_mode, option.id)
+				props.act("set_end_mode", option.id)
 			end,
 			LayoutOrder = index,
 		})
@@ -141,19 +135,19 @@ local function SettingsPanel(props: {
 			then React.createElement(Group, {
 				label = "SCAVENGERS",
 				LayoutOrder = 3,
-			}, by_kind.scavengers)
+			}, by_group.scavengers)
 			else nil,
 		Teams = if mission == nil
 			then React.createElement(Group, {
 				label = "TEAMS",
 				LayoutOrder = 4,
-			}, by_kind.teams)
+			}, by_group.teams)
 			else nil,
 		Ffa = if mission == nil
 			then React.createElement(Group, {
 				label = "FREE FOR ALL",
 				LayoutOrder = 5,
-			}, by_kind.ffa)
+			}, by_group.ffa)
 			else nil,
 		Seam = React.createElement("Frame", {
 			[React.Tag] = "seam",
@@ -168,7 +162,7 @@ local function SettingsPanel(props: {
 				active = props.visibility == "public",
 				locked = locked,
 				on_pick = function()
-					props.act(ACTIONS.set_visibility, "public")
+					props.act("set_visibility", "public")
 				end,
 				LayoutOrder = 1,
 			}),
@@ -177,7 +171,7 @@ local function SettingsPanel(props: {
 				active = props.visibility == "friends",
 				locked = locked,
 				on_pick = function()
-					props.act(ACTIONS.set_visibility, "friends")
+					props.act("set_visibility", "friends")
 				end,
 				LayoutOrder = 2,
 			}),
@@ -190,18 +184,18 @@ local function SettingsPanel(props: {
 			Off = React.createElement(Chip, {
 				label = "Off",
 				active = props.ally_griefing == false,
-				locked = game_locked,
+				locked = locked,
 				on_pick = function()
-					props.act(ACTIONS.set_ally_griefing, false)
+					props.act("set_ally_griefing", false)
 				end,
 				LayoutOrder = 1,
 			}),
 			On = React.createElement(Chip, {
 				label = "On",
 				active = props.ally_griefing,
-				locked = game_locked,
+				locked = locked,
 				on_pick = function()
-					props.act(ACTIONS.set_ally_griefing, true)
+					props.act("set_ally_griefing", true)
 				end,
 				LayoutOrder = 2,
 			}),

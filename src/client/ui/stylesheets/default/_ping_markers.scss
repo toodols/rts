@@ -1,4 +1,4 @@
-@use "theme" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
 
 // A ping's marker: the name of the team that pinged over its column, or at the edge of the screen behind an arrow
 // pointing the way to it. Where it sits, which way the arrow points and the team's colour are set from code; this is

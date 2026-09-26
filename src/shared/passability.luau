@@ -1,31 +1,33 @@
--- Which cells of the map each slope class can stand on, worked out from the heightmap once and kept, so that
+-- Which cells of the map each movement class can stand on, worked out from the heightmap once and kept, so that
 -- asking is a byte read and not a slope calculation. Pathfinding and steering both read from it.
 --
--- The classes and their limits are BAR's, from the `maxslope` of each movement class in
--- gamedata/movedefs.lua, which is the steepest ground angle in degrees a unit of the class can stand on
--- (the engine's own 1.5 multiplier and the file's division by it cancel, so the number in the file is the
--- angle): 54 for bots, the amphibious bot and the commander (`SLOPE.DIFFICULT`), 27 for tanks (`SLOPE.MINIMUM`). Ground exactly
--- at the limit is passable and anything steeper is not, as it is there. A unit with no slope class, like an
--- aircraft or a ship, has no limit.
+-- A class's limit is its `max_slope` (shared/move_classes), BAR's `maxslope`. Ground exactly at the limit is passable
+-- and anything steeper is not, as it is there. Something with no class, like an aircraft, or a class held to no
+-- slope, a ship's, has no limit.
 --
--- A hovercraft's classes (HOVER2 and HOVER3, `SLOPE.MODERATE`, 33) hold it to that slope only on land: BAR gives them
--- no limit over water (`maxwaterslope = SLOPE.MAXIMUM`), since a hovercraft rides the water's flat surface and not
--- the sea floor. So a hover class is judged by the surface it rides, the ground or the water over it, whichever is
--- higher, and the sea is flat to it however steep the floor under it.
+-- A hovercraft's classes hold it to their slope only on land: BAR gives them no limit over water
+-- (`maxwaterslope = SLOPE.MAXIMUM`), since a hovercraft rides the water's flat surface and not the sea floor. So a
+-- hover class is judged by the surface it rides, the ground or the water over it, whichever is higher, and the sea is
+-- flat to it however steep the floor under it.
 --
 -- A cell is as steep as the average slope of its four corners' surface. Classes with the same limit, and that ride
 -- the same surface, share one map, so there are as many maps as there are different pairs of those, not classes.
 --
 -- The map is a `buffer` of one byte a cell, `1` where the class can stand and `0` where it cannot, in rows of
--- `width`: cell (cx, cz), which spans `config.CELL_STUDS` studs and is counted from 0 at the map's low corner,
+-- `width`: cell (cx, cz), which spans `world_scale.CELL_STUDS` studs and is counted from 0 at the map's low corner,
 -- is byte `cz * width + cx`. A pathfinder can read `buffer.readu8` on it directly.
 --
 -- `initialize` must be called after `heightmap.initialize`, and `refresh` whenever the ground is edited.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local config = require(ReplicatedStorage.Shared.config)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local move_classes = require(ReplicatedStorage.Shared.move_classes)
+local types = require(ReplicatedStorage.Shared.types)
+
+type MoveClassName = types.MoveClassName
 
 export type PassabilityMap = {
 	width: number,
@@ -37,39 +39,11 @@ export type PassabilityMap = {
 	cells: buffer,
 }
 
-local CELL_STUDS = config.CELL_STUDS
--- The map's size in cells, taken from the heightmap by `initialize`, since maps are not all the same size.
-local width = config.MAP_CELLS_X
-local depth = config.MAP_CELLS_Z
-
--- Movement class to its `maxslope`, in degrees.
-local SLOPE_CLASSES: { [string]: number } = {
-	COMMANDERBOT = 54,
-	BOT2 = 54,
-	BOT3 = 54,
-	ABOT3 = 54,
-	SBOT2 = 54,
-	HBOT4 = 54,
-	HBOT7 = 54,
-	VBOT6 = 54,
-	HABOT5 = 54,
-	TBOT3 = 90,
-	HTBOT6 = 90,
-	TANK2 = 27,
-	TANK3 = 27,
-	HTANK4 = 27,
-	HTANK7 = 33,
-	MTANK3 = 27,
-	ATANK3 = 54,
-	HOVER2 = 33,
-	HOVER3 = 33,
-}
-
--- The classes that ride the water's surface, a hovercraft's.
-local OVER_WATER_CLASSES: { [string]: boolean } = {
-	HOVER2 = true,
-	HOVER3 = true,
-}
+local CELL_STUDS = world_scale.CELL_STUDS
+-- The map's size in cells, taken from the heightmap by `initialize`, since maps are not all the same size; none until
+-- a map is built.
+local width = 0
+local depth = 0
 
 -- Keyed by `map_key`, so classes with the same limit that ride the same surface share.
 local maps: { [string]: PassabilityMap } = {}
@@ -90,7 +64,7 @@ end
 -- The height of the surface at corner (cx, cz): the ground, or where `over_water` the water over it if that is higher.
 local function surface_sample(cx: number, cz: number, over_water: boolean): number
 	local ground = heightmap.sample(cx, cz)
-	return if over_water then math.max(ground, config.WATER_LEVEL) else ground
+	return if over_water then math.max(ground, ground_levels.WATER_LEVEL) else ground
 end
 
 -- Rise over run of the ground in a cell: the length of the gradient of its surface, averaged over the cell. With
@@ -126,8 +100,12 @@ end
 local function initialize()
 	width, depth = heightmap.cells()
 	table.clear(maps)
-	for slope_class, max_slope in SLOPE_CLASSES do
-		local over_water = OVER_WATER_CLASSES[slope_class] == true
+	for _, class in move_classes.CLASSES do
+		local max_slope = class.max_slope
+		if max_slope == nil then
+			continue
+		end
+		local over_water = class.water == "hover"
 		local key = map_key(max_slope, over_water)
 		if maps[key] == nil then
 			maps[key] = {
@@ -142,31 +120,37 @@ local function initialize()
 	refresh(0, 0, width - 1, depth - 1)
 end
 
--- The steepest angle, in degrees, that a slope class can stand on; nil for no class, which has no limit.
-local function max_slope(slope_class: string?): number?
-	if slope_class == nil then
-		return nil
-	end
-	local degrees = SLOPE_CLASSES[slope_class]
-	assert(degrees ~= nil, `unknown slope class "{slope_class}"`)
-	return degrees
+-- The steepest angle, in degrees, that a movement class can stand on; nil for no class, or one held to no slope,
+-- which has no limit.
+local function max_slope(class: MoveClassName?): number?
+	local move = move_classes.of(class)
+	return if move ~= nil then move.max_slope else nil
 end
 
--- The passability map of a slope class, for a pathfinder that wants to read it directly; nil for no class,
--- which can stand anywhere.
-local function map_for(slope_class: string?): PassabilityMap?
-	local degrees = max_slope(slope_class)
-	if degrees == nil then
+-- The passability map of a movement class, for a pathfinder that wants to read it directly; nil for no class, or one
+-- held to no slope, which can stand anywhere.
+local function map_for(class: MoveClassName?): PassabilityMap?
+	local move = move_classes.of(class)
+	if move == nil or move.max_slope == nil then
 		return nil
 	end
-	local map = maps[map_key(degrees, OVER_WATER_CLASSES[slope_class :: string] == true)]
+	local map = maps[map_key(move.max_slope, move.water == "hover")]
 	assert(map ~= nil, "passability.initialize has not been called")
 	return map
 end
 
+-- Every passability map there is, one for each slope and surface some class has.
+local function all_maps(): { PassabilityMap }
+	local found = {}
+	for _, map in maps do
+		table.insert(found, map)
+	end
+	return found
+end
+
 -- Whether cell (cx, cz) is ground the class can stand on. Off the map nothing can, unless it has no class.
-local function passable_cell(slope_class: string?, cx: number, cz: number): boolean
-	local map = map_for(slope_class)
+local function passable_cell(class: MoveClassName?, cx: number, cz: number): boolean
+	local map = map_for(class)
 	if map == nil then
 		return true
 	end
@@ -177,9 +161,9 @@ local function passable_cell(slope_class: string?, cx: number, cz: number): bool
 end
 
 -- Whether the point (x, z) in the world is on ground the class can stand on.
-local function passable_at(slope_class: string?, x: number, z: number): boolean
+local function passable_at(class: MoveClassName?, x: number, z: number): boolean
 	local gx, gz = heightmap.world_to_grid(x, z)
-	return passable_cell(slope_class, math.floor(gx), math.floor(gz))
+	return passable_cell(class, math.floor(gx), math.floor(gz))
 end
 
 return table.freeze({
@@ -189,6 +173,7 @@ return table.freeze({
 	steepness_limit = steepness_limit,
 	max_slope = max_slope,
 	map_for = map_for,
+	all_maps = all_maps,
 	passable_cell = passable_cell,
 	passable_at = passable_at,
 })

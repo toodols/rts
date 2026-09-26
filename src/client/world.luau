@@ -8,15 +8,29 @@
 -- A map can be strewn with thousands of reclaimables, rocks and trees that never move and almost never change, so
 -- they are kept out of `all()`, which what runs every frame walks: they are only looked up by id (`get`), and the few
 -- someone has started reclaiming are listed in `reclaimables_started()`, for the bars over them.
+--
+-- What is listed in either is told about as it changes, for what shows it to follow without looking again and again:
+-- `subscribe_listed` as a model is listed, `subscribe_changed` with its id and the attribute whenever one of its
+-- attributes changes, and `subscribe_removed` as any tracked model goes (reclaimables never started included), with
+-- the id it had.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
+local signal = require(ReplicatedStorage.Shared.signal)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local switches = require(ReplicatedStorage.Shared.switches)
+local teams = require(ReplicatedStorage.Shared.teams)
+local seating = require(ReplicatedStorage.Shared.seating)
 
 type EntityId = types.EntityId
+type EntityDef = types.EntityDef
+
+-- Whose side something is on, as `viewer` sees it (`relation`).
+export type Relation = "own" | "ally" | "enemy" | "neutral"
 
 local by_id: { [EntityId]: Model } = {}
 local id_of_model: { [Model]: EntityId } = {}
@@ -28,7 +42,13 @@ local started: { Model } = {}
 local started_index: { [Model]: number } = {}
 -- the reclaimables not started yet, each waiting for its store to go down
 local watching: { [Model]: RBXScriptConnection } = {}
+-- what is listed in `models` or `started`, each told about as its attributes change
+local attribute_connections: { [Model]: RBXScriptConnection } = {}
 local folder: Folder? = nil
+
+local listed = signal.new() :: signal.Signal<Model>
+local changed = signal.new() :: signal.Signal<EntityId, string>
+local removed = signal.new() :: signal.Signal<Model, EntityId>
 
 local function container(): Folder
 	if folder ~= nil then
@@ -39,12 +59,16 @@ local function container(): Folder
 	return found
 end
 
-local function add_to(list: { Model }, index: { [Model]: number }, model: Model)
+local function add_to(list: { Model }, index: { [Model]: number }, model: Model, id: EntityId)
 	if index[model] ~= nil then
 		return
 	end
 	table.insert(list, model)
 	index[model] = #list
+	attribute_connections[model] = model.AttributeChanged:Connect(function(attribute: string)
+		changed.fire(id, attribute)
+	end)
+	listed.fire(model)
 end
 
 local function remove_from(list: { Model }, index: { [Model]: number }, model: Model)
@@ -60,12 +84,12 @@ local function remove_from(list: { Model }, index: { [Model]: number }, model: M
 end
 
 -- A reclaimable joins `started` once what is left in it drops below what it held, and stays until it is gone.
-local function watch_reclaimable(model: Model)
+local function watch_reclaimable(model: Model, id: EntityId)
 	local function check(): boolean
-		local left = model:GetAttribute "reclaim_left"
-		local total = model:GetAttribute "reclaim_total"
-		if typeof(left) == "number" and typeof(total) == "number" and left < total then
-			add_to(started, started_index, model)
+		local left = entity_attrs.number(model, "reclaim_left")
+		local total = entity_attrs.number(model, "reclaim_total")
+		if left ~= nil and total ~= nil and left < total then
+			add_to(started, started_index, model, id)
 			return true
 		end
 		return false
@@ -73,7 +97,7 @@ local function watch_reclaimable(model: Model)
 	if check() then
 		return
 	end
-	watching[model] = model:GetAttributeChangedSignal("reclaim_left"):Connect(function()
+	watching[model] = entity_attrs.changed(model, "reclaim_left"):Connect(function()
 		if check() then
 			local connection = watching[model]
 			if connection ~= nil then
@@ -87,10 +111,10 @@ end
 local function add(model: Model, id: EntityId)
 	by_id[id] = model
 	id_of_model[model] = id
-	if model:GetAttribute "kind" == "reclaimable" then
-		watch_reclaimable(model)
+	if entity_attrs.kind(model) == "reclaimable" then
+		watch_reclaimable(model, id)
 	else
-		add_to(models, index_of, model)
+		add_to(models, index_of, model, id)
 	end
 end
 
@@ -99,16 +123,16 @@ local function track(child: Instance)
 		return
 	end
 	local model = child :: Model
-	local id = model:GetAttribute "entity_id"
-	if typeof(id) == "number" then
+	local id = entity_attrs.id(model)
+	if id ~= nil then
 		add(model, id)
 		return
 	end
 	-- the model can replicate a frame before its attributes do
 	local connection: RBXScriptConnection
-	connection = model:GetAttributeChangedSignal("entity_id"):Connect(function()
-		local late = model:GetAttribute "entity_id"
-		if typeof(late) == "number" then
+	connection = entity_attrs.changed(model, "entity_id"):Connect(function()
+		local late = entity_attrs.id(model)
+		if late ~= nil then
 			connection:Disconnect()
 			add(model, late)
 		end
@@ -121,19 +145,23 @@ local function untrack(child: Instance)
 	end
 	local model = child :: Model
 	local id = id_of_model[model]
-	if id ~= nil then
-		id_of_model[model] = nil
-		if by_id[id] == model then
-			by_id[id] = nil
-		end
+	if id == nil then
+		return
+	end
+	id_of_model[model] = nil
+	if by_id[id] == model then
+		by_id[id] = nil
 	end
 	remove_from(models, index_of, model)
 	remove_from(started, started_index, model)
-	local connection = watching[model]
-	if connection ~= nil then
-		connection:Disconnect()
-		watching[model] = nil
+	for _, connections in { watching, attribute_connections } do
+		local connection = connections[model]
+		if connection ~= nil then
+			connection:Disconnect()
+			connections[model] = nil
+		end
 	end
+	removed.fire(model, id)
 end
 
 -- Every live entity model but the reclaimables. The returned table is reused, so callers must not hold onto it.
@@ -162,7 +190,7 @@ end
 local function from_instance(instance: Instance?): Model?
 	local current = instance
 	while current ~= nil do
-		if current:IsA "Model" and current:GetAttribute "entity_id" ~= nil then
+		if current:IsA "Model" and entity_attrs.id(current) ~= nil then
 			return current
 		end
 		current = current.Parent
@@ -171,11 +199,19 @@ local function from_instance(instance: Instance?): Model?
 end
 
 local function id_of(model: Model): EntityId?
-	local id = model:GetAttribute "entity_id"
-	if typeof(id) ~= "number" then
-		return nil
-	end
-	return id
+	return entity_attrs.id(model)
+end
+
+-- The def `model` is of, or nil for one that names none. A wreck names the def of what it was.
+local function def_of(model: Model): EntityDef?
+	local def_name = entity_attrs.def_name(model)
+	return if def_name ~= nil then unit_defs.defs[def_name] else nil
+end
+
+-- The def of the entity `id`, or nil when it is not there or names none.
+local function def_of_id(id: EntityId): EntityDef?
+	local model = get(id)
+	return if model ~= nil then def_of(model) else nil
 end
 
 -- An entity model is placed by its pivot, whether or not it has a PrimaryPart, so that is where
@@ -184,23 +220,83 @@ local function position_of(model: Model): Vector3
 	return model:GetPivot().Position
 end
 
--- Whether an entity is yours to select and command: it is on your team, or the server is in
--- godmode and it is on any real team. The neutral team 0 is never anyone's.
+-- Whether `model` is remains, a wreck or a reclaimable (`unit_defs.is_remains_kind`).
+local function is_remains(model: Model): boolean
+	local kind = entity_attrs.kind(model)
+	return kind ~= nil and unit_defs.is_remains_kind(kind)
+end
+
+-- Whose side `model` is on as `viewer`, an entity model, sees it: the viewer's own team ("own"), a team allied with it
+-- ("ally"), any other side ("enemy"), or nobody's ("neutral": rocks, trees and wrecks). An order is judged from what it
+-- is given to, which in godmode can be on any team. `ally_group` is the same for every team in an alliance, itself
+-- included, so comparing it tells an ally without the client knowing the alliance graph.
+local function relation(model: Model, viewer: Model): Relation
+	local team = entity_attrs.team(model)
+	if team == nil or team == teams.NEUTRAL or is_remains(model) then
+		return "neutral"
+	end
+	if team == entity_attrs.team(viewer) then
+		return "own"
+	end
+	return if entity_attrs.number(model, "ally_group") == entity_attrs.number(viewer, "ally_group")
+		then "ally"
+		else "enemy"
+end
+
+-- Whether something on `viewer`'s side may attack `model`: an enemy's, or a wreck, which is nobody's but may be shot
+-- apart all the same.
+local function is_attackable(model: Model, viewer: Model): boolean
+	return entity_attrs.kind(model) == "wreck" or relation(model, viewer) == "enemy"
+end
+
+-- Whether something on `viewer`'s side may guard `model`: its own side's or an ally's, never an enemy's or nobody's.
+local function is_guardable(model: Model, viewer: Model): boolean
+	local side = relation(model, viewer)
+	return side == "own" or side == "ally"
+end
+
+-- Whether an entity is yours to select and command: on your team, or in godmode on any real team, and not a drone,
+-- which its carrier looks after. Nobody's things are never anyone's.
 local function is_mine(model: Model): boolean
-	local team = model:GetAttribute "team"
-	if typeof(team) ~= "number" then
+	local team = entity_attrs.team(model)
+	if team == nil or team == teams.NEUTRAL then
 		return false
 	end
-	-- a drone is not yours to pick or command: its carrier looks after it
-	local def_name = model:GetAttribute "def_name"
-	local def = if typeof(def_name) == "string" then unit_defs.defs[def_name] else nil
-	if def ~= nil and def.drone == true then
+	local def = def_of(model)
+	if def ~= nil and unit_defs.is_drone(def) then
 		return false
 	end
-	if Workspace:GetAttribute "godmode" == true then
-		return team ~= 0
+	return switches.is_on "godmode" or team == seating.team_of(Players.LocalPlayer)
+end
+
+-- Whether the local player only watches: they are on no team, and command nothing.
+local function spectating(): boolean
+	return seating.is_spectator(Players.LocalPlayer)
+end
+
+-- Whether an entity can be selected: yours, or, for a spectator, anything on a real team, to see it and its team's
+-- resources.
+local function is_selectable(model: Model): boolean
+	if is_mine(model) then
+		return true
 	end
-	return team == Players.LocalPlayer:GetAttribute "team"
+	local team = entity_attrs.team(model)
+	return spectating() and team ~= nil and team ~= teams.NEUTRAL
+end
+
+-- Your commanders on the field, lowest entity id first.
+local function my_commanders(): { Model }
+	local found: { Model } = {}
+	for _, model in models do
+		local def = def_of(model)
+		if def ~= nil and unit_defs.is_commander(def) and is_mine(model) and id_of(model) ~= nil then
+			table.insert(found, model)
+		end
+	end
+	table.sort(found, function(a: Model, b: Model): boolean
+		return (id_of(a) :: EntityId) < (id_of(b) :: EntityId)
+	end)
+	return found
 end
 
 local function init()
@@ -220,6 +316,18 @@ return table.freeze({
 	get = get,
 	from_instance = from_instance,
 	id_of = id_of,
+	def_of = def_of,
+	def_of_id = def_of_id,
+	relation = relation,
+	is_remains = is_remains,
+	is_attackable = is_attackable,
+	is_guardable = is_guardable,
+	my_commanders = my_commanders,
 	position_of = position_of,
 	is_mine = is_mine,
+	spectating = spectating,
+	is_selectable = is_selectable,
+	subscribe_listed = listed.subscribe,
+	subscribe_changed = changed.subscribe,
+	subscribe_removed = removed.subscribe,
 })

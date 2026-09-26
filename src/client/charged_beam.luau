@@ -1,4 +1,4 @@
--- The dressing of a heavy beam weapon (`charged_beam` on its def's weapon): the Sharpshooter's, the Starlight's and
+-- The dressing of a heavy beam weapon (`charged` on its weapon's beam): the Sharpshooter's, the Starlight's and
 -- the Pulsar's. It is only drawn.
 --
 -- Its muzzle glows as the weapon charges up between shots (the `reload_progress` the server replicates): a core that
@@ -12,20 +12,18 @@
 local Debris = game:GetService "Debris"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
-local Workspace = game:GetService "Workspace"
 
-local config = require(ReplicatedStorage.Shared.config)
+local appearance = require(ReplicatedStorage.Shared.appearance)
 local types = require(ReplicatedStorage.Shared.types)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
+
+local world_fx = require(ReplicatedStorage.Client.world_fx)
 
 local TAU = 2 * math.pi
 local WHITE = Color3.new(1, 1, 1)
 
--- A laser's colour when its weapon does not say: its team's.
-local TEAM_BEAM_COLORS: { [number]: Color3 } = {
-	[1] = Color3.fromRGB(140, 200, 255),
-	[2] = Color3.fromRGB(255, 150, 130),
-	[config.SCAVENGER_TEAM] = Color3.fromRGB(206, 130, 255),
-}
+-- A laser's colour when its weapon does not say is its team's, lightened by this much toward white, since it glows.
+local TEAM_BEAM_LIGHTEN = 0.4
 
 -- The muzzle: its core's width against the beam's, and the least it is; how many rings sit round the barrel behind
 -- it, how far apart in muzzle widths, and how wide against the core; how fast a full charge breathes, in breaths a
@@ -66,29 +64,17 @@ local SHOT_IMPACT_FLASH = 5
 local SHOT_LEAST_TIME = 0.45
 local SHOT_LEAST_GLOW = 0.5
 
--- The colour a laser of a weapon that says `color`, fired by `team`, is drawn in.
+-- The colour a laser of a weapon that says `color`, fired by `team`, is drawn in: white for nobody's.
 local function color_of(color: Color3?, team: number?): Color3
 	if color ~= nil then
 		return color
 	end
-	local by_team = if team ~= nil then TEAM_BEAM_COLORS[team] else nil
-	return by_team or WHITE
-end
-
-local function effects_folder(): Instance
-	return Workspace:FindFirstChild "Effects" or Workspace
+	return if team ~= nil then appearance.team_color(team):Lerp(WHITE, TEAM_BEAM_LIGHTEN) else WHITE
 end
 
 local function glowing_part(name: string, shape: Enum.PartType, color: Color3): Part
-	local part = Instance.new "Part"
-	part.Name = name
+	local part = world_fx.part(name)
 	part.Shape = shape
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
 	part.Color = color
 	return part
 end
@@ -138,9 +124,9 @@ type Muzzle = {
 
 local muzzles: { [Model]: Muzzle } = {}
 
-local function make_muzzle(parent: Instance, weapon: types.Weapon, team: number?): Muzzle
-	local color = color_of(weapon.beam_color, team)
-	local width = math.max((weapon.beam_thickness or 0.25) * MUZZLE_WIDTH, MUZZLE_LEAST)
+local function make_muzzle(parent: Instance, beam: types.Beam, team: number?): Muzzle
+	local color = color_of(beam.color, team)
+	local width = math.max((beam.thickness or 0.25) * MUZZLE_WIDTH, MUZZLE_LEAST)
 	local folder = Instance.new "Folder"
 	folder.Name = "ChargeGlow"
 	local core = glowing_part("Charge", Enum.PartType.Ball, color:Lerp(WHITE, 0.2))
@@ -181,26 +167,18 @@ local function forget(model: Model)
 	end
 end
 
--- Draws the muzzle of `model`'s charged beam `weapon` at `at`, a frame facing along the barrel, for this frame;
+-- Draws the muzzle of `model`'s charged `beam` at `at`, a frame facing along the barrel, for this frame;
 -- `showing` is false while it is not a finished, working thing (a blueprint, a wreck), which hides it. The glow is
 -- kept under `parent`, the model's art.
-local function step_muzzle(
-	model: Model,
-	weapon: types.Weapon,
-	at: CFrame,
-	showing: boolean,
-	parent: Instance,
-	dt: number
-)
+local function step_muzzle(model: Model, beam: types.Beam, at: CFrame, showing: boolean, parent: Instance, dt: number)
 	local muzzle = muzzles[model]
 	if muzzle == nil then
-		local team = model:GetAttribute "team"
-		muzzle = make_muzzle(parent, weapon, if typeof(team) == "number" then team else nil)
+		muzzle = make_muzzle(parent, beam, entity_attrs.team(model))
 		muzzles[model] = muzzle
 	end
 	local now = os.clock()
-	local progress = model:GetAttribute "reload_progress"
-	local charge = if showing and typeof(progress) == "number" then progress elseif showing then 1 else 0
+	local progress = entity_attrs.number(model, "reload_progress")
+	local charge = if showing and progress ~= nil then progress elseif showing then 1 else 0
 	if muzzle.seen ~= nil and charge < muzzle.seen - FIRED_DROP then
 		muzzle.flashed_at = now
 		muzzle.shown = charge
@@ -314,7 +292,7 @@ local function draw(from: Vector3, to: Vector3, color: Color3, thickness: number
 	light.Shadows = false
 	light.Parent = impact
 
-	folder.Parent = effects_folder()
+	folder.Parent = world_fx.folder()
 	Debris:AddItem(folder, total + 0.1)
 
 	local started = os.clock()

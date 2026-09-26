@@ -9,8 +9,8 @@ return {
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 4.51, 0 }, size = { 8, 9.02, 8 }, hash = "2cc737cd5e8d7002", mesh = "rbxassetid://122231836157498" },
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 6.3, -0.6693 }, size = { 5.8, 9.4, 6.3615 }, hash = "740e9af16dfd6cb2", mesh = "rbxassetid://111876513571079" },
 		{ group = "base", color = { 0.45, 0.9, 1 }, offset = { 0, 4.57, 0 }, size = { 4.436, 4.752, 4.9375 }, hash = "c9132e5ca88a3f75", neon = true, mesh = "rbxassetid://112678645331165" },
-		{ group = "base", color = { 0.392, 0.588, 0.784 }, offset = { 0, 8.65, 0 }, size = { 5.7, 0.9, 4.9363 }, hash = "e08446807060a38b", team = true, mesh = "rbxassetid://124001687847720" },
-		{ group = "hatch", color = { 0.392, 0.588, 0.784 }, offset = { 0, 0.25, 2.4249 }, size = { 5.6, 0.5, 4.8497 }, hash = "5346331224a19982", team = true, mesh = "rbxassetid://129333843305141" },
+		{ group = "base", color = { 0.3922, 0.5882, 0.7843 }, offset = { 0, 8.65, 0 }, size = { 5.7, 0.9, 4.9363 }, hash = "e08446807060a38b", team = true, mesh = "rbxassetid://124001687847720" },
+		{ group = "hatch", color = { 0.3922, 0.5882, 0.7843 }, offset = { 0, 0.25, 2.4249 }, size = { 5.6, 0.5, 4.8497 }, hash = "5346331224a19982", team = true, mesh = "rbxassetid://129333843305141" },
 		{ group = "radar", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.1813, -0.0845 }, size = { 2.8, 1.3745, 0.8182 }, hash = "94cb99ed29e792b0", mesh = "rbxassetid://135272821794525" },
 	},
 }

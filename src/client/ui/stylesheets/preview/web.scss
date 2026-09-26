@@ -4,7 +4,7 @@
 // property. Both divergences are gone — the leaf partials `@use "main"` for their `@extend`
 // targets, and `_theme.scss` interpolates its `:root` values — so this is now `default.scss` with
 // a different compiler pointed at it, which is what a reference render should be.
-@use "default/main";
+@use "../../../client_shared/stylesheets/main";
 @use "default/resource_bar";
 @use "default/selection_panel";
 @use "default/build_menu";

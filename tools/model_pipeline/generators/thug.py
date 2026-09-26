@@ -4,17 +4,23 @@ Short, wide and heavily plated where the Grunt is a slim runner: stubby braced l
 with an armored hump on top, the head sunk low at the front, massive shoulder plates, a fat plasma
 cannon on the right arm and an armored fist on the left. The upper body turns as weapon 1's turret; each leg swings about its hip as it walks.
 
-Collider capsule(29, 32, 29): radius 1.32, height 2.91 studs. Budget: 100 triangles.
+Budget: 100 triangles.
 """
 
-from . import bot_t1_common as bt
+from .shared import bot_t1 as bt
+from .shared import common
+from .shared import palette
 
-ACCENT = bt.rgb(196, 140, 84)
-GLOW = (1.0, 0.72, 0.25, 1.0)  # plasma orange
+CATEGORY = "entity"
+DEF = "thug"
+MOUNTS = {
+    1: {"pivot": (0, 0, 0), "muzzle": (1.0606, 2.0823, 1.3182)},
+}
 
 
 def generate(params):
-    m = bt.Mats("thug", ACCENT, GLOW)
+    accent = params["color"]
+    m = common.Materials(accent, palette.PLASMA_GOLD)
 
     upper = []
     chest = m.body(bt.slab("chest", 0.72, 0.56, 0.66, top_w=1.0, top_d=0.74, top_offset=(0.0, 0.0), origin=(0.0, 0.0, 1.10)))
@@ -41,6 +47,4 @@ def generate(params):
 
     bt.group(upper, "torso", chest, kind="turret", weapon=1)
     objs = upper + legs
-    bt.finish(objs)
-    bt.check_fit(objs, *bt.collider(29, 32, 29), "thug")
     return objs

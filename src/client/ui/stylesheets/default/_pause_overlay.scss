@@ -1,5 +1,5 @@
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // The game paused: the whole screen dimmed, a little less than for the end of a game, and a plate across the middle
 // with hazard stripes along its top and bottom so it reads as a halt rather than a result. It sits under the victory

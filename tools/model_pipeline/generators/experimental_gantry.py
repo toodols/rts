@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `experimental_gantry` (BAR corgant): a 4x3x4 cell (16 x 12 x 16 stud) factory for T3
+"""unit_defs/factory.luau `experimental_gantry` (BAR corgant): a factory for T3
 experimentals.
 
 Two massive sloped towers flank a tall open bay closed at the back by a dark wall; a heavy team-coloured gantry
@@ -6,11 +6,15 @@ bridge spans the tower tops over the doorway, and three yellow nanolathes hang f
 the front edge where production.luau builds each unit (Blender -Y, Roblox +Z). Under 100 triangles.
 """
 
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "experimental_gantry"
 
 
 def generate(params):
-    k = fc.Kit("gantry")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     trim, body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     floor = 0.7
     bay = 4.3
@@ -18,7 +22,7 @@ def generate(params):
     tower_top = 11.8
     glacis_top = -5.0
 
-    footing = fc.Shape().hull((-8, 8, -8, 8), (-7.6, 7.6, -7.6, 7.6), 0.0, floor)
+    footing = fc.Shape().hull((-hw, hw, -hl, hl), (-7.6, 7.6, -7.6, 7.6), 0.0, floor)
 
     lean = 1.8  # the towers' inner walls lean in, narrowing the doorway toward the top
     for sx in (-1, 1):
@@ -50,11 +54,11 @@ def generate(params):
     fc.chevron(nano, 0.0, front + 2.2, floor + 0.02, 5.6, 0.9)
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.trim(trim.build("trim")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.trim_mat(trim.build("trim")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
-    return fc.finish(objs)
+    return objs

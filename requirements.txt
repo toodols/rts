@@ -1,0 +1,7 @@
+# The tools' Python packages (python -m pip install -r requirements.txt), at the versions they are run with.
+# Blender (5.2, for tools/model_pipeline) and outlass (tools/stylesheets.py) are not pip packages: see their scripts.
+lupa==2.8           # tools/bar_maps/import_bar_features.py reads BAR's feature definitions, which are Lua
+numpy==2.5.3        # tools/bar_maps, tools/sound_pipeline, tools/ai_arena
+Pillow==11.1.0      # tools/bar_maps, tools/model_pipeline/icon_sheet.py
+requests==2.32.3    # tools/roblox_open_cloud.py, which uploads
+scipy==1.18.1       # tools/bar_maps, tools/sound_pipeline

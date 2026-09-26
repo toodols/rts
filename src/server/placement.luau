@@ -1,210 +1,223 @@
--- Answers "can this footprint go here": the check a construction_bot runs before dropping a blueprint,
--- and the same check a factory runs on the spot in front of itself before starting the next unit.
+-- Answers "can this footprint go here" on the server (the rules are shared/placement_rules): the check a
+-- construction_bot runs before dropping a blueprint, and a factory on the spot in front of itself before starting the
+-- next unit.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
-local heightmap = require(ReplicatedStorage.Shared.heightmap)
-local spots = require(ReplicatedStorage.Shared.spots)
-local geometry = require(ReplicatedStorage.Shared.geometry)
+local placement_rules = require(ReplicatedStorage.Shared.placement_rules)
 
 local state = require(script.Parent.state)
 local air = require(script.Parent.air)
+local spatial = require(script.Parent.spatial)
 
 type Entity = types.Entity
-type EntityId = types.EntityId
-
--- Footprints are allowed to touch; only real overlap is rejected.
-local OVERLAP_PADDING = 0
--- How close to a spot a spot-bound building has to be to count as on it.
-local SPOT_MATCH_RADIUS = 0.5
--- How far off its grid position a building may be, only there to forgive float error.
-local GRID_TOLERANCE = 0.01
--- How close something has to be to a spot to be sitting on it or headed for it.
-local TAKEN_RADIUS = 1
+type TeamId = types.TeamId
+type Occupants = placement_rules.Occupants<Entity>
 
 local function half_extents_for(entity: Entity): Vector2
-	local def = unit_defs.of(entity)
-	return geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), entity.facing)
+	return placement_rules.footprint(entity.def, entity.facing)
 end
 
--- Whether something in the way of a footprint can be moved off it for `team`: a wreck or a reclaimable, which is
--- reclaimed, or one of its own units that can move, which is sent away.
-local function clearable(other: Entity, team: types.TeamId): boolean
-	if other.kind == "wreck" or other.kind == "reclaimable" then
-		return true
-	end
-	return other.kind == "unit"
-		and other.state == "active"
-		and other.team == team
-		and unit_defs.of(other).max_speed ~= nil
+-- Whether something in the way of a footprint can be moved off it for `team` (`placement_rules.clearable`).
+local function clearable(other: Entity, team: TeamId): boolean
+	return placement_rules.clearable(other.kind, other.state, other.def, other.team == team)
 end
 
--- Whether `other` is what `def_name` is built over in place (`EntityDef.upgrades`), a T1 mex under a T2 one or a
--- geothermal plant under an advanced one: it does not block the footprint, the way a wreck or a movable unit does not.
-local function is_upgrade_target(def_name: string, other: Entity): boolean
-	return other.kind == "building" and spots.upgrades(unit_defs.get(def_name), other.def_name)
+-- The map as the placement rules see it, for a builder of `clearing_team`, which clears what it can off a footprint
+-- (`clearable`), or for nothing that clears anything. One of each is made, the first time it is asked for.
+local function kind_of(entity: Entity): types.EntityKind
+	return entity.kind
 end
-
--- Everything standing in the way of a footprint at `position`.
-local function overlapping(def_name: string, position: Vector3, facing: number, ignore_id: EntityId?): { Entity }
-	local def = unit_defs.get(def_name)
-	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
-	local found: { Entity } = {}
-	for id, other in state.all() do
-		if other.alive == false or id == ignore_id or air.is_airborne(other) or is_upgrade_target(def_name, other) then
-			continue
+local function position_of(entity: Entity): Vector3
+	return entity.position
+end
+local function facing_of(entity: Entity): number
+	return entity.facing
+end
+-- the dead are not in the way, though they are in `spatial` until the step ends; what has just been made is, though it
+-- is not in `spatial` until it joins the world (`state.pending`), so that the next thing put down beside it sees it
+local function each_living_near(x: number, z: number, radius: number, visit: (Entity) -> ())
+	spatial.each_near(x, z, radius, function(other: Entity)
+		if other.alive then
+			visit(other)
 		end
-		if geometry.aabb_overlap(position, half, other.position, half_extents_for(other), OVERLAP_PADDING) then
+	end)
+	for _, made in state.pending() do
+		if made.alive and state.carrier_of(made.id) == nil then
+			visit(made)
+		end
+	end
+end
+local function def_of(entity: Entity): types.EntityDef
+	return entity.def
+end
+local function view(clearing: (Entity) -> boolean): Occupants
+	local occupants: Occupants = {
+		each_near = each_living_near,
+		kind = kind_of,
+		def = def_of,
+		position = position_of,
+		facing = facing_of,
+		airborne = air.is_airborne,
+		clearable = clearing,
+	}
+	return table.freeze(occupants)
+end
+local CLEARING_NOTHING = view(function(_: Entity): boolean
+	return false
+end)
+local views: { [TeamId]: Occupants } = {}
+local function occupants_for(clearing_team: TeamId?): Occupants
+	if clearing_team == nil then
+		return CLEARING_NOTHING
+	end
+	local found = views[clearing_team]
+	if found == nil then
+		found = view(function(other: Entity): boolean
+			return clearable(other, clearing_team)
+		end)
+		views[clearing_team] = found
+	end
+	return found
+end
+
+-- Everything standing in the way of a footprint at `position`, `ignore` aside, clearable or not.
+local function overlapping(def_name: string, position: Vector3, facing: number, ignore: Entity?): { Entity }
+	local found: { Entity } = {}
+	placement_rules.each_in_the_way(CLEARING_NOTHING, unit_defs.get(def_name), position, facing, function(other: Entity)
+		if other ~= ignore then
 			table.insert(found, other)
+		end
+	end)
+	return found
+end
+
+-- Returns whether the footprint is clear, and what is wrong when it is not (`placement_rules.problem`). Given a
+-- `clearing_team`, what that team can clear away, wrecks and its own movable units, is not counted as being in the way:
+-- removing it is the job of the builder, once it gets there. `ignore`, the builder itself, is never in the way.
+local function can_place(
+	def_name: string,
+	position: Vector3,
+	facing: number,
+	ignore: Entity?,
+	clearing_team: TeamId?
+): (boolean, placement_rules.Problem?)
+	local wrong = placement_rules.problem(occupants_for(clearing_team), def_name, position, facing, ignore)
+	return wrong == nil, wrong
+end
+
+-- The middle of something of `def_name` standing at (x, z) (`placement_rules.ground_center`).
+local function ground_center(def_name: string, x: number, z: number): Vector3
+	return placement_rules.ground_center(unit_defs.get(def_name), x, z)
+end
+
+-- Where `builder` already has something spot-bound queued to be built: none without a builder.
+local function queued_spots(builder: Entity?): { Vector3 }
+	local found: { Vector3 } = {}
+	if builder == nil then
+		return found
+	end
+	for _, order in builder.orders do
+		local def_name = order.def_name
+		if
+			order.kind == "build"
+			and def_name ~= nil
+			and order.position ~= nil
+			and unit_defs.get(def_name).spot ~= nil
+		then
+			table.insert(found, order.position)
 		end
 	end
 	return found
 end
 
--- Returns whether the footprint is clear, and a short reason when it is not. Given a `clearing_team`, what
--- that team can clear away, wrecks and its own movable units, is not counted as being in the way: removing
--- it is the job of the builder, once it gets there.
-local function can_place(
+-- Where a building asked for at (x, z) would actually go, turned to `facing` (`placement_rules.resolve_center`): a spot
+-- `builder` has a build queued onto is spoken for.
+local function resolve_center(def_name: string, x: number, z: number, facing: number, builder: Entity?): Vector3?
+	return placement_rules.resolve_center(
+		CLEARING_NOTHING,
+		unit_defs.get(def_name),
+		x,
+		z,
+		facing,
+		queued_spots(builder)
+	)
+end
+
+-- The first place on the rings round `around`, each `spacing` further out and six more places round than the one
+-- inside it, out to ring `rings`, where something of `def_name` turned to `facing` can go: where `resolve_center` puts
+-- it, clear (`can_place`), and, given `fits`, somewhere that allows. Nil when there is none.
+local function find_free_spot(
 	def_name: string,
-	position: Vector3,
+	around: Vector3,
 	facing: number,
-	ignore_id: EntityId?,
-	clearing_team: types.TeamId?
-): (boolean, string?)
-	local def = unit_defs.get(def_name)
-	local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
-
-	if heightmap.in_bounds(position.X - half.X, position.Z - half.Y) == false then
-		return false, "out of bounds"
-	end
-	if heightmap.in_bounds(position.X + half.X, position.Z + half.Y) == false then
-		return false, "out of bounds"
-	end
-
-	if def.kind == "building" then
-		local grid_x, grid_z = geometry.snap_center(position.X, position.Z, half, config.CELL_STUDS)
-		if math.abs(grid_x - position.X) > GRID_TOLERANCE or math.abs(grid_z - position.Z) > GRID_TOLERANCE then
-			return false, "off the grid"
+	rings: number,
+	spacing: number,
+	fits: ((center: Vector3) -> boolean)?
+): Vector3?
+	for ring = 0, rings do
+		local count = math.max(1, ring * 6)
+		for index = 0, count - 1 do
+			local angle = index * (math.pi * 2 / count)
+			local center = resolve_center(
+				def_name,
+				around.X + math.cos(angle) * ring * spacing,
+				around.Z + math.sin(angle) * ring * spacing,
+				facing
+			)
+			if center ~= nil and (fits == nil or fits(center)) and can_place(def_name, center, facing, nil) then
+				return center
+			end
 		end
 	end
-
-	local bound_to = spots.for_def(def)
-	if bound_to ~= nil then
-		-- placement snaps onto a spot before it gets here, so anything not exactly on one is off it
-		if bound_to.nearest(position.X, position.Z, SPOT_MATCH_RADIUS) == nil then
-			return false, if def.requires_geo_spot == true then "needs a geothermal vent" else "needs a metal spot"
-		end
-	end
-
-	local lowest, highest = heightmap.height_range(position.X, position.Z, half.X, half.Y)
-	if def.kind == "building" and highest - lowest > config.MAX_BUILD_SLOPE_STUDS then
-		return false, "ground too steep"
-	end
-	local deepest = math.max(0, config.WATER_LEVEL - lowest)
-	local shallowest = math.max(0, config.WATER_LEVEL - highest)
-	if unit_defs.tolerates_water(def, shallowest, deepest) == false then
-		return false, if deepest > def.max_water_depth then "water too deep" else "water too shallow"
-	end
-
-	for id, other in state.all() do
-		if other.alive == false then
-			continue
-		end
-		if id == ignore_id then
-			continue
-		end
-		-- an aircraft that is up in the air is over whatever is put down beneath it
-		if air.is_airborne(other) then
-			continue
-		end
-		if clearing_team ~= nil and clearable(other, clearing_team) then
-			continue
-		end
-		if is_upgrade_target(def_name, other) then
-			continue
-		end
-		if geometry.aabb_overlap(position, half, other.position, half_extents_for(other), OVERLAP_PADDING) then
-			return false, "blocked"
-		end
-	end
-
-	return true, nil
+	return nil
 end
 
--- Drops a footprint's centre onto what it rests on, so it sits on the terrain rather than in it, or on the
--- water's surface if it floats.
-local function ground_center(def_name: string, x: number, z: number): Vector3
-	local def = unit_defs.get(def_name)
-	return Vector3.new(x, unit_defs.surface_height(def, x, z) + unit_defs.collider_height(def) / 2, z)
-end
-
--- Whether something spot-bound already stands on `spot`, or is waiting in a builder's queue to.
--- If `builder_id` is provided, only that builder's own queue counts: it won't snap onto a spot it has already
--- queued, but may snap onto one another builder has queued. With no builder, every queue counts.
--- Spots with what `def_name` is built over in place (`EntityDef.upgrades`) on them are not considered taken.
-local function spot_taken(spot: Vector3, builder_id: EntityId?, def_name: string?): boolean
-	for _, other in state.all() do
-		if other.alive == false then
-			continue
-		end
-		if other.kind == "building" and spots.for_def(unit_defs.of(other)) ~= nil then
-			-- a T2 mex may go on a spot a T1 mex already stands on (fix #4), and an advanced geothermal on a vent a
-			-- plain one does
-			if def_name ~= nil and is_upgrade_target(def_name, other) then
+-- A search for somewhere on rings round `around`, from `inner` out to `outer`, `step` apart, with points about `step`
+-- apart round each (six at the least, and one at the very middle), each ring starting at an angle rolled from `random`:
+-- `try(x, z, angle)` is asked of each point in turn that `within` lets through (every point, without it), no more than
+-- `max_tries` of them (all, without it), and the first thing it gives is the answer. What the game's own players look
+-- for a place with: where the AI puts a building up, and where the scavengers put down what their beacons make.
+local function ring_search<T>(
+	around: Vector3,
+	inner: number,
+	outer: number,
+	step: number,
+	random: Random,
+	try: (x: number, z: number, angle: number) -> T?,
+	within: ((x: number, z: number) -> boolean)?,
+	max_tries: number?
+): T?
+	local tries = 0
+	for radius = inner, outer, step do
+		local count = if radius <= 0 then 1 else math.max(6, math.floor(math.pi * 2 * radius / step))
+		local first_angle = random:NextNumber(0, math.pi * 2)
+		for index = 0, count - 1 do
+			local angle = first_angle + index * (math.pi * 2 / count)
+			local x = around.X + math.cos(angle) * radius
+			local z = around.Z + math.sin(angle) * radius
+			if within ~= nil and within(x, z) == false then
 				continue
 			end
-			if geometry.distance_2d(other.position, spot) < TAKEN_RADIUS then
-				return true
+			tries += 1
+			if max_tries ~= nil and tries > max_tries then
+				return nil
 			end
-		end
-		for _, order in other.orders do
-			local queued_def = if order.kind == "build" and order.def_name ~= nil
-				then unit_defs.of(order)
-				else nil
-			if queued_def ~= nil and spots.for_def(queued_def) ~= nil and order.position ~= nil then
-				-- another builder's queued mex doesn't take the spot from this one (fix #10)
-				if builder_id ~= nil and other.id ~= builder_id then
-					continue
-				end
-				if geometry.distance_2d(order.position, spot) < TAKEN_RADIUS then
-					return true
-				end
+			local found = try(x, z, angle)
+			if found ~= nil then
+				return found
 			end
 		end
 	end
-	return false
-end
-
--- Where a building asked for at (x, z) would actually go, turned to `facing`. Buildings sit on the
--- building grid, and a spot-bound one goes on the nearest spot of its kind instead, a metal spot or a geothermal vent,
--- or nowhere if there is none close enough. If `builder_id` is provided and this is a spot-bound building, only
--- spots queued by that builder are taken, not those other builders have queued. Something built over another in place can use spots that other
--- already stands on.
-local function resolve_center(def_name: string, x: number, z: number, facing: number, builder_id: EntityId?): Vector3?
-	local def = unit_defs.get(def_name)
-	local bound_to = spots.for_def(def)
-	if bound_to ~= nil then
-		local spot = bound_to.nearest(x, z, config.METAL_SPOT_SNAP, function(s)
-			return spot_taken(s, builder_id, def_name)
-		end)
-		if spot == nil then
-			return nil
-		end
-		return ground_center(def_name, spot.X, spot.Z)
-	end
-	if def.kind == "building" then
-		local half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(def), facing)
-		local grid_x, grid_z = geometry.snap_center(x, z, half, config.CELL_STUDS)
-		return ground_center(def_name, grid_x, grid_z)
-	end
-	return ground_center(def_name, x, z)
+	return nil
 end
 
 return table.freeze({
 	can_place = can_place,
+	find_free_spot = find_free_spot,
+	ring_search = ring_search,
 	overlapping = overlapping,
 	clearable = clearable,
 	ground_center = ground_center,

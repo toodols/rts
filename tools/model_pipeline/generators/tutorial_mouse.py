@@ -10,15 +10,10 @@ import math
 
 import bmesh
 
-from . import common
-from . import tutorial_common as tc
+from .shared import common
+from .shared import palette
 
-MAX_TRIANGLES = tc.MAX_TRIANGLES
-RECENTRE = False
-
-SHELL_COLOR = (0.15, 0.15, 0.17, 1.0)
-BUTTON_COLOR = (0.62, 0.63, 0.66, 1.0)
-WHEEL_COLOR = (0.36, 0.37, 0.40, 1.0)
+CATEGORY = "hud"
 
 HALF_WIDTH = 1.25
 FRONT = 2.05  # from the dome's peak to the front edge (Blender +Y)
@@ -154,10 +149,10 @@ def button(name, side, columns=5, rows=5):
 
 
 def generate(params):
-    base = tc.mat(shell(), "mouse_shell", SHELL_COLOR, roughness=0.45)
+    base = common.paint(shell(), palette.MOUSE_SHELL)
 
-    left = tc.mat(button("button_left", -1), "mouse_button", BUTTON_COLOR, roughness=0.5)
-    right = tc.mat(button("button_right", 1), "mouse_button", BUTTON_COLOR, roughness=0.5)
+    left = common.paint(button("button_left", -1), palette.MOUSE_BUTTON)
+    right = common.paint(button("button_right", 1), palette.MOUSE_BUTTON)
     common.art_group(left, "button_left")
     common.art_group(right, "button_right")
 
@@ -171,6 +166,6 @@ def generate(params):
         v.co.z -= 0.12
     wheel.rotation_euler = (0.0, math.radians(90.0), 0.0)
     wheel.location = (0.0, wy, wz)
-    tc.mat(wheel, "mouse_wheel", WHEEL_COLOR, roughness=0.6)
+    common.paint(wheel, palette.MOUSE_WHEEL)
     common.art_group(wheel, "wheel", pivot=True)
     return [base, left, right, wheel]

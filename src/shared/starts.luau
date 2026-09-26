@@ -1,31 +1,27 @@
--- Where each team starts. Every slot has an ideal place on a ring around the middle of the map; if that
--- is under water or on a slope it is moved to the nearest ground that is dry and level enough to
--- open on. Like the heightmap it is a pure function of the seed, so the server and the client, and the
--- metal spots laid out around each start, all agree without being told.
+--!strict
+-- Where each team starts. Every map says where each of its starts ideally is (`Preset.starts`); if one is under water
+-- or on a slope it is moved to the nearest ground that is dry and level enough to open on. Like the heightmap it is a
+-- pure function of the map, so the server and the client, and the metal spots laid out around each start, all agree
+-- without being told.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local config = require(ReplicatedStorage.Shared.config)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
-local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local map_types = require(ReplicatedStorage.Shared.map_types)
+
+type Preset = map_types.Preset
+type StartBox = map_types.StartBox
 
 -- The start has to be dry, with this much room around it, and this far above the water.
 local CLEAR_HALF_EXTENT = 16
-local MIN_HEIGHT_ABOVE_WATER = 1
+local MIN_HEIGHT_ABOVE_WATER = ground_levels.DRY_GROUND_MARGIN
 local MAX_SLOPE_STUDS = 4
 local SEARCH_STEP = 8
 local SEARCH_RADIUS = 240
 
 local centers: { Vector2 } = {}
-
-local function ideal(slot: number): Vector2
-	local start_position = map_presets.get(heightmap.get_preset()).start_position
-	if start_position ~= nil then
-		return start_position(slot)
-	end
-	local angle = (slot - 1) * (math.pi * 2 / config.START_SLOTS)
-	return Vector2.new(math.cos(angle), math.sin(angle)) * config.START_RING_RADIUS
-end
+local boxes: { StartBox } = {}
 
 local function fits(x: number, z: number): boolean
 	if
@@ -35,68 +31,57 @@ local function fits(x: number, z: number): boolean
 		return false
 	end
 	local lowest, highest = heightmap.height_range(x, z, CLEAR_HALF_EXTENT, CLEAR_HALF_EXTENT)
-	return lowest >= config.WATER_LEVEL + MIN_HEIGHT_ABOVE_WATER and highest - lowest <= MAX_SLOPE_STUDS
+	return lowest >= ground_levels.WATER_LEVEL + MIN_HEIGHT_ABOVE_WATER and highest - lowest <= MAX_SLOPE_STUDS
 end
 
--- Must be called after `heightmap.initialize`.
-local function initialize()
+-- The first point `accept` takes, going out from (x, z) in rings SEARCH_STEP apart to SEARCH_RADIUS, or nil if it
+-- takes none.
+local function search(x: number, z: number, accept: (x: number, z: number) -> boolean): Vector2?
+	for radius = 0, SEARCH_RADIUS, SEARCH_STEP do
+		local around = math.max(1, math.ceil(math.pi * 2 * radius / SEARCH_STEP))
+		for step = 0, around - 1 do
+			local angle = step * (math.pi * 2 / around)
+			local at_x = x + math.cos(angle) * radius
+			local at_z = z + math.sin(angle) * radius
+			if accept(at_x, at_z) then
+				return Vector2.new(at_x, at_z)
+			end
+		end
+	end
+	return nil
+end
+
+-- Lays out the starts of `preset`, whose ground the heightmap has to have been built from already (see map_state).
+local function initialize(preset: Preset)
 	table.clear(centers)
-	for slot = 1, config.START_SLOTS do
-		local wanted = ideal(slot)
-		local found = wanted
-		local placed = false
-		for radius = 0, SEARCH_RADIUS, SEARCH_STEP do
-			local around = math.max(1, math.ceil(math.pi * 2 * radius / SEARCH_STEP))
-			for step = 0, around - 1 do
-				local angle = step * (math.pi * 2 / around)
-				local x = wanted.X + math.cos(angle) * radius
-				local z = wanted.Y + math.sin(angle) * radius
-				if fits(x, z) then
-					found = Vector2.new(x, z)
-					placed = true
-					break
-				end
-			end
-			if placed then
-				break
-			end
+	boxes = preset.start_boxes
+	for slot, wanted in preset.starts do
+		local found = search(wanted.X, wanted.Y, fits)
+		if found == nil then
+			warn(`no dry level ground within {SEARCH_RADIUS} studs of start {slot}; it stays where the map puts it`)
 		end
-		if placed == false then
-			warn(`no dry level ground within {SEARCH_RADIUS} studs of start {slot}; it stays where the ring puts it`)
-		end
-		centers[slot] = found
+		centers[slot] = found or wanted
 	end
 end
 
--- The centre of a team's start area, as (x, z).
-local function center(slot: number): Vector2
-	return centers[(slot - 1) % config.START_SLOTS + 1]
-end
-
--- How many different start points the map has: slots past this are the same places over again.
+-- How many starts the map has.
 local function count(): number
-	local distinct: { Vector2 } = {}
-	for _, point in centers do
-		if table.find(distinct, point) == nil then
-			table.insert(distinct, point)
-		end
-	end
-	return #distinct
+	return #centers
 end
 
--- The map's start boxes (`Preset.start_boxes`), one to a team, where its players choose to start.
-local function boxes(): { map_presets.StartBox }
-	return map_presets.get(heightmap.get_preset()).start_boxes
+-- The centre of a team's start area, as (x, z); more teams than starts share them, round again from the first.
+local function center(slot: number): Vector2
+	return centers[(slot - 1) % #centers + 1]
 end
 
 local function box_count(): number
-	return #boxes()
+	return #boxes
 end
 
--- Start box `index`; more teams than boxes share them, round again from the first.
-local function box(index: number): map_presets.StartBox
-	local all = boxes()
-	return all[(index - 1) % #all + 1]
+-- The map's start box `index` (`Preset.start_boxes`), where a team's players choose to start; more teams than boxes
+-- share them, round again from the first.
+local function box(index: number): StartBox
+	return boxes[(index - 1) % #boxes + 1]
 end
 
 local function in_box(index: number, x: number, z: number): boolean
@@ -111,18 +96,9 @@ end
 
 -- The ground in box `index` nearest (x, z) that a team can start on, or nil if there is none near.
 local function nearest_start(index: number, x: number, z: number): Vector2?
-	for radius = 0, SEARCH_RADIUS, SEARCH_STEP do
-		local around = math.max(1, math.ceil(math.pi * 2 * radius / SEARCH_STEP))
-		for step = 0, around - 1 do
-			local angle = step * (math.pi * 2 / around)
-			local at_x = x + math.cos(angle) * radius
-			local at_z = z + math.sin(angle) * radius
-			if in_box(index, at_x, at_z) and fits(at_x, at_z) then
-				return Vector2.new(at_x, at_z)
-			end
-		end
-	end
-	return nil
+	return search(x, z, function(at_x: number, at_z: number): boolean
+		return in_box(index, at_x, at_z) and fits(at_x, at_z)
+	end)
 end
 
 -- Where to start in box `index` for a player who has not chosen: the start nearest its middle that is in it, or the

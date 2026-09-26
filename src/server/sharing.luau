@@ -10,10 +10,14 @@
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
+local ServerScriptService = game:GetService "ServerScriptService"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
+local teams = require(ReplicatedStorage.Shared.teams)
 local appearance = require(ReplicatedStorage.Shared.appearance)
+local decode = require(ReplicatedStorage.Shared.decode)
+
+local remotes = require(ServerScriptService.ServerShared.remotes)
 
 local state = require(script.Parent.state)
 local alliances = require(script.Parent.alliances)
@@ -24,31 +28,18 @@ local notifications = require(script.Parent.notifications)
 type TeamId = types.TeamId
 type Team = types.Team
 
-export type Relation = "self" | "ally" | "enemy" | "watched"
-
--- What the list is told of a team's bank: only ever for the player's own team and their allies.
-export type Bank = {
-	metal: number,
-	energy: number,
-	metal_capacity: number,
-	energy_capacity: number,
-}
-
-export type RosterEntry = {
-	team_id: TeamId,
-	name: string,
-	-- the UserId of the team's player for their headshot, or 0 for a team with nobody on it
-	user_id: number,
-	color: Color3,
-	relation: Relation,
-	bank: Bank?,
-}
+type Relation = types.RosterRelation
+type Resource = types.Resource
+type Bank = types.Bank
+type RosterEntry = types.RosterEntry
 
 local roster_updated: RemoteEvent = ReplicatedStorage.Shared.RosterUpdated
 local share_resources: RemoteEvent = ReplicatedStorage.Shared.ShareResources
 
 -- Whatever is asked for below this is not worth a message; the client never sends it.
 local MIN_SHARE = 1
+local RESOURCE = decode.one_of({ "metal", "energy" } :: { Resource })
+local SHARE_RATE = { per_second = 10, burst = 10 }
 
 local function bank_of(team: Team): Bank
 	return {
@@ -63,7 +54,7 @@ end
 local function listed_teams(): { Team }
 	local result: { Team } = {}
 	for team_id, team in state.all_teams() do
-		if team_id == 0 or team_id == config.SCAVENGER_TEAM then
+		if teams.is_playable(team_id) == false then
 			continue
 		end
 		table.insert(result, team)
@@ -74,9 +65,9 @@ local function listed_teams(): { Team }
 	return result
 end
 
-local function roster_for(viewer: TeamId?, teams: { Team }): { RosterEntry }
+local function roster_for(viewer: TeamId?, listed: { Team }): { RosterEntry }
 	local result: { RosterEntry } = {}
-	for _, team in teams do
+	for _, team in listed do
 		local relation: Relation = if viewer == nil
 			then "watched"
 			elseif team.id == viewer then "self"
@@ -96,67 +87,45 @@ local function roster_for(viewer: TeamId?, teams: { Team }): { RosterEntry }
 end
 
 local function broadcast()
-	local teams = listed_teams()
+	local listed = listed_teams()
 	for _, player in Players:GetPlayers() do
-		roster_updated:FireClient(player, roster_for(players.team_of(player), teams))
+		remotes.tell(roster_updated, player, roster_for(players.team_of(player), listed))
 	end
 end
 
 -- Moves up to `amount` of `resource` from one team to another, capped by what the giver has and what the taker has
 -- room for. Returns how much moved.
-local function give(from: TeamId, to: TeamId, resource: "metal" | "energy", amount: number): number
-	local giver = state.get_team(from)
-	local taker = state.get_team(to)
-	if giver == nil or taker == nil then
-		return 0
-	end
-	local held = if resource == "metal" then giver.metal else giver.energy
-	-- what won't fit stays with the giver, so it mustn't reach the taker's revenue either
-	local room = if resource == "metal"
-		then taker.metal_capacity - taker.metal
-		else taker.energy_capacity - taker.energy
-	local offered = math.min(amount, held, room)
-	if offered <= 0 then
-		return 0
-	end
-	local banked = if resource == "metal" then economy.add_metal(to, offered) else economy.add_energy(to, offered)
-	if resource == "metal" then
-		giver.metal -= banked
-		economy.record_spent(from, banked, 0)
+local function give(from: TeamId, to: TeamId, resource: Resource, amount: number): number
+	local banked = economy.transfer(from, to, resource, amount)
+	if resource == "metal" and banked > 0 then
 		notifications.metal_sent(from, to, banked)
-	else
-		giver.energy -= banked
-		economy.record_spent(from, 0, banked)
 	end
 	return banked
 end
 
--- A request from team `from` (nil for someone with no team) to give an ally some of what it has, checked as
--- ShareResources receives it: to an ally that is not itself, of metal or energy, in a sensible amount. Returns how
--- much moved.
-local function share(from: TeamId?, to: unknown, resource: unknown, amount: unknown): number
-	if from == nil or typeof(to) ~= "number" then
+-- Team `from` gives an ally some of what it has: only to an ally that is not itself, and only a sensible amount.
+-- Returns how much moved.
+local function share(from: TeamId, to: TeamId, resource: Resource, amount: number): number
+	-- NaN fails this as well
+	if (amount >= MIN_SHARE) == false or to == from or alliances.are_allied(from, to) == false then
 		return 0
 	end
-	if resource ~= "metal" and resource ~= "energy" then
-		return 0
-	end
-	-- NaN and infinity fail these as well
-	if typeof(amount) ~= "number" or not (amount >= MIN_SHARE and amount < math.huge) then
-		return 0
-	end
-	if to == from or alliances.are_allied(from, to) == false then
-		return 0
-	end
-	return give(from, to, if resource == "metal" then "metal" else "energy", amount)
+	return give(from, to, resource, amount)
 end
 
-local function on_share_resources(player: Player, to: unknown, resource: unknown, amount: unknown)
-	share(players.team_of(player), to, resource, amount)
+local function on_share_resources(player: Player, to: TeamId, resource: Resource, amount: number)
+	local from = players.team_of(player)
+	if from ~= nil then
+		share(from, to, resource, amount)
+	end
 end
 
 local function init()
-	share_resources.OnServerEvent:Connect(on_share_resources)
+	remotes.listen(
+		share_resources,
+		{ args = { decode.number, RESOURCE, decode.number }, rate = SHARE_RATE },
+		on_share_resources
+	)
 end
 
 return table.freeze({

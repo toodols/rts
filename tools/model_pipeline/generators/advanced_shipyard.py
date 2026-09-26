@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `advanced_shipyard` (BAR corasy): a 4x2x4 cell (16 x 8 x 16 stud) ship factory for the
+"""unit_defs/factory.luau `advanced_shipyard` (BAR corasy): a ship factory for the
 second tier.
 
 It floats, as the shipyard does: z = 0 here is the waterline. The shipyard's U-shaped dock grown into a heavier one --
@@ -9,14 +9,20 @@ with a lit bridge and a mast stands on the stern block. Under 200 triangles. It 
 stretched to its 16 along the level.
 """
 
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
 
-# From the 12 studs it is laid out in to the 16 its footprint is.
-SPREAD = 16.0 / 12.0
+CATEGORY = "entity"
+DEF = "advanced_shipyard"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"height": 8.4}
+# built over the budget before the build held it to one: trimming it means re-uploading its meshes
+TRIANGLES = 188
 
 
 def generate(params):
-    k = fc.Kit("advshipyard")
+    # laid out 12 studs square, and stretched to its footprint
+    spread_x, spread_y = params["collider"]["width"] / 12.0, params["collider"]["length"] / 12.0
     trim, body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     keel, deck = -0.9, 1.0
 
@@ -59,15 +65,15 @@ def generate(params):
                         glow_len=0.6)
 
     objs = [
-        k.body(dock.build("dock")),
-        k.body(body.build("body")),
-        k.trim(trim.build("trim")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.body_mat(dock.build("dock")),
+        common.body_mat(body.build("body")),
+        common.trim_mat(trim.build("trim")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
     for obj in objs:
         for v in obj.data.vertices:
-            v.co.x *= SPREAD
-            v.co.y *= SPREAD
-    return fc.finish(objs)
+            v.co.x *= spread_x
+            v.co.y *= spread_y
+    return objs

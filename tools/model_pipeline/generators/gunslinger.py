@@ -1,16 +1,22 @@
-"""unit_defs/bot_t2.luau `gunslinger` (armmav in BAR): the self-mending rifle bot, capsule(36, 48, 36) -- 1.64 studs
-of radius, 4.4 tall, at most 100 triangles. A broad-shouldered gunfighter, unlike the Sharpshooter's thin stilts:
+"""unit_defs/bot_t2.luau `gunslinger` (armmav in BAR): the self-mending rifle bot, at most 100 triangles. A broad-shouldered gunfighter, unlike the Sharpshooter's thin stilts:
 splayed legs planted on heavy boots, a chest that widens to a square, team-coloured shoulder line, a small head
 with a glowing visor, a great armored pauldron on the left shoulder, and the whole right forearm a heavy rifle
 levelled forward. The torso and gun arm turn together to aim.
 """
 
-from . import bot_t2_common as bt
-from .bot_t2_common import FRONT, UP, hring, vring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import FRONT, UP, hring, vring
+
+CATEGORY = "entity"
+DEF = "gunslinger"
+MOUNTS = {
+    1: {"pivot": (0, 2.1983, -0.0277), "muzzle": (1.1127, 0.7584, 1.6641)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("gunslinger", bt.rgb(120, 150, 196), glow=(0.35, 1.0, 0.55, 1.0), collider=bt.collider(36, 48, 36))
+    bot = bt.Bot("gunslinger", params["color"], glow=palette.MENDING_GREEN)
 
     # splayed legs in a wide stance, from the boots up into the torso
     leg = bt.sweep_faces([hring(0.72, 0.0, 0.28, 0.4, 0.44), hring(0.42, 0.02, 2.15, 0.5, 0.56)],

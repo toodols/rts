@@ -1,6 +1,6 @@
 """unit_defs/air_t2.luau `stronghold`: the heavy transport gunship.
 
-Collider capsule(70, 44, 90): radius 90/22 = 4.09 studs, height 44/11 = 4.0. Faceted low-poly, under 100
+Faceted low-poly, under 100
 triangles. A tandem-rotor heavy lifter with guns: one long squared hull with a glazed cockpit, a dark gun barrel under
 the chin (its fast laser), a missile pod on either flank (its anti air missiles), a pair of dark cargo jaws under the
 belly, and two big three-bladed rotors, fore and aft on masts, that spin opposite ways. The rotors are the team-coloured
@@ -9,14 +9,17 @@ accent.
 
 import math
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(226, 178, 74)
-RADIUS, HEIGHT = 90 / 22, 44 / 11
+CATEGORY = "entity"
+DEF = "stronghold"
+# an aircraft's BAR collision volume is only its fuselage's: the rest of it reaches past, as BAR's model does
+ENVELOPE = {"length": 7.9, "height": 3.63}
 
 
-def rotor(objects, name, hub, blade_len, chord, speed, turn):
+def rotor(objects, name, hub, blade_len, chord, speed, turn, accent):
     """Three flat paddles meeting at `hub`, spinning together about it (Blender Z) at `speed`."""
     blades = []
     for i in range(3):
@@ -26,7 +29,7 @@ def rotor(objects, name, hub, blade_len, chord, speed, turn):
         blades.append(air.plate(f"{name}_{i}", c, (ca * blade_len / 2.0, sa * blade_len / 2.0, 0.0),
                                 (-sa * chord / 2.0, ca * chord / 2.0, 0.0), (0, 0, 1)))
     for blade in blades:
-        air.accent_mat(blade, "stronghold", ACCENT)
+        common.accent_mat(blade, accent)
         objects.append(common.art_group(blade, name))
     # the pivot has to sit on the axis, so the first blade's origin is moved onto the hub and its vertices to match
     first = blades[0]
@@ -40,6 +43,7 @@ def rotor(objects, name, hub, blade_len, chord, speed, turn):
 
 
 def generate(params):
+    accent = params["color"]
     zc = 2.00
     objects = []
 
@@ -80,20 +84,17 @@ def generate(params):
     top = zc + 0.95 * 0.7071
     hubs = []
     for y, rise in ((-1.55, 0.60), (2.25, 1.00)):
-        mast = air.block(f"mast_{y:+.2f}", 0.60, 0.70, rise + 0.05, 0.34, 0.40, origin=(0.0, y, top - 0.10),
-                         open_bottom=True)
+        mast = common.drop_bottom(common.block(f"mast_{y:+.2f}", 0.60, 0.70, rise + 0.05, top=(0.34, 0.40), origin=(0.0, y, top - 0.10)))
         trims.append(mast)
         hubs.append((0.0, y, top - 0.05 + rise))
 
     for obj in trims:
         common.trim_mat(obj)
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
     objects += trims + glows
 
-    rotor(objects, "rotor_front", hubs[0], 2.30, 0.36, 9.0, 90.0)
-    rotor(objects, "rotor_back", hubs[1], 2.30, 0.36, -9.0, 30.0)
+    rotor(objects, "rotor_front", hubs[0], 2.30, 0.36, 9.0, 90.0, accent)
+    rotor(objects, "rotor_back", hubs[1], 2.30, 0.36, -9.0, 30.0, accent)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "stronghold")
     return objects

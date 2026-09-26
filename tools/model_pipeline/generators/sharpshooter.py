@@ -1,15 +1,21 @@
-"""unit_defs/bot_t2.luau `sharpshooter` (armsnipe in BAR): the sniper bot, capsule(30, 44, 30) -- 1.36 studs of
-radius, 4 tall, at most 100 triangles. Tall and thin: long stilt legs with forward knees under a slim torso and a
+"""unit_defs/bot_t2.luau `sharpshooter` (armsnipe in BAR): the sniper bot, at most 100 triangles. Tall and thin: long stilt legs with forward knees under a slim torso and a
 dark sensor head, the torso in the team colour, with a rifle as long as the unit is wide resting on its right shoulder -- stock
 behind, scope on top, barrel far out in front ending in a glowing muzzle. The torso and rifle turn to aim.
 """
 
-from . import bot_t2_common as bt
-from .bot_t2_common import BACK, FRONT, UP, hring, vring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import FRONT, UP, hring, vring
+
+CATEGORY = "entity"
+DEF = "sharpshooter"
+MOUNTS = {
+    1: {"pivot": (0, 2.1448, 0), "muzzle": (0.818, 1.4209, 1.3636)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("sharpshooter", bt.rgb(120, 150, 196), glow=(1.0, 0.95, 0.2, 1.0), collider=bt.collider(30, 44, 30))
+    bot = bt.Bot("sharpshooter", params["color"], glow=palette.SNIPER_YELLOW)
 
     # stilt legs: a pointed foot on the ground, a knee well forward, the hip under the torso
     leg = bt.sweep_faces([hring(0.45, -0.08, 0.0, 0.36, 0.72), hring(0.52, -0.3, 1.1, 0.28, 0.32),

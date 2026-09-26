@@ -1,10 +1,10 @@
-"""unit_defs.luau `energy_storage`: 1x1x1 cells (4x4x4 studs), gold capacitor drum (see storage_common.py)."""
+"""unit_defs.luau `energy_storage`: a gold capacitor drum (see shared/storage.py)."""
 
-from . import storage_common
+from .shared import storage
+
+CATEGORY = "entity"
+DEF = "energy_storage"
 
 
 def generate(params):
-    params.setdefault("width", 4.0)
-    params.setdefault("depth", 4.0)
-    params.setdefault("height", 4.0)
-    return storage_common.generate(params, kind="energy")
+    return storage.capacitor(params, hardened=False)

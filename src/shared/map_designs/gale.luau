@@ -1,3 +1,4 @@
+--!strict
 -- Gale: a small, bare tundra for one against one, where the wind never drops. There is no water for a tidal generator,
 -- no tree to reclaim, and not much metal, so the energy is the wind's, and a game is quick. Long, low ridges carved by
 -- the wind run across it from west to east, the way it blows, gentle enough for anything to drive over.
@@ -89,12 +90,12 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "gale",
+	display_name = "Gale",
 	description = "A small windswept tundra",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 44), kit.box_around(-WEST_START, 44) },
 	metal_layers = nil,
 	metal_spots = SPOTS,

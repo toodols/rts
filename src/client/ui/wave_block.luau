@@ -1,115 +1,82 @@
--- The counterattack's waves (server/counterattack.luau), at the end of the resource bar while that mission is played:
--- the time left to prepare, then which wave has arrived of how many and the time to the next, and once the final wave
--- has arrived, how many of the enemy's are left. It is drawn as the scavengers' difficulty is, which is never shown
--- in a campaign mission, so it wears that block's tags.
---
--- The server publishes it all as Workspace attributes (campaign.COUNTERATTACK_ATTRIBUTES); `waves` is there only while
--- the mission is played.
+-- A mission's waves, in a box of their own at the top of the mission's guide (ui/tutorial.luau): the time until the
+-- next wave's enemies arrive and which wave that is of how many, and once the final wave has arrived, how many of the
+-- enemy's are left. The server publishes them (Shared.mission_state) only while such a mission is played.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local Workspace = game:GetService "Workspace"
 
 local React = require(ReplicatedStorage.Packages.react)
 
-local campaign = require(ReplicatedStorage.Shared.campaign)
+local mission_state = require(ReplicatedStorage.Shared.mission_state)
 
-local ATTRIBUTES = campaign.COUNTERATTACK_ATTRIBUTES
+local format = require(ReplicatedStorage.ClientShared.format)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
-export type Waves = {
-	-- how many have arrived, 0 while preparing, and how many there are
-	wave: number,
-	waves: number,
-	-- whole seconds to the next, none once the last has arrived
-	wave_in: number?,
-	-- how many of the enemy's are left standing
-	left: number,
-}
+type Waves = mission_state.Waves
 
-local function number_attribute(name: string): number?
-	local value = Workspace:GetAttribute(name)
-	return if typeof(value) == "number" then value else nil
-end
-
-local function read_waves(): Waves?
-	local waves = number_attribute(ATTRIBUTES.waves)
-	if waves == nil then
-		return nil
-	end
-	return {
-		wave = number_attribute(ATTRIBUTES.wave) or 0,
-		waves = waves,
-		wave_in = number_attribute(ATTRIBUTES.wave_in),
-		left = number_attribute(ATTRIBUTES.enemies_left) or 0,
-	}
-end
-
--- The waves as they stand, or nil outside the counterattack.
+-- The waves as they stand, or nil outside a mission with waves.
 local function use_waves(): Waves?
-	local waves, set_waves = React.useState(read_waves)
-
-	React.useEffect(function()
-		local connections: { RBXScriptConnection } = {}
-		for _, name in ATTRIBUTES do
-			table.insert(
-				connections,
-				Workspace:GetAttributeChangedSignal(name):Connect(function()
-					set_waves(read_waves())
-				end)
-			)
-		end
-		set_waves(read_waves())
-		return function()
-			for _, connection in connections do
-				connection:Disconnect()
-			end
-		end
-	end, {})
-
-	return waves
+	return use_store.use_store(mission_state.waves, mission_state.subscribe_waves)
 end
 
--- Seconds as minutes and seconds: `4:05`.
-local function format_time(seconds: number): string
-	return string.format("%d:%02d", seconds // 60, seconds % 60)
-end
-
-local function WaveBlock(props: { LayoutOrder: number, waves: Waves })
-	local waves = props.waves
-	local label: string
-	local value: string
-	if waves.wave == 0 then
-		label = "ENEMY IN"
-		value = format_time(waves.wave_in or 0)
-	elseif waves.wave_in ~= nil then
-		label = `WAVE {waves.wave}/{waves.waves}`
-		value = format_time(waves.wave_in)
-	else
-		label = "FINAL WAVE"
-		value = `{waves.left} left`
-	end
+-- One half of the box: a caption over a big readout.
+local function Readout(props: { caption: string, value: string, tone: string?, LayoutOrder: number })
 	return React.createElement("Frame", {
-		[React.Tag] = "scavenger-block",
+		[React.Tag] = "wave-readout",
 		LayoutOrder = props.LayoutOrder,
 	}, {
-		Head = React.createElement("Frame", {
-			[React.Tag] = "scavenger-head",
+		Caption = React.createElement("TextLabel", {
+			[React.Tag] = "wave-caption",
 			LayoutOrder = 1,
-		}, {
-			Label = React.createElement("TextLabel", {
-				[React.Tag] = "resource-name",
-				LayoutOrder = 1,
-				Text = label,
-			}),
+			Text = props.caption,
 		}),
 		Value = React.createElement("TextLabel", {
-			[React.Tag] = "scavenger-value",
+			[React.Tag] = if props.tone ~= nil then `wave-value {props.tone}` else "wave-value",
 			LayoutOrder = 2,
-			Text = value,
+			Text = props.value,
 		}),
+	})
+end
+
+-- ENEMIES IN 4:05 | WAVE 2/7, or once the last has arrived, FINAL WAVE | 12 LEFT.
+local function WaveBox(props: { LayoutOrder: number, waves: Waves })
+	local waves = props.waves
+	local final = waves.wave_in == nil and waves.wave > 0
+	return React.createElement("Frame", {
+		[React.Tag] = "wave-box",
+		LayoutOrder = props.LayoutOrder,
+	}, {
+		When = if final
+			then React.createElement(Readout, {
+				caption = "FINAL WAVE",
+				value = `{waves.waves}/{waves.waves}`,
+				LayoutOrder = 1,
+			})
+			else React.createElement(Readout, {
+				caption = "ENEMIES IN",
+				value = format.clock(waves.wave_in or 0),
+				tone = "danger",
+				LayoutOrder = 1,
+			}),
+		Divider = React.createElement("Frame", {
+			[React.Tag] = "wave-divider",
+			LayoutOrder = 2,
+		}),
+		Which = if final
+			then React.createElement(Readout, {
+				caption = "ENEMIES LEFT",
+				value = tostring(waves.left),
+				tone = "danger",
+				LayoutOrder = 3,
+			})
+			else React.createElement(Readout, {
+				caption = "WAVE",
+				value = `{waves.wave + 1}/{waves.waves}`,
+				LayoutOrder = 3,
+			}),
 	})
 end
 
 return table.freeze({
 	use_waves = use_waves,
-	WaveBlock = WaveBlock,
+	WaveBox = WaveBox,
 })

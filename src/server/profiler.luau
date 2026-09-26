@@ -1,11 +1,12 @@
+--!strict
 -- Where each simulation step's time actually goes, and how many entities are alive, so a leak - one
 -- kind or def quietly never being cleaned up - shows up as a count that only ever grows rather than
 -- having to be guessed at from lag alone.
 --
 -- `mark(label)` closes out whatever section was open (attributing the time since the last mark to it)
--- and opens the next one under `label`, so a step just calls it once between each piece of work it
--- does - no per-call closures, no wrapping. `mark(nil)` closes the last section without opening a new
--- one, for the end of a step.
+-- and opens the next one under `label`. The step marks each of its phases by name (server/simulation.luau), and
+-- nothing inside a phase marks anything, so the report reads as the step's own list. `mark(nil)` closes the last
+-- section without opening a new one, for the end of a step.
 --
 -- Time accumulates into a running total per label, alongside how many steps have gone by since the
 -- last reset, so `report()` can give both a share of the step and an average time per step. It always
@@ -28,8 +29,7 @@ local by_def_at_reset: { [string]: number } = {}
 local entity_total = 0
 local entity_total_at_reset = 0
 
--- Recounts every live entity. Call once a step; state.all() is already walked by several other
--- systems every step, so one more pass here is not what a leak would be hiding behind.
+-- Recounts every live entity, when a count is asked for (`reset`, `entity_report`) and never as part of a step.
 local function sample_entities()
 	table.clear(by_kind)
 	table.clear(by_def)
@@ -51,12 +51,6 @@ local function mark(label: string?)
 	end
 	last_label = label
 	last_time = now
-end
-
--- The label currently open, so something that briefly marks its own section can hand control back
--- to whatever section it interrupted rather than assuming which one that was.
-local function current(): string?
-	return last_label
 end
 
 -- Call once per step, after the last `mark`, so `steps` only counts whole steps.
@@ -140,9 +134,9 @@ local function count_rows(counts: { [string]: number }, at_reset: { [string]: nu
 end
 
 -- The live entity count, its change since the last reset, and both broken down by kind and by def
--- name, heaviest first. Uses whatever the last `sample_entities` found - call it fresh first for a
--- live number, since a step_done() ago is close but not exact.
+-- name, heaviest first, counted now.
 local function entity_report(): EntitySummary
+	sample_entities()
 	return {
 		total = entity_total,
 		total_delta = entity_total - entity_total_at_reset,
@@ -153,12 +147,10 @@ end
 
 return table.freeze({
 	mark = mark,
-	current = current,
 	step_done = step_done,
 	reset = reset,
 	report = report,
 	elapsed_since_reset = elapsed_since_reset,
 	step_count = step_count,
-	sample_entities = sample_entities,
 	entity_report = entity_report,
 })

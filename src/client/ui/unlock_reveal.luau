@@ -2,7 +2,7 @@
 -- that one after another charges up (its glow swelling and turning the colour of its tier, the card shaking harder
 -- and harder) and bursts open with a flash, a ring, sparks and light rays turning behind it, to show the def's own
 -- model turning slowly, its name, what it is, and a banner with its tier. Nothing is rolled: what is revealed is
--- exactly `def_names`, and each def's tier is fixed by what it costs or named by the def (`tier_of`). The cheapest is
+-- exactly `def_names`, and each def's tier is fixed by what it costs (Shared.rarity). The cheapest is
 -- opened first, so the best comes last. A tally beside the heading counts the reveals.
 --
 -- Everything that moves runs off one clock (`use_clock`), a binding set every frame, so none of it re-renders
@@ -15,31 +15,28 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
 local TweenService = game:GetService "TweenService"
-local UserInputService = game:GetService "UserInputService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
+local rarity = require(ReplicatedStorage.Shared.rarity)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local unit_descriptions = require(ReplicatedStorage.Shared.unit_descriptions)
 
-local unit_picture = require(ReplicatedStorage.Client.ui.unit_picture)
+local input_router = require(ReplicatedStorage.Client.input_router)
+
+local palette = require(ReplicatedStorage.ClientShared.palette)
+local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
 
 local UnitPicture = unit_picture.UnitPicture
 
--- How rare a def is made to look. A def is of the first tier its power (unit_defs.power: metal plus energy / 60) is
--- below, unless it names its own (EntityDef.tier), which wins.
-export type Tier = {
-	label: string,
-	-- the class its card and banner take in the stylesheet
-	tag: string,
-	color: Color3,
-	below: number,
-}
+type Tier = rarity.Tier
 
 -- One card: what it shows, and when each of its beats lands, in seconds of the reveal's clock.
 type Card = {
 	def_name: string,
 	tier: Tier,
+	-- its tier's colour
+	color: Color3,
 	index: number,
 	-- dealt onto the table face down; starts to charge; bursts open
 	deal_at: number,
@@ -69,17 +66,6 @@ type Touch = { hover: Eased, press: Eased, hovered_at: number, clicked_at: numbe
 type Handling = { hover: number, press: number, punch: number, since_hover: number }
 
 type Binding = any
-
--- Roughly: the cheapest T1 things common, the rest of T1 uncommon, T2 rare, the priciest T2 and the T2 labs epic, T3
--- legendary, and the biggest experimentals mythic.
-local TIERS: { Tier } = {
-	{ label = "COMMON", tag = "common", color = Color3.fromRGB(178, 190, 204), below = 100 },
-	{ label = "UNCOMMON", tag = "uncommon", color = Color3.fromRGB(110, 222, 96), below = 400 },
-	{ label = "RARE", tag = "rare", color = Color3.fromRGB(96, 210, 242), below = 1200 },
-	{ label = "EPIC", tag = "epic", color = Color3.fromRGB(176, 96, 240), below = 3500 },
-	{ label = "LEGENDARY", tag = "legendary", color = Color3.fromRGB(255, 196, 64), below = 15000 },
-	{ label = "MYTHIC", tag = "mythic", color = Color3.fromRGB(255, 98, 74), below = math.huge },
-}
 
 local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
@@ -195,24 +181,6 @@ local VIGNETTE_FADE = NumberSequence.new({
 })
 local VIGNETTE_DARKNESS = 0.35
 
-local function tier_of(def_name: string): Tier
-	local def = unit_defs.get(def_name)
-	if def.tier ~= nil then
-		for _, tier in TIERS do
-			if tier.tag == def.tier then
-				return tier
-			end
-		end
-	end
-	local power = unit_defs.power(def)
-	for _, tier in TIERS do
-		if power < tier.below then
-			return tier
-		end
-	end
-	return TIERS[#TIERS]
-end
-
 -- The cards for `def_names`, cheapest first, and when each beat of each lands.
 local function plan(def_names: { string }): Plan
 	local power_of: { [string]: number } = {}
@@ -237,9 +205,11 @@ local function plan(def_names: { string }): Plan
 	for index, def_name in order do
 		local seconds = if index == count and count > 1 then FINAL_CHARGE_SECONDS else CHARGE_SECONDS
 		local burst_at = charge_at + seconds
+		local tier = rarity.tier_of(def_name)
 		table.insert(cards, {
 			def_name = def_name,
-			tier = tier_of(def_name),
+			tier = tier,
+			color = palette.tier_color(tier.tag),
 			index = index,
 			deal_at = DEAL_AT + DEAL_STAGGER * (index - 1),
 			charge_at = charge_at,
@@ -338,7 +308,10 @@ local function use_clock(done_at: number): (Binding, boolean)
 				set_done(true)
 			end
 		end)
-		local skipped = UserInputService.InputBegan:Connect(function(input: InputObject)
+		local stop_watching = input_router.watch(function(input: InputObject, phase: input_router.Phase)
+			if phase ~= "began" then
+				return
+			end
 			local kind = input.UserInputType
 			local pressed = kind == Enum.UserInputType.MouseButton1
 				or kind == Enum.UserInputType.Touch
@@ -350,7 +323,7 @@ local function use_clock(done_at: number): (Binding, boolean)
 		end)
 		return function()
 			stepped:Disconnect()
-			skipped:Disconnect()
+			stop_watching()
 		end
 	end, { done_at })
 	return clock, done
@@ -382,7 +355,7 @@ local function Glow(props: { card: Card, clock: Binding, touch: Touch })
 			return {
 				size = lerp(1.15, 2, charge ^ 1.5),
 				transparency = lerp(0.8, 0.12, charge),
-				color = WHITE:Lerp(card.tier.color, charge * charge),
+				color = WHITE:Lerp(card.color, charge * charge),
 			}
 		end
 		local settle = ease(through(t, card.burst_at, 0.8), Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -393,7 +366,7 @@ local function Glow(props: { card: Card, clock: Binding, touch: Touch })
 				+ 0.35 * handled.hover
 				+ 0.5 * handled.punch,
 			transparency = math.max(lerp(0, 0.4, settle) - 0.22 * handled.hover - 0.3 * handled.punch, 0),
-			color = card.tier.color,
+			color = card.color,
 		}
 	end)
 	local size = look:map(function(value: { size: number }): UDim2
@@ -437,7 +410,7 @@ local function Rays(props: { card: Card, clock: Binding, touch: Touch })
 			Position = CENTER,
 			Size = UDim2.new(0, if index % 2 == 0 then RAY_NARROW else RAY_WIDE, 1, 0),
 			Rotation = (index - 1) * 180 / RAYS,
-			BackgroundColor3 = card.tier.color,
+			BackgroundColor3 = card.color,
 			BackgroundTransparency = transparency,
 		}, {
 			Fade = React.createElement("UIGradient", { Transparency = RAY_FADE, Rotation = 90 }),
@@ -485,7 +458,7 @@ local function Ring(props: { card: Card, clock: Binding, since: (Clock) -> numbe
 	}, {
 		Corner = React.createElement("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
 		Stroke = React.createElement("UIStroke", {
-			Color = card.tier.color,
+			Color = card.color,
 			Thickness = spread:map(function(alpha: number): number
 				return RING_THICKNESS * (1 - alpha) + 1
 			end),
@@ -512,7 +485,7 @@ local function Sparks(props: { card: Card, clock: Binding, since: (Clock) -> num
 			return through(since(clock), 0, seconds)
 		end)
 		children[`Spark{index}`] = fx({
-			BackgroundColor3 = if index % 3 == 0 then WHITE else card.tier.color:Lerp(WHITE, 0.35),
+			BackgroundColor3 = if index % 3 == 0 then WHITE else card.color:Lerp(WHITE, 0.35),
 			ZIndex = 6,
 			Visible = props.clock:map(function(clock: Clock): boolean
 				local flown = since(clock)
@@ -580,7 +553,7 @@ local function CardBack(props: { card: Card, clock: Binding })
 				end),
 				BackgroundColor3 = props.clock:map(function(clock: Clock): Color3
 					local charge = charge_of(card, clock.t)
-					return WHITE:Lerp(card.tier.color, charge * charge)
+					return WHITE:Lerp(card.color, charge * charge)
 				end),
 			}),
 		}),
@@ -592,7 +565,7 @@ local function CardFace(props: { card: Card, clock: Binding })
 	local card = props.card
 	local def = unit_defs.get(card.def_name)
 	local kind = if def.subtitle ~= nil then def.subtitle elseif def.kind == "building" then "Building" else "Unit"
-	local description = unit_descriptions[card.def_name]
+	local text = unit_descriptions.text_of(def)
 	return React.createElement("Frame", {
 		[React.Tag] = `unlock-card-face {card.tier.tag}`,
 		Visible = props.clock:map(function(clock: Clock): boolean
@@ -604,6 +577,7 @@ local function CardFace(props: { card: Card, clock: Binding })
 			LayoutOrder = 1,
 		}, {
 			Model = React.createElement(UnitPicture, {
+				framing = "field",
 				def_name = card.def_name,
 				tag = "unlock-card-model",
 				Position = CENTER,
@@ -621,11 +595,11 @@ local function CardFace(props: { card: Card, clock: Binding })
 			LayoutOrder = 3,
 			Text = kind,
 		}),
-		Description = if description ~= nil and description.text ~= nil
+		Description = if text ~= nil
 			then React.createElement("TextLabel", {
 				[React.Tag] = "unlock-card-text",
 				LayoutOrder = 4,
-				Text = description.text,
+				Text = text,
 			})
 			else nil,
 	})
@@ -752,7 +726,7 @@ local function CardSlot(props: { card: Card, clock: Binding })
 		Rim = fx({
 			AnchorPoint = Vector2.zero,
 			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = card.tier.color,
+			BackgroundColor3 = card.color,
 			ZIndex = 5,
 			BackgroundTransparency = handled:map(function(feel: Handling): number
 				return 1 - 0.1 * feel.hover - 0.25 * feel.punch
@@ -983,8 +957,6 @@ local function UnlockVignette()
 end
 
 return table.freeze({
-	TIERS = TIERS,
 	UnlockReveal = UnlockReveal,
 	UnlockVignette = UnlockVignette,
-	tier_of = tier_of,
 })

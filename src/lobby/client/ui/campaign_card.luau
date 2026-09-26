@@ -1,3 +1,4 @@
+--!strict
 -- The way into the campaign, over the lobby browser: a card that is itself the button, saying how far this player is
 -- through the campaign, with an arrow at its right end. The stylesheet (.campaign-card in lobby.scss) does most of its
 -- motion: the face brightening, the glow, the title stepping in, the arrow walking out with a second chevron trailing
@@ -10,8 +11,12 @@ local TweenService = game:GetService "TweenService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
-local use_campaign = require(ReplicatedStorage.LobbyClient.use_campaign)
+local campaign_standing = require(ReplicatedStorage.ClientShared.campaign_standing)
+
 local campaign = require(script.Parent.campaign)
+
+-- An element's properties: strict mode cannot type a table of them that mixes tags, properties and handlers.
+type Props = { [any]: any }
 
 -- The sheen frame carries a band of light across its middle, and is swept from a card's width left of the card to a
 -- card's width right of it, where it stays parked; the card clips it.
@@ -32,7 +37,7 @@ local function Chevron(props: { tag: string })
 end
 
 local function CampaignCard(props: { on_open: () -> (), LayoutOrder: number })
-	local progress = use_campaign.use_campaign()
+	local progress = campaign_standing.use_standing()
 	local done, missions = campaign.mission_counts(progress.completed)
 	local unlocked, lockable = campaign.unlock_counts(progress.unlocks)
 
@@ -93,54 +98,58 @@ local function CampaignCard(props: { on_open: () -> (), LayoutOrder: number })
 		[React.Tag] = "campaign-strip",
 		LayoutOrder = props.LayoutOrder,
 	}, {
-		Card = React.createElement("TextButton", {
-			[React.Tag] = tag,
-			Text = "",
-			AutoButtonColor = false,
-			[React.Event.MouseEnter] = sweep,
-			[React.Event.SelectionGained] = function()
-				set_selected(true)
-				sweep()
-			end,
-			[React.Event.SelectionLost] = function()
-				set_selected(false)
-			end,
-			[React.Event.Activated] = launch,
-		}, {
-			Glow = React.createElement("Frame", { [React.Tag] = "campaign-card-glow" }),
-			Edge = React.createElement("Frame", { [React.Tag] = "campaign-card-edge" }),
-			Content = React.createElement("Frame", {
-				[React.Tag] = "campaign-card-content",
-			}, {
-				Texts = React.createElement("Frame", {
-					[React.Tag] = "campaign-strip-texts grow",
-					LayoutOrder = 1,
+		Card = React.createElement(
+			"TextButton",
+			{
+				[React.Tag] = tag,
+				Text = "",
+				AutoButtonColor = false,
+				[React.Event.MouseEnter] = sweep,
+				[React.Event.SelectionGained] = function()
+					set_selected(true)
+					sweep()
+				end,
+				[React.Event.SelectionLost] = function()
+					set_selected(false)
+				end,
+				[React.Event.Activated] = launch,
+			} :: Props,
+			{
+				Glow = React.createElement("Frame", { [React.Tag] = "campaign-card-glow" }),
+				Edge = React.createElement("Frame", { [React.Tag] = "campaign-card-edge" }),
+				Content = React.createElement("Frame", {
+					[React.Tag] = "campaign-card-content",
 				}, {
-					Title = React.createElement("TextLabel", {
-						[React.Tag] = "campaign-strip-title heading",
+					Texts = React.createElement("Frame", {
+						[React.Tag] = "campaign-strip-texts grow",
 						LayoutOrder = 1,
-						Text = "Campaign",
+					}, {
+						Title = React.createElement("TextLabel", {
+							[React.Tag] = "campaign-strip-title heading",
+							LayoutOrder = 1,
+							Text = "Campaign",
+						}),
+						Progress = React.createElement("TextLabel", {
+							[React.Tag] = "campaign-strip-progress",
+							LayoutOrder = 2,
+							Text = `{done}/{missions} missions complete · {unlocked}/{lockable} units unlocked`,
+						}),
 					}),
-					Progress = React.createElement("TextLabel", {
-						[React.Tag] = "campaign-strip-progress",
+					Arrow = React.createElement("Frame", {
+						[React.Tag] = "campaign-card-arrow",
 						LayoutOrder = 2,
-						Text = `{done}/{missions} missions complete · {unlocked}/{lockable} units unlocked`,
+					}, {
+						Trail = React.createElement(Chevron, { tag = "trail" }),
+						Lead = React.createElement(Chevron, { tag = "lead" }),
 					}),
 				}),
-				Arrow = React.createElement("Frame", {
-					[React.Tag] = "campaign-card-arrow",
-					LayoutOrder = 2,
-				}, {
-					Trail = React.createElement(Chevron, { tag = "trail" }),
-					Lead = React.createElement(Chevron, { tag = "lead" }),
+				Sheen = React.createElement("Frame", {
+					[React.Tag] = "campaign-card-sheen",
+					Position = SHEEN_PARKED,
+					ref = sheen_ref,
 				}),
-			}),
-			Sheen = React.createElement("Frame", {
-				[React.Tag] = "campaign-card-sheen",
-				Position = SHEEN_PARKED,
-				ref = sheen_ref,
-			}),
-		}),
+			}
+		),
 	})
 end
 

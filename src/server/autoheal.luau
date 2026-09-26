@@ -5,21 +5,25 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
 
 type Entity = types.Entity
 
+-- Everything in the world that heals itself (`state.indexed`).
+local healers = state.indexed(function(def: types.EntityDef): boolean
+	return def.autoheal ~= nil
+end)
+
 -- Mends everything that heals itself, a step's worth. Only finished things do: a blueprint's health follows its
--- progress, and a wreck has none to mend.
+-- progress.
 local function tick(delta: number)
-	for _, entity: Entity in state.all() do
-		if entity.alive == false or entity.state ~= "active" or entity.kind == "wreck" then
+	for _, entity: Entity in healers do
+		if entity.alive == false or entity.state ~= "active" then
 			continue
 		end
-		local rate = unit_defs.of(entity).autoheal
-		if rate ~= nil and entity.health < entity.max_health then
+		local rate = entity.def.autoheal :: number
+		if entity.health < entity.max_health then
 			entity.health = math.min(entity.max_health, entity.health + rate * delta)
 		end
 	end

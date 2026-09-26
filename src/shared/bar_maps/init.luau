@@ -1,7 +1,7 @@
 -- Beyond All Reason's maps, brought over from the images on their pages by tools/bar_maps/import_bar_maps.py, which
--- writes one data module here for each. A map is exactly as big as it is in BAR, at config.ELMOS_PER_STUD, and its data
--- has one height sample to each corner of the game's heightmap cells and one material to each cell, so it is laid
--- down as it is: centred on (0, 0), and never stretched or shrunk.
+-- writes one data module here for each and names.luau listing them. A map is exactly as big as it is in BAR, at
+-- world_scale.ELMOS_PER_STUD, and its data has one height sample to each corner of the game's heightmap cells and one
+-- material to each cell, so it is laid down as it is: centred on (0, 0), and never stretched or shrunk.
 --
 -- What lies on each map, its geothermal vents and its reclaimable features, is in a module of its own beside it, written
 -- by tools/bar_maps/import_bar_features.py from the map's archive (`features_of`).
@@ -13,29 +13,9 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
 
-local config = require(ReplicatedStorage.Shared.config)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
+local names = require(script.names)
 local rights = require(script.rights)
-
-local supreme_isthmus = require(script.supreme_isthmus)
-local hooked = require(script.hooked)
-local center_command = require(script.center_command)
-local rifted = require(script.rifted)
-local comet_catcher = require(script.comet_catcher)
-local altair_crossing = require(script.altair_crossing)
-local ancient_bastion = require(script.ancient_bastion)
-local folsom_dam = require(script.folsom_dam)
-local pinewood_derby = require(script.pinewood_derby)
-local acidic_quarry = require(script.acidic_quarry)
-local aurelia = require(script.aurelia)
-local canis_river = require(script.canis_river)
-local boulder_beach = require(script.boulder_beach)
-local charlie_in_the_hills = require(script.charlie_in_the_hills)
-local coast_to_coast = require(script.coast_to_coast)
-local devils_postpiles = require(script.devils_postpiles)
-local faster_than_light = require(script.faster_than_light)
-local gasbag_grabens = require(script.gasbag_grabens)
-local great_divide = require(script.great_divide)
-local greenest_fields = require(script.greenest_fields)
 
 -- What lies on a map, as its `<name>_features` module has it (see tools/bar_maps/import_bar_features.py).
 export type Features = {
@@ -134,12 +114,12 @@ local function fit(map: BarMap): Fitted
 	assert(buffer.len(heights) == samples_x * (map.cells_z + 1), `{map.name}: the heights are the wrong length`)
 	assert(buffer.len(cells) == map.cells_x * map.cells_z, `{map.name}: the cells are the wrong length`)
 
-	local width = map.cells_x * config.CELL_STUDS
-	local depth = map.cells_z * config.CELL_STUDS
+	local width = map.cells_x * world_scale.CELL_STUDS
+	local depth = map.cells_z * world_scale.CELL_STUDS
 	local west = -width / 2
 	local north = -depth / 2
-	local height_per_byte = (map.highest - map.lowest) / 255 / config.ELMOS_PER_STUD
-	local height_base = map.lowest / config.ELMOS_PER_STUD
+	local height_per_byte = (map.highest - map.lowest) / 255 / world_scale.ELMOS_PER_STUD
+	local height_base = map.lowest / world_scale.ELMOS_PER_STUD
 
 	local function sample(ix: number, iz: number): number
 		local byte = buffer.readu8(heights, iz * samples_x + ix)
@@ -182,28 +162,11 @@ local function fit(map: BarMap): Fitted
 	})
 end
 
-local ALL_MAPS: { BarMap } = {
-	supreme_isthmus,
-	hooked,
-	center_command,
-	rifted,
-	comet_catcher,
-	altair_crossing,
-	ancient_bastion,
-	folsom_dam,
-	pinewood_derby,
-	acidic_quarry,
-	aurelia,
-	canis_river,
-	boulder_beach,
-	charlie_in_the_hills,
-	coast_to_coast,
-	devils_postpiles,
-	faster_than_light,
-	gasbag_grabens,
-	great_divide,
-	greenest_fields,
-}
+-- Every map, in the order names.luau (which the importer writes) lists them.
+local ALL_MAPS: { BarMap } = {}
+for _, name in names do
+	table.insert(ALL_MAPS, require(script:FindFirstChild(name) :: ModuleScript) :: BarMap)
+end
 
 -- The maps in the game: in Studio every one, and anywhere else only those whose makers have said we may use them
 -- (see rights.luau). The rest are a developer's maps, as if they were not part of the game: no preset is made for

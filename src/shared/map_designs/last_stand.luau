@@ -1,3 +1,4 @@
+--!strict
 -- Last stand: made for scavengers. Each side has a fortress, a plateau walled all round by cliffs, with three ramps
 -- down to the wide open ground around it; hold the ramps and the fortress holds. The open ground is where the metal is,
 -- spread thin, and where the scavengers come from: the start boxes out in its far corners are nobody's in a game of two
@@ -135,25 +136,28 @@ local THEME: Theme = {
 
 -- The two fortresses first, so that two sides get one each, and then the open corners, the one furthest from the first
 -- fortress first.
+local STARTS = { FORT, -FORT, Vector2.new(300, 300), Vector2.new(-300, -300) }
 local BOXES = {
-	kit.box_around(FORT, 50),
-	kit.box_around(-FORT, 50),
-	kit.box_around(Vector2.new(300, 300), 56),
-	kit.box_around(Vector2.new(-300, -300), 56),
+	kit.box_around(STARTS[1], 50),
+	kit.box_around(STARTS[2], 50),
+	kit.box_around(STARTS[3], 56),
+	kit.box_around(STARTS[4], 56),
 }
 
 return table.freeze({
 	name = "last_stand",
+	display_name = "Last Stand",
 	description = "Two fortresses on open ground",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then FORT else -FORT
-	end,
+	starts = STARTS,
 	start_boxes = BOXES,
 	metal_layers = nil,
 	metal_spots = SPOTS,
-	geo_spots = VENTS,
+	geo_spots = function(): { Vector2 }
+		return VENTS
+	end,
 	reclaimables = nil,
 	wrecks = nil,
 	theme = THEME,

@@ -1,15 +1,21 @@
-"""unit_defs/bot_t2.luau `sumo`: Cortex's armored assault bot, capsule(32, 34, 30) -- 1.45 studs of radius, 3.1
-tall, at most 100 triangles. A squat, top-heavy brawler: short splayed legs on broad feet under a chest that
+"""unit_defs/bot_t2.luau `sumo`: Cortex's armored assault bot, at most 100 triangles. A squat, top-heavy brawler: short splayed legs on broad feet under a chest that
 widens to the shoulders, two big team-coloured shoulder slabs, a slit visor, and a twin laser jutting from the
 lower chest. The torso turns on the waist to aim.
 """
 
-from . import bot_t2_common as bt
-from .bot_t2_common import DOWN, FRONT, LEFT, RIGHT, UP, hring, vring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import DOWN, FRONT, LEFT, RIGHT, UP, hring, vring
+
+CATEGORY = "entity"
+DEF = "sumo"
+MOUNTS = {
+    1: {"pivot": (0, 1.2573, 0.0505), "muzzle": (0.5004, 0.482, 1.3131)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("sumo", bt.rgb(226, 178, 74), glow=(1.0, 0.25, 0.15, 1.0), collider=bt.collider(32, 34, 30))
+    bot = bt.Bot("sumo", params["color"], glow=palette.BEACON_RED)
 
     # legs: one stubby splayed column each, from the foot up into the torso (its top is buried there)
     leg = bt.sweep_faces([hring(0.66, 0.0, 0.22, 0.42, 0.5), hring(0.48, 0.0, 1.3, 0.5, 0.56)],

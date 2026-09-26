@@ -1,4 +1,4 @@
--- The player list, opened and closed with T (see input.luau): every team in the game, yours and your allies' first
+-- The player list, opened and closed with T (see Client.hud_state): every team in the game, yours and your allies' first
 -- with what each has in the bank, then your enemies'. An enemy's bank is never sent (see server/sharing.luau).
 --
 -- An ally's metal and energy bars each carry a handle at the end of their fill. Dragging it out along the bar measures
@@ -12,33 +12,24 @@
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local TweenService = game:GetService "TweenService"
-local UserInputService = game:GetService "UserInputService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
-local input = require(ReplicatedStorage.Client.input)
+local seating = require(ReplicatedStorage.Shared.seating)
+local types = require(ReplicatedStorage.Shared.types)
+
+local hud_state = require(ReplicatedStorage.Client.hud_state)
+local input_router = require(ReplicatedStorage.Client.input_router)
 
 local use_viewport = require(script.Parent.use_viewport)
 
-type Relation = "self" | "ally" | "enemy" | "watched"
-type Resource = "metal" | "energy"
+local format = require(ReplicatedStorage.ClientShared.format)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
--- As server/sharing.luau sends them.
-type Bank = {
-	metal: number,
-	energy: number,
-	metal_capacity: number,
-	energy_capacity: number,
-}
-
-type RosterEntry = {
-	team_id: number,
-	name: string,
-	user_id: number,
-	color: Color3,
-	relation: Relation,
-	bank: Bank?,
-}
+type Relation = types.RosterRelation
+type Resource = types.Resource
+type Bank = types.Bank
+type RosterEntry = types.RosterEntry
 
 type Drag = {
 	start_x: number,
@@ -66,13 +57,6 @@ local LABELS: { [Resource]: string } = {
 	energy = "ENERGY",
 }
 
-local function format_amount(value: number): string
-	if value >= 10000 then
-		return string.format("%.1fk", value / 1000)
-	end
-	return string.format("%d", math.floor(value))
-end
-
 local function amount_of(bank: Bank, resource: Resource): number
 	return if resource == "metal" then bank.metal else bank.energy
 end
@@ -82,12 +66,7 @@ local function capacity_of(bank: Bank, resource: Resource): number
 end
 
 local function use_open(): boolean
-	local open, set_open = React.useState(input.is_player_list_open())
-	React.useEffect(function()
-		set_open(input.is_player_list_open())
-		return input.subscribe_player_list(set_open)
-	end, {})
-	return open
+	return use_store.use_store(hud_state.is_player_list_open, hud_state.subscribe_player_list)
 end
 
 local function use_roster(): { RosterEntry }
@@ -118,7 +97,7 @@ local function Avatar(props: { entry: RosterEntry, LayoutOrder: number })
 			then nil
 			else React.createElement("TextLabel", {
 				[React.Tag] = "roster-initial",
-				Text = string.upper(string.sub(props.entry.name, 1, 1)),
+				Text = format.escape(string.upper(string.sub(props.entry.name, 1, 1))),
 			}),
 	})
 end
@@ -157,7 +136,7 @@ local function Meter(props: {
 	limits_ref.current = { reach = reach, capacity = capacity }
 
 	React.useEffect(function()
-		local moved = UserInputService.InputChanged:Connect(function(event: InputObject)
+		local function moved(event: InputObject)
 			local drag = drag_ref.current
 			local lane = lane_ref.current
 			if drag == nil or lane == nil or event.UserInputType ~= Enum.UserInputType.MouseMovement then
@@ -172,8 +151,8 @@ local function Meter(props: {
 			local next_pending = math.floor(math.clamp(measured, 0, limits.reach))
 			pending_ref.current = next_pending
 			set_pending(next_pending)
-		end)
-		local released = UserInputService.InputEnded:Connect(function(event: InputObject)
+		end
+		local function released(event: InputObject)
 			if drag_ref.current == nil or event.UserInputType ~= Enum.UserInputType.MouseButton1 then
 				return
 			end
@@ -189,11 +168,15 @@ local function Meter(props: {
 				end
 				set_sent(given)
 			end
-		end)
-		return function()
-			moved:Disconnect()
-			released:Disconnect()
 		end
+		-- the drag is watched wherever the cursor goes, over the bar or not, and whatever takes the release
+		return input_router.watch(function(event: InputObject, phase: input_router.Phase)
+			if phase == "changed" then
+				moved(event)
+			elseif phase == "ended" then
+				released(event)
+			end
+		end)
 	end, { props.team_id, props.resource, asking } :: { any })
 
 	-- the note of what was sent clears itself, unless something newer has replaced it by then
@@ -240,9 +223,9 @@ local function Meter(props: {
 
 	local head = fraction + (pending or 0) / capacity
 	local readout = if dragging
-		then `+{format_amount(pending :: number)}`
-		elseif sent ~= nil then `{if asking then "ASKED" else "SENT"} {format_amount(sent)}`
-		else `{format_amount(amount)}/{format_amount(capacity)}`
+		then `+{format.amount(pending :: number)}`
+		elseif sent ~= nil then `{if asking then "ASKED" else "SENT"} {format.amount(sent)}`
+		else `{format.amount(amount)}/{format.amount(capacity)}`
 
 	local tags = `roster-meter {props.resource}`
 	if low then
@@ -349,7 +332,7 @@ local function Card(props: { entry: RosterEntry, mine: Bank?, can_ask: boolean, 
 				Name = React.createElement("TextLabel", {
 					[React.Tag] = "roster-name",
 					LayoutOrder = 2,
-					Text = entry.name,
+					Text = format.escape(entry.name),
 				}),
 				Badge = if BADGES[entry.relation] ~= ""
 					then React.createElement("TextLabel", {
@@ -426,7 +409,7 @@ local function PlayerList()
 			table.insert(friends, entry)
 		end
 	end
-	local watching = local_player:GetAttribute "spectator" == true
+	local watching = seating.is_spectator(local_player)
 	local can_ask = #friends > 1 and watching == false
 
 	local children: { [string]: any } = {

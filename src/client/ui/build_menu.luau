@@ -7,7 +7,7 @@
 -- blueprint is created where the next left click lands. It opens on a first page of categories, each drawn as
 -- the building its key (Z, X, C, V) places, and placing anything turns it to that building's category.
 --
--- What the player has not unlocked through the campaign (Client.unlocks) is still listed, so they can see what there
+-- What the player has not unlocked through the campaign (ClientShared.campaign_standing) is still listed, so they can see what there
 -- is to earn, but drawn locked: its picture greyed, a lock over it, and nothing happens when it is clicked. Hovering
 -- it says how it is unlocked.
 --
@@ -15,31 +15,34 @@
 -- option itself, or on the first page the category it is in. Once it is being placed, the menu stops pointing.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local UserInputService = game:GetService "UserInputService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
+local campaign = require(ReplicatedStorage.Shared.campaign)
+local build_hotkeys = require(ReplicatedStorage.Shared.build_hotkeys)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local unit_descriptions = require(ReplicatedStorage.Shared.unit_descriptions)
+local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
-local build_mode = require(ReplicatedStorage.Client.build_mode)
-local input = require(ReplicatedStorage.Client.input)
-local tutorial = require(ReplicatedStorage.Client.tutorial)
+local command_state = require(ReplicatedStorage.Client.command_state)
+local modifiers = require(ReplicatedStorage.Client.modifiers)
+local orders = require(ReplicatedStorage.Client.orders)
+local selected = require(ReplicatedStorage.Client.selected)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
-local unlocks = require(ReplicatedStorage.Client.unlocks)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local tutorial_pointer = require(ReplicatedStorage.Client.ui.tutorial_pointer)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
-local unit_icon = require(ReplicatedStorage.Client.ui.unit_icon)
+
+local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
+local campaign_standing = require(ReplicatedStorage.ClientShared.campaign_standing)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 local TutorialPointer = tutorial_pointer.TutorialPointer
-local UnitIcon = unit_icon.UnitIcon
+local UnitPicture = unit_picture.UnitPicture
 
-type EntityView = use_entities.EntityView
 type Content = tooltip.Content
-
-local queue_production: RemoteEvent = ReplicatedStorage.Shared.QueueProduction
 
 -- Holding shift when clicking a factory option adds a batch instead of a single unit.
 local SHIFT_BATCH = 5
@@ -58,63 +61,26 @@ local function locked_tooltip(def_name: string): Content
 	}
 end
 
--- What the local player has unlocked, as a number that changes whenever it does, for a component to re-render on.
-local function use_unlocks(): number
-	local version, set_version = React.useState(0)
-	React.useEffect(function()
-		return unlocks.subscribe(function()
-			set_version(function(value: number)
-				return value + 1
-			end)
-		end)
-	end, {})
-	return version
-end
-
-local function whole(value: number): string
-	return tostring(math.floor(value + 0.5))
+-- What the local player has unlocked, kept up to date: whether they may build a def, by its name.
+local function use_unlocked(): (def_name: string) -> boolean
+	local unlocked = campaign_standing.use_standing().unlocks
+	return function(def_name: string): boolean
+		return campaign.is_unlocked(unlocked, def_name)
+	end
 end
 
 -- The card shown while a cell is hovered: what the thing is for and how to use it (unit_descriptions), then what it
--- costs and what it brings. The menu is on the right of the screen, so the card opens to its left.
+-- costs and what it brings (unit_facts). The menu is on the right of the screen, so the card opens to its left.
 local function def_tooltip(def_name: string, category: string?): tooltip.Content
 	local def = unit_defs.get(def_name)
-	local description = unit_descriptions[def_name]
-	local rows: { tooltip.Row } = {
-		{ label = "Metal cost", value = whole(def.metal_cost), tag = "metal" },
-		{ label = "Energy cost", value = whole(def.energy_cost), tag = "energy" },
-		{ label = "Health", value = whole(def.health) },
-	}
-	if def.buildpower ~= nil then
-		table.insert(rows, { label = "Build power", value = whole(def.buildpower), tag = "buildpower" })
-	end
-	if def.metal_income ~= nil then
-		table.insert(rows, { label = "Metal", value = `+{def.metal_income}/s`, tag = "gain" })
-	end
-	if def.energy_income ~= nil then
-		table.insert(rows, { label = "Energy", value = `+{def.energy_income}/s`, tag = "gain" })
-	end
-	local range = unit_defs.attack_range(def)
-	if range ~= nil then
-		table.insert(rows, { label = "Range", value = `{whole(range)} studs`, tag = "weapon" })
-	end
-	if def.max_speed ~= nil and def.max_speed > 0 then
-		table.insert(rows, { label = "Speed", value = `{whole(def.max_speed)} studs/s` })
-	end
-
 	local kind = if def.subtitle ~= nil then def.subtitle elseif def.kind == "building" then "Building" else "Unit"
 	return {
 		kicker = string.upper(if category ~= nil then `{category} · {kind}` else kind),
 		title = string.upper(def.display_name),
-		tone = if range ~= nil
-			then "weapon"
-			elseif def.buildpower ~= nil then "build"
-			elseif def.energy_income ~= nil then "energy"
-			elseif def.metal_income ~= nil then "metal"
-			else "plain",
-		text = if description ~= nil then description.text else nil,
-		rows = rows,
-		notes = if description ~= nil then description.tips else nil,
+		tone = unit_facts.tone(def),
+		text = unit_descriptions.text_of(def),
+		rows = unit_facts.summary_rows(def),
+		notes = unit_descriptions.tips_of(def_name),
 	}
 end
 
@@ -200,8 +166,8 @@ local function CategoryRow(
 		def_name: string,
 		team: Color3?,
 		locked: boolean,
-		-- what the tutorial's pointer at it says, when it is what the tutorial wants clicked
-		pointer: string?,
+		-- whether the tutorial points at it, as what leads to what it wants clicked
+		pointed: boolean,
 		LayoutOrder: number,
 		on_click: (def_name: string) -> (),
 	}
@@ -212,7 +178,7 @@ local function CategoryRow(
 	end, "left")
 
 	return React.createElement(OptionShell, {
-		tag = if props.pointer ~= nil then "build-category-row tutorial-highlight" else "build-category-row",
+		tag = tutorial_pointer.lit("build-category-row", props.pointed),
 		def_name = props.def_name,
 		locked = props.locked,
 		LayoutOrder = props.LayoutOrder,
@@ -220,9 +186,7 @@ local function CategoryRow(
 		tip = tip,
 	}, {
 		Tooltip = tip.card,
-		Pointer = if props.pointer ~= nil
-			then React.createElement(TutorialPointer, { text = props.pointer, side = "left" })
-			else nil,
+		Pointer = if props.pointed then React.createElement(TutorialPointer, { side = "left" }) else nil,
 		Header = React.createElement("Frame", {
 			[React.Tag] = "build-category-header",
 			LayoutOrder = 1,
@@ -245,7 +209,8 @@ local function CategoryRow(
 			[React.Tag] = "build-category-body",
 			LayoutOrder = 2,
 		}, {
-			Icon = React.createElement(UnitIcon, {
+			Icon = React.createElement(UnitPicture, {
+				framing = "card",
 				def_name = props.def_name,
 				team = props.team,
 				locked = props.locked,
@@ -284,7 +249,7 @@ local function Option(props: {
 	hotkey: string?,
 	team: Color3?,
 	locked: boolean,
-	pointer: string?,
+	pointed: boolean,
 	LayoutOrder: number,
 	on_click: (def_name: string) -> (),
 })
@@ -294,7 +259,7 @@ local function Option(props: {
 	end, "left")
 
 	return React.createElement(OptionShell, {
-		tag = if props.pointer ~= nil then "build-option tutorial-highlight" else "build-option",
+		tag = tutorial_pointer.lit("build-option", props.pointed),
 		def_name = props.def_name,
 		locked = props.locked,
 		LayoutOrder = props.LayoutOrder,
@@ -302,12 +267,11 @@ local function Option(props: {
 		tip = tip,
 	}, {
 		Tooltip = tip.card,
-		Pointer = if props.pointer ~= nil
-			then React.createElement(TutorialPointer, { text = props.pointer, side = "left" })
-			else nil,
+		Pointer = if props.pointed then React.createElement(TutorialPointer, { side = "left" }) else nil,
 		-- the icon and the key sit over the cell where they like, so they are kept out of the body, whose list
 		-- layout would stack them with the text
-		Icon = React.createElement(UnitIcon, {
+		Icon = React.createElement(UnitPicture, {
+			framing = "card",
 			def_name = props.def_name,
 			team = props.team,
 			locked = props.locked,
@@ -364,42 +328,20 @@ type Page = {
 	keys: { [string]: string },
 }
 
--- The first page: one row for each category the builder can build from, showing the building its key places (the
--- category's main building, or else the first in it the builder can build). What the player has unlocked comes first,
--- as it does for the key (input's category_entry); a category with nothing unlocked shows its building locked.
--- Anything it can build that no category holds follows them in the grid.
-local function first_page(builds: { string }): Page
+-- The first page: one row for each category the builder can build from, showing the building its key places, which
+-- is what the key itself would place (build_hotkeys.entry); a category with nothing unlocked shows its building
+-- locked. Anything it can build that no category holds follows them in the grid.
+local function first_page(builds: { string }, is_unlocked: (def_name: string) -> boolean): Page
 	local page: Page = { category = nil, key = nil, rows = {}, defs = {}, keys = {} }
-	local taken: { [string]: boolean } = {}
-	for _, tab in input.build_tabs do
-		-- the first choice among what is unlocked, and the first choice whatever is locked
-		local entry: string? = nil
-		local fallback: string? = nil
-		for _, def_name in tab.primary do
-			if table.find(builds, def_name) ~= nil then
-				fallback = fallback or def_name
-				if unlocks.is_unlocked(def_name) then
-					entry = def_name
-					break
-				end
-			end
-		end
-		for _, def_name in builds do
-			if table.find(tab.defs, def_name) ~= nil then
-				taken[def_name] = true
-				fallback = fallback or def_name
-				if entry == nil and unlocks.is_unlocked(def_name) then
-					entry = def_name
-				end
-			end
-		end
-		entry = entry or fallback
-		if entry ~= nil then
-			table.insert(page.rows, { category = tab.name, key = tab.key, def_name = entry })
+	for _, category in build_hotkeys.categories do
+		local entry, shown = build_hotkeys.entry(category, builds, is_unlocked)
+		local def_name = entry or shown
+		if def_name ~= nil then
+			table.insert(page.rows, { category = category.name, key = category.key, def_name = def_name })
 		end
 	end
 	for _, def_name in builds do
-		if taken[def_name] == nil then
+		if build_hotkeys.category_of(def_name) == nil then
 			table.insert(page.defs, def_name)
 		end
 	end
@@ -409,82 +351,48 @@ end
 -- The page of the category `placing` belongs to: every building in it the builder can build, in the order the
 -- builder lists them, each against the key that picks it. Nil if no category holds it.
 local function category_page(builds: { string }, placing: string): Page?
-	for _, tab in input.build_tabs do
-		if table.find(tab.defs, placing) == nil then
-			continue
-		end
-		local defs: { string } = {}
-		for _, def_name in builds do
-			if table.find(tab.defs, def_name) ~= nil then
-				table.insert(defs, def_name)
-			end
-		end
-		return { category = tab.name, key = tab.key, rows = {}, defs = defs, keys = tab.keys }
+	local category = build_hotkeys.category_of(placing)
+	if category == nil then
+		return nil
 	end
-	return nil
-end
-
--- The menu follows the first selected entity that can build anything.
-local function first_builder(views: { EntityView }): EntityView?
-	for _, view in views do
-		local def = unit_defs.defs[view.def_name]
-		if def ~= nil and def.build_options ~= nil then
-			return view
+	local defs: { string } = {}
+	for _, def_name in builds do
+		if category.key_of[def_name] ~= nil then
+			table.insert(defs, def_name)
 		end
 	end
-	return nil
+	return { category = category.name, key = category.key, rows = {}, defs = defs, keys = category.key_of }
 end
 
 local function BuildMenu()
-	local ids = use_entities.use_selection()
-	local views = use_entities.use_views(ids)
-	local placing, set_placing = React.useState(build_mode.active())
+	-- the menu follows the selection's builder, rendering again as the selection changes
+	use_entities.use_selection()
+	local placing = use_store.use_store(command_state.placing, command_state.subscribe_placing)
 	local ui_scale = use_viewport.use_ui_scale()
-	-- only to re-render when unlocks change; what is locked is asked of `unlocks` as it is drawn
-	use_unlocks()
-	-- only to re-render when the tutorial's step changes; what it wants clicked is asked of `tutorial` below
-	use_tutorial.use_tutorial()
+	local is_unlocked = use_unlocked()
+	-- what the guide wants clicked, if anything
+	local wanted = use_tutorial.use_build_target()
 
-	React.useEffect(function()
-		return build_mode.subscribe(function(def_name: string?)
-			set_placing(def_name)
-		end)
-	end, {})
-
-	local builder = first_builder(views)
-	-- leaving placement mode when the builder is deselected keeps the ghost from outliving it
-	React.useEffect(function()
-		if builder == nil and build_mode.active() ~= nil then
-			build_mode.exit()
-		end
-	end, { builder })
-
+	local builder = selected.builder()
 	if builder == nil then
 		return nil
 	end
-
-	local builder_def = unit_defs.get(builder.def_name)
-	local builds = builder_def.build_options
-	if builds == nil then
-		return nil
-	end
+	local builder_def = builder.def
+	local builds = unit_defs.build_options(builder_def)
+	local team_color = entity_attrs.color(builder.model, "team_color")
 
 	local function on_click(def_name: string)
 		-- a locked option is not a button, but it may have been unlocked away since it was drawn
-		if unlocks.is_unlocked(def_name) == false then
+		if campaign_standing.is_unlocked(def_name) == false then
 			return
 		end
 		local def = unit_defs.get(def_name)
 		if def.kind == "building" then
-			build_mode.enter(def_name)
+			-- whatever the cursor was doing ends, a mode waiting for its click among it
+			command_state.place(def_name)
 			return
 		end
-		local shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
-		queue_production:FireServer({
-			factory_id = builder.id,
-			def_name = def_name,
-			count = if shift then SHIFT_BATCH else 1,
-		})
+		orders.queue(builder.id, def_name, if modifiers.shift_held() then SHIFT_BATCH else 1)
 	end
 
 	-- A construction_bot's buildings are shown a category at a time, or they would fill the screen: the first page
@@ -499,30 +407,15 @@ local function BuildMenu()
 	end
 	local page: Page = { category = nil, key = nil, rows = {}, defs = builds, keys = {} }
 	if buildings_only then
-		page = (if placing ~= nil then category_page(builds, placing) else nil) or first_page(builds)
+		page = (if placing ~= nil then category_page(builds, placing) else nil) or first_page(builds, is_unlocked)
 	end
 
-	-- what the tutorial wants clicked, if this builder can build it and it is not being placed already
-	local target = tutorial.build_target()
-	if target ~= nil and (table.find(builds, target) == nil or placing == target) then
-		target = nil
-	end
-	local function row_pointer(row: Row): string?
-		if target == nil then
-			return nil
-		end
-		for _, tab in input.build_tabs do
-			if tab.name == row.category and (row.def_name == target or table.find(tab.defs, target) ~= nil) then
-				return "CLICK"
-			end
-		end
-		return nil
-	end
-	local function option_pointer(def_name: string): string?
-		if def_name ~= target then
-			return nil
-		end
-		return "CLICK"
+	-- what the tutorial wants clicked, if this builder can build it and it is not being placed already, and so what
+	-- leads to it: its own cell, or on the first page the row of its category
+	local target = if wanted ~= nil and table.find(builds, wanted) ~= nil and placing ~= wanted then wanted else nil
+	local target_category = if target ~= nil then build_hotkeys.category_of(target) else nil
+	local function leads_to_target(def_name: string, category: string?): boolean
+		return target ~= nil and (def_name == target or (target_category ~= nil and target_category.name == category))
 	end
 
 	local rows = {}
@@ -531,9 +424,9 @@ local function BuildMenu()
 			category = row.category,
 			hotkey = row.key,
 			def_name = row.def_name,
-			team = builder.team_color,
-			locked = unlocks.is_unlocked(row.def_name) == false,
-			pointer = row_pointer(row),
+			team = team_color,
+			locked = is_unlocked(row.def_name) == false,
+			pointed = leads_to_target(row.def_name, row.category),
 			LayoutOrder = index,
 			on_click = on_click,
 		})
@@ -544,9 +437,9 @@ local function BuildMenu()
 		options[`Option{index}`] = React.createElement(Option, {
 			def_name = def_name,
 			hotkey = page.keys[def_name],
-			team = builder.team_color,
-			locked = unlocks.is_unlocked(def_name) == false,
-			pointer = option_pointer(def_name),
+			team = team_color,
+			locked = is_unlocked(def_name) == false,
+			pointed = leads_to_target(def_name, nil),
 			LayoutOrder = index,
 			on_click = on_click,
 		})

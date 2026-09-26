@@ -6,8 +6,9 @@ with metal / energy / buildpower economics.
 ## Getting started
 
 ```bash
-aftman install          # rojo, wally, selene, stylua, luau-lsp
-wally install           # react, react-roblox, promise, janitor
+aftman install          # rojo, wally, selene, stylua, luau-lsp, lune
+wally install           # react, react-roblox
+python -m pip install -r requirements.txt   # the tools' Python packages
 rojo build rts-game.project.json -o rts.rbxlx # then open in Studio and `rojo serve rts-game.project.json`
 ```
 
@@ -19,7 +20,8 @@ Stylesheets are SCSS compiled by [outlass](https://github.com/toodols/outlass) i
 ./build_stylesheets.bat --watch    # rebuild on change
 ```
 
-It uses `outlass` from PATH if installed, otherwise builds it from `../outlass`.
+It uses `outlass` from PATH if installed, otherwise builds it from `../outlass`; it has to be the version
+`tools/stylesheets.py` names.
 
 `build_preview.bat` renders the same SCSS in a browser instead, via dart-sass, as a reference to
 diff the Roblox render against — see `src/client/ui/stylesheets/preview/README.md`.
@@ -27,20 +29,28 @@ diff the Roblox render against — see `src/client/ui/stylesheets/preview/README
 ## Checks
 
 ```bash
-selene src
-stylua src
-rojo sourcemap rts-game.project.json --output sourcemap.json
-luau-lsp analyze --defs=globalTypes.d.luau --sourcemap=sourcemap.json --ignore="**/Packages/**" --ignore="**/pow/**" src
+python tools/check.py              # types, tests, arena, style, stylesheets, art
+python tools/check.py types tests  # some of them
+git config core.hooksPath tools/hooks   # once: run them all before every commit
 ```
 
-`globalTypes.d.luau` is fetched from the luau-lsp repo and is not checked in.
+`tools/check.py` type checks both places with luau-lsp, runs the headless tests and the golden AI duels
+(`tools/golden`), StyLua and selene (every lint, over `src/` and `tools/`), and checks the committed stylesheets and art
+are what their sources build and each project serves into the place `shared/places.luau` names. luau-lsp reads Roblox's
+API from `globalTypes.d.luau` at the repository's root, fetched from the luau-lsp repo and not checked in.
+
+The tests are scenarios played on the real simulation, one module per area in `src/server/tests/` (fixtures in
+`harness.luau`). They run headless (`lune run tools/headless_tests/run.luau all`, or a test's name; `list` lists them)
+or in Studio (`StudioTestService:ExecuteRunModeAsync({ test = "<name>" })`). Headless, the arena and the tests load
+`src/` unchanged into `tools/lib`, a stand-in of the Roblox engine that compiles each module as Studio does.
 
 ## Command bar
 
 [pow](https://github.com/toodols/pow) (checked out in `pow/`) is the in-game command bar for debugging
-and administration. Press `;` to open it, `help` lists commands. It is started by
-`src/server/pow_init.server.luau`, which also sets who may use it, and this game's own commands live in
-`src/server/pow_server_ext.luau`:
+and administration. Press `;` to open it, `help` lists commands. It is started the same way in
+both places by `src/server_shared/pow_setup.luau`, which lets the game's developers (`shared/developers.luau`) use it;
+the commands both places have are in `src/server_shared/pow_common.luau`, and this game's own in
+`src/server/pow_commands/`:
 
 | Command | Effect |
 | --- | --- |
@@ -56,16 +66,16 @@ and administration. Press `;` to open it, `help` lists commands. It is started b
 ## Skins
 
 A skin is another look for the same units (`src/shared/skins`, one module each). Each player equips one in the lobby's
-Skins tab (`lobby/client/ui/skins_tab.luau`, saved by `lobby/server/skins.luau`), and in every game they play after,
+Skins tab (`lobby/client/ui/skins_tab.luau`, saved by `server_shared/skin_session.luau`), and in every game they play after,
 their team wears it: everything it has and makes (the `skin` attribute on each model), so every player sees it. It
-cannot be changed once a game has started. What a player has equipped is kept in a DataStore (`shared/skin_store.luau`),
-which the game place reads as they arrive (`server/skins.luau`); until it is read, and for anyone who never equipped
-one, it is `DEFAULT_SKIN` in `shared/config.luau`: the plain `default` skin.
+cannot be changed once a game has started. What a player has equipped is kept in a DataStore (`server_shared/skin_session.luau`),
+which the game place reads as they arrive, and their team wears it (`server/skins.luau`); until it is read, and for anyone who never equipped
+one, it is `DEFAULT_SKIN` in `shared/skins`: the plain `default` skin.
 Every special skin is opt in: nobody wears one they did not equip, and a team no player chose for (the scavengers,
 anything neutral) is plain. `shared/skins` refuses to start with a default that is anything but plain. A developer-only skin is only
 offered to, and only equippable by, developers (`shared/developers.luau`). A skin can swap a def's art for other art altogether (`art`), repaint it (`paint`), or hang things on it
 (`attachments`), all of which only the client draws (`client/art.luau`). A developer-only skin may also change the numbers
-(`stats`); the server reads every def through `unit_defs.of(entity)`, which applies them.
+(`stats`); the server reads every def as an entity carries it (`Entity.def`, made through `unit_defs.skinned`), which applies them.
 
 | Skin | What it does |
 | --- | --- |
@@ -78,16 +88,16 @@ offered to, and only equippable by, developers (`shared/developers.luau`). A ski
 Everything a player can build starts locked except the Bot Lab, Construction Bot, Grunt, Guard, Solar Collector and
 Metal Extractor (`shared/campaign.luau`), and missions unlock the rest. Only something that some def can build is ever locked, so a
 commander or the tutorial's boulder never is. Each player's progress is kept in the `campaign_progress_v1` DataStore
-(`shared/campaign_store.luau`) and published on their Player as the `campaign_unlocks` attribute, which the build menu
+(`server_shared/campaign_session.luau`, the progress itself `shared/campaign_progress.luau`) and published on their Player as the `campaign_unlocks` attribute, which the build menu
 reads: a locked option is greyed, shows a lock where its key would be and LOCKED where its cost would be, cannot be
 clicked or hotkeyed, and its tooltip says it is unlocked through the campaign. The server refuses it too
-(`server/campaign.luau`): placing it, queueing it in a factory, and any build order for it already queued. Teams with
+(`server/unlocks.luau`): placing it, queueing it in a factory, and any build order for it already queued. Teams with
 no player, like the scavengers or a mission's enemy, are never restricted. In Studio, where DataStores cannot be read,
 a player has the starting unlocks; the `unlock <def|all>`, `unlock_all [player]`, `relock` and `complete_mission <id>` commands
 change them, and `reset_data [player]` wipes what is saved for a player.
 
 The lobby's Campaign screen lists the missions and every lockable thing, dimmed while locked, and starts a mission for
-the player alone, as a match of the mission's `campaign_<id>` mode on its own map (`lobby/server/missions.luau`).
+the player alone, as a match of the mission's `campaign_<id>` mode on its own map (`lobby/server/mission_starts.luau`).
 Campaign modes and maps (a preset with `campaign_only`) are never offered to a lobby.
 
 The first mission is the tutorial, on the `tutorial` map: a small valley split north to south by a ridge nothing can
@@ -125,6 +135,13 @@ is none). Both teleport to the lobby (`server/campaign_exit.luau`, over `Campaig
 teleport carries its id, and the lobby starts it the way the campaign screen's Play does, if it is open to the player.
 A mission is lost, in DEFEAT, when the player has nothing left.
 
+The fourth mission, Prairie Skirmish (`prairie`, on the prairie map), is played like an ordinary game: the players
+choose their starts in their start box, and once the game begins the enemy is handed to the AI, playing by the
+mission's `ai_profile` (`passive`, which builds its economy as usual but spends only a quarter of its metal on its army
+and little on defence; see `shared/ai_profiles.luau`), from the start furthest from them. It is played to the
+commanders end mode both ways: killing the enemy's commander wins, losing every player's commander loses.
+`{ test = "prairie_skirmish" }` checks it.
+
 To play the tutorial in Studio, set a string attribute `CampaignMission = "tutorial"` on the game place's Workspace and
 press Play. `{ test = "tutorial_boulder" }` checks the boulder (what does and does not hurt it, and that nothing gets
 past it until it is gone).
@@ -137,9 +154,10 @@ The lobby is a place of its own, built from `rts-lobby.project.json` (the game i
 rojo build rts-lobby.project.json -o lobby.rbxlx   # or `rojo serve rts-lobby.project.json` into the lobby place
 ```
 
-It shares `src/shared` and the game's SCSS partials with the game, and adds `src/lobby`: `server/` (the lobbies and
-their rules, the cross-server list, and launching), `shared/` (the remotes and the protocol) and `client/` (the React
-screens). `build_stylesheets.bat` compiles its sheet, `src/lobby/client/stylesheets/lobby.scss`, alongside the game's.
+It shares `src/shared`, `src/client_shared` (what both clients draw with: built art and its pictures, the palette,
+formatting, sounds) and the game's SCSS partials with the game, and adds `src/lobby`: `server/` (the lobbies and their
+rules, the cross-server list, and launching), `shared/` (the remotes and the protocol) and `client/` (the React
+screens). It does not mount the game's own client, `src/client`. `build_stylesheets.bat` compiles its sheet, `src/lobby/client/stylesheets/lobby.scss`, alongside the game's.
 
 The lobby's screen has three tabs along its header: Play (the lobby list, the campaign and the lobby itself), Skins
 (where a player equips the skin their units wear in their games; see Skins above) and Microtransactions, which has
@@ -161,7 +179,7 @@ Starting reserves a server of the game place and teleports everyone in the lobby
 server's PrivateServerId, and as each player's teleport data. The game server reads it as it starts
 (`server/match.luau`), from the store first, since only a server can write it, and from the first arrival's teleport
 data if the store cannot be read. The match overrides what the game starts with when it is played straight from Studio
-(`MAP_PRESET` and `MAP_SEED` in `server/init.server.luau`, and the scavengers as config has them): each seated player
+(`MAP_PRESET` and `MAP_SEED` in `server/init.server.luau`, and the scavengers off, as `shared/switches.luau` has them): each seated player
 gets a team, teams on a side are allied, and the scavengers are turned off or paced to the difficulty. The game's
 start-choosing phase then waits for everyone the lobby sent, showing who is still arriving, for up to 60 seconds. A
 player whose teleport fails is sent again, up to three times, and then put back in the browser.
@@ -182,14 +200,26 @@ game:GetService("StudioTestService"):ExecuteRunModeAsync({
 
 ## How it fits together
 
-The simulation is authoritative and lives entirely in `src/server`, stepping at a fixed 20 Hz
-(`config.TICK_RATE`). It knows nothing about Roblox instances. `instances.luau` mirrors each
-entity into `Workspace.Entities` as an anchored model whose attributes carry its state, which is
-both how the world replicates and how the client picks units with a raycast.
+Two places: the game (`rts-game.project.json`) and the lobby (`rts-lobby.project.json`, `src/lobby/`), which
+teleports a party into a reserved game server.
 
-`src/shared` holds everything both sides need: unit definitions, tunables, the heightmap and
-footprint maths. The heightmap is generated from a seed by a pure function, so the client rebuilds
-the server's terrain locally instead of receiving it.
+- `src/server` is the authoritative simulation, stepping at a fixed 20 Hz (`shared/tick_rate.luau`) through the one
+  phase list in `simulation.luau`. It knows nothing about Roblox instances. `instances.luau` mirrors each entity into
+  `Workspace.Entities` as an anchored model whose attributes carry its state (`shared/entity_attrs.luau`), which is both
+  how the world replicates and how the client picks units with a raycast. Its folders: `ai/` (the computer players),
+  `scavengers/` (the gamemode, its numbers in `settings.luau`), `missions/` (the campaign), `pow_commands/` and
+  `tests/`.
+- `src/shared` holds everything both sides need: unit definitions (`unit_defs/`), the heightmap and footprint maths,
+  and small focused modules of tunables (`tick_rate`, `world_scale`, `ground_levels`, `craters`, ...); a knob only one
+  module reads is that module's own constant. The heightmap is generated from a seed by a pure function, so the client
+  rebuilds the server's terrain locally instead of receiving it. The game's state that is not an entity's is a set of
+  replicated fields (`shared/replicated.luau`), attributes on the `WorldState` folder and on each Player.
+- `src/client` is the game's client and its React HUD (`client/ui`); `src/client_shared` (`ReplicatedStorage.ClientShared`)
+  and `src/server_shared` (`ServerScriptService.ServerShared`) are what the game and the lobby share on each side.
+- Clients talk to the server only through remotes declared in `server_shared/remotes.luau`, each read through decoders
+  (`shared/decode.luau`) and rate-limited before a handler sees it.
+- `tools/`: `check.py`, `lib/` (the engine stand-in), `headless_tests/`, `ai_arena/` (headless AI duels),
+  `model_pipeline/` (every model, built in Blender and uploaded), `bar_maps/`, `sound_pipeline/` and `stylesheets.py`.
 
 ### Economy and buildpower
 
@@ -280,27 +310,29 @@ can place the turbine with Z then D.
 
 ### Map presets
 
-The ground comes from a preset in `shared/map_presets.luau`, chosen by `MAP_PRESET` in `server/init.server.luau`
-and sent to clients with the seed. `highlands` is the rolling hills the map has always had. `islands` is islands
-in an ocean: one flat-topped island under every team start, a few more scattered between, and at least one
-volcano, a cone about 55 degrees steep with a crater that nothing can be built on. `continents` is two
-continents with sea all round them, joined by two narrow land bridges; teams start at the far ends, slots 1 and 2
-facing each other across the water (a preset may set its own start positions with `start_position`), and the
-spread of underwater metal spots lies on the sea floor around them. A preset is a function of the
-seed alone, so the server and the client build the same ground. Adding one is adding an entry to that table.
+The ground comes from a preset in `shared/map_presets`, chosen by `MAP_PRESET` in `server/init.server.luau`
+and sent to clients with the seed. The maps made for the game are one module each in `shared/map_designs`, and
+Beyond All Reason's are made presets from `shared/bar_maps` by `shared/map_presets/bar.luau`. `highlands` is the
+rolling hills the map has always had. `islands` is islands in an ocean: one flat-topped island under every team
+start, a few more scattered between, and at least one volcano, a cone about 55 degrees steep with a crater that
+nothing can be built on. `continents` is two continents with sea all round them, joined by two narrow land bridges;
+teams start at the far ends, slots 1 and 2 facing each other across the water (every preset lists its starts in
+`starts`, one for each team it is laid out for), and the spread of underwater metal spots lies on the sea floor
+around them. A preset is a function of the seed alone, so the server and the client build the same ground. Adding
+one is adding a module to `shared/map_designs` and listing it in its `init.luau`.
 
 ### Scavengers
 
-A gamemode (`config.SCAVENGERS_ENABLED`, or the `scavengers` command) where the map fights back. The
-scavengers are a team of their own (`config.SCAVENGER_TEAM`), so everything they own is an enemy of every
+A gamemode (the `scavengers` switch, which a lobby's scavengers mode or the `scavengers` command turns on) where the map fights back. The
+scavengers are a team of their own (`teams.SCAVENGER`), so everything they own is an enemy of every
 player and `combat` needs no special case for them; they have no economy, and their weapons are never short of
-energy. All of it lives in `src/server/scavengers.luau`.
+energy. All of it lives in `src/server/scavengers/`, and every number below is a constant in its `settings.luau`.
 
-Progress runs from 0 to 1 over `config.SCAVENGER_GAME_LENGTH` seconds, and it is all that decides when things
+Progress runs from 0 to 1 over `GAME_LENGTH` seconds, and it is all that decides when things
 happen. As the game begins (the first step anything of a player's stands) the scavengers take the start box no player
 was given that is furthest from the players, and their first beacon goes up in it. It makes nothing until progress reaches
-`SCAVENGER_SPAWN_PROGRESS` (0.05); from then on another beacon follows every 3 to 5 minutes while fewer than
-`SCAVENGER_MAX_BEACONS` stand, each between `SCAVENGER_BEACON_SPACING` and `SCAVENGER_BEACON_SPREAD` from one already
+`SPAWN_PROGRESS` (0.05); from then on another beacon follows every 3 to 5 minutes while fewer than
+`MAX_BEACONS` stand, each between `BEACON_SPACING` and `BEACON_SPREAD` from one already
 standing, so they spread out from where they began. A new site still has to be well clear of every player, with
 room to move around it; with no beacon standing, or no room round any, one goes anywhere on the map. With every
 box taken the first beacon goes anywhere too. Where there is water at the spot it is a sea beacon
@@ -308,9 +340,9 @@ box taken the first beacon goes anywhere too. Where there is water at the spot i
 there is not it is a land beacon on level ground, which makes everything else. The first beacon, and any put down
 with none standing, is always a land one. A beacon starts at 20000 health and cannot be reclaimed, so it has to be
 destroyed; what it leaves is a wreck worth half its metal cost. Every standing beacon grows tougher with progress, to
-1 + `SCAVENGER_BEACON_HEALTH_GROWTH` (4) times the progress times that, so five times as much by the end.
+1 + `BEACON_HEALTH_GROWTH` (4) times the progress times that, so five times as much by the end.
 
-Destroying a beacon moves progress on by `SCAVENGER_BEACON_KILL_PROGRESS` (0.01), which is small beside what it
+Destroying a beacon moves progress on by `BEACON_KILL_PROGRESS` (0.01), which is small beside what it
 buys: one beacon fewer making units. Destroying the last one standing brings the scavengers' boss at once, where it
 stood; so does progress reaching 1. The boss, the Scavenger Overlord (`scavenger_boss`, in
 `unit_defs/scavenger.luau`), is a Juggernaut half as big again with twice its health before the difficulty, and it
@@ -326,17 +358,17 @@ three and five times it. Beacons grow with progress instead. Beacons come every 
 kill, not one with more of them.
 
 While a beacon stands it makes a unit every 10 seconds and a defence every 15, on separate clocks. There is no limit
-on units: every beacon keeps making them, so how many come is how many beacons stand. (`SCAVENGER_UNIT_CEILING` is
-only a guard for the server.) A beacon keeps at most `SCAVENGER_MAX_DEFENSES_PER_BEACON` defences round it, and past
+on units: every beacon keeps making them, so how many come is how many beacons stand. (`UNIT_CEILING` is
+only a guard for the server.) A beacon keeps at most `MAX_DEFENSES_PER_BEACON` defences round it, and past
 that a new one takes the place of the easiest only if it is at least twice as hard. What they can make is set by a
 budget in difficulty, which is a thing's metal plus its energy, over 60: the hardest single thing a beacon may make
-now, and the difficulty the players see. It runs from `SCAVENGER_BUDGET_START` (20) to `SCAVENGER_BUDGET_END`
+now, and the difficulty the players see. It runs from `BUDGET_START` (20) to `BUDGET_END`
 (100,000) over the game, a little slower than exponentially: START * (END / START) ^ (progress ^
-`SCAVENGER_BUDGET_SHAPE`), where a shape of 1 would be exponential and 0.85 has it gain fastest early and ease off
+`BUDGET_SHAPE`), where a shape of 1 would be exponential and 0.85 has it gain fastest early and ease off
 late. That puts it at about 40 at 5%, 2,300 half way, 23,000 at 80% and 100,000 at the end; the Juggernaut (10,733)
 comes in at about 70% and the Calamity (14,467), the hardest thing there is, at 74%. Anything under 12% of the hardest
 thing a beacon could make now is fodder, and is left out, so the easiest things drop away as the budget grows.
-These numbers are all in `config.luau` to be tuned.
+These numbers are all in `server/scavengers/settings.luau` to be tuned.
 
 What they can make is everything a player can: `build_roster` takes every def that some builder or factory lists,
 that has a weapon or drones to fight with, and that is not itself a drone, so a new unit is in it without being
@@ -347,9 +379,9 @@ Valiant) are made only while a player has something in the air. A bomber gets a 
 runs, and a carrier with nothing of its own to fire goes to its spot and lets its drones fight. Drones are their
 carrier's: the AI leaves them alone, and they do not count towards the server's unit ceiling.
 
-A unit that gets nothing done for `SCAVENGER_FUTILE_SECONDS` (2 minutes) is taken away without a wreck, so that a
+A unit that gets nothing done for `FUTILE_SECONDS` (2 minutes) is taken away without a wreck, so that a
 map cut into islands cannot be made safe by leaving scavengers stranded on one. Getting something done is going after
-something it can reach, or getting `SCAVENGER_FUTILE_PROGRESS` studs nearer the nearest thing of a player's than it
+something it can reach, or getting `FUTILE_PROGRESS` studs nearer the nearest thing of a player's than it
 has been yet; with nothing of a player's it could turn on at all, nothing is held against it. Aircraft and the boss
 are never taken away. What it was worth, in difficulty, goes into a credit that is spent, one unit a second at a
 standing beacon, on things that can get across: aircraft, hovercraft and amphibious walkers, picked by weight as the
@@ -357,17 +389,17 @@ beacons pick. Credit short of the cheapest of them (the Goon, at 26) waits for m
 
 While the gamemode is on, the wreck of any unit comes back as a scavenger. Each gains resurrection progress, the
 same progress the purple bar over it shows and a Graverobber works on, at the rate that fills it in
-`SCAVENGER_REVIVE_SECONDS` (a minute), and then stands up on the scavengers' team with the health a raised unit
-has, and the difficulty's multiple of it, at no cost to them. Only units come back, never a commander or the boss, and only within `SCAVENGER_REVIVE_RANGE` (300 studs)
+`REVIVE_SECONDS` (a minute), and then stands up on the scavengers' team with the health a raised unit
+has, and the difficulty's multiple of it, at no cost to them. Only units come back, never a commander or the boss, and only within `REVIVE_RANGE` (300 studs)
 of a standing beacon: a wreck further out just lies there, keeping what progress it had, until a beacon goes up near
 it. Whatever takes the wreck apart first by reclaiming it wins.
 
 Units scatter. A new one first heads off away from its beacon, up to 60 degrees either side of straight out, and
 leaves hunting alone for a few seconds; after that, with nothing of a player's near, it seeks: it heads for
-the nearest thing of a player's anywhere on the map, to a staging spot at 80% of `SCAVENGER_DETECTION_RANGE`
-from it, by a straight run or else by a route. `SCAVENGER_SEEKER_SHARE` is the share of units that do, all of
+the nearest thing of a player's anywhere on the map, to a staging spot at 80% of `DETECTION_RANGE`
+from it, by a straight run or else by a route. `SEEKER_SHARE` is the share of units that do, all of
 them by default, and the rest wander to a spot a fair way off whenever they have nothing to do. It also hunts:
-anything of a player's within `SCAVENGER_DETECTION_RANGE` that a unit can shoot is attacked, and the chase ends
+anything of a player's within `DETECTION_RANGE` that a unit can shoot is attacked, and the chase ends
 when it can no longer be. Hunters do not all make for the target itself, which
 would stop them in a clump at the front with the rest unable to get into range. Each walks to a spot of its own
 at shooting range, on the ring round the target, spread across the half of it that it is coming from and fixed
@@ -407,11 +439,11 @@ click a wreck. A wreck has to be full of metal first, so one that has been recla
 team paying back the metal at the rate reclaiming took it. Then the buildpower goes into the resurrection,
 which takes as much as building the unit did and costs its energy but no metal, and a purple bar over the
 wreck shows how far along it is. When it finishes the wreck is replaced by the unit, on the team that raised
-it, at `config.RESURRECT_HEALTH_FRACTION` of its health. Only units come back, not buildings.
+it, at `RESURRECT_HEALTH_FRACTION` (`server/resurrection.luau`) of its health. Only units come back, not buildings.
 
 ### Water
 
-The sea is at height 0 (`config.WATER_LEVEL`), and the terrain has basins that dip below it. Ground below
+The sea is at height 0 (`shared/ground_levels.luau`), and the terrain has basins that dip below it. Ground below
 that is under water, as deep as it is far below (`heightmap.water_depth`). Every def says how deep the water
 may be where it stands (`max_water_depth`): land units and buildings not at all, the commander anything.
 A def may also say how deep it has to be (`min_water_depth`), which is what makes something a ship: it
@@ -531,7 +563,7 @@ comes back down. The Apocalypse's range covers the whole map. Missiles live for 
 longer than any other rocket, which a nuke crossing the map needs.
 
 A launcher shows a bar over it for how far along its next missile is, with the number it holds under it. Any
-weapon that takes longer than `config.RELOAD_BAR_MIN_SECONDS` (5) to reload, like the Pulsar's, shows a bar over
+weapon that takes longer than `RELOAD_BAR_MIN_SECONDS` (5, `server/weapons.luau`) to reload, like the Pulsar's, shows a bar over
 its owner for how far along it is to its next shot. Both come from attributes on the model (`stockpile_progress`,
 `reload_progress`) and are drawn by `world_bars.luau`.
 
@@ -580,7 +612,7 @@ builder has is measured along the ground it works from up in the air, over water
 can cross. It does not settle onto the ground while it has orders, so it stays up through a build or a
 reclaim; an aircraft with no orders left still lands after the delay below. An
 aircraft has `air` set on its def: it takes off and lands straight up and down, so it needs no runway. It
-climbs to its `altitude` when it has somewhere to go, hovers for `config.AIR_LAND_DELAY` seconds once it
+climbs to its `altitude` when it has somewhere to go, hovers for `AIR_LAND_DELAY` seconds (`server/movement.luau`) once it
 has nothing to do, then settles onto the ground. Aircraft fly over water and over everything on the ground:
 they crowd only each other, and an airborne one neither blocks a placement nor is caught in a ground blast
 or the disintegrator. Shot down, one leaves its wreck on the ground below.
@@ -599,7 +631,7 @@ Their cruise altitudes and `run_out` come from BAR's `corveng` and `corshad` (`c
 of its flight model. `turn_rate` is that model's steady turn with full bank, elevator and rudder, from each unit's
 `maxbank`, `maxelevator`, `maxrudder` and `speedtofront`, which is a circle of about 23 studs for both.
 
-Every weapon that is not dedicated anti air (`anti_air = true`) does `config.NON_AA_AIR_DAMAGE_FRACTION`
+Every weapon that is not dedicated anti air (`anti_air = true`) does `NON_AA_AIR_DAMAGE_FRACTION` (`shared/weapon_kinds.luau`)
 (20%) of its damage to an aircraft, rockets and their blasts included. A weapon can also name the layer it
 shoots at with `target_layer`: the Valiant hits aircraft only, and the Whirlwind's bombs hit the ground
 only. A lobbed shell is never thrown at something in the air. An attack order a weapon cannot carry out is
@@ -635,8 +667,7 @@ The Hercules (light transport) and the Hephaestus (heavy transport) carry things
 defence has a `weight_class`, `"light"` or `"heavy"`, or none, which cannot be carried at all; a
 transport's `carries` says how much it can lift, and a `"heavy"` one takes light and heavy while a
 `"light"` one takes light only. The commander, the Guard, the Thistle, the Twin Guard and the Warden are heavy, and every
-T1 ground unit is light. A load is measured in slots (one for every `config.TRANSPORT_SLOT_RADIUS` studs of
-radius) against the transport's `capacity`.
+T1 ground unit is light. A transport takes up to its `capacity` things at once, as BAR's `transportcapacity` counts them.
 
 A transport can pick up the enemy's things as well as its own. It flies to the thing at its usual height and
 only comes down once it is within `TRANSPORT_DESCEND_RANGE` of it, so it never drags itself along ground that is
@@ -703,16 +734,10 @@ A factory's build orders **always** queue, with or without shift; shift adds fiv
 
 ## Not built yet
 
-- Models, mostly. Fifteen buildings have procedural art from `tools/model_pipeline`: the three laser towers, both
-  construction turrets, the fusion reactors, the energy converters and the four storages. It is kept as data in
-  `src/shared/art/` and built by each client with EditableMesh (`client/art.luau`), which the experience has to
-  allow (Game Settings > Security > Allow Mesh / Image APIs); the server's model for them is an invisible hitbox.
-  Tower heads turn with their turrets' aim, construction turrets turn toward their work, and reactor rings spin.
-  Every other building is a box the size of its collider. Units are procedural stand-ins that fit inside
-  theirs (`server/unit_placeholder.luau`): vehicles are tracked boxes with a cab and a barrel, ships the same
-  without tracks, bots are stacked cylinders whose proportions come from a hash of their name, and aircraft
-  are flat isosceles triangles. Anything that builds, repairs, reclaims or assists has a yellow part. A
-  vehicle is a def with `vehicle = true`.
+- Art for the heavy drone and the scavenger boss. Every other def is dressed in procedural art from
+  `tools/model_pipeline`, uploaded as meshes and described by its module in `src/shared/art/`, which each client builds
+  (`client/art.luau`); the server's model for it is an invisible hitbox. These two are procedural stand-ins that fit
+  inside their colliders (`server/unit_placeholder.luau`).
 - Pathfinding round other units and buildings. Only the ground is routed round; units are pushed apart from each
   other and off buildings as they go.
 - Debris fields, resource buildings, and any win condition.

@@ -1,5 +1,6 @@
--- The shapes a map preset is made of (see map_presets.luau), kept apart from the presets themselves so that the maps
--- designed in map_designs can be typed without requiring map_presets, which requires them.
+--!strict
+-- The shapes a map preset is made of (see map_presets), kept apart from the presets themselves so that the maps
+-- in map_designs can be typed without requiring map_presets, which requires them.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -80,16 +81,24 @@ export type FixedWreck = {
 	facing: number,
 }
 
+-- Where a map comes from: brought over from Beyond All Reason (bar_maps), drawn by hand for this game, or generated from
+-- the seed (both in map_designs).
+export type PresetSource = "bar" | "design" | "generated"
+
 export type Preset = {
 	name: string,
+	-- what a player is shown it as
+	display_name: string,
 	description: string,
-	-- How big the map is, in studs along x and z, rounded to an even number of cells; nil for config's MAP_CELLS_X by
-	-- MAP_CELLS_Z.
-	size: Vector2?,
+	source: PresetSource,
+	-- How big the map is, in studs along x and z: an even number of cells each way (map_presets checks), which puts its
+	-- edges, and so every cell, on the terrain's voxel grid about the middle.
+	size: Vector2,
 	-- Gives the ground height at a world position.
 	build: (seed: number) -> (x: number, z: number) -> number,
-	-- Where a team's start ideally is, as (x, z); nil puts them on a ring around the middle.
-	start_position: ((slot: number) -> Vector2)?,
+	-- Where each team ideally starts, as (x, z): one for every team the map is laid out for, and more teams than these
+	-- share them, round again from the first. How many there are is how many starts the map has.
+	starts: { Vector2 },
 	-- The box each team's players choose where to start within, one to a team, in world (x, z): BAR's own for a map
 	-- from BAR, and for any other laid over its starts by eye. More teams than boxes share them.
 	start_boxes: { StartBox },
@@ -99,8 +108,9 @@ export type Preset = {
 	-- Every metal spot on the map, where the map says, in place of any laid out from the seed; nil to lay them out.
 	metal_spots: { FixedMetalSpot }?,
 	-- Every geothermal vent on the map, in world (x, z), where the map says. A map with neither this nor `geo_at_starts`
-	-- has none: vents are as particular to a map as its metal is.
-	geo_spots: { Vector2 }?,
+	-- has none: vents are as particular to a map as its metal is. Read only when the map is built, since a BAR map's are
+	-- in its features module, which nothing else needs.
+	geo_spots: (() -> { Vector2 })?,
 	-- A vent beside every start, for a map that does not say where its vents are.
 	geo_at_starts: boolean?,
 	-- The reclaimables the map starts with, where the map says, in place of any laid out from the seed; nil to lay them
@@ -109,14 +119,24 @@ export type Preset = {
 	-- The wrecks the map starts with, besides its reclaimables; nil for none. Read only when asked for, like them.
 	wrecks: (() -> { FixedWreck })?,
 	theme: Theme,
-	-- The least and most the wind blows, and how strong the tide is (see environment.luau); any left nil is config's
-	-- default.
+	-- The least and most the wind blows, and how strong the tide is (see environment.luau); any left nil is the
+	-- default there.
 	conditions: environment.Conditions?,
 	-- How the map looks: its time of day, light, haze and weather (see atmosphere.luau), all cosmetic; nil, or any field
 	-- left nil, for the scene as it is lit without one.
 	atmosphere: atmosphere.Atmosphere?,
 	-- Only played as a campaign mission's map, never offered in a lobby.
 	campaign_only: boolean?,
+	-- Places on the map a campaign mission played on it refers to by name, in world (x, z): its "player_start" and
+	-- "enemy_start", and whatever else the map is built around (the tutorial's "pass"). The map is the one place
+	-- they are said; see shared/mission_map.luau.
+	points: { [string]: Vector2 }?,
 }
 
-return table.freeze({})
+-- What an extractor on a rich metal spot makes, as a multiple of its own income: every few of the middle spots a map
+-- lays out from its seed, and the ones a map that says where its metal is marks rich.
+local RICH_MULTIPLIER = 4.0
+
+return table.freeze({
+	RICH_MULTIPLIER = RICH_MULTIPLIER,
+})

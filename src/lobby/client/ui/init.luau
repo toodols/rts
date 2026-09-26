@@ -1,18 +1,22 @@
+--!strict
 -- The lobby's whole screen: a header with the tabs, then the tab open: Play, the browser while this player is in no
 -- lobby (or the campaign screen, which the browser opens) and the lobby itself while they are in one; Skins, where they
--- pick what their units wear (skins_tab.luau); the Encyclopedia, an entry for every unit and building (encyclopedia.luau),
+-- pick what their units wear (skins_tab.luau); the Encyclopedia, an entry for every unit and building (encyclopedia/),
 -- which the campaign's missions link into; and Microtransactions (microtransactions_tab.luau). And a line along
 -- the bottom for anything that went wrong. All of it over the scene (see LobbyClient.scene), which the backdrop only darkens toward the edges, so the
 -- menus sit in a world rather than on a blank page.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local Workspace = game:GetService "Workspace"
 
 local React = require(ReplicatedStorage.Packages.react)
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 
 local game_modes = require(ReplicatedStorage.Shared.game_modes)
+
+local protocol = require(ReplicatedStorage.Lobby.protocol)
+
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 local use_lobby = require(ReplicatedStorage.LobbyClient.use_lobby)
 local stylesheets = require(ReplicatedStorage.LobbyClient.stylesheets)
@@ -47,21 +51,7 @@ end
 
 -- The scale that fits the shell to the screen, following the screen as it changes size.
 local function use_fit_scale(): number
-	local scale, set_scale = React.useState(1)
-	React.useEffect(function()
-		local camera = Workspace.CurrentCamera
-		if camera == nil then
-			return
-		end
-		local connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-			set_scale(fit_scale(camera.ViewportSize))
-		end)
-		set_scale(fit_scale(camera.ViewportSize))
-		return function()
-			connection:Disconnect()
-		end
-	end, {})
-	return scale
+	return fit_scale(use_store.use_viewport_size())
 end
 
 type Tab = "play" | "skins" | "encyclopedia" | "microtransactions"
@@ -76,7 +66,7 @@ local TABS: { { id: Tab, label: string } } = {
 
 local function App()
 	local state, received = use_lobby.use_state()
-	local notice, set_notice = React.useState(nil :: string?)
+	local notice: string?, set_notice = React.useState(nil :: string?)
 	-- out of a lobby, whether the campaign screen is open rather than the browser
 	local in_campaign, set_in_campaign = React.useState(false)
 	local tab: Tab, set_tab = React.useState("play" :: Tab)
@@ -104,7 +94,7 @@ local function App()
 		set_tab "encyclopedia"
 	end
 
-	local function act(action: string, argument: any?)
+	local function act(action: protocol.Action, argument: any?)
 		task.spawn(function()
 			local ok, message = use_lobby.request(action, argument)
 			if ok == false then
@@ -125,12 +115,7 @@ local function App()
 	local title = "LOBBY"
 	local subtitle = ""
 	if current ~= nil then
-		local mode = game_modes.get(current.mode)
-		local label = if mode == nil
-			then current.mode
-			elseif mode.kind == "campaign" then `Co-op: {mode.label}`
-			else mode.label
-		subtitle = `Lobby {current.id} · {label}`
+		subtitle = `Lobby {current.id} · {game_modes.label_of(current.match.mode)}`
 	elseif campaign_open then
 		title = "CAMPAIGN"
 	end
@@ -185,7 +170,7 @@ local function App()
 
 	return React.createElement(React.Fragment, {}, {
 		StyleLink = React.createElement("StyleLink", {
-			StyleSheet = stylesheets.lobby_stylesheet,
+			StyleSheet = stylesheets.lobby(),
 		}),
 		Backdrop = React.createElement("Frame", {
 			[React.Tag] = if wide then "backdrop room-view" else "backdrop",

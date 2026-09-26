@@ -9,7 +9,7 @@ return {
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 1.1795, 0 }, size = { 3.2424, 2.3589, 4.154 }, hash = "6204e9089b7230bb", mesh = "rbxassetid://81609145286632" },
 		{ group = "base", color = { 0.8863, 0.698, 0.2902 }, offset = { -0.0682, 1.9412, -0.2789 }, size = { 2.8636, 1.0249, 3.3588 }, hash = "0077aa8d04b8372d", team = true, mesh = "rbxassetid://90724116877742" },
 		{ group = "base", color = { 1, 0.78, 0.35 }, offset = { 0, 1.1228, 1.848 }, size = { 2.4545, 0.1398, 0.178 }, hash = "1c962166407f318e", neon = true, mesh = "rbxassetid://80422218738705" },
-		{ group = "nanolathe", color = { 0.98, 0.8, 0.1 }, offset = { 0, 0.922, 0.4044 }, size = { 1.2121, 1.844, 1.7583 }, hash = "ab818b6c71457b3a", mesh = "rbxassetid://75227977035279" },
+		{ group = "nanolathe", color = { 0.95, 0.78, 0.12 }, offset = { 0, 0.922, 0.4044 }, size = { 1.2121, 1.844, 1.7583 }, hash = "ab818b6c71457b3a", mesh = "rbxassetid://75227977035279" },
 		{ group = "nanolathe", color = { 0.35, 0.95, 0.75 }, offset = { 0, 0.6853, 1.321 }, size = { 0.4071, 0.4518, 0.3393 }, hash = "7d1b3071bd1d0ca7", neon = true, mesh = "rbxassetid://115477554467295" },
 	},
 }

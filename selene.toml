@@ -1,7 +1,3 @@
 std = "roblox"
-[rules]
-empty_if = "allow"
-unused_variable = "allow"
-global_usage = "allow"
-if_same_then_else = "allow"
-roblox_manual_fromscale_or_fromoffset = "allow"
+# outlass generates the stylesheets
+exclude = ["src/client/ui/stylesheets/default_stylesheet.lua", "src/lobby/client/stylesheets/lobby_stylesheet.lua"]

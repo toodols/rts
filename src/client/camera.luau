@@ -1,24 +1,34 @@
 -- A fixed-pitch RTS camera. It looks at a focus point on the ground, pans with the arrow keys or by
 -- dragging with the middle mouse button, turns around the focus by dragging with the middle mouse
 -- button while alt is held, and zooms by raising and lowering itself rather than changing angle. The
--- letter keys are left free for commands.
+-- letter keys are left free for commands. Panning is told as it happens (Client.events).
 
-local ContextActionService = game:GetService "ContextActionService"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
 local UserInputService = game:GetService "UserInputService"
 local Workspace = game:GetService "Workspace"
 
-local config = require(ReplicatedStorage.Shared.config)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
-local PAN_ACTION = "rts_camera_pan"
+local events = require(ReplicatedStorage.Client.events)
+local modifiers = require(ReplicatedStorage.Client.modifiers)
+local input_router = require(ReplicatedStorage.Client.input_router)
+
 local RENDER_STEP = "rts_camera"
 -- How long a glide (`glide_to`) takes, in seconds.
 local GLIDE_SECONDS = 0.8
+-- Units are only a few studs across, so the default altitude is low enough to actually read them.
+local CAMERA_HEIGHT = 65
+local CAMERA_PITCH = -55
+local CAMERA_PAN_SPEED = 120
+local CAMERA_MIN_HEIGHT = 22
+local CAMERA_MAX_HEIGHT = 420
+local CAMERA_ZOOM_STEP = 14
+-- Radians the view turns per pixel of cursor movement while rotating with alt and the middle button.
+local CAMERA_ROTATE_SPEED = 0.008
 
 local focus = Vector3.zero
-local height = config.CAMERA_HEIGHT
+local height = CAMERA_HEIGHT
 -- How far the view has turned about the vertical, in radians. At zero the camera sits south of the
 -- focus looking north.
 local yaw = 0
@@ -32,7 +42,8 @@ local KEY_DIRECTIONS: { [Enum.KeyCode]: Vector2 } = {
 
 local held: { [Enum.KeyCode]: boolean } = {}
 
--- Set while something else has the camera (piloting a unit, client/pilot.luau): this neither moves it nor zooms.
+-- Set while something else has the camera, which the input router tells as its layer is covered (piloting a unit,
+-- client/pilot.luau): this neither moves it nor zooms.
 local suspended = false
 
 -- A move of the view that eases there rather than jumping (`glide_to`): from where and to where, in (x, z), when it
@@ -44,31 +55,6 @@ local glide: Glide? = nil
 -- pans or turns by how far it has moved since. The button is polled every frame rather than followed
 -- through input events, which the interface can swallow.
 local last_drag_location: Vector2? = nil
-
--- How the view was panned, for whoever wants to know (the tutorial): with the arrow keys, or by dragging with the
--- middle mouse button. Told every frame the focus moves, and only then; turning and zooming are not panning.
-export type PanMethod = "keys" | "drag"
-local pan_listeners: { (method: PanMethod) -> () } = {}
-
-local function report_pan(method: PanMethod)
-	for _, listener in table.clone(pan_listeners) do
-		listener(method)
-	end
-end
-
-local function subscribe_pan(listener: (method: PanMethod) -> ()): () -> ()
-	table.insert(pan_listeners, listener)
-	return function()
-		local index = table.find(pan_listeners, listener)
-		if index ~= nil then
-			table.remove(pan_listeners, index)
-		end
-	end
-end
-
-local function alt_held(): boolean
-	return UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt)
-end
 
 local function keyboard_pan(): Vector2
 	local total = Vector2.zero
@@ -90,7 +76,7 @@ end
 -- The camera looking at `at_focus` from `at_height`, behind and above it along the pitch angle and
 -- turned by the current yaw.
 local function view_at(at_focus: Vector3, at_height: number): CFrame
-	local back = at_height / math.tan(-math.rad(config.CAMERA_PITCH))
+	local back = at_height / math.tan(-math.rad(CAMERA_PITCH))
 	return CFrame.new(at_focus + screen_to_ground(Vector2.new(0, back)) + Vector3.new(0, at_height, 0), at_focus)
 end
 
@@ -102,7 +88,7 @@ local function pan_by_pixels(delta: Vector2)
 	if camera == nil or camera.ViewportSize.Y <= 0 then
 		return
 	end
-	local elevation = math.rad(-config.CAMERA_PITCH)
+	local elevation = math.rad(-CAMERA_PITCH)
 	local distance = height / math.sin(elevation)
 	local per_pixel = 2 * distance * math.tan(math.rad(camera.FieldOfView) / 2) / camera.ViewportSize.Y
 	-- the camera goes where the cursor goes: moving the mouse up pans it the way the view faces
@@ -120,13 +106,13 @@ local function apply(delta: number)
 		local location = UserInputService:GetMouseLocation()
 		if last_drag_location ~= nil then
 			local moved = location - last_drag_location
-			if alt_held() then
+			if modifiers.alt_held() then
 				-- the ground turns the way the cursor drags it
-				yaw -= moved.X * config.CAMERA_ROTATE_SPEED
+				yaw -= moved.X * CAMERA_ROTATE_SPEED
 			elseif moved.Magnitude > 0 then
 				glide = nil
 				pan_by_pixels(moved)
-				report_pan "drag"
+				events.panned.fire "drag"
 			end
 		end
 		last_drag_location = location
@@ -138,10 +124,10 @@ local function apply(delta: number)
 	if direction.Magnitude > 0 then
 		-- pan speed scales with altitude so a zoomed-out camera crosses the map at the same
 		-- apparent rate as a zoomed-in one
-		local speed = config.CAMERA_PAN_SPEED * (height / config.CAMERA_HEIGHT)
+		local speed = CAMERA_PAN_SPEED * (height / CAMERA_HEIGHT)
 		glide = nil
 		focus += screen_to_ground(direction.Unit) * speed * delta
-		report_pan "keys"
+		events.panned.fire "keys"
 	end
 
 	local gliding = glide
@@ -183,25 +169,18 @@ local function ground_under_cursor(cursor: Vector2, at_focus: Vector3, at_height
 	return view.Position + direction * ((at_focus.Y - view.Position.Y) / direction.Y)
 end
 
-local function on_zoom(_, input_state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
-	if input.UserInputType ~= Enum.UserInputType.MouseWheel or suspended then
-		return Enum.ContextActionResult.Pass
-	end
-	-- Zoom toward the cursor: whatever is under it stays under it. The focus moves by however far the
-	-- point under the cursor would otherwise have slid across the ground.
+-- Zooms by `delta` notches of the wheel toward the cursor: whatever is under it stays under it. The focus moves by
+-- however far the point under the cursor would otherwise have slid across the ground.
+local function zoom(delta: number): boolean
 	glide = nil
 	local cursor = UserInputService:GetMouseLocation()
 	local before = ground_under_cursor(cursor, focus, height)
-	height = math.clamp(
-		height - input.Position.Z * config.CAMERA_ZOOM_STEP,
-		config.CAMERA_MIN_HEIGHT,
-		config.CAMERA_MAX_HEIGHT
-	)
+	height = math.clamp(height - delta * CAMERA_ZOOM_STEP, CAMERA_MIN_HEIGHT, CAMERA_MAX_HEIGHT)
 	local after = ground_under_cursor(cursor, focus, height)
 	if before ~= nil and after ~= nil then
 		focus += Vector3.new(before.X - after.X, 0, before.Z - after.Z)
 	end
-	return Enum.ContextActionResult.Sink
+	return true
 end
 
 local function look_at(position: Vector3)
@@ -219,6 +198,7 @@ local function glide_to(position: Vector3)
 	}
 end
 
+-- Where the view looks now.
 local function get_focus(): Vector3
 	return focus
 end
@@ -235,21 +215,23 @@ local function init()
 		camera.CameraType = Enum.CameraType.Scriptable
 	end
 
-	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed then
-			return
-		end
-		if KEY_DIRECTIONS[input.KeyCode] ~= nil then
+	-- the arrow keys, held down, and the wheel, through the input router, which covers the layer while something else
+	-- has the camera
+	input_router.push({
+		began = function(input: InputObject, processed: boolean): boolean
+			if processed or KEY_DIRECTIONS[input.KeyCode] == nil then
+				return false
+			end
 			held[input.KeyCode] = true
-		end
-	end)
-	UserInputService.InputEnded:Connect(function(input: InputObject)
-		if KEY_DIRECTIONS[input.KeyCode] ~= nil then
+			return true
+		end,
+		ended = function(input: InputObject)
 			held[input.KeyCode] = nil
-		end
-	end)
-
-	ContextActionService:BindAction(PAN_ACTION, on_zoom, false, Enum.UserInputType.MouseWheel)
+		end,
+		wheel = zoom,
+		exclusive = false,
+		covered = set_suspended,
+	})
 
 	-- Bound at the camera's own priority so that everything that projects through the camera, which
 	-- binds just after it, sees this frame's position and not last frame's.
@@ -257,10 +239,10 @@ local function init()
 end
 
 return table.freeze({
+	CAMERA_HEIGHT = CAMERA_HEIGHT,
+	CAMERA_PITCH = CAMERA_PITCH,
 	init = init,
 	look_at = look_at,
 	glide_to = glide_to,
 	get_focus = get_focus,
-	set_suspended = set_suspended,
-	subscribe_pan = subscribe_pan,
 })

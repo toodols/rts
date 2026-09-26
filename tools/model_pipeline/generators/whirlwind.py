@@ -1,21 +1,22 @@
 """unit_defs/air_t1.luau `whirlwind` (BAR corshad): a bomber.
 
-Collider capsule(44, 26, 48): radius 48/22 = 2.18 studs, height 26/11 = 2.36. Faceted low-poly, under 100
+Faceted low-poly, under 100
 triangles. Heavier and broader than the Valiant so the two never read alike: a fat hexagonal fuselage with a
 glazed nose, long swept wings (the team-coloured accent) carrying a big square engine nacelle each, a single
 tall fin with a tailplane on top, and a dark bomb bay under the belly. Nothing moves: its bombs just drop.
 """
 
-import math
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(176, 122, 88)
-RADIUS, HEIGHT = 48 / 22, 26 / 11
+CATEGORY = "entity"
+DEF = "whirlwind"
 
 
 def generate(params):
+    accent = params["color"]
     zc = 1.15
     objects = []
 
@@ -68,7 +69,7 @@ def generate(params):
         (-0.80, 1.86, zc + 0.92),
     ], top=(0.0, 1.80, zc + 0.96), bottom=(0.0, 1.80, zc + 0.86)))
     for obj in accents:
-        air.accent_mat(obj, "whirlwind", ACCENT)
+        common.accent_mat(obj, accent)
         objects.append(obj)
 
     # Engine nacelles under the wings: square-section tubes, dark intake faces, glowing nozzles.
@@ -92,9 +93,7 @@ def generate(params):
         common.trim_mat(obj)
         objects.append(obj)
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
         objects.append(obj)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "whirlwind")
     return objects

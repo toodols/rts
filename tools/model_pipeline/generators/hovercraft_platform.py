@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `hovercraft_platform` (BAR corhp): a 3x1x3 cell (12 x 4 x 12 stud) factory for hovercraft.
+"""unit_defs/factory.luau `hovercraft_platform` (BAR corhp): a factory for hovercraft.
 
 Where the vehicle lab is a walled bay, this is an open launch apron: a broad, low pad with no walls or roof, its
 front a long slipway sloping down to the ground on the open side where production.luau builds each hovercraft
@@ -8,19 +8,27 @@ block sits across the back, and the deck carries a team-coloured hexagonal landi
 100 triangles.
 """
 
-from . import factory_common as fc
+import math
+
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "hovercraft_platform"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"height": 4.9}
 
 
 def generate(params):
-    k = fc.Kit("hoverpad")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     base = 0.25
     deck = 0.9
-    front = -6.0
+    front = -hl
     ramp_top = -2.6
     tower_top = 4.9
 
-    footing = fc.Shape().hull((-6, 6, -6, 6), (-5.85, 5.85, -5.85, 5.85), 0.0, base)
+    footing = fc.Shape().hull((-hw, hw, -hl, hl), (-5.85, 5.85, -5.85, 5.85), 0.0, base)
 
     # The pad: deck from the back to ramp_top, then a slipway down to the front edge.
     body.hull((-4.4, 4.4, front, 5.8), (-4.2, 4.2, ramp_top, 5.8), base, deck)
@@ -54,7 +62,7 @@ def generate(params):
     # Landing diamond on the deck, and launch chevrons down the slipway.
     z = deck + 0.02
     # Team-coloured hexagonal landing mark on the deck.
-    hexagon = accent._add([(2.4 * fc.math.cos(fc.math.pi * i / 3), 0.6 + 2.4 * fc.math.sin(fc.math.pi * i / 3), z)
+    hexagon = accent._add([(2.4 * math.cos(math.pi * i / 3), 0.6 + 2.4 * math.sin(math.pi * i / 3), z)
                            for i in range(6)])
     accent._face([hexagon + i for i in range(6)], normal=(0, 0, 1))
     slope = (deck - base) / (ramp_top - front)
@@ -68,10 +76,10 @@ def generate(params):
             nano.quad(*[(x, y, zr(y)) for x, y in pts], normal=tuple(n))
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
-    return fc.finish(objs)
+    return objs

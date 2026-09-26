@@ -2,19 +2,18 @@
 
 A pointed team-colour fuselage with a dark wing through it, a lift rotor spinning in a nacelle at each wingtip,
 a short laser under the nose and a glowing sensor eye. Its origin is the bottom of its collider, like any
-unit's, though it flies. Collider capsule(20, 20, 20): radius 0.909, height 1.82 studs. 100-triangle budget.
-"""
+unit's, though it flies."""
 
-from . import common
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import palette
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(226, 226, 120)
-EYE_COLOR = (1.0, 0.35, 0.25, 1.0)  # a hostile red eye, the laser's colour
+CATEGORY = "entity"
+DEF = "drone"
 
 
 def generate(params):
-    radius, height = v.collider(20, 20, 20)
-    m = v.Mats("drone", tuple(params.get("accent_color", ACCENT)))
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
     z = 0.62  # belly height
 
@@ -27,13 +26,11 @@ def generate(params):
     objects.append(m.accent(body))
 
     # Wing through the fuselage (12 tris) and a nacelle at each tip (10 each).
-    wing = v.block("wing", 1.0, 0.34, 0.07, origin=(0.0, 0.08, z + 0.16), top=(1.0, 0.26), top_offset=(0.0, 0.03),
-                   drop=())
+    wing = common.block("wing", 1.0, 0.34, 0.07, top=(1.0, 0.26), top_offset=(0.0, 0.03), at=(0.0, 0.08, z + 0.16), drop=())
     objects.append(m.trim(wing))
     nx = 0.56
     for side in (-1, 1):
-        nacelle = v.block(f"nacelle_{side}", 0.16, 0.4, 0.26, origin=(side * nx, 0.08, z + 0.06), top=(0.12, 0.3),
-                          drop=())
+        nacelle = common.block(f"nacelle_{side}", 0.16, 0.4, 0.26, top=(0.12, 0.3), at=(side * nx, 0.08, z + 0.06), drop=())
         objects.append(m.body(nacelle))
 
     # Laser under the nose (10 tris) and the sensor eye on it (2).
@@ -41,7 +38,7 @@ def generate(params):
     objects.append(m.trim(gun))
     eye = v.decal("eye", [(-0.05, -0.47, z + 0.3), (0.05, -0.47, z + 0.3), (0.08, -0.3, z + 0.345),
                           (-0.08, -0.3, z + 0.345)], up=(0.0, -0.3, 1.0))
-    objects.append(m.glow(eye, color=EYE_COLOR, name="eye"))
+    objects.append(m.glow(eye, palette.HOSTILE_RED))
 
     # Two-bladed rotors over the nacelles, each spinning on its own (4 tris: top and underside).
     for side in (-1, 1):
@@ -59,5 +56,4 @@ def generate(params):
         objects.append(common.art_group(rotor, f"rotor_{'r' if side > 0 else 'l'}", pivot=True, kind="spin",
                                         axis=(0.0, 0.0, 1.0), speed=-30.0 * side))
 
-    v.check_fit(objects, radius, height, "drone")
     return objects

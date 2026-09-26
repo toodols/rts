@@ -1,0 +1,22 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Tabs -------------------------------------------------------------------------------------------------------
+
+// The tabs, at the right of the header: Play, Skins, Encyclopedia, Microtransactions. The open one is lit as a chosen chip is.
+.tabs {
+	width: auto;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.chip.tab {
+	height: 34px;
+	padding: 0 space(4);
+
+	> .chip-label {
+		font-family: Michroma;
+		font-size: 12px;
+	}
+}

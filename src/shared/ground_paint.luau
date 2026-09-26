@@ -1,15 +1,15 @@
--- What the ground is made of at each place on a map, from the map preset's theme (see map_presets.luau). The ground is
+-- What the ground is made of at each place on a map, from the map preset's theme (see map_presets). The ground is
 -- painted by what can cross it, with the limits passability uses: one material where tanks can drive, another where
 -- only bots can climb, and a third where nothing walks. So a player reads the routes off the colour of the ground, and
 -- a crater's walls turn to rock as they steepen.
 --
 -- The server's terrain is painted with this, and so is the lobby's picture of each map, so the two agree.
 
-local config = require(script.Parent.config)
-local map_presets = require(script.Parent.map_presets)
+local ground_levels = require(script.Parent.ground_levels)
+local map_types = require(script.Parent.map_types)
 local passability = require(script.Parent.passability)
 
-type Theme = map_presets.Theme
+type Theme = map_types.Theme
 
 export type Painter = (x: number, z: number, height: number, steepness: number) -> Enum.Material
 
@@ -26,6 +26,28 @@ local PATCH_THRESHOLD = 0.15
 local HIGH_GROUND_WAVER = 3
 local HIGH_GROUND_FREQUENCY = 0.05
 
+-- What each material is as ground that things lie on (`Feature.ground`, `bears`): soil, where what grows grows, and
+-- any dry ground, where the rest lies.
+local SOIL: { [Enum.Material]: boolean } = {
+	[Enum.Material.Grass] = true,
+	[Enum.Material.LeafyGrass] = true,
+	[Enum.Material.Ground] = true,
+	[Enum.Material.Mud] = true,
+}
+local ANY_GROUND: { [Enum.Material]: boolean } = {
+	[Enum.Material.Rock] = true,
+	[Enum.Material.Slate] = true,
+	[Enum.Material.Basalt] = true,
+	[Enum.Material.Sandstone] = true,
+	[Enum.Material.Limestone] = true,
+	[Enum.Material.Ground] = true,
+	[Enum.Material.Sand] = true,
+	[Enum.Material.Salt] = true,
+	[Enum.Material.Snow] = true,
+	[Enum.Material.CrackedLava] = true,
+	[Enum.Material.Grass] = true,
+	[Enum.Material.LeafyGrass] = true,
+}
 -- What each material looks like where a theme does not give it a colour of its own: Roblox's own terrain colours.
 local MATERIAL_COLORS: { [Enum.Material]: Color3 } = {
 	[Enum.Material.Grass] = Color3.fromRGB(106, 127, 63),
@@ -65,10 +87,10 @@ local function make_painter(theme: Theme, seed: number): Painter
 		if too_steep then
 			return theme.cliff
 		end
-		if height < config.WATER_LEVEL - SHORE_BAND then
+		if height < ground_levels.WATER_LEVEL - SHORE_BAND then
 			return theme.seabed
 		end
-		if height < config.WATER_LEVEL + SHORE_BAND then
+		if height < ground_levels.WATER_LEVEL + SHORE_BAND then
 			return theme.shore
 		end
 		if steepness > TANK_STEEPNESS then
@@ -96,7 +118,15 @@ local function color_of(theme: Theme, material: Enum.Material): Color3
 	return MATERIAL_COLORS[material] or UNKNOWN_COLOR
 end
 
+-- Whether ground of `material` bears something laid on `ground` (`Feature.ground`): soil for what grows, any dry
+-- ground for the rest.
+local function bears(material: Enum.Material, ground: "soil" | "any"): boolean
+	local allowed = if ground == "soil" then SOIL else ANY_GROUND
+	return allowed[material] == true
+end
+
 return table.freeze({
 	make_painter = make_painter,
+	bears = bears,
 	color_of = color_of,
 })

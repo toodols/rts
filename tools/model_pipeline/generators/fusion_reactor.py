@@ -1,10 +1,10 @@
-"""unit_defs `fusion_reactor`: 1-tier fusion reactor, 3x3x3 cells (12x12x12 studs). See reactor_common.py."""
+"""unit_defs `fusion_reactor`: the tier-1 fusion reactor (see shared/reactor.py)."""
 
-from . import reactor_common
+from .shared import reactor
+
+CATEGORY = "entity"
+DEF = "fusion_reactor"
 
 
 def generate(params):
-    params.setdefault("width", 12.0)
-    params.setdefault("depth", 12.0)
-    params.setdefault("height", 12.0)
-    return reactor_common.generate(params, tier=1)
+    return reactor.generate(params, tier=1)

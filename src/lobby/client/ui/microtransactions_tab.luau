@@ -1,3 +1,4 @@
+--!strict
 -- The lobby's Microtransactions tab. Nothing is for sale yet, so for now it only says so; it is where purchases will go.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"

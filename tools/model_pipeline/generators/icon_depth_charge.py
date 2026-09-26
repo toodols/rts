@@ -1,9 +1,10 @@
-"""HUD icon: depth charges, a banded drum sinking under a wave. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: depth charges, a banded drum sinking under a wave. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     wave = ic.wave(-1.95, 1.95, 1.5, 0.14, 1.3, 0.36, segments=20)
@@ -13,8 +14,8 @@ def generate(params):
     return ic.build(
         "depth_charge",
         [
-            ic.layer([wave] + bubbles, ic.ICON),
-            ic.layer([drum], ic.ICON),
-            ic.layer(hoops, ic.OUTLINE, rim=None),
+            ic.layer([wave] + bubbles, palette.ICON_FILL),
+            ic.layer([drum], palette.ICON_FILL),
+            ic.layer(hoops, palette.ICON_OUTLINE, rim=None),
         ],
     )

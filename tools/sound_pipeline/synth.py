@@ -10,7 +10,6 @@ move over the sound's life, it is saturated for harmonics, and everything is put
 
 import subprocess
 import zlib
-from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -18,9 +17,10 @@ from scipy.io import wavfile
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import butter, fftconvolve, iirpeak, sosfilt, sosfiltfilt, tf2sos
 
+from records import BUILD
+
 RATE = 44100
 NYQUIST = RATE / 2
-BUILD = Path(__file__).parent / "build"
 rng = np.random.default_rng(7)
 
 

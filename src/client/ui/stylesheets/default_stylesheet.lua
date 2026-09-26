@@ -20,6 +20,14 @@ sheet:SetAttribute("Accent", Color3.fromRGB(96, 210, 242))
 sheet:SetAttribute("Resurrect", Color3.fromRGB(176, 96, 240))
 sheet:SetAttribute("Fight", Color3.fromRGB(255, 138, 64))
 sheet:SetAttribute("Emp", Color3.fromRGB(130, 215, 255))
+sheet:SetAttribute("Disintegrator", Color3.fromRGB(238, 60, 48))
+sheet:SetAttribute("Guard", Color3.fromRGB(190, 150, 255))
+sheet:SetAttribute("TierCommon", Color3.fromRGB(178, 190, 204))
+sheet:SetAttribute("TierUncommon", Color3.fromRGB(110, 222, 96))
+sheet:SetAttribute("TierRare", Color3.fromRGB(96, 210, 242))
+sheet:SetAttribute("TierEpic", Color3.fromRGB(176, 96, 240))
+sheet:SetAttribute("TierLegendary", Color3.fromRGB(255, 196, 64))
+sheet:SetAttribute("TierMythic", Color3.fromRGB(255, 98, 74))
 
 local function rule(parent: Instance, selector: string, priority: number?, properties: { [string]: any }?): StyleRule
 	local r = Instance.new("StyleRule")
@@ -99,12 +107,12 @@ rule(sheet, ".rail::UIGradient", 4, {
 	Rotation = 0,
 })
 
-rule(sheet, ".hazard, .build-option.unaffordable", 304, {
+rule(sheet, ".hazard, .build-option.unaffordable", 316, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".hazard::UIGradient, .build-option.unaffordable::UIGradient", 304, {
+rule(sheet, ".hazard::UIGradient, .build-option.unaffordable::UIGradient", 316, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.12, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.12, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.25, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.25, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.37, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.37, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.62, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.62, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.75, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.75, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.87, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.87, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.12, 0.1), NumberSequenceKeypoint.new(0.25, 0.1), NumberSequenceKeypoint.new(0.37, 0.1), NumberSequenceKeypoint.new(0.5, 0.1), NumberSequenceKeypoint.new(0.62, 0.1), NumberSequenceKeypoint.new(0.75, 0.1), NumberSequenceKeypoint.new(0.87, 0.1), NumberSequenceKeypoint.new(1, 0.1)}),
 	Rotation = -45,
@@ -144,11 +152,11 @@ rule(sheet, ".heading::UIStroke, .selection-name::UIStroke, .tooltip-title::UISt
 	Transparency = 0.15,
 })
 
-rule(sheet, ".readout, .resource-amount, .wind-speed, .tide-value, .scavenger-value, .vitals-label, .tile-rate-value, .group-count, .loadout-value, .tooltip-value", 10, {
+rule(sheet, ".readout, .resource-amount, .wind-speed, .tide-value, .scavenger-value, .vitals-label, .tile-rate-value, .group-count, .loadout-value, .tooltip-value, .wave-value", 10, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".readout::UIStroke, .resource-amount::UIStroke, .wind-speed::UIStroke, .tide-value::UIStroke, .scavenger-value::UIStroke, .vitals-label::UIStroke, .tile-rate-value::UIStroke, .group-count::UIStroke, .loadout-value::UIStroke, .tooltip-value::UIStroke", 10, {
+rule(sheet, ".readout::UIStroke, .resource-amount::UIStroke, .wind-speed::UIStroke, .tide-value::UIStroke, .scavenger-value::UIStroke, .vitals-label::UIStroke, .tile-rate-value::UIStroke, .group-count::UIStroke, .loadout-value::UIStroke, .tooltip-value::UIStroke, .wave-value::UIStroke", 10, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -161,7 +169,22 @@ rule(sheet, ".grow::UIFlexItem", 11, {
 	GrowRatio = 1,
 })
 
-rule(sheet, ".resource-bar", 12, {
+rule(sheet, ".picture-icon", 12, {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(0.5, 0, 0.5, 0),
+	AutomaticSize = Enum.AutomaticSize.None,
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+})
+
+rule(sheet, ".picture-icon.art-fallback", 317, {
+	TextColor3 = "$TextDim",
+	TextTransparency = 0,
+	TextSize = 18,
+	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+})
+
+rule(sheet, ".resource-bar", 13, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -173,101 +196,101 @@ rule(sheet, ".resource-bar", 12, {
 	AnchorPoint = Vector2.new(0.5, 0),
 })
 
-rule(sheet, ".resource-bar::UIGradient", 12, {
+rule(sheet, ".resource-bar::UIGradient", 13, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".resource-bar::UIPadding", 12, {
+rule(sheet, ".resource-bar::UIPadding", 13, {
 	PaddingTop = UDim.new(0, 16),
 	PaddingRight = UDim.new(0, 28),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 28),
 })
 
-rule(sheet, ".resource-bar::UIListLayout", 12, {
+rule(sheet, ".resource-bar::UIListLayout", 13, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 24),
 })
 
-rule(sheet, ".resource-bar.with-scavengers", 305, {
+rule(sheet, ".resource-bar.with-scavengers", 318, {
 	Size = UDim2.new(0, 1048, 0, 76),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".resource", 13, {
+rule(sheet, ".resource", 14, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".resource::UIListLayout", 13, {
+rule(sheet, ".resource::UIListLayout", 14, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".resource::UIFlexItem", 13, {
+rule(sheet, ".resource::UIFlexItem", 14, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".resource-chip", 14, {
+rule(sheet, ".resource-chip", 15, {
 	Size = UDim2.new(0, 4, 0, 14),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".resource-chip.metal-chip", 306, {
+rule(sheet, ".resource-chip.metal-chip", 319, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".resource-chip.metal-chip::UIGradient", 306, {
+rule(sheet, ".resource-chip.metal-chip::UIGradient", 319, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(196, 206, 220))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".resource-chip.energy-chip", 307, {
+rule(sheet, ".resource-chip.energy-chip", 320, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".resource-chip.energy-chip::UIGradient", 307, {
+rule(sheet, ".resource-chip.energy-chip::UIGradient", 320, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 243, 166)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 230, 64))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".resource-head", 15, {
+rule(sheet, ".resource-head", 16, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".resource-head::UIListLayout", 15, {
+rule(sheet, ".resource-head::UIListLayout", 16, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".resource-name", 16, {
+rule(sheet, ".resource-name", 17, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".resource-name::UIFlexItem", 16, {
+rule(sheet, ".resource-name::UIFlexItem", 17, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".resource-amount", 17, {
+rule(sheet, ".resource-amount", 18, {
 	TextSize = 19,
 	TextXAlignment = Enum.TextXAlignment.Right,
 })
 
-rule(sheet, ".resource-income", 18, {
+rule(sheet, ".resource-income", 19, {
 	TextColor3 = "$Buildpower",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -275,19 +298,19 @@ rule(sheet, ".resource-income", 18, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".resource-flow", 19, {
+rule(sheet, ".resource-flow", 20, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".resource-flow::UIListLayout", 19, {
+rule(sheet, ".resource-flow::UIListLayout", 20, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".resource-revenue", 20, {
+rule(sheet, ".resource-revenue", 21, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -295,7 +318,7 @@ rule(sheet, ".resource-revenue", 20, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".resource-expense", 21, {
+rule(sheet, ".resource-expense", 22, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -303,7 +326,7 @@ rule(sheet, ".resource-expense", 21, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".resource-track", 22, {
+rule(sheet, ".resource-track", 23, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 6),
@@ -312,7 +335,7 @@ rule(sheet, ".resource-track", 22, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".resource-track::UIStroke", 22, {
+rule(sheet, ".resource-track::UIStroke", 23, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -321,7 +344,7 @@ rule(sheet, ".resource-track::UIStroke", 22, {
 })
 
 do
-	local r1 = rule(sheet, ".resource-fill", 23, {
+	local r1 = rule(sheet, ".resource-fill", 24, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -330,13 +353,13 @@ do
 	})
 end
 
-rule(sheet, ".resource-fill::UIGradient", 23, {
+rule(sheet, ".resource-fill::UIGradient", 24, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(69, 89, 117)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".resource-fill.energy-fill", 308, {
+	local r1 = rule(sheet, ".resource-fill.energy-fill", 321, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -345,30 +368,30 @@ do
 	})
 end
 
-rule(sheet, ".resource-fill.energy-fill::UIGradient", 308, {
+rule(sheet, ".resource-fill.energy-fill::UIGradient", 321, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 78, 0)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 247, 192))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".stalling", 483, {
+rule(sheet, ".stalling", 505, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".resource-divider", 24, {
+rule(sheet, ".resource-divider", 25, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 2, 0, 44),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".resource-divider::UIGradient", 24, {
+rule(sheet, ".resource-divider::UIGradient", 25, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.35, Color3.fromRGB(78, 96, 118)), ColorSequenceKeypoint.new(0.65, Color3.fromRGB(78, 96, 118)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.35, 0), NumberSequenceKeypoint.new(0.65, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 90,
 })
 
-rule(sheet, ".wind-block", 25, {
+rule(sheet, ".wind-block", 26, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.5,
 	Size = UDim2.new(0, 130, 0, 64),
@@ -376,7 +399,7 @@ rule(sheet, ".wind-block", 25, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".wind-block::UIStroke", 25, {
+rule(sheet, ".wind-block::UIStroke", 26, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -384,49 +407,49 @@ rule(sheet, ".wind-block::UIStroke", 25, {
 	Transparency = 0,
 })
 
-rule(sheet, ".wind-field", 26, {
+rule(sheet, ".wind-field", 27, {
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".wind-content", 27, {
+rule(sheet, ".wind-content", 28, {
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".wind-content::UIPadding", 27, {
+rule(sheet, ".wind-content::UIPadding", 28, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".wind-content::UIListLayout", 27, {
+rule(sheet, ".wind-content::UIListLayout", 28, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".wind-head", 28, {
+rule(sheet, ".wind-head", 29, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".wind-head::UIListLayout", 28, {
+rule(sheet, ".wind-head::UIListLayout", 29, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".wind-speed", 29, {
+rule(sheet, ".wind-speed", 30, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 19,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".wind-gauge", 30, {
+rule(sheet, ".wind-gauge", 31, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.15,
 	Size = UDim2.new(1, 0, 0, 5),
@@ -435,7 +458,7 @@ rule(sheet, ".wind-gauge", 30, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".wind-gauge::UIStroke", 30, {
+rule(sheet, ".wind-gauge::UIStroke", 31, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -444,7 +467,7 @@ rule(sheet, ".wind-gauge::UIStroke", 30, {
 })
 
 do
-	local r1 = rule(sheet, ".wind-gauge-fill", 31, {
+	local r1 = rule(sheet, ".wind-gauge-fill", 32, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -453,23 +476,23 @@ do
 	})
 end
 
-rule(sheet, ".wind-gauge-fill::UIGradient", 31, {
+rule(sheet, ".wind-gauge-fill::UIGradient", 32, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 80, 100)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 243, 252))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".wind-range", 32, {
+rule(sheet, ".wind-range", 33, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".wind-range::UIListLayout", 32, {
+rule(sheet, ".wind-range::UIListLayout", 33, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".wind-limit", 33, {
+rule(sheet, ".wind-limit", 34, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 9,
@@ -477,11 +500,11 @@ rule(sheet, ".wind-limit", 33, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".wind-limit.right", 309, {
+rule(sheet, ".wind-limit.right", 322, {
 	TextXAlignment = Enum.TextXAlignment.Right,
 })
 
-rule(sheet, ".tide-block", 34, {
+rule(sheet, ".tide-block", 35, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.5,
 	Size = UDim2.new(0, 64, 0, 64),
@@ -489,14 +512,14 @@ rule(sheet, ".tide-block", 34, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tide-block::UIPadding", 34, {
+rule(sheet, ".tide-block::UIPadding", 35, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".tide-block::UIStroke", 34, {
+rule(sheet, ".tide-block::UIStroke", 35, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -504,20 +527,20 @@ rule(sheet, ".tide-block::UIStroke", 34, {
 	Transparency = 0,
 })
 
-rule(sheet, ".tide-block::UIListLayout", 34, {
+rule(sheet, ".tide-block::UIListLayout", 35, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".tide-value", 35, {
+rule(sheet, ".tide-value", 36, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 19,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".scavenger-block", 36, {
+rule(sheet, ".scavenger-block", 37, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.5,
 	Size = UDim2.new(0, 130, 0, 64),
@@ -525,14 +548,14 @@ rule(sheet, ".scavenger-block", 36, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".scavenger-block::UIPadding", 36, {
+rule(sheet, ".scavenger-block::UIPadding", 37, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".scavenger-block::UIStroke", 36, {
+rule(sheet, ".scavenger-block::UIStroke", 37, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -540,84 +563,84 @@ rule(sheet, ".scavenger-block::UIStroke", 36, {
 	Transparency = 0,
 })
 
-rule(sheet, ".scavenger-block::UIListLayout", 36, {
+rule(sheet, ".scavenger-block::UIListLayout", 37, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".scavenger-head", 37, {
+rule(sheet, ".scavenger-head", 38, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".scavenger-head::UIListLayout", 37, {
+rule(sheet, ".scavenger-head::UIListLayout", 38, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".scavenger-value", 38, {
+rule(sheet, ".scavenger-value", 39, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	TextSize = 19,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".bottom-left", 39, {
+rule(sheet, ".bottom-left", 40, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 	Position = UDim2.new(0, 20, 1, -20),
 	AnchorPoint = Vector2.new(0, 1),
 })
 
-rule(sheet, ".bottom-left::UIListLayout", 39, {
+rule(sheet, ".bottom-left::UIListLayout", 40, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Bottom,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".selection-panel", 40, {
+rule(sheet, ".selection-panel", 41, {
 	Size = UDim2.new(0, 360, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".selection-panel::UIPadding", 40, {
+rule(sheet, ".selection-panel::UIPadding", 41, {
 	PaddingTop = UDim.new(0, 16),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".selection-panel::UIListLayout", 40, {
+rule(sheet, ".selection-panel::UIListLayout", 41, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".selection-title", 41, {
+rule(sheet, ".selection-title", 42, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".selection-title::UIListLayout", 41, {
+rule(sheet, ".selection-title::UIListLayout", 42, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".selection-name", 42, {
+rule(sheet, ".selection-name", 43, {
 	TextSize = 16,
 })
 
-rule(sheet, ".selection-name::UIFlexItem", 42, {
+rule(sheet, ".selection-name::UIFlexItem", 43, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".badge", 43, {
+rule(sheet, ".badge", 44, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -627,14 +650,14 @@ rule(sheet, ".badge", 43, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".badge::UIPadding", 43, {
+rule(sheet, ".badge::UIPadding", 44, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".badge::UIStroke", 43, {
+rule(sheet, ".badge::UIStroke", 44, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -642,46 +665,46 @@ rule(sheet, ".badge::UIStroke", 43, {
 	Transparency = 0,
 })
 
-rule(sheet, ".badge-blueprint", 44, {
+rule(sheet, ".badge-blueprint", 45, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".badge-blueprint::UIStroke", 44, {
+rule(sheet, ".badge-blueprint::UIStroke", 45, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".badge-count", 45, {
+rule(sheet, ".badge-count", 46, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".badge-count::UIStroke", 45, {
+rule(sheet, ".badge-count::UIStroke", 46, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".badge-remnant", 46, {
+rule(sheet, ".badge-remnant", 47, {
 	TextColor3 = "$Caution",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".badge-remnant::UIStroke", 46, {
+rule(sheet, ".badge-remnant::UIStroke", 47, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".veterancy", 47, {
+rule(sheet, ".veterancy", 48, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -691,7 +714,7 @@ rule(sheet, ".veterancy", 47, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".team-swatch", 48, {
+rule(sheet, ".team-swatch", 49, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 10, 0, 10),
@@ -699,7 +722,7 @@ rule(sheet, ".team-swatch", 48, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".team-swatch::UIStroke", 48, {
+rule(sheet, ".team-swatch::UIStroke", 49, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -707,12 +730,12 @@ rule(sheet, ".team-swatch::UIStroke", 48, {
 	Transparency = 0.2,
 })
 
-rule(sheet, ".team-swatch-neutral", 49, {
+rule(sheet, ".team-swatch-neutral", 50, {
 	BackgroundColor3 = "$TextFaint",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".vitals-track", 50, {
+rule(sheet, ".vitals-track", 51, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 20),
@@ -721,7 +744,7 @@ rule(sheet, ".vitals-track", 50, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".vitals-track::UIStroke", 50, {
+rule(sheet, ".vitals-track::UIStroke", 51, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -729,12 +752,12 @@ rule(sheet, ".vitals-track::UIStroke", 50, {
 	Transparency = 0,
 })
 
-rule(sheet, ".vitals-fill", 51, {
+rule(sheet, ".vitals-fill", 52, {
 	Position = UDim2.new(0, 0, 0, 0),
 })
 
 do
-	local r1 = rule(sheet, ".vitals-fill-good", 52, {
+	local r1 = rule(sheet, ".vitals-fill-healthy", 53, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -743,13 +766,13 @@ do
 	})
 end
 
-rule(sheet, ".vitals-fill-good::UIGradient", 52, {
+rule(sheet, ".vitals-fill-healthy::UIGradient", 53, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 76, 30)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(96, 224, 128)), ColorSequenceKeypoint.new(1, Color3.fromRGB(203, 245, 213))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".vitals-fill-worn", 53, {
+	local r1 = rule(sheet, ".vitals-fill-worn", 54, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -758,13 +781,13 @@ do
 	})
 end
 
-rule(sheet, ".vitals-fill-worn::UIGradient", 53, {
+rule(sheet, ".vitals-fill-worn::UIGradient", 54, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(68, 49, 7)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(236, 184, 68)), ColorSequenceKeypoint.new(1, Color3.fromRGB(248, 228, 184))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".vitals-fill-critical", 54, {
+	local r1 = rule(sheet, ".vitals-fill-low", 55, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -773,13 +796,13 @@ do
 	})
 end
 
-rule(sheet, ".vitals-fill-critical::UIGradient", 54, {
+rule(sheet, ".vitals-fill-low::UIGradient", 55, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(75, 13, 7)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(1, Color3.fromRGB(249, 196, 191))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".vitals-fill-blueprint", 55, {
+	local r1 = rule(sheet, ".vitals-fill-blueprint", 56, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -788,13 +811,13 @@ do
 	})
 end
 
-rule(sheet, ".vitals-fill-blueprint::UIGradient", 55, {
+rule(sheet, ".vitals-fill-blueprint::UIGradient", 56, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 80, 100)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 243, 252))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".vitals-fill-wreck", 56, {
+	local r1 = rule(sheet, ".vitals-fill-wreck", 57, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -803,12 +826,12 @@ do
 	})
 end
 
-rule(sheet, ".vitals-fill-wreck::UIGradient", 56, {
+rule(sheet, ".vitals-fill-wreck::UIGradient", 57, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(68, 49, 7)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(236, 184, 68)), ColorSequenceKeypoint.new(1, Color3.fromRGB(248, 228, 184))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".vitals-label", 57, {
+rule(sheet, ".vitals-label", 58, {
 	TextSize = 14,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	LineHeight = 1.4285714286,
@@ -818,25 +841,25 @@ rule(sheet, ".vitals-label", 57, {
 	ZIndex = 2,
 })
 
-rule(sheet, ".economy-row", 58, {
+rule(sheet, ".economy-row", 59, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".economy-row::UIListLayout", 58, {
+rule(sheet, ".economy-row::UIListLayout", 59, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".resource-tile", 59, {
+rule(sheet, ".resource-tile", 60, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.45,
 	AutomaticSize = Enum.AutomaticSize.Y,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".resource-tile::UIPadding", 59, {
+rule(sheet, ".resource-tile::UIPadding", 60, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 8),
@@ -844,7 +867,7 @@ rule(sheet, ".resource-tile::UIPadding", 59, {
 })
 
 do
-	local r1 = rule(sheet, ".resource-tile::UIStroke", 59, {
+	local r1 = rule(sheet, ".resource-tile::UIStroke", 60, {
 		Enabled = true,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		Thickness = 1,
@@ -857,107 +880,107 @@ do
 	})
 end
 
-rule(sheet, ".resource-tile::UIListLayout", 59, {
+rule(sheet, ".resource-tile::UIListLayout", 60, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".resource-tile::UIFlexItem", 59, {
+rule(sheet, ".resource-tile::UIFlexItem", 60, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 	ShrinkRatio = 1,
 })
 
-rule(sheet, ".resource-tile.metal-tile", 310, {
+rule(sheet, ".resource-tile.metal-tile", 323, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".resource-tile.metal-tile::UIGradient", 310, {
+rule(sheet, ".resource-tile.metal-tile::UIGradient", 323, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(51, 56, 62)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.387), NumberSequenceKeypoint.new(0.6, 0.45), NumberSequenceKeypoint.new(1, 0.45)}),
 	Rotation = 70,
 })
 
-rule(sheet, ".resource-tile.energy-tile", 311, {
+rule(sheet, ".resource-tile.energy-tile", 324, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".resource-tile.energy-tile::UIGradient", 311, {
+rule(sheet, ".resource-tile.energy-tile::UIGradient", 324, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(72, 67, 28)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.378), NumberSequenceKeypoint.new(0.6, 0.45), NumberSequenceKeypoint.new(1, 0.45)}),
 	Rotation = 70,
 })
 
-rule(sheet, ".resource-tile.tile-stalled", 484, {
+rule(sheet, ".resource-tile.tile-stalled", 506, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".resource-tile.tile-stalled::UIStroke", 484, {
+rule(sheet, ".resource-tile.tile-stalled::UIStroke", 506, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".tile-rail", 60, {
+rule(sheet, ".tile-rail", 61, {
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Position = UDim2.new(0, 0, 0, 0),
 })
 
-rule(sheet, ".tile-rail.metal-rail", 312, {
+rule(sheet, ".tile-rail.metal-rail", 325, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tile-rail.metal-rail::UIGradient", 312, {
+rule(sheet, ".tile-rail.metal-rail::UIGradient", 325, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tile-rail.energy-rail", 313, {
+rule(sheet, ".tile-rail.energy-rail", 326, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tile-rail.energy-rail::UIGradient", 313, {
+rule(sheet, ".tile-rail.energy-rail::UIGradient", 326, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tile-head", 61, {
+rule(sheet, ".tile-head", 62, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tile-head::UIListLayout", 61, {
+rule(sheet, ".tile-head::UIListLayout", 62, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".tile-name", 62, {
+rule(sheet, ".tile-name", 63, {
 	TextSize = 12,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".tile-name::UIFlexItem", 62, {
+rule(sheet, ".tile-name::UIFlexItem", 63, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".tile-stall", 63, {
+rule(sheet, ".tile-stall", 64, {
 	TextColor3 = "$Void",
 	TextTransparency = 0,
 	BackgroundColor3 = "$Danger",
@@ -966,72 +989,72 @@ rule(sheet, ".tile-stall", 63, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".tile-stall::UIPadding", 63, {
+rule(sheet, ".tile-stall::UIPadding", 64, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 4),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 4),
 })
 
-rule(sheet, ".tile-rate", 64, {
+rule(sheet, ".tile-rate", 65, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tile-rate::UIListLayout", 64, {
+rule(sheet, ".tile-rate::UIListLayout", 65, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Bottom,
 	Padding = UDim.new(0, 2),
 })
 
-rule(sheet, ".tile-rate-value", 65, {
+rule(sheet, ".tile-rate-value", 66, {
 	TextSize = 26,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".tile-rate-unit", 66, {
+rule(sheet, ".tile-rate-unit", 67, {
 	TextSize = 14,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".tile-rate-unit.tile-rate-gain", 314, {
+rule(sheet, ".tile-rate-unit.tile-rate-gain", 327, {
 	TextColor3 = Color3.fromRGB(37, 191, 76),
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-rate-unit.tile-rate-loss", 315, {
+rule(sheet, ".tile-rate-unit.tile-rate-loss", 328, {
 	TextColor3 = Color3.fromRGB(215, 37, 20),
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-rate-gain", 67, {
+rule(sheet, ".tile-rate-gain", 68, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-rate-loss", 68, {
+rule(sheet, ".tile-rate-loss", 69, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-rate-idle", 69, {
+rule(sheet, ".tile-rate-idle", 70, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-rate-metal", 70, {
+rule(sheet, ".tile-rate-metal", 71, {
 	TextColor3 = "$Metal",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-rate-energy", 71, {
+rule(sheet, ".tile-rate-energy", 72, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tile-cost", 72, {
+rule(sheet, ".tile-cost", 73, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -1039,34 +1062,34 @@ rule(sheet, ".tile-cost", 72, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".gauge-list", 73, {
+rule(sheet, ".gauge-list", 74, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".gauge-list::UIPadding", 73, {
+rule(sheet, ".gauge-list::UIPadding", 74, {
 	PaddingTop = UDim.new(0, 8),
 })
 
-rule(sheet, ".gauge-list::UIListLayout", 73, {
+rule(sheet, ".gauge-list::UIListLayout", 74, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".gauge-row", 74, {
+rule(sheet, ".gauge-row", 75, {
 	Size = UDim2.new(1, 0, 0, 20),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".gauge-row::UIListLayout", 74, {
+rule(sheet, ".gauge-row::UIListLayout", 75, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".gauge-label", 75, {
+rule(sheet, ".gauge-label", 76, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -1076,7 +1099,7 @@ rule(sheet, ".gauge-label", 75, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".gauge-track", 76, {
+rule(sheet, ".gauge-track", 77, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 0, 0, 6),
@@ -1085,7 +1108,7 @@ rule(sheet, ".gauge-track", 76, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".gauge-track::UIStroke", 76, {
+rule(sheet, ".gauge-track::UIStroke", 77, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1093,13 +1116,13 @@ rule(sheet, ".gauge-track::UIStroke", 76, {
 	Transparency = 0,
 })
 
-rule(sheet, ".gauge-track::UIFlexItem", 76, {
+rule(sheet, ".gauge-track::UIFlexItem", 77, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
 do
-	local r1 = rule(sheet, ".gauge-fill.shield-fill", 316, {
+	local r1 = rule(sheet, ".gauge-fill.shield-fill", 329, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -1108,13 +1131,13 @@ do
 	})
 end
 
-rule(sheet, ".gauge-fill.shield-fill::UIGradient", 316, {
+rule(sheet, ".gauge-fill.shield-fill::UIGradient", 329, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 80, 100)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 243, 252))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".gauge-fill.missile-fill", 317, {
+	local r1 = rule(sheet, ".gauge-fill.missile-fill", 330, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -1123,13 +1146,13 @@ do
 	})
 end
 
-rule(sheet, ".gauge-fill.missile-fill::UIGradient", 317, {
+rule(sheet, ".gauge-fill.missile-fill::UIGradient", 330, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 35, 0)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 138, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 216, 192))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".gauge-fill.cargo-fill", 318, {
+	local r1 = rule(sheet, ".gauge-fill.cargo-fill", 331, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -1138,13 +1161,13 @@ do
 	})
 end
 
-rule(sheet, ".gauge-fill.cargo-fill::UIGradient", 318, {
+rule(sheet, ".gauge-fill.cargo-fill::UIGradient", 331, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(69, 89, 117)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".gauge-fill.reclaim-fill", 319, {
+	local r1 = rule(sheet, ".gauge-fill.reclaim-fill", 332, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -1153,13 +1176,13 @@ do
 	})
 end
 
-rule(sheet, ".gauge-fill.reclaim-fill::UIGradient", 319, {
+rule(sheet, ".gauge-fill.reclaim-fill::UIGradient", 332, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(68, 49, 7)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(236, 184, 68)), ColorSequenceKeypoint.new(1, Color3.fromRGB(248, 228, 184))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".gauge-fill.resurrect-fill", 320, {
+	local r1 = rule(sheet, ".gauge-fill.resurrect-fill", 333, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -1168,28 +1191,28 @@ do
 	})
 end
 
-rule(sheet, ".gauge-fill.resurrect-fill::UIGradient", 320, {
+rule(sheet, ".gauge-fill.resurrect-fill::UIGradient", 333, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(58, 9, 97)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(176, 96, 240)), ColorSequenceKeypoint.new(1, Color3.fromRGB(234, 213, 251))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".pip-row", 77, {
+rule(sheet, ".pip-row", 78, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".pip-row::UIListLayout", 77, {
+rule(sheet, ".pip-row::UIListLayout", 78, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 3),
 })
 
-rule(sheet, ".pip-row::UIFlexItem", 77, {
+rule(sheet, ".pip-row::UIFlexItem", 78, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".pip", 78, {
+rule(sheet, ".pip", 79, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 10, 0, 10),
@@ -1197,7 +1220,7 @@ rule(sheet, ".pip", 78, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pip::UIStroke", 78, {
+rule(sheet, ".pip::UIStroke", 79, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1205,11 +1228,11 @@ rule(sheet, ".pip::UIStroke", 78, {
 	Transparency = 0,
 })
 
-rule(sheet, ".pip-full", 79, {
+rule(sheet, ".pip-full", 80, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pip-full::UIStroke", 79, {
+rule(sheet, ".pip-full::UIStroke", 80, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1217,22 +1240,22 @@ rule(sheet, ".pip-full::UIStroke", 79, {
 	Transparency = 0.65,
 })
 
-rule(sheet, ".pip.shield-pip", 321, {
+rule(sheet, ".pip.shield-pip", 334, {
 	BackgroundColor3 = "$Accent",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".pip.missile-pip", 322, {
+rule(sheet, ".pip.missile-pip", 335, {
 	BackgroundColor3 = "$Fight",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".pip.cargo-pip", 323, {
+rule(sheet, ".pip.cargo-pip", 336, {
 	BackgroundColor3 = "$Metal",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".gauge-value", 80, {
+rule(sheet, ".gauge-value", 81, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -1240,12 +1263,12 @@ rule(sheet, ".gauge-value", 80, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".group-grid", 81, {
+rule(sheet, ".group-grid", 82, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".group-grid::UIGridLayout", 81, {
+rule(sheet, ".group-grid::UIGridLayout", 82, {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	CellPadding = UDim2.new(0, 8, 0, 8),
 	FillDirectionMaxCells = 4,
@@ -1253,7 +1276,7 @@ rule(sheet, ".group-grid::UIGridLayout", 81, {
 })
 
 do
-	local r1 = rule(sheet, ".group-tile", 82, {
+	local r1 = rule(sheet, ".group-tile", 83, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(0, 68, 0, 44),
@@ -1266,12 +1289,12 @@ do
 	})
 end
 
-rule(sheet, ".group-tile::UIGradient", 82, {
+rule(sheet, ".group-tile::UIGradient", 83, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".group-tile::UIStroke", 82, {
+rule(sheet, ".group-tile::UIStroke", 83, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1279,43 +1302,43 @@ rule(sheet, ".group-tile::UIStroke", 82, {
 	Transparency = 0,
 })
 
-rule(sheet, ".group-tile::UIListLayout", 82, {
+rule(sheet, ".group-tile::UIListLayout", 83, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 0),
 })
 
-rule(sheet, ".group-tile:Hover", 324, {
+rule(sheet, ".group-tile:Hover", 337, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".group-tile:Hover::UIStroke", 324, {
+rule(sheet, ".group-tile:Hover::UIStroke", 337, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".group-tile:Press", 325, {
+rule(sheet, ".group-tile:Press", 338, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".group-tile:NonInteractable", 326, {
+rule(sheet, ".group-tile:NonInteractable", 339, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".group-tile:NonInteractable::UIStroke", 326, {
+rule(sheet, ".group-tile:NonInteractable::UIStroke", 339, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".group-count", 83, {
+rule(sheet, ".group-count", 84, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 18,
@@ -1323,7 +1346,7 @@ rule(sheet, ".group-count", 83, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".group-name", 84, {
+rule(sheet, ".group-name", 85, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 10,
@@ -1335,12 +1358,12 @@ rule(sheet, ".group-name", 84, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".queue-strip", 85, {
+rule(sheet, ".queue-strip", 86, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".queue-strip::UIListLayout", 85, {
+rule(sheet, ".queue-strip::UIListLayout", 86, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
@@ -1348,7 +1371,7 @@ rule(sheet, ".queue-strip::UIListLayout", 85, {
 })
 
 do
-	local r1 = rule(sheet, ".queue-chip", 86, {
+	local r1 = rule(sheet, ".queue-chip", 87, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		TextSize = 11,
@@ -1363,12 +1386,12 @@ do
 	})
 end
 
-rule(sheet, ".queue-chip::UIGradient", 86, {
+rule(sheet, ".queue-chip::UIGradient", 87, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".queue-chip::UIStroke", 86, {
+rule(sheet, ".queue-chip::UIStroke", 87, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1376,49 +1399,49 @@ rule(sheet, ".queue-chip::UIStroke", 86, {
 	Transparency = 0,
 })
 
-rule(sheet, ".queue-chip:Hover", 327, {
+rule(sheet, ".queue-chip:Hover", 340, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".queue-chip:Hover::UIStroke", 327, {
+rule(sheet, ".queue-chip:Hover::UIStroke", 340, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".queue-chip:Press", 328, {
+rule(sheet, ".queue-chip:Press", 341, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".queue-chip:NonInteractable", 329, {
+rule(sheet, ".queue-chip:NonInteractable", 342, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".queue-chip:NonInteractable::UIStroke", 329, {
+rule(sheet, ".queue-chip:NonInteractable::UIStroke", 342, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".queue-chip:Hover", 330, {
+rule(sheet, ".queue-chip:Hover", 343, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".queue-chip:Hover::UIStroke", 330, {
+rule(sheet, ".queue-chip:Hover::UIStroke", 343, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".queue-chip-icon", 87, {
+rule(sheet, ".queue-chip-icon", 88, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
@@ -1426,19 +1449,19 @@ rule(sheet, ".queue-chip-icon", 87, {
 	Interactable = false,
 })
 
-rule(sheet, ".subtitle-row", 88, {
+rule(sheet, ".subtitle-row", 89, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".subtitle-row::UIListLayout", 88, {
+rule(sheet, ".subtitle-row::UIListLayout", 89, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".selection-subtitle", 89, {
+rule(sheet, ".selection-subtitle", 90, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -1447,23 +1470,23 @@ rule(sheet, ".selection-subtitle", 89, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".selection-subtitle::UIFlexItem", 89, {
+rule(sheet, ".selection-subtitle::UIFlexItem", 90, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".team-tag", 90, {
+rule(sheet, ".team-tag", 91, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".team-tag::UIListLayout", 90, {
+rule(sheet, ".team-tag::UIListLayout", 91, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".team-name", 91, {
+rule(sheet, ".team-name", 92, {
 	TextSize = 12,
 	TextXAlignment = Enum.TextXAlignment.Right,
 	TextWrapped = false,
@@ -1473,73 +1496,73 @@ rule(sheet, ".team-name", 91, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".team-name::UISizeConstraint", 91, {
+rule(sheet, ".team-name::UISizeConstraint", 92, {
 	MinSize = Vector2.new(0, 0),
 	MaxSize = Vector2.new(120, math.huge),
 })
 
-rule(sheet, ".loadout", 92, {
+rule(sheet, ".loadout", 93, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".loadout::UIListLayout", 92, {
+rule(sheet, ".loadout::UIListLayout", 93, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".loadout-heading", 93, {
+rule(sheet, ".loadout-heading", 94, {
 	Size = UDim2.new(1, 0, 0, 18),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".loadout-heading::UIPadding", 93, {
+rule(sheet, ".loadout-heading::UIPadding", 94, {
 	PaddingTop = UDim.new(0, 4),
 })
 
-rule(sheet, ".loadout-heading::UIListLayout", 93, {
+rule(sheet, ".loadout-heading::UIListLayout", 94, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".loadout-heading-text", 94, {
+rule(sheet, ".loadout-heading-text", 95, {
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".loadout-heading-text.heading-weapon", 331, {
+rule(sheet, ".loadout-heading-text.heading-weapon", 344, {
 	TextColor3 = "$Fight",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".loadout-rule", 95, {
+rule(sheet, ".loadout-rule", 96, {
 	Size = UDim2.new(0, 0, 0, 1),
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".loadout-rule::UIFlexItem", 95, {
+rule(sheet, ".loadout-rule::UIFlexItem", 96, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".loadout-rule.rule-weapon", 332, {
+rule(sheet, ".loadout-rule.rule-weapon", 345, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".loadout-rule.rule-weapon::UIGradient", 332, {
+rule(sheet, ".loadout-rule.rule-weapon::UIGradient", 345, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 138, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".loadout-row", 96, {
+	local r1 = rule(sheet, ".loadout-row", 97, {
 		BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 		BackgroundTransparency = 0.5,
 		Size = UDim2.new(1, 0, 0, 34),
@@ -1552,11 +1575,11 @@ do
 	})
 end
 
-rule(sheet, ".loadout-row::UIPadding", 96, {
+rule(sheet, ".loadout-row::UIPadding", 97, {
 	PaddingRight = UDim.new(0, 8),
 })
 
-rule(sheet, ".loadout-row::UIStroke", 96, {
+rule(sheet, ".loadout-row::UIStroke", 97, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1564,20 +1587,20 @@ rule(sheet, ".loadout-row::UIStroke", 96, {
 	Transparency = 0.45,
 })
 
-rule(sheet, ".loadout-row::UIListLayout", 96, {
+rule(sheet, ".loadout-row::UIListLayout", 97, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".loadout-row:Hover", 333, {
+rule(sheet, ".loadout-row:Hover", 346, {
 	BackgroundColor3 = Color3.fromRGB(52, 66, 82),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".loadout-row:Hover::UIStroke", 333, {
+rule(sheet, ".loadout-row:Hover::UIStroke", 346, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1585,70 +1608,70 @@ rule(sheet, ".loadout-row:Hover::UIStroke", 333, {
 	Transparency = 0,
 })
 
-rule(sheet, ".loadout-row.loadout-weapon, .loadout-row.loadout-manual", 334, {
+rule(sheet, ".loadout-row.loadout-weapon, .loadout-row.loadout-manual", 347, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".loadout-row.loadout-weapon::UIGradient, .loadout-row.loadout-manual::UIGradient", 334, {
+rule(sheet, ".loadout-row.loadout-weapon::UIGradient, .loadout-row.loadout-manual::UIGradient", 347, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(61, 38, 25)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.44), NumberSequenceKeypoint.new(0.55, 0.5), NumberSequenceKeypoint.new(1, 0.5)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".loadout-row.loadout-build", 335, {
+rule(sheet, ".loadout-row.loadout-build", 348, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".loadout-row.loadout-build::UIGradient", 335, {
+rule(sheet, ".loadout-row.loadout-build::UIGradient", 348, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(29, 53, 40)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(0.55, 0.5), NumberSequenceKeypoint.new(1, 0.5)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".loadout-slot", 97, {
+rule(sheet, ".loadout-slot", 98, {
 	Size = UDim2.new(0, 40, 0, 34),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".loadout-slot.slot-weapon", 336, {
+rule(sheet, ".loadout-slot.slot-weapon", 349, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".loadout-slot.slot-weapon::UIGradient", 336, {
+rule(sheet, ".loadout-slot.slot-weapon::UIGradient", 349, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 169, 115)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 101, 3))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".loadout-slot.slot-manual", 337, {
+rule(sheet, ".loadout-slot.slot-manual", 350, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".loadout-slot.slot-manual::UIGradient", 337, {
+rule(sheet, ".loadout-slot.slot-manual::UIGradient", 350, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(242, 131, 121)), ColorSequenceKeypoint.new(1, Color3.fromRGB(229, 39, 22))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".loadout-slot.slot-build", 338, {
+rule(sheet, ".loadout-slot.slot-build", 351, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".loadout-slot.slot-build::UIGradient", 338, {
+rule(sheet, ".loadout-slot.slot-build::UIGradient", 351, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(163, 244, 183)), ColorSequenceKeypoint.new(1, Color3.fromRGB(44, 230, 90))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".loadout-slot-icon", 98, {
+rule(sheet, ".loadout-slot-icon", 99, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".loadout-slot-code, .loadout-slot-icon.art-fallback", 339, {
+rule(sheet, ".loadout-slot-code, .loadout-slot-icon.art-fallback", 352, {
 	TextColor3 = "$Void",
 	TextTransparency = 0,
 	BackgroundTransparency = 1,
@@ -1658,7 +1681,7 @@ rule(sheet, ".loadout-slot-code, .loadout-slot-icon.art-fallback", 339, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".loadout-name", 99, {
+rule(sheet, ".loadout-name", 100, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -1668,46 +1691,46 @@ rule(sheet, ".loadout-name", 99, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".loadout-name::UIFlexItem", 99, {
+rule(sheet, ".loadout-name::UIFlexItem", 100, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".loadout-figure", 100, {
+rule(sheet, ".loadout-figure", 101, {
 	Size = UDim2.new(0, 64, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".loadout-figure::UIListLayout", 100, {
+rule(sheet, ".loadout-figure::UIListLayout", 101, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Right,
 	Padding = UDim.new(0, 0),
 })
 
-rule(sheet, ".loadout-value", 101, {
+rule(sheet, ".loadout-value", 102, {
 	TextSize = 19,
 	TextXAlignment = Enum.TextXAlignment.Right,
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".loadout-value.value-weapon", 340, {
+rule(sheet, ".loadout-value.value-weapon", 353, {
 	TextColor3 = "$Fight",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".loadout-value.value-manual", 341, {
+rule(sheet, ".loadout-value.value-manual", 354, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".loadout-value.value-build", 342, {
+rule(sheet, ".loadout-value.value-build", 355, {
 	TextColor3 = "$Buildpower",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".loadout-unit", 102, {
+rule(sheet, ".loadout-unit", 103, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -1717,39 +1740,39 @@ rule(sheet, ".loadout-unit", 102, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-menu", 103, {
+rule(sheet, ".build-menu", 104, {
 	Size = UDim2.new(0, 336, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	Position = UDim2.new(1, -20, 1, -20),
 	AnchorPoint = Vector2.new(1, 1),
 })
 
-rule(sheet, ".build-menu::UIPadding", 103, {
+rule(sheet, ".build-menu::UIPadding", 104, {
 	PaddingTop = UDim.new(0, 16),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".build-menu::UIListLayout", 103, {
+rule(sheet, ".build-menu::UIListLayout", 104, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".build-title", 104, {
+rule(sheet, ".build-title", 105, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-title::UIListLayout", 104, {
+rule(sheet, ".build-title::UIListLayout", 105, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-grid::UIGridLayout", 105, {
+rule(sheet, ".build-grid::UIGridLayout", 106, {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	CellPadding = UDim2.new(0, 8, 0, 8),
 	FillDirectionMaxCells = 3,
@@ -1757,7 +1780,7 @@ rule(sheet, ".build-grid::UIGridLayout", 105, {
 })
 
 do
-	local r1 = rule(sheet, ".build-option", 106, {
+	local r1 = rule(sheet, ".build-option", 107, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(0, 96, 0, 96),
@@ -1770,12 +1793,12 @@ do
 	})
 end
 
-rule(sheet, ".build-option::UIGradient", 106, {
+rule(sheet, ".build-option::UIGradient", 107, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".build-option::UIStroke", 106, {
+rule(sheet, ".build-option::UIStroke", 107, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1783,36 +1806,36 @@ rule(sheet, ".build-option::UIStroke", 106, {
 	Transparency = 0,
 })
 
-rule(sheet, ".build-option:Hover", 343, {
+rule(sheet, ".build-option:Hover", 356, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-option:Hover::UIStroke", 343, {
+rule(sheet, ".build-option:Hover::UIStroke", 356, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".build-option:Press", 344, {
+rule(sheet, ".build-option:Press", 357, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".build-option:NonInteractable", 345, {
+rule(sheet, ".build-option:NonInteractable", 358, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".build-option:NonInteractable::UIStroke", 345, {
+rule(sheet, ".build-option:NonInteractable::UIStroke", 358, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".build-option.unaffordable", 346, {
+rule(sheet, ".build-option.unaffordable", 359, {
 	TextTransparency = 0.25,
 	BackgroundTransparency = 0.25,
 	ImageTransparency = 0.25,
@@ -1820,14 +1843,14 @@ rule(sheet, ".build-option.unaffordable", 346, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-option.unaffordable::UIStroke", 346, {
+rule(sheet, ".build-option.unaffordable::UIStroke", 359, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0.25,
 })
 
-rule(sheet, ".build-option-body", 107, {
+rule(sheet, ".build-option-body", 108, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
@@ -1836,14 +1859,14 @@ rule(sheet, ".build-option-body", 107, {
 	Interactable = false,
 })
 
-rule(sheet, ".build-option-body::UIPadding", 107, {
+rule(sheet, ".build-option-body::UIPadding", 108, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-option-body::UIListLayout", 107, {
+rule(sheet, ".build-option-body::UIListLayout", 108, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Bottom,
@@ -1851,19 +1874,19 @@ rule(sheet, ".build-option-body::UIListLayout", 107, {
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".build-category-list", 108, {
+rule(sheet, ".build-category-list", 109, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-category-list::UIListLayout", 108, {
+rule(sheet, ".build-category-list::UIListLayout", 109, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 8),
 })
 
 do
-	local r1 = rule(sheet, ".build-category-row", 109, {
+	local r1 = rule(sheet, ".build-category-row", 110, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(1, 0, 0, 0),
@@ -1876,12 +1899,12 @@ do
 	})
 end
 
-rule(sheet, ".build-category-row::UIGradient", 109, {
+rule(sheet, ".build-category-row::UIGradient", 110, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".build-category-row::UIStroke", 109, {
+rule(sheet, ".build-category-row::UIStroke", 110, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -1889,69 +1912,69 @@ rule(sheet, ".build-category-row::UIStroke", 109, {
 	Transparency = 0,
 })
 
-rule(sheet, ".build-category-row::UIListLayout", 109, {
+rule(sheet, ".build-category-row::UIListLayout", 110, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 0),
 })
 
-rule(sheet, ".build-category-row:Hover", 347, {
+rule(sheet, ".build-category-row:Hover", 360, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-category-row:Hover::UIStroke", 347, {
+rule(sheet, ".build-category-row:Hover::UIStroke", 360, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".build-category-row:Press", 348, {
+rule(sheet, ".build-category-row:Press", 361, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".build-category-row:NonInteractable", 349, {
+rule(sheet, ".build-category-row:NonInteractable", 362, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".build-category-row:NonInteractable::UIStroke", 349, {
+rule(sheet, ".build-category-row:NonInteractable::UIStroke", 362, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".build-category-header", 110, {
+rule(sheet, ".build-category-header", 111, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 22),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".build-category-header::UIGradient", 110, {
+rule(sheet, ".build-category-header::UIGradient", 111, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(96, 210, 242))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.65), NumberSequenceKeypoint.new(1, 0.95)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".build-category-header::UIPadding", 110, {
+rule(sheet, ".build-category-header::UIPadding", 111, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-category-header::UIListLayout", 110, {
+rule(sheet, ".build-category-header::UIListLayout", 111, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-category-name", 111, {
+rule(sheet, ".build-category-name", 112, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -1960,7 +1983,7 @@ rule(sheet, ".build-category-name", 111, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-category-key, .build-page-key", 112, {
+rule(sheet, ".build-category-key, .build-page-key", 113, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
@@ -1971,58 +1994,58 @@ rule(sheet, ".build-category-key, .build-page-key", 112, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-category-key::UIPadding, .build-page-key::UIPadding", 112, {
+rule(sheet, ".build-category-key::UIPadding, .build-page-key::UIPadding", 113, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 4),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 4),
 })
 
-rule(sheet, ".build-category-key::UIStroke, .build-page-key::UIStroke", 112, {
+rule(sheet, ".build-category-key::UIStroke, .build-page-key::UIStroke", 113, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".build-category-body", 113, {
+rule(sheet, ".build-category-body", 114, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-category-body::UIPadding", 113, {
+rule(sheet, ".build-category-body::UIPadding", 114, {
 	PaddingTop = UDim.new(0, 4),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 4),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-category-body::UIListLayout", 113, {
+rule(sheet, ".build-category-body::UIListLayout", 114, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".build-category-icon", 114, {
+rule(sheet, ".build-category-icon", 115, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(0, 56, 0, 56),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Interactable = false,
 })
 
-rule(sheet, ".build-category-info", 115, {
+rule(sheet, ".build-category-info", 116, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-category-info::UIListLayout", 115, {
+rule(sheet, ".build-category-info::UIListLayout", 116, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Left,
 	Padding = UDim.new(0, 2),
 })
 
-rule(sheet, ".build-category-building", 116, {
+rule(sheet, ".build-category-building", 117, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -2030,14 +2053,14 @@ rule(sheet, ".build-category-building", 116, {
 	FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".build-category-subtitle", 117, {
+rule(sheet, ".build-category-subtitle", 118, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".build-page-header", 118, {
+rule(sheet, ".build-page-header", 119, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 0),
@@ -2045,34 +2068,34 @@ rule(sheet, ".build-page-header", 118, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-page-header::UIGradient", 118, {
+rule(sheet, ".build-page-header::UIGradient", 119, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(96, 210, 242))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0.92)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".build-page-header::UIPadding", 118, {
+rule(sheet, ".build-page-header::UIPadding", 119, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-page-header::UIStroke", 118, {
+rule(sheet, ".build-page-header::UIStroke", 119, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".build-page-header::UIListLayout", 118, {
+rule(sheet, ".build-page-header::UIListLayout", 119, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".build-page-name", 119, {
+rule(sheet, ".build-page-name", 120, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 16,
@@ -2081,7 +2104,7 @@ rule(sheet, ".build-page-name", 119, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-page-back", 120, {
+rule(sheet, ".build-page-back", 121, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2089,7 +2112,7 @@ rule(sheet, ".build-page-back", 120, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".build-option-key", 121, {
+rule(sheet, ".build-option-key", 122, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
@@ -2103,21 +2126,21 @@ rule(sheet, ".build-option-key", 121, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-option-key::UIPadding", 121, {
+rule(sheet, ".build-option-key::UIPadding", 122, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 4),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 4),
 })
 
-rule(sheet, ".build-option-key::UIStroke", 121, {
+rule(sheet, ".build-option-key::UIStroke", 122, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".build-option-icon", 122, {
+rule(sheet, ".build-option-icon", 123, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
@@ -2126,38 +2149,38 @@ rule(sheet, ".build-option-icon", 122, {
 	Interactable = false,
 })
 
-rule(sheet, ".build-option-name, .build-option-subtitle, .cost", 123, {
+rule(sheet, ".build-option-name, .build-option-subtitle, .cost", 124, {
 	ZIndex = 1,
 })
 
-rule(sheet, ".build-option-name", 124, {
+rule(sheet, ".build-option-name", 125, {
 	TextSize = 14,
 	FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".build-cost::UIListLayout", 125, {
+rule(sheet, ".build-cost::UIListLayout", 126, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".cost", 126, {
+rule(sheet, ".cost", 127, {
 	TextSize = 13,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".cost-metal", 127, {
+rule(sheet, ".cost-metal", 128, {
 	TextColor3 = "$Metal",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".cost-energy", 128, {
+rule(sheet, ".cost-energy", 129, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".build-hint", 129, {
+rule(sheet, ".build-hint", 130, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2167,24 +2190,24 @@ rule(sheet, ".build-hint", 129, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".build-option-subtitle", 130, {
+rule(sheet, ".build-option-subtitle", 131, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
 })
 
-rule(sheet, ".build-option.locked, .build-category-row.locked", 350, {
+rule(sheet, ".build-option.locked, .build-category-row.locked", 363, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-option.locked::UIGradient, .build-category-row.locked::UIGradient", 350, {
+rule(sheet, ".build-option.locked::UIGradient, .build-category-row.locked::UIGradient", 363, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.1, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.1, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.2, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.2, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.3, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.3, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.7, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.7, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.8, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(0.8, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.9, Color3.fromRGB(17, 22, 28)), ColorSequenceKeypoint.new(0.9, Color3.fromRGB(21, 28, 35)), ColorSequenceKeypoint.new(1, Color3.fromRGB(21, 28, 35))}),
 	Rotation = -45,
 })
 
-rule(sheet, ".build-option.locked::UIStroke, .build-category-row.locked::UIStroke", 350, {
+rule(sheet, ".build-option.locked::UIStroke, .build-category-row.locked::UIStroke", 363, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2192,29 +2215,29 @@ rule(sheet, ".build-option.locked::UIStroke, .build-category-row.locked::UIStrok
 	Transparency = 0.3,
 })
 
-rule(sheet, ".build-option.locked >> .build-option-name, .build-category-row.locked >> .build-category-building", 449, {
+rule(sheet, ".build-option.locked >> .build-option-name, .build-category-row.locked >> .build-category-building", 471, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".build-category-row.locked >> .build-category-header", 450, {
+rule(sheet, ".build-category-row.locked >> .build-category-header", 472, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".build-category-row.locked >> .build-category-header::UIGradient", 450, {
+rule(sheet, ".build-category-row.locked >> .build-category-header::UIGradient", 472, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(78, 96, 118)), ColorSequenceKeypoint.new(1, Color3.fromRGB(78, 96, 118))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.65), NumberSequenceKeypoint.new(1, 0.95)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".locked-icon", 131, {
+rule(sheet, ".locked-icon", 132, {
 	TextTransparency = 0.45,
 	ImageTransparency = 0.45,
 	GroupTransparency = 0.45,
 })
 
-rule(sheet, ".build-option-lock, .build-category-lock", 132, {
+rule(sheet, ".build-option-lock, .build-category-lock", 133, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.3,
 	TextSize = 12,
@@ -2222,14 +2245,14 @@ rule(sheet, ".build-option-lock, .build-category-lock", 132, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".build-option-lock::UIPadding, .build-category-lock::UIPadding", 132, {
+rule(sheet, ".build-option-lock::UIPadding, .build-category-lock::UIPadding", 133, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 4),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 4),
 })
 
-rule(sheet, ".build-option-lock::UIStroke, .build-category-lock::UIStroke", 132, {
+rule(sheet, ".build-option-lock::UIStroke, .build-category-lock::UIStroke", 133, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2237,13 +2260,13 @@ rule(sheet, ".build-option-lock::UIStroke, .build-category-lock::UIStroke", 132,
 	Transparency = 0.2,
 })
 
-rule(sheet, ".build-option-lock", 133, {
+rule(sheet, ".build-option-lock", 134, {
 	Position = UDim2.new(1, -4, 0, 4),
 	AnchorPoint = Vector2.new(1, 0),
 	ZIndex = 2,
 })
 
-rule(sheet, ".build-locked-label", 134, {
+rule(sheet, ".build-locked-label", 135, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2252,11 +2275,11 @@ rule(sheet, ".build-locked-label", 134, {
 	ZIndex = 1,
 })
 
-rule(sheet, ".tutorial-highlight", 135, {
+rule(sheet, ".tutorial-highlight", 136, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tutorial-highlight::UIStroke", 135, {
+rule(sheet, ".tutorial-highlight::UIStroke", 136, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -2264,7 +2287,7 @@ rule(sheet, ".tutorial-highlight::UIStroke", 135, {
 	Transparency = 0,
 })
 
-rule(sheet, ".tutorial-pointer", 136, {
+rule(sheet, ".tutorial-pointer", 137, {
 	TextColor3 = Color3.fromRGB(8, 11, 15),
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(96, 224, 128),
@@ -2277,41 +2300,41 @@ rule(sheet, ".tutorial-pointer", 136, {
 	Interactable = false,
 })
 
-rule(sheet, ".tutorial-pointer::UICorner", 136, {
+rule(sheet, ".tutorial-pointer::UICorner", 137, {
 	CornerRadius = UDim.new(0, 4),
 })
 
-rule(sheet, ".tutorial-pointer::UIPadding", 136, {
+rule(sheet, ".tutorial-pointer::UIPadding", 137, {
 	PaddingTop = UDim.new(0, 4),
 	PaddingRight = UDim.new(0, 10),
 	PaddingBottom = UDim.new(0, 4),
 	PaddingLeft = UDim.new(0, 10),
 })
 
-rule(sheet, ".command-panel", 137, {
+rule(sheet, ".command-panel", 138, {
 	Size = UDim2.new(0, 210, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".command-panel::UIPadding", 137, {
+rule(sheet, ".command-panel::UIPadding", 138, {
 	PaddingTop = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 12),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".command-panel::UIListLayout", 137, {
+rule(sheet, ".command-panel::UIListLayout", 138, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".command-title", 138, {
+rule(sheet, ".command-title", 139, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".command-title::UIListLayout", 138, {
+rule(sheet, ".command-title::UIListLayout", 139, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -2319,7 +2342,7 @@ rule(sheet, ".command-title::UIListLayout", 138, {
 })
 
 do
-	local r1 = rule(sheet, ".command-row", 139, {
+	local r1 = rule(sheet, ".command-row", 140, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(1, 0, 0, 28),
@@ -2332,19 +2355,19 @@ do
 	})
 end
 
-rule(sheet, ".command-row::UIGradient", 139, {
+rule(sheet, ".command-row::UIGradient", 140, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".command-row::UIPadding", 139, {
+rule(sheet, ".command-row::UIPadding", 140, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".command-row::UIStroke", 139, {
+rule(sheet, ".command-row::UIStroke", 140, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2352,90 +2375,90 @@ rule(sheet, ".command-row::UIStroke", 139, {
 	Transparency = 0,
 })
 
-rule(sheet, ".command-row::UIListLayout", 139, {
+rule(sheet, ".command-row::UIListLayout", 140, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".command-row:Hover", 351, {
+rule(sheet, ".command-row:Hover", 364, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".command-row:Hover::UIStroke", 351, {
+rule(sheet, ".command-row:Hover::UIStroke", 364, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".command-row:Press", 352, {
+rule(sheet, ".command-row:Press", 365, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".command-row:NonInteractable", 353, {
+rule(sheet, ".command-row:NonInteractable", 366, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".command-row:NonInteractable::UIStroke", 353, {
+rule(sheet, ".command-row:NonInteractable::UIStroke", 366, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".command-row.active", 354, {
+rule(sheet, ".command-row.active", 367, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".command-row.active::UIStroke", 354, {
+rule(sheet, ".command-row.active::UIStroke", 367, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".command-icon", 140, {
+rule(sheet, ".command-icon", 141, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(0, 20, 0, 20),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".command-name", 141, {
+rule(sheet, ".command-name", 142, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 13,
 	TextXAlignment = Enum.TextXAlignment.Left,
 })
 
-rule(sheet, ".command-key", 142, {
+rule(sheet, ".command-key", 143, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 13,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".selection-box", 143, {
+rule(sheet, ".selection-box", 144, {
 	BackgroundColor3 = Color3.fromRGB(96, 210, 242),
 	BackgroundTransparency = 0.9,
 	ZIndex = 100,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".selection-box::UIStroke", 143, {
+rule(sheet, ".selection-box::UIStroke", 144, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".placement-hint", 144, {
+rule(sheet, ".placement-hint", 145, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
@@ -2447,14 +2470,14 @@ rule(sheet, ".placement-hint", 144, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".placement-hint::UIPadding", 144, {
+rule(sheet, ".placement-hint::UIPadding", 145, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".placement-hint::UIStroke", 144, {
+rule(sheet, ".placement-hint::UIStroke", 145, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2462,7 +2485,7 @@ rule(sheet, ".placement-hint::UIStroke", 144, {
 	Transparency = 0,
 })
 
-rule(sheet, ".placement-problem", 145, {
+rule(sheet, ".placement-problem", 146, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
@@ -2476,99 +2499,99 @@ rule(sheet, ".placement-problem", 145, {
 	Interactable = false,
 })
 
-rule(sheet, ".placement-problem::UIPadding", 145, {
+rule(sheet, ".placement-problem::UIPadding", 146, {
 	PaddingTop = UDim.new(0, 4),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 4),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".placement-problem::UIStroke", 145, {
+rule(sheet, ".placement-problem::UIStroke", 146, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".mode-hint", 146, {
+rule(sheet, ".mode-hint", 147, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".mode-hint::UIStroke", 146, {
+rule(sheet, ".mode-hint::UIStroke", 147, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".mode-hint.attack", 355, {
+rule(sheet, ".mode-hint.attack", 368, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".mode-hint.attack::UIStroke", 355, {
+rule(sheet, ".mode-hint.attack::UIStroke", 368, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".mode-hint.fight", 356, {
+rule(sheet, ".mode-hint.fight", 369, {
 	TextColor3 = "$Fight",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".mode-hint.fight::UIStroke", 356, {
+rule(sheet, ".mode-hint.fight::UIStroke", 369, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".mode-hint.repair", 357, {
+rule(sheet, ".mode-hint.repair", 370, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".mode-hint.repair::UIStroke", 357, {
+rule(sheet, ".mode-hint.repair::UIStroke", 370, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".mode-hint.resurrect", 358, {
+rule(sheet, ".mode-hint.resurrect", 371, {
 	TextColor3 = "$Resurrect",
 	TextTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".mode-hint.resurrect::UIStroke", 358, {
+rule(sheet, ".mode-hint.resurrect::UIStroke", 371, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".world-bar", 147, {
+rule(sheet, ".world-bar", 148, {
 	Size = UDim2.new(0, 52, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	Interactable = false,
 })
 
-rule(sheet, ".world-bar::UIListLayout", 147, {
+rule(sheet, ".world-bar::UIListLayout", 148, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 2),
 })
 
-rule(sheet, ".bar-name", 148, {
+rule(sheet, ".bar-name", 149, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 10,
@@ -2576,11 +2599,11 @@ rule(sheet, ".bar-name", 148, {
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".bar-name.far", 359, {
+rule(sheet, ".bar-name.far", 372, {
 	TextSize = 14,
 })
 
-rule(sheet, ".bar-name.far::UIStroke", 359, {
+rule(sheet, ".bar-name.far::UIStroke", 372, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -2588,7 +2611,7 @@ rule(sheet, ".bar-name.far::UIStroke", 359, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".bar-dot", 149, {
+rule(sheet, ".bar-dot", 150, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 6, 0, 6),
@@ -2596,11 +2619,11 @@ rule(sheet, ".bar-dot", 149, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".bar-dot::UICorner", 149, {
+rule(sheet, ".bar-dot::UICorner", 150, {
 	CornerRadius = UDim.new(0.5, 0),
 })
 
-rule(sheet, ".bar-dot::UIStroke", 149, {
+rule(sheet, ".bar-dot::UIStroke", 150, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2608,13 +2631,13 @@ rule(sheet, ".bar-dot::UIStroke", 149, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".bar-dot.far", 360, {
+rule(sheet, ".bar-dot.far", 373, {
 	Size = UDim2.new(0, 8, 0, 8),
 	AutomaticSize = Enum.AutomaticSize.None,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".bar-dot.far::UIStroke", 360, {
+rule(sheet, ".bar-dot.far::UIStroke", 373, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2622,7 +2645,7 @@ rule(sheet, ".bar-dot.far::UIStroke", 360, {
 	Transparency = 0.2,
 })
 
-rule(sheet, ".bar-track", 150, {
+rule(sheet, ".bar-track", 151, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.15,
 	Size = UDim2.new(1, 0, 0, 6),
@@ -2631,7 +2654,7 @@ rule(sheet, ".bar-track", 150, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".bar-track::UIStroke", 150, {
+rule(sheet, ".bar-track::UIStroke", 151, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2640,7 +2663,7 @@ rule(sheet, ".bar-track::UIStroke", 150, {
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.health", 361, {
+	local r1 = rule(sheet, ".bar-fill.health", 374, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2649,13 +2672,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.health::UIGradient", 361, {
+rule(sheet, ".bar-fill.health::UIGradient", 374, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(14, 122, 41)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(126, 240, 154)), ColorSequenceKeypoint.new(1, Color3.fromRGB(240, 253, 243))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.health.mid", 451, {
+	local r1 = rule(sheet, ".bar-fill.health.worn", 473, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2664,13 +2687,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.health.mid::UIGradient", 451, {
+rule(sheet, ".bar-fill.health.worn::UIGradient", 473, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(68, 49, 7)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(236, 184, 68)), ColorSequenceKeypoint.new(1, Color3.fromRGB(248, 228, 184))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.health.low", 452, {
+	local r1 = rule(sheet, ".bar-fill.health.low", 474, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2679,13 +2702,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.health.low::UIGradient", 452, {
+rule(sheet, ".bar-fill.health.low::UIGradient", 474, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(75, 13, 7)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(1, Color3.fromRGB(249, 196, 191))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.progress", 362, {
+	local r1 = rule(sheet, ".bar-fill.progress", 375, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2694,13 +2717,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.progress::UIGradient", 362, {
+rule(sheet, ".bar-fill.progress::UIGradient", 375, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 80, 100)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 243, 252))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.reclaim", 363, {
+	local r1 = rule(sheet, ".bar-fill.reclaim", 376, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2709,13 +2732,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.reclaim::UIGradient", 363, {
+rule(sheet, ".bar-fill.reclaim::UIGradient", 376, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(69, 89, 117)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.reclaim.energy", 453, {
+	local r1 = rule(sheet, ".bar-fill.reclaim.energy", 475, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2724,13 +2747,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.reclaim.energy::UIGradient", 453, {
+rule(sheet, ".bar-fill.reclaim.energy::UIGradient", 475, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 78, 0)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 247, 192))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.resurrect", 364, {
+	local r1 = rule(sheet, ".bar-fill.resurrect", 377, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2739,23 +2762,23 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.resurrect::UIGradient", 364, {
+rule(sheet, ".bar-fill.resurrect::UIGradient", 377, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(58, 9, 97)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(176, 96, 240)), ColorSequenceKeypoint.new(1, Color3.fromRGB(234, 213, 251))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".world-bar.blueprint >> .bar-track", 454, {
+rule(sheet, ".world-bar.blueprint >> .bar-track", 476, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".world-bar.blueprint >> .bar-track::UIStroke", 454, {
+rule(sheet, ".world-bar.blueprint >> .bar-track::UIStroke", 476, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".bar-eta", 151, {
+rule(sheet, ".bar-eta", 152, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2763,17 +2786,17 @@ rule(sheet, ".bar-eta", 151, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".bar-eta.decaying", 365, {
+rule(sheet, ".bar-eta.decaying", 378, {
 	TextColor3 = Color3.fromRGB(238, 88, 74),
 	TextTransparency = 0,
 })
 
-rule(sheet, ".bar-eta.decaying.lit", 455, {
+rule(sheet, ".bar-eta.decaying.lit", 477, {
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextTransparency = 0,
 })
 
-rule(sheet, ".bar-warning", 152, {
+rule(sheet, ".bar-warning", 153, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2781,12 +2804,12 @@ rule(sheet, ".bar-warning", 152, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".bar-warning.lit", 366, {
+rule(sheet, ".bar-warning.lit", 379, {
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextTransparency = 0,
 })
 
-rule(sheet, ".bar-self-destruct", 153, {
+rule(sheet, ".bar-self-destruct", 154, {
 	TextColor3 = Color3.fromRGB(238, 88, 74),
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2794,13 +2817,13 @@ rule(sheet, ".bar-self-destruct", 153, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".bar-self-destruct.lit", 367, {
+rule(sheet, ".bar-self-destruct.lit", 380, {
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextTransparency = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.reload", 368, {
+	local r1 = rule(sheet, ".bar-fill.reload", 381, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2809,13 +2832,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.reload::UIGradient", 368, {
+rule(sheet, ".bar-fill.reload::UIGradient", 381, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 78, 0)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 247, 192))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.shield", 369, {
+	local r1 = rule(sheet, ".bar-fill.shield", 382, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2824,13 +2847,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.shield::UIGradient", 369, {
+rule(sheet, ".bar-fill.shield::UIGradient", 382, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 80, 100)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 243, 252))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.stockpile", 370, {
+	local r1 = rule(sheet, ".bar-fill.stockpile", 383, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2839,13 +2862,13 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.stockpile::UIGradient", 370, {
+rule(sheet, ".bar-fill.stockpile::UIGradient", 383, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(69, 89, 117)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".bar-fill.emp", 371, {
+	local r1 = rule(sheet, ".bar-fill.emp", 384, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -2854,12 +2877,12 @@ do
 	})
 end
 
-rule(sheet, ".bar-fill.emp::UIGradient", 371, {
+rule(sheet, ".bar-fill.emp::UIGradient", 384, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 106, 155)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(130, 215, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".bar-stun", 154, {
+rule(sheet, ".bar-stun", 155, {
 	TextColor3 = "$Emp",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2867,7 +2890,7 @@ rule(sheet, ".bar-stun", 154, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".bar-count", 155, {
+rule(sheet, ".bar-count", 156, {
 	TextColor3 = "$Metal",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -2875,13 +2898,13 @@ rule(sheet, ".bar-count", 155, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".ping-marker", 156, {
+rule(sheet, ".ping-marker", 157, {
 	Size = UDim2.new(0, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Interactable = false,
 })
 
-rule(sheet, ".ping-name", 157, {
+rule(sheet, ".ping-name", 158, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 16,
@@ -2890,7 +2913,7 @@ rule(sheet, ".ping-name", 157, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".ping-name::UIStroke", 157, {
+rule(sheet, ".ping-name::UIStroke", 158, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -2898,7 +2921,7 @@ rule(sheet, ".ping-name::UIStroke", 157, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".ping-arm", 158, {
+rule(sheet, ".ping-arm", 159, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 18, 0, 4),
@@ -2906,7 +2929,7 @@ rule(sheet, ".ping-arm", 158, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".ping-arm::UIStroke", 158, {
+rule(sheet, ".ping-arm::UIStroke", 159, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2914,7 +2937,7 @@ rule(sheet, ".ping-arm::UIStroke", 158, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".lobby-panel", 159, {
+rule(sheet, ".lobby-panel", 160, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -2926,33 +2949,33 @@ rule(sheet, ".lobby-panel", 159, {
 	AnchorPoint = Vector2.new(0.5, 0),
 })
 
-rule(sheet, ".lobby-panel::UIGradient", 159, {
+rule(sheet, ".lobby-panel::UIGradient", 160, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".lobby-panel::UIPadding", 159, {
+rule(sheet, ".lobby-panel::UIPadding", 160, {
 	PaddingTop = UDim.new(0, 16),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".lobby-panel::UIListLayout", 159, {
+rule(sheet, ".lobby-panel::UIListLayout", 160, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".lobby-title", 160, {
+rule(sheet, ".lobby-title", 161, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 20,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".lobby-title::UIStroke", 160, {
+rule(sheet, ".lobby-title::UIStroke", 161, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -2960,37 +2983,37 @@ rule(sheet, ".lobby-title::UIStroke", 160, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".lobby-panel.counting >> .lobby-title", 456, {
+rule(sheet, ".lobby-panel.counting >> .lobby-title", 478, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".lobby-hint", 161, {
+rule(sheet, ".lobby-hint", 162, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 13,
 })
 
-rule(sheet, ".lobby-list::UIListLayout", 162, {
+rule(sheet, ".lobby-list::UIListLayout", 163, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".lobby-row", 163, {
+rule(sheet, ".lobby-row", 164, {
 	BackgroundColor3 = Color3.fromRGB(31, 40, 51),
 	BackgroundTransparency = 0.2,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".lobby-row::UIPadding", 163, {
+rule(sheet, ".lobby-row::UIPadding", 164, {
 	PaddingTop = UDim.new(0, 4),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 4),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".lobby-row::UIStroke", 163, {
+rule(sheet, ".lobby-row::UIStroke", 164, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -2998,14 +3021,14 @@ rule(sheet, ".lobby-row::UIStroke", 163, {
 	Transparency = 0,
 })
 
-rule(sheet, ".lobby-row::UIListLayout", 163, {
+rule(sheet, ".lobby-row::UIListLayout", 164, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".lobby-name", 164, {
+rule(sheet, ".lobby-name", 165, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -3016,13 +3039,13 @@ rule(sheet, ".lobby-name", 164, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".lobby-name.you", 372, {
+rule(sheet, ".lobby-name.you", 385, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".lobby-status", 165, {
+rule(sheet, ".lobby-status", 166, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -3030,13 +3053,13 @@ rule(sheet, ".lobby-status", 165, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".lobby-row.ready >> .lobby-status", 457, {
+rule(sheet, ".lobby-row.ready >> .lobby-status", 479, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".victory-screen", 166, {
+rule(sheet, ".victory-screen", 167, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.45,
 	Size = UDim2.new(1, 0, 1, 0),
@@ -3045,21 +3068,21 @@ rule(sheet, ".victory-screen", 166, {
 	ZIndex = 100,
 })
 
-rule(sheet, ".victory-layout", 167, {
+rule(sheet, ".victory-layout", 168, {
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Position = UDim2.new(0, 0, 0, 0),
 	ZIndex = 2,
 })
 
-rule(sheet, ".victory-layout::UIListLayout", 167, {
+rule(sheet, ".victory-layout::UIListLayout", 168, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 })
 
-rule(sheet, ".victory-plate", 168, {
+rule(sheet, ".victory-plate", 169, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -3067,38 +3090,38 @@ rule(sheet, ".victory-plate", 168, {
 	GroupTransparency = 0.03,
 })
 
-rule(sheet, ".victory-plate::UIGradient", 168, {
+rule(sheet, ".victory-plate::UIGradient", 169, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".victory-plate::UISizeConstraint", 168, {
+rule(sheet, ".victory-plate::UISizeConstraint", 169, {
 	MinSize = Vector2.new(420, 0),
 	MaxSize = Vector2.new(math.huge, math.huge),
 })
 
-rule(sheet, ".victory-plate::UIPadding", 168, {
+rule(sheet, ".victory-plate::UIPadding", 169, {
 	PaddingTop = UDim.new(0, 32),
 	PaddingRight = UDim.new(0, 48),
 	PaddingBottom = UDim.new(0, 32),
 	PaddingLeft = UDim.new(0, 48),
 })
 
-rule(sheet, ".victory-plate::UIListLayout", 168, {
+rule(sheet, ".victory-plate::UIListLayout", 169, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".victory-title", 169, {
+rule(sheet, ".victory-title", 170, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 56,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".victory-title::UIStroke", 169, {
+rule(sheet, ".victory-title::UIStroke", 170, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 3,
@@ -3106,28 +3129,28 @@ rule(sheet, ".victory-title::UIStroke", 169, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".victory-reason", 170, {
+rule(sheet, ".victory-reason", 171, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 16,
 	TextXAlignment = Enum.TextXAlignment.Center,
 })
 
-rule(sheet, ".victory-screen.victory >> .victory-title", 458, {
+rule(sheet, ".victory-screen.victory >> .victory-title", 480, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".victory-screen.defeat >> .victory-title", 459, {
+rule(sheet, ".victory-screen.defeat >> .victory-title", 481, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".victory-choices", 171, {
+rule(sheet, ".victory-choices", 172, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".victory-choices::UIListLayout", 171, {
+rule(sheet, ".victory-choices::UIListLayout", 172, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -3136,7 +3159,7 @@ rule(sheet, ".victory-choices::UIListLayout", 171, {
 })
 
 do
-	local r1 = rule(sheet, ".victory-button", 172, {
+	local r1 = rule(sheet, ".victory-button", 173, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(0, 0, 0, 40),
@@ -3149,24 +3172,24 @@ do
 	})
 end
 
-rule(sheet, ".victory-button::UIGradient", 172, {
+rule(sheet, ".victory-button::UIGradient", 173, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".victory-button::UISizeConstraint", 172, {
+rule(sheet, ".victory-button::UISizeConstraint", 173, {
 	MinSize = Vector2.new(180, 0),
 	MaxSize = Vector2.new(math.huge, math.huge),
 })
 
-rule(sheet, ".victory-button::UIPadding", 172, {
+rule(sheet, ".victory-button::UIPadding", 173, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 20),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 20),
 })
 
-rule(sheet, ".victory-button::UIStroke", 172, {
+rule(sheet, ".victory-button::UIStroke", 173, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -3174,77 +3197,77 @@ rule(sheet, ".victory-button::UIStroke", 172, {
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-button::UIListLayout", 172, {
+rule(sheet, ".victory-button::UIListLayout", 173, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 })
 
-rule(sheet, ".victory-button:Hover", 373, {
+rule(sheet, ".victory-button:Hover", 386, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-button:Hover::UIStroke", 373, {
+rule(sheet, ".victory-button:Hover::UIStroke", 386, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-button:Press", 374, {
+rule(sheet, ".victory-button:Press", 387, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".victory-button:NonInteractable", 375, {
+rule(sheet, ".victory-button:NonInteractable", 388, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".victory-button:NonInteractable::UIStroke", 375, {
+rule(sheet, ".victory-button:NonInteractable::UIStroke", 388, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".victory-button.primary", 376, {
+rule(sheet, ".victory-button.primary", 389, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-button.primary::UIGradient", 376, {
+rule(sheet, ".victory-button.primary::UIGradient", 389, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 183, 217)), ColorSequenceKeypoint.new(1, Color3.fromRGB(13, 125, 157))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".victory-button.primary::UIStroke", 376, {
+rule(sheet, ".victory-button.primary::UIStroke", 389, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-button.primary:Hover", 460, {
+rule(sheet, ".victory-button.primary:Hover", 482, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".victory-button.disabled, .victory-button:NonInteractable", 377, {
+rule(sheet, ".victory-button.disabled, .victory-button:NonInteractable", 390, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".victory-button.disabled::UIStroke, .victory-button:NonInteractable::UIStroke", 377, {
+rule(sheet, ".victory-button.disabled::UIStroke, .victory-button:NonInteractable::UIStroke", 390, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".victory-button-label", 173, {
+rule(sheet, ".victory-button-label", 174, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -3253,44 +3276,44 @@ rule(sheet, ".victory-button-label", 173, {
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".victory-button.disabled >> .victory-button-label", 461, {
+rule(sheet, ".victory-button.disabled >> .victory-button-label", 483, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".victory-stats", 174, {
+rule(sheet, ".victory-stats", 175, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".victory-stats::UIPadding", 174, {
+rule(sheet, ".victory-stats::UIPadding", 175, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 0),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 0),
 })
 
-rule(sheet, ".victory-stats::UIListLayout", 174, {
+rule(sheet, ".victory-stats::UIListLayout", 175, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".victory-stats-table", 175, {
+rule(sheet, ".victory-stats-table", 176, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.55,
 	AutomaticSize = Enum.AutomaticSize.XY,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-stats-table::UIPadding", 175, {
+rule(sheet, ".victory-stats-table::UIPadding", 176, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".victory-stats-table::UIStroke", 175, {
+rule(sheet, ".victory-stats-table::UIStroke", 176, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -3298,43 +3321,43 @@ rule(sheet, ".victory-stats-table::UIStroke", 175, {
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-stats-table::UIListLayout", 175, {
+rule(sheet, ".victory-stats-table::UIListLayout", 176, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".victory-stats-row", 176, {
+rule(sheet, ".victory-stats-row", 177, {
 	Size = UDim2.new(0, 0, 0, 28),
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".victory-stats-row::UIPadding", 176, {
+rule(sheet, ".victory-stats-row::UIPadding", 177, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".victory-stats-row::UIListLayout", 176, {
+rule(sheet, ".victory-stats-row::UIListLayout", 177, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".victory-stats-row.headings", 378, {
+rule(sheet, ".victory-stats-row.headings", 391, {
 	Size = UDim2.new(0, 0, 0, 22),
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".victory-stats-row.own", 379, {
+rule(sheet, ".victory-stats-row.own", 392, {
 	BackgroundColor3 = Color3.fromRGB(96, 210, 242),
 	BackgroundTransparency = 0.86,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-stats-row.own::UIStroke", 379, {
+rule(sheet, ".victory-stats-row.own::UIStroke", 392, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -3342,7 +3365,7 @@ rule(sheet, ".victory-stats-row.own::UIStroke", 379, {
 	Transparency = 0.5,
 })
 
-rule(sheet, ".victory-stat", 177, {
+rule(sheet, ".victory-stat", 178, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -3352,7 +3375,7 @@ rule(sheet, ".victory-stat", 177, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".victory-stat.name", 380, {
+rule(sheet, ".victory-stat.name", 393, {
 	TextSize = 16,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
@@ -3360,26 +3383,26 @@ rule(sheet, ".victory-stat.name", 380, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".victory-stats-row.headings >> .victory-stat", 462, {
+rule(sheet, ".victory-stats-row.headings >> .victory-stat", 484, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 10,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".victory-stats-row.won >> .victory-stat.name", 482, {
+rule(sheet, ".victory-stats-row.won >> .victory-stat.name", 504, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".victory-mvp", 178, {
+rule(sheet, ".victory-mvp", 179, {
 	TextColor3 = "$Caution",
 	TextTransparency = 0,
 	TextSize = 14,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".victory-mvp::UIStroke", 178, {
+rule(sheet, ".victory-mvp::UIStroke", 179, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -3387,23 +3410,23 @@ rule(sheet, ".victory-mvp::UIStroke", 178, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".victory-status", 179, {
+rule(sheet, ".victory-status", 180, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 14,
 	TextXAlignment = Enum.TextXAlignment.Center,
 })
 
-rule(sheet, ".victory-status.failed", 381, {
+rule(sheet, ".victory-status.failed", 394, {
 	TextColor3 = "$Caution",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".victory-voters", 180, {
+rule(sheet, ".victory-voters", 181, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".victory-voters::UIListLayout", 180, {
+rule(sheet, ".victory-voters::UIListLayout", 181, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -3411,7 +3434,7 @@ rule(sheet, ".victory-voters::UIListLayout", 180, {
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".victory-voter", 181, {
+rule(sheet, ".victory-voter", 182, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.4,
 	Size = UDim2.new(0, 40, 0, 40),
@@ -3419,7 +3442,7 @@ rule(sheet, ".victory-voter", 181, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-voter::UIStroke", 181, {
+rule(sheet, ".victory-voter::UIStroke", 182, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -3427,20 +3450,20 @@ rule(sheet, ".victory-voter::UIStroke", 181, {
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-voter.agreed", 382, {
+rule(sheet, ".victory-voter.agreed", 395, {
 	BackgroundColor3 = Color3.fromRGB(96, 224, 128),
 	BackgroundTransparency = 0.82,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-voter.agreed::UIStroke", 382, {
+rule(sheet, ".victory-voter.agreed::UIStroke", 395, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-voter-tick", 182, {
+rule(sheet, ".victory-voter-tick", 183, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
@@ -3455,14 +3478,14 @@ rule(sheet, ".victory-voter-tick", 182, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-voter-tick::UIStroke", 182, {
+rule(sheet, ".victory-voter-tick::UIStroke", 183, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-vote-count", 183, {
+rule(sheet, ".victory-vote-count", 184, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -3471,7 +3494,7 @@ rule(sheet, ".victory-vote-count", 183, {
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".victory-vote-count::UIPadding", 183, {
+rule(sheet, ".victory-vote-count::UIPadding", 184, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 4),
 	PaddingBottom = UDim.new(0, 0),
@@ -3479,7 +3502,7 @@ rule(sheet, ".victory-vote-count::UIPadding", 183, {
 })
 
 do
-	local r1 = rule(sheet, ".victory-reopen", 184, {
+	local r1 = rule(sheet, ".victory-reopen", 185, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(0, 0, 0, 30),
@@ -3495,19 +3518,19 @@ do
 	})
 end
 
-rule(sheet, ".victory-reopen::UIGradient", 184, {
+rule(sheet, ".victory-reopen::UIGradient", 185, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".victory-reopen::UIPadding", 184, {
+rule(sheet, ".victory-reopen::UIPadding", 185, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".victory-reopen::UIStroke", 184, {
+rule(sheet, ".victory-reopen::UIStroke", 185, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -3515,48 +3538,48 @@ rule(sheet, ".victory-reopen::UIStroke", 184, {
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-reopen::UIListLayout", 184, {
+rule(sheet, ".victory-reopen::UIListLayout", 185, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 })
 
-rule(sheet, ".victory-reopen:Hover", 383, {
+rule(sheet, ".victory-reopen:Hover", 396, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".victory-reopen:Hover::UIStroke", 383, {
+rule(sheet, ".victory-reopen:Hover::UIStroke", 396, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".victory-reopen:Press", 384, {
+rule(sheet, ".victory-reopen:Press", 397, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".victory-reopen:NonInteractable", 385, {
+rule(sheet, ".victory-reopen:NonInteractable", 398, {
 	TextTransparency = 0.6,
 	BackgroundTransparency = 0.6,
 	ImageTransparency = 0.6,
 	GroupTransparency = 0.6,
 })
 
-rule(sheet, ".victory-reopen:NonInteractable::UIStroke", 385, {
+rule(sheet, ".victory-reopen:NonInteractable::UIStroke", 398, {
 	Transparency = 0.6,
 })
 
-rule(sheet, ".victory-reopen.with-scavengers", 386, {
+rule(sheet, ".victory-reopen.with-scavengers", 399, {
 	Position = UDim2.new(0.5, -536, 0, 23),
 	AnchorPoint = Vector2.new(1, 0),
 })
 
-rule(sheet, ".victory-reopen-label", 185, {
+rule(sheet, ".victory-reopen-label", 186, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -3565,55 +3588,55 @@ rule(sheet, ".victory-reopen-label", 185, {
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".victory-reopen.victory >> .victory-reopen-label", 463, {
+rule(sheet, ".victory-reopen.victory >> .victory-reopen-label", 485, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".victory-reopen.defeat >> .victory-reopen-label", 464, {
+rule(sheet, ".victory-reopen.defeat >> .victory-reopen-label", 486, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".unlock-fx", 186, {
+rule(sheet, ".unlock-fx", 187, {
 	AutomaticSize = Enum.AutomaticSize.None,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-vignette", 187, {
+rule(sheet, ".unlock-vignette", 188, {
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Position = UDim2.new(0, 0, 0, 0),
 	ZIndex = 1,
 })
 
-rule(sheet, ".unlock-reveal", 188, {
+rule(sheet, ".unlock-reveal", 189, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".unlock-reveal::UIPadding", 188, {
+rule(sheet, ".unlock-reveal::UIPadding", 189, {
 	PaddingTop = UDim.new(0, 8),
 })
 
-rule(sheet, ".unlock-reveal::UIListLayout", 188, {
+rule(sheet, ".unlock-reveal::UIListLayout", 189, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".unlock-header", 189, {
+rule(sheet, ".unlock-header", 190, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".unlock-header::UIListLayout", 189, {
+rule(sheet, ".unlock-header::UIListLayout", 190, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".unlock-title", 190, {
+rule(sheet, ".unlock-title", 191, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 	TextSize = 22,
@@ -3621,7 +3644,7 @@ rule(sheet, ".unlock-title", 190, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".unlock-title::UIStroke", 190, {
+rule(sheet, ".unlock-title::UIStroke", 191, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -3629,7 +3652,7 @@ rule(sheet, ".unlock-title::UIStroke", 190, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".unlock-tally", 191, {
+rule(sheet, ".unlock-tally", 192, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(96, 224, 128),
@@ -3640,32 +3663,32 @@ rule(sheet, ".unlock-tally", 191, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-tally::UIPadding", 191, {
+rule(sheet, ".unlock-tally::UIPadding", 192, {
 	PaddingTop = UDim.new(0, 2),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 2),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".unlock-tally::UIStroke", 191, {
+rule(sheet, ".unlock-tally::UIStroke", 192, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-cards", 192, {
+rule(sheet, ".unlock-cards", 193, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".unlock-cards::UIPadding", 192, {
+rule(sheet, ".unlock-cards::UIPadding", 193, {
 	PaddingTop = UDim.new(0, 20),
 	PaddingRight = UDim.new(0, 24),
 	PaddingBottom = UDim.new(0, 20),
 	PaddingLeft = UDim.new(0, 24),
 })
 
-rule(sheet, ".unlock-cards::UIListLayout", 192, {
+rule(sheet, ".unlock-cards::UIListLayout", 193, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -3673,17 +3696,17 @@ rule(sheet, ".unlock-cards::UIListLayout", 192, {
 	Padding = UDim.new(0, 32),
 })
 
-rule(sheet, ".unlock-slot", 193, {
+rule(sheet, ".unlock-slot", 194, {
 	Size = UDim2.new(0, 196, 0, 284),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".unlock-card", 194, {
+rule(sheet, ".unlock-card", 195, {
 	BackgroundTransparency = 1,
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".unlock-card-back", 195, {
+rule(sheet, ".unlock-card-back", 196, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 1, 0),
@@ -3691,12 +3714,12 @@ rule(sheet, ".unlock-card-back", 195, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-back::UIGradient", 195, {
+rule(sheet, ".unlock-card-back::UIGradient", 196, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.45, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 70,
 })
 
-rule(sheet, ".unlock-card-back::UIStroke", 195, {
+rule(sheet, ".unlock-card-back::UIStroke", 196, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -3704,7 +3727,7 @@ rule(sheet, ".unlock-card-back::UIStroke", 195, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-seal", 196, {
+rule(sheet, ".unlock-card-seal", 197, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 44),
@@ -3714,12 +3737,12 @@ rule(sheet, ".unlock-card-seal", 196, {
 	ZIndex = 1,
 })
 
-rule(sheet, ".unlock-card-seal::UIGradient", 196, {
+rule(sheet, ".unlock-card-seal::UIGradient", 197, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.12, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.12, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.25, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.25, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.37, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.37, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.62, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.62, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.75, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(0.75, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.87, Color3.fromRGB(193, 139, 20)), ColorSequenceKeypoint.new(0.87, Color3.fromRGB(8, 11, 15)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = -45,
 })
 
-rule(sheet, ".unlock-card-mark", 197, {
+rule(sheet, ".unlock-card-mark", 198, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(31, 40, 51),
@@ -3734,7 +3757,7 @@ rule(sheet, ".unlock-card-mark", 197, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-mark::UIStroke", 197, {
+rule(sheet, ".unlock-card-mark::UIStroke", 198, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -3742,7 +3765,7 @@ rule(sheet, ".unlock-card-mark::UIStroke", 197, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-sealed", 198, {
+rule(sheet, ".unlock-card-sealed", 199, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -3753,7 +3776,7 @@ rule(sheet, ".unlock-card-sealed", 198, {
 	Position = UDim2.new(0, 0, 0, 16),
 })
 
-rule(sheet, ".unlock-charge-track", 199, {
+rule(sheet, ".unlock-charge-track", 200, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0.8, 0, 0, 6),
@@ -3763,7 +3786,7 @@ rule(sheet, ".unlock-charge-track", 199, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-charge-track::UIStroke", 199, {
+rule(sheet, ".unlock-charge-track::UIStroke", 200, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -3771,47 +3794,39 @@ rule(sheet, ".unlock-charge-track::UIStroke", 199, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-face", 200, {
+rule(sheet, ".unlock-card-face", 201, {
 	BackgroundColor3 = Color3.fromRGB(20, 26, 34),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".unlock-card-face::UIPadding", 200, {
+rule(sheet, ".unlock-card-face::UIPadding", 201, {
 	PaddingTop = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 12),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".unlock-card-face::UIListLayout", 200, {
+rule(sheet, ".unlock-card-face::UIListLayout", 201, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 4),
 })
 
-rule(sheet, ".unlock-card-art", 201, {
+rule(sheet, ".unlock-card-art", 202, {
 	Size = UDim2.new(1, 0, 0, 124),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".unlock-card-model", 202, {
+rule(sheet, ".unlock-card-model", 203, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".unlock-card-model.art-fallback", 387, {
-	TextColor3 = "$Text",
-	TextTransparency = 0,
-	TextSize = 20,
-	TextWrapped = true,
-	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
-})
-
-rule(sheet, ".unlock-card-name", 203, {
+rule(sheet, ".unlock-card-name", 204, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -3821,7 +3836,7 @@ rule(sheet, ".unlock-card-name", 203, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".unlock-card-kind", 204, {
+rule(sheet, ".unlock-card-kind", 205, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -3831,7 +3846,7 @@ rule(sheet, ".unlock-card-kind", 204, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".unlock-card-text", 205, {
+rule(sheet, ".unlock-card-text", 206, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -3841,7 +3856,7 @@ rule(sheet, ".unlock-card-text", 205, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".unlock-card-new", 206, {
+rule(sheet, ".unlock-card-new", 207, {
 	TextColor3 = Color3.fromRGB(8, 11, 15),
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(96, 224, 128),
@@ -3856,7 +3871,7 @@ rule(sheet, ".unlock-card-new", 206, {
 	ZIndex = 6,
 })
 
-rule(sheet, ".unlock-banner", 207, {
+rule(sheet, ".unlock-banner", 208, {
 	TextColor3 = Color3.fromRGB(8, 11, 15),
 	TextTransparency = 0,
 	TextSize = 15,
@@ -3865,18 +3880,18 @@ rule(sheet, ".unlock-banner", 207, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".unlock-card-face.common", 388, {
+rule(sheet, ".unlock-card-face.common", 400, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-face.common::UIGradient", 388, {
+rule(sheet, ".unlock-card-face.common::UIGradient", 400, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(91, 100, 111)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-card-face.common::UIStroke", 388, {
+rule(sheet, ".unlock-card-face.common::UIStroke", 400, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -3884,18 +3899,18 @@ rule(sheet, ".unlock-card-face.common::UIStroke", 388, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-banner.common", 389, {
+rule(sheet, ".unlock-banner.common", 401, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-banner.common::UIGradient", 389, {
+rule(sheet, ".unlock-banner.common::UIGradient", 401, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(221, 226, 232)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(178, 190, 204)), ColorSequenceKeypoint.new(1, Color3.fromRGB(135, 154, 176))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-banner.common::UIStroke", 389, {
+rule(sheet, ".unlock-banner.common::UIStroke", 401, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -3903,18 +3918,18 @@ rule(sheet, ".unlock-banner.common::UIStroke", 389, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-face.uncommon", 390, {
+rule(sheet, ".unlock-card-face.uncommon", 402, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-face.uncommon::UIGradient", 390, {
+rule(sheet, ".unlock-card-face.uncommon::UIGradient", 402, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(61, 114, 62)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-card-face.uncommon::UIStroke", 390, {
+rule(sheet, ".unlock-card-face.uncommon::UIStroke", 402, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -3922,18 +3937,18 @@ rule(sheet, ".unlock-card-face.uncommon::UIStroke", 390, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-banner.uncommon", 391, {
+rule(sheet, ".unlock-banner.uncommon", 403, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-banner.uncommon::UIGradient", 391, {
+rule(sheet, ".unlock-banner.uncommon::UIGradient", 403, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(164, 234, 155)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(110, 222, 96)), ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 204, 42))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-banner.uncommon::UIStroke", 391, {
+rule(sheet, ".unlock-banner.uncommon::UIStroke", 403, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -3941,18 +3956,18 @@ rule(sheet, ".unlock-banner.uncommon::UIStroke", 391, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-face.rare", 392, {
+rule(sheet, ".unlock-card-face.rare", 404, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-face.rare::UIGradient", 392, {
+rule(sheet, ".unlock-card-face.rare::UIGradient", 404, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(54, 109, 128)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-card-face.rare::UIStroke", 392, {
+rule(sheet, ".unlock-card-face.rare::UIStroke", 404, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -3960,18 +3975,18 @@ rule(sheet, ".unlock-card-face.rare::UIStroke", 392, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-banner.rare", 393, {
+rule(sheet, ".unlock-banner.rare", 405, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-banner.rare::UIGradient", 393, {
+rule(sheet, ".unlock-banner.rare::UIGradient", 405, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(162, 229, 247)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 191, 237))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-banner.rare::UIStroke", 393, {
+rule(sheet, ".unlock-banner.rare::UIStroke", 405, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -3979,18 +3994,18 @@ rule(sheet, ".unlock-banner.rare::UIStroke", 393, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-face.epic", 394, {
+rule(sheet, ".unlock-card-face.epic", 406, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-face.epic::UIGradient", 394, {
+rule(sheet, ".unlock-card-face.epic::UIGradient", 406, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 58, 127)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-card-face.epic::UIStroke", 394, {
+rule(sheet, ".unlock-card-face.epic::UIStroke", 406, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -3998,18 +4013,18 @@ rule(sheet, ".unlock-card-face.epic::UIStroke", 394, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-banner.epic", 395, {
+rule(sheet, ".unlock-banner.epic", 407, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-banner.epic::UIGradient", 395, {
+rule(sheet, ".unlock-banner.epic::UIGradient", 407, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(208, 161, 246)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(176, 96, 240)), ColorSequenceKeypoint.new(1, Color3.fromRGB(144, 31, 234))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-banner.epic::UIStroke", 395, {
+rule(sheet, ".unlock-banner.epic::UIStroke", 407, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -4017,18 +4032,18 @@ rule(sheet, ".unlock-banner.epic::UIStroke", 395, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-face.legendary", 396, {
+rule(sheet, ".unlock-card-face.legendary", 408, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-face.legendary::UIGradient", 396, {
+rule(sheet, ".unlock-card-face.legendary::UIGradient", 408, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(126, 103, 48)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-card-face.legendary::UIStroke", 396, {
+rule(sheet, ".unlock-card-face.legendary::UIStroke", 408, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -4036,18 +4051,18 @@ rule(sheet, ".unlock-card-face.legendary::UIStroke", 396, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-banner.legendary", 397, {
+rule(sheet, ".unlock-banner.legendary", 409, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-banner.legendary::UIGradient", 397, {
+rule(sheet, ".unlock-banner.legendary::UIGradient", 409, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 218, 135)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 196, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(248, 171, 0))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-banner.legendary::UIStroke", 397, {
+rule(sheet, ".unlock-banner.legendary::UIStroke", 409, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -4055,18 +4070,18 @@ rule(sheet, ".unlock-banner.legendary::UIStroke", 397, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-card-face.mythic", 398, {
+rule(sheet, ".unlock-card-face.mythic", 410, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-card-face.mythic::UIGradient", 398, {
+rule(sheet, ".unlock-card-face.mythic::UIGradient", 410, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(126, 58, 52)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 15))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-card-face.mythic::UIStroke", 398, {
+rule(sheet, ".unlock-card-face.mythic::UIStroke", 410, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -4074,18 +4089,18 @@ rule(sheet, ".unlock-card-face.mythic::UIStroke", 398, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-banner.mythic", 399, {
+rule(sheet, ".unlock-banner.mythic", 411, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".unlock-banner.mythic::UIGradient", 399, {
+rule(sheet, ".unlock-banner.mythic::UIGradient", 411, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 160, 145)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 98, 74)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 36, 3))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".unlock-banner.mythic::UIStroke", 399, {
+rule(sheet, ".unlock-banner.mythic::UIStroke", 411, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -4093,7 +4108,7 @@ rule(sheet, ".unlock-banner.mythic::UIStroke", 399, {
 	Transparency = 0,
 })
 
-rule(sheet, ".unlock-hint", 208, {
+rule(sheet, ".unlock-hint", 209, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -4103,7 +4118,7 @@ rule(sheet, ".unlock-hint", 208, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".pause-overlay", 209, {
+rule(sheet, ".pause-overlay", 210, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.55,
 	Size = UDim2.new(1, 0, 1, 0),
@@ -4112,14 +4127,14 @@ rule(sheet, ".pause-overlay", 209, {
 	ZIndex = 90,
 })
 
-rule(sheet, ".pause-overlay::UIListLayout", 209, {
+rule(sheet, ".pause-overlay::UIListLayout", 210, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 })
 
-rule(sheet, ".pause-plate", 210, {
+rule(sheet, ".pause-plate", 211, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -4127,38 +4142,38 @@ rule(sheet, ".pause-plate", 210, {
 	GroupTransparency = 0.03,
 })
 
-rule(sheet, ".pause-plate::UIGradient", 210, {
+rule(sheet, ".pause-plate::UIGradient", 211, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".pause-plate::UISizeConstraint", 210, {
+rule(sheet, ".pause-plate::UISizeConstraint", 211, {
 	MinSize = Vector2.new(380, 0),
 	MaxSize = Vector2.new(math.huge, math.huge),
 })
 
-rule(sheet, ".pause-plate::UIPadding", 210, {
+rule(sheet, ".pause-plate::UIPadding", 211, {
 	PaddingTop = UDim.new(0, 24),
 	PaddingRight = UDim.new(0, 48),
 	PaddingBottom = UDim.new(0, 24),
 	PaddingLeft = UDim.new(0, 48),
 })
 
-rule(sheet, ".pause-plate::UIListLayout", 210, {
+rule(sheet, ".pause-plate::UIListLayout", 211, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".pause-title", 211, {
+rule(sheet, ".pause-title", 212, {
 	TextColor3 = "$Caution",
 	TextTransparency = 0,
 	TextSize = 56,
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".pause-title::UIStroke", 211, {
+rule(sheet, ".pause-title::UIStroke", 212, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 3,
@@ -4166,14 +4181,14 @@ rule(sheet, ".pause-title::UIStroke", 211, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".pause-hint", 212, {
+rule(sheet, ".pause-hint", 213, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 15,
 	TextXAlignment = Enum.TextXAlignment.Center,
 })
 
-rule(sheet, ".tooltip", 213, {
+rule(sheet, ".tooltip", 214, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -4185,19 +4200,19 @@ rule(sheet, ".tooltip", 213, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tooltip::UIGradient", 213, {
+rule(sheet, ".tooltip::UIGradient", 214, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".tooltip::UIPadding", 213, {
+rule(sheet, ".tooltip::UIPadding", 214, {
 	PaddingTop = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".tooltip::UIStroke", 213, {
+rule(sheet, ".tooltip::UIStroke", 214, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4205,91 +4220,91 @@ rule(sheet, ".tooltip::UIStroke", 213, {
 	Transparency = 0.03,
 })
 
-rule(sheet, ".tooltip::UIListLayout", 213, {
+rule(sheet, ".tooltip::UIListLayout", 214, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".tooltip-rail", 214, {
+rule(sheet, ".tooltip-rail", 215, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-rail::UIGradient", 214, {
+rule(sheet, ".tooltip-rail::UIGradient", 215, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-weapon", 400, {
+rule(sheet, ".tooltip-rail.tooltip-weapon", 412, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-weapon::UIGradient", 400, {
+rule(sheet, ".tooltip-rail.tooltip-weapon::UIGradient", 412, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 138, 64)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 138, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-build", 401, {
+rule(sheet, ".tooltip-rail.tooltip-build", 413, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-build::UIGradient", 401, {
+rule(sheet, ".tooltip-rail.tooltip-build::UIGradient", 413, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(126, 240, 154)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(126, 240, 154)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-metal", 402, {
+rule(sheet, ".tooltip-rail.tooltip-metal", 414, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-metal::UIGradient", 402, {
+rule(sheet, ".tooltip-rail.tooltip-metal::UIGradient", 414, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-energy", 403, {
+rule(sheet, ".tooltip-rail.tooltip-energy", 415, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-energy::UIGradient", 403, {
+rule(sheet, ".tooltip-rail.tooltip-energy::UIGradient", 415, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-danger", 404, {
+rule(sheet, ".tooltip-rail.tooltip-danger", 416, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 2),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-rail.tooltip-danger::UIGradient", 404, {
+rule(sheet, ".tooltip-rail.tooltip-danger::UIGradient", 416, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(238, 88, 74)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.55, 0), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".tooltip-kicker", 215, {
+rule(sheet, ".tooltip-kicker", 216, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -4299,38 +4314,38 @@ rule(sheet, ".tooltip-kicker", 215, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tooltip-title", 216, {
+rule(sheet, ".tooltip-title", 217, {
 	TextSize = 17,
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tooltip-title.tooltip-weapon", 405, {
+rule(sheet, ".tooltip-title.tooltip-weapon", 417, {
 	TextColor3 = "$Fight",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-title.tooltip-build", 406, {
+rule(sheet, ".tooltip-title.tooltip-build", 418, {
 	TextColor3 = "$Buildpower",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-title.tooltip-metal", 407, {
+rule(sheet, ".tooltip-title.tooltip-metal", 419, {
 	TextColor3 = "$Metal",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-title.tooltip-energy", 408, {
+rule(sheet, ".tooltip-title.tooltip-energy", 420, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-title.tooltip-danger", 409, {
+rule(sheet, ".tooltip-title.tooltip-danger", 421, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-text", 217, {
+rule(sheet, ".tooltip-text", 218, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 15,
@@ -4339,34 +4354,34 @@ rule(sheet, ".tooltip-text", 217, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tooltip-rows", 218, {
+rule(sheet, ".tooltip-rows", 219, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tooltip-rows::UIPadding", 218, {
+rule(sheet, ".tooltip-rows::UIPadding", 219, {
 	PaddingTop = UDim.new(0, 4),
 })
 
-rule(sheet, ".tooltip-rows::UIListLayout", 218, {
+rule(sheet, ".tooltip-rows::UIListLayout", 219, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 3),
 })
 
-rule(sheet, ".tooltip-row", 219, {
+rule(sheet, ".tooltip-row", 220, {
 	Size = UDim2.new(1, 0, 0, 20),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-row::UIListLayout", 219, {
+rule(sheet, ".tooltip-row::UIListLayout", 220, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".tooltip-divider", 220, {
+rule(sheet, ".tooltip-divider", 221, {
 	TextTransparency = 0.3,
 	BackgroundColor3 = Color3.fromRGB(78, 96, 118),
 	BackgroundTransparency = 0.3,
@@ -4376,7 +4391,7 @@ rule(sheet, ".tooltip-divider", 220, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tooltip-label", 221, {
+rule(sheet, ".tooltip-label", 222, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 15,
@@ -4384,12 +4399,12 @@ rule(sheet, ".tooltip-label", 221, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tooltip-label::UIFlexItem", 221, {
+rule(sheet, ".tooltip-label::UIFlexItem", 222, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".tooltip-value", 222, {
+rule(sheet, ".tooltip-value", 223, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 15,
@@ -4398,52 +4413,52 @@ rule(sheet, ".tooltip-value", 222, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tooltip-value.weapon", 410, {
+rule(sheet, ".tooltip-value.weapon", 422, {
 	TextColor3 = "$Fight",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-value.buildpower", 411, {
+rule(sheet, ".tooltip-value.buildpower", 423, {
 	TextColor3 = "$Buildpower",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-value.metal", 412, {
+rule(sheet, ".tooltip-value.metal", 424, {
 	TextColor3 = "$Metal",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-value.energy", 413, {
+rule(sheet, ".tooltip-value.energy", 425, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-value.gain", 414, {
+rule(sheet, ".tooltip-value.gain", 426, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-value.loss", 415, {
+rule(sheet, ".tooltip-value.loss", 427, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tooltip-notes", 223, {
+rule(sheet, ".tooltip-notes", 224, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tooltip-notes::UIPadding", 223, {
+rule(sheet, ".tooltip-notes::UIPadding", 224, {
 	PaddingTop = UDim.new(0, 4),
 })
 
-rule(sheet, ".tooltip-notes::UIListLayout", 223, {
+rule(sheet, ".tooltip-notes::UIListLayout", 224, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 2),
 })
 
-rule(sheet, ".tooltip-note", 224, {
+rule(sheet, ".tooltip-note", 225, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -4452,7 +4467,7 @@ rule(sheet, ".tooltip-note", 224, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".player-list", 225, {
+rule(sheet, ".player-list", 226, {
 	Size = UDim2.new(0, 360, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 	Position = UDim2.new(1, -16, 0.5, 0),
@@ -4460,46 +4475,46 @@ rule(sheet, ".player-list", 225, {
 	ZIndex = 20,
 })
 
-rule(sheet, ".player-list::UIPadding", 225, {
+rule(sheet, ".player-list::UIPadding", 226, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 16),
 })
 
-rule(sheet, ".player-list::UIListLayout", 225, {
+rule(sheet, ".player-list::UIListLayout", 226, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-header", 226, {
+rule(sheet, ".roster-header", 227, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-header::UIPadding", 226, {
+rule(sheet, ".roster-header::UIPadding", 227, {
 	PaddingTop = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-header::UIListLayout", 226, {
+rule(sheet, ".roster-header::UIListLayout", 227, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-title", 227, {
+rule(sheet, ".roster-title", 228, {
 	TextSize = 18,
 })
 
-rule(sheet, ".roster-title::UIFlexItem", 227, {
+rule(sheet, ".roster-title::UIFlexItem", 228, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".roster-key", 228, {
+rule(sheet, ".roster-key", 229, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(31, 40, 51),
@@ -4511,7 +4526,7 @@ rule(sheet, ".roster-key", 228, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".roster-key::UIStroke", 228, {
+rule(sheet, ".roster-key::UIStroke", 229, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4519,19 +4534,19 @@ rule(sheet, ".roster-key::UIStroke", 228, {
 	Transparency = 0,
 })
 
-rule(sheet, ".roster-section", 229, {
+rule(sheet, ".roster-section", 230, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-section::UIListLayout", 229, {
+rule(sheet, ".roster-section::UIListLayout", 230, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-section-title", 230, {
+rule(sheet, ".roster-section-title", 231, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 10,
@@ -4539,14 +4554,14 @@ rule(sheet, ".roster-section-title", 230, {
 	FontFace = Font.new("rbxasset://fonts/families/Michroma.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".roster-section-count", 231, {
+rule(sheet, ".roster-section-count", 232, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 11,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".roster-section-seam", 232, {
+rule(sheet, ".roster-section-seam", 233, {
 	TextTransparency = 0.55,
 	BackgroundColor3 = Color3.fromRGB(78, 96, 118),
 	BackgroundTransparency = 0.55,
@@ -4556,13 +4571,13 @@ rule(sheet, ".roster-section-seam", 232, {
 	AutomaticSize = Enum.AutomaticSize.X,
 })
 
-rule(sheet, ".roster-section-seam::UIFlexItem", 232, {
+rule(sheet, ".roster-section-seam::UIFlexItem", 233, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
 do
-	local r1 = rule(sheet, ".roster-card", 233, {
+	local r1 = rule(sheet, ".roster-card", 234, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(1, 0, 0, 0),
@@ -4575,13 +4590,13 @@ do
 	})
 end
 
-rule(sheet, ".roster-card::UIGradient", 233, {
+rule(sheet, ".roster-card::UIGradient", 234, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(31, 40, 51)), ColorSequenceKeypoint.new(1, Color3.fromRGB(31, 40, 51))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.1425), NumberSequenceKeypoint.new(0.6, 0.15), NumberSequenceKeypoint.new(1, 0.15)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".roster-card::UIStroke", 233, {
+rule(sheet, ".roster-card::UIStroke", 234, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4589,22 +4604,22 @@ rule(sheet, ".roster-card::UIStroke", 233, {
 	Transparency = 0,
 })
 
-rule(sheet, ".roster-card::UIListLayout", 233, {
+rule(sheet, ".roster-card::UIListLayout", 234, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 })
 
-rule(sheet, ".roster-card:Hover", 416, {
+rule(sheet, ".roster-card:Hover", 428, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".roster-card.self", 417, {
+rule(sheet, ".roster-card.self", 429, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".roster-card.self::UIStroke", 417, {
+rule(sheet, ".roster-card.self::UIStroke", 429, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4612,75 +4627,75 @@ rule(sheet, ".roster-card.self::UIStroke", 417, {
 	Transparency = 0.45,
 })
 
-rule(sheet, ".roster-card.enemy", 418, {
+rule(sheet, ".roster-card.enemy", 430, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".roster-card.enemy::UIGradient", 418, {
+rule(sheet, ".roster-card.enemy::UIGradient", 430, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(49, 34, 39)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 26, 34))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.088), NumberSequenceKeypoint.new(0.5, 0.1), NumberSequenceKeypoint.new(1, 0.1)}),
 	Rotation = 0,
 })
 
-rule(sheet, ".roster-stripe", 234, {
+rule(sheet, ".roster-stripe", 235, {
 	Size = UDim2.new(0, 4, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-stripe::UIFlexItem", 234, {
+rule(sheet, ".roster-stripe::UIFlexItem", 235, {
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 })
 
-rule(sheet, ".roster-body", 235, {
+rule(sheet, ".roster-body", 236, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-body::UIPadding", 235, {
+rule(sheet, ".roster-body::UIPadding", 236, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".roster-body::UIListLayout", 235, {
+rule(sheet, ".roster-body::UIListLayout", 236, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-body::UIFlexItem", 235, {
+rule(sheet, ".roster-body::UIFlexItem", 236, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".roster-card.enemy >> .roster-body::UIPadding", 465, {
+rule(sheet, ".roster-card.enemy >> .roster-body::UIPadding", 487, {
 	PaddingTop = UDim.new(0, 4),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 4),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".roster-head", 236, {
+rule(sheet, ".roster-head", 237, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-head::UIListLayout", 236, {
+rule(sheet, ".roster-head::UIListLayout", 237, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".roster-avatar", 237, {
+rule(sheet, ".roster-avatar", 238, {
 	Size = UDim2.new(0, 32, 0, 32),
 	AutomaticSize = Enum.AutomaticSize.None,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".roster-avatar::UIStroke", 237, {
+rule(sheet, ".roster-avatar::UIStroke", 238, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4688,12 +4703,12 @@ rule(sheet, ".roster-avatar::UIStroke", 237, {
 	Transparency = 0,
 })
 
-rule(sheet, ".roster-card.enemy >> .roster-avatar", 466, {
+rule(sheet, ".roster-card.enemy >> .roster-avatar", 488, {
 	Size = UDim2.new(0, 24, 0, 24),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".roster-initial", 238, {
+rule(sheet, ".roster-initial", 239, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
@@ -4704,7 +4719,7 @@ rule(sheet, ".roster-initial", 238, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".roster-initial::UIStroke", 238, {
+rule(sheet, ".roster-initial::UIStroke", 239, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 1,
@@ -4712,7 +4727,7 @@ rule(sheet, ".roster-initial::UIStroke", 238, {
 	Transparency = 0.2,
 })
 
-rule(sheet, ".roster-name", 239, {
+rule(sheet, ".roster-name", 240, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 16,
@@ -4723,18 +4738,18 @@ rule(sheet, ".roster-name", 239, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".roster-name::UIFlexItem", 239, {
+rule(sheet, ".roster-name::UIFlexItem", 240, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".roster-card.enemy >> .roster-name", 467, {
+rule(sheet, ".roster-card.enemy >> .roster-name", 489, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 14,
 })
 
-rule(sheet, ".roster-badge", 240, {
+rule(sheet, ".roster-badge", 241, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(96, 224, 128),
@@ -4746,14 +4761,14 @@ rule(sheet, ".roster-badge", 240, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".roster-badge::UIPadding", 240, {
+rule(sheet, ".roster-badge::UIPadding", 241, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-badge::UIStroke", 240, {
+rule(sheet, ".roster-badge::UIStroke", 241, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4761,7 +4776,7 @@ rule(sheet, ".roster-badge::UIStroke", 240, {
 	Transparency = 0.5,
 })
 
-rule(sheet, ".roster-badge.self", 419, {
+rule(sheet, ".roster-badge.self", 431, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(96, 210, 242),
@@ -4769,7 +4784,7 @@ rule(sheet, ".roster-badge.self", 419, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".roster-badge.self::UIStroke", 419, {
+rule(sheet, ".roster-badge.self::UIStroke", 431, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4777,7 +4792,7 @@ rule(sheet, ".roster-badge.self::UIStroke", 419, {
 	Transparency = 0.5,
 })
 
-rule(sheet, ".roster-badge.enemy", 420, {
+rule(sheet, ".roster-badge.enemy", 432, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(238, 88, 74),
@@ -4785,7 +4800,7 @@ rule(sheet, ".roster-badge.enemy", 420, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".roster-badge.enemy::UIStroke", 420, {
+rule(sheet, ".roster-badge.enemy::UIStroke", 432, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4793,19 +4808,19 @@ rule(sheet, ".roster-badge.enemy::UIStroke", 420, {
 	Transparency = 0.5,
 })
 
-rule(sheet, ".roster-meter", 241, {
+rule(sheet, ".roster-meter", 242, {
 	Size = UDim2.new(1, 0, 0, 18),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".roster-meter::UIListLayout", 241, {
+rule(sheet, ".roster-meter::UIListLayout", 242, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".roster-meter-label", 242, {
+rule(sheet, ".roster-meter-label", 243, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 10,
@@ -4815,23 +4830,23 @@ rule(sheet, ".roster-meter-label", 242, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-meter.low >> .roster-meter-label", 468, {
+rule(sheet, ".roster-meter.low >> .roster-meter-label", 490, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".roster-lane", 243, {
+rule(sheet, ".roster-lane", 244, {
 	Size = UDim2.new(0, 0, 0, 18),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".roster-lane::UIFlexItem", 243, {
+rule(sheet, ".roster-lane::UIFlexItem", 244, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".roster-track", 244, {
+rule(sheet, ".roster-track", 245, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 8),
@@ -4842,7 +4857,7 @@ rule(sheet, ".roster-track", 244, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".roster-track::UIStroke", 244, {
+rule(sheet, ".roster-track::UIStroke", 245, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4850,11 +4865,11 @@ rule(sheet, ".roster-track::UIStroke", 244, {
 	Transparency = 0,
 })
 
-rule(sheet, ".roster-meter.low >> .roster-track", 469, {
+rule(sheet, ".roster-meter.low >> .roster-track", 491, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".roster-meter.low >> .roster-track::UIStroke", 469, {
+rule(sheet, ".roster-meter.low >> .roster-track::UIStroke", 491, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4863,7 +4878,7 @@ rule(sheet, ".roster-meter.low >> .roster-track::UIStroke", 469, {
 })
 
 do
-	local r1 = rule(sheet, ".roster-fill", 245, {
+	local r1 = rule(sheet, ".roster-fill", 246, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -4872,13 +4887,13 @@ do
 	})
 end
 
-rule(sheet, ".roster-fill::UIGradient", 245, {
+rule(sheet, ".roster-fill::UIGradient", 246, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(69, 89, 117)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(196, 206, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".roster-fill.energy-fill", 421, {
+	local r1 = rule(sheet, ".roster-fill.energy-fill", 433, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 	})
@@ -4887,34 +4902,34 @@ do
 	})
 end
 
-rule(sheet, ".roster-fill.energy-fill::UIGradient", 421, {
+rule(sheet, ".roster-fill.energy-fill::UIGradient", 433, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 78, 0)), ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 230, 64)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 247, 192))}),
 	Rotation = 0,
 })
 
-rule(sheet, ".roster-reach", 246, {
+rule(sheet, ".roster-reach", 247, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".roster-reach::UIGradient", 246, {
+rule(sheet, ".roster-reach::UIGradient", 247, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.1, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.1, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.2, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.2, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.3, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.3, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.6, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.7, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.7, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.8, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.8, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.9, Color3.fromRGB(96, 210, 242)), ColorSequenceKeypoint.new(0.9, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
 	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.72), NumberSequenceKeypoint.new(0.1, 0.72), NumberSequenceKeypoint.new(0.1, 1), NumberSequenceKeypoint.new(0.2, 1), NumberSequenceKeypoint.new(0.2, 0.72), NumberSequenceKeypoint.new(0.3, 0.72), NumberSequenceKeypoint.new(0.3, 1), NumberSequenceKeypoint.new(0.4, 1), NumberSequenceKeypoint.new(0.4, 0.72), NumberSequenceKeypoint.new(0.5, 0.72), NumberSequenceKeypoint.new(0.5, 1), NumberSequenceKeypoint.new(0.6, 1), NumberSequenceKeypoint.new(0.6, 0.72), NumberSequenceKeypoint.new(0.7, 0.72), NumberSequenceKeypoint.new(0.7, 1), NumberSequenceKeypoint.new(0.8, 1), NumberSequenceKeypoint.new(0.8, 0.72), NumberSequenceKeypoint.new(0.9, 0.72), NumberSequenceKeypoint.new(0.9, 1), NumberSequenceKeypoint.new(1, 1)}),
 	Rotation = -135,
 })
 
-rule(sheet, ".roster-pending", 247, {
+rule(sheet, ".roster-pending", 248, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".roster-pending::UIGradient", 247, {
+rule(sheet, ".roster-pending::UIGradient", 248, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(176, 233, 249)), ColorSequenceKeypoint.new(1, Color3.fromRGB(96, 210, 242))}),
 	Rotation = 0,
 })
 
 do
-	local r1 = rule(sheet, ".roster-handle", 248, {
+	local r1 = rule(sheet, ".roster-handle", 249, {
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0,
 		Size = UDim2.new(0, 8, 0, 18),
@@ -4928,12 +4943,12 @@ do
 	})
 end
 
-rule(sheet, ".roster-handle::UIGradient", 248, {
+rule(sheet, ".roster-handle::UIGradient", 249, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(186, 202, 220))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".roster-handle::UIStroke", 248, {
+rule(sheet, ".roster-handle::UIStroke", 249, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -4941,31 +4956,31 @@ rule(sheet, ".roster-handle::UIStroke", 248, {
 	Transparency = 0,
 })
 
-rule(sheet, ".roster-handle:Hover", 422, {
+rule(sheet, ".roster-handle:Hover", 434, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 12, 0, 18),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".roster-handle.wanted", 423, {
+rule(sheet, ".roster-handle.wanted", 435, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".roster-handle.wanted::UIGradient", 423, {
+rule(sheet, ".roster-handle.wanted::UIGradient", 435, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(190, 237, 250)), ColorSequenceKeypoint.new(1, Color3.fromRGB(96, 210, 242))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".roster-meter.dragging >> .roster-handle", 470, {
+rule(sheet, ".roster-meter.dragging >> .roster-handle", 492, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 12, 0, 18),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".roster-readout", 249, {
+rule(sheet, ".roster-readout", 250, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -4975,24 +4990,24 @@ rule(sheet, ".roster-readout", 249, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".roster-meter.low >> .roster-readout", 471, {
+rule(sheet, ".roster-meter.low >> .roster-readout", 493, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".roster-meter.dragging >> .roster-readout", 485, {
+rule(sheet, ".roster-meter.dragging >> .roster-readout", 507, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".roster-meter.sent >> .roster-readout", 486, {
+rule(sheet, ".roster-meter.sent >> .roster-readout", 508, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".roster-hint", 250, {
+rule(sheet, ".roster-hint", 251, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -5002,14 +5017,15 @@ rule(sheet, ".roster-hint", 250, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".toasts", 251, {
-	Size = UDim2.new(0, 300, 0, 0),
+rule(sheet, ".toasts", 252, {
+	Size = UDim2.new(0, 320, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
-	Position = UDim2.new(0, 16, 0, 16),
+	Position = UDim2.new(0.5, 0, 0.28, 0),
+	AnchorPoint = Vector2.new(0.5, 0),
 	ZIndex = 30,
 })
 
-rule(sheet, ".toasts::UIListLayout", 251, {
+rule(sheet, ".toasts::UIListLayout", 252, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
@@ -5017,7 +5033,7 @@ rule(sheet, ".toasts::UIListLayout", 251, {
 })
 
 do
-	local r1 = rule(sheet, ".toast", 252, {
+	local r1 = rule(sheet, ".toast", 253, {
 		TextTransparency = 0.03,
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0.03,
@@ -5033,12 +5049,12 @@ do
 	})
 end
 
-rule(sheet, ".toast::UIGradient", 252, {
+rule(sheet, ".toast::UIGradient", 253, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".toast::UIStroke", 252, {
+rule(sheet, ".toast::UIStroke", 253, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5046,22 +5062,22 @@ rule(sheet, ".toast::UIStroke", 252, {
 	Transparency = 0.03,
 })
 
-rule(sheet, ".toast::UIListLayout", 252, {
+rule(sheet, ".toast::UIListLayout", 253, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 })
 
-rule(sheet, ".toast:Hover", 424, {
+rule(sheet, ".toast:Hover", 436, {
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
 })
 
-rule(sheet, ".toast.danger", 425, {
+rule(sheet, ".toast.danger", 437, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".toast.danger::UIStroke", 425, {
+rule(sheet, ".toast.danger::UIStroke", 437, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5069,11 +5085,11 @@ rule(sheet, ".toast.danger::UIStroke", 425, {
 	Transparency = 0.321,
 })
 
-rule(sheet, ".toast.caution", 426, {
+rule(sheet, ".toast.caution", 438, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".toast.caution::UIStroke", 426, {
+rule(sheet, ".toast.caution::UIStroke", 438, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5081,29 +5097,29 @@ rule(sheet, ".toast.caution::UIStroke", 426, {
 	Transparency = 0.321,
 })
 
-rule(sheet, ".toast-stripe", 253, {
+rule(sheet, ".toast-stripe", 254, {
 	Size = UDim2.new(0, 4, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".toast-stripe::UIFlexItem", 253, {
+rule(sheet, ".toast-stripe::UIFlexItem", 254, {
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
 })
 
-rule(sheet, ".toast.danger >> .toast-stripe", 472, {
+rule(sheet, ".toast.danger >> .toast-stripe", 494, {
 	BackgroundColor3 = "$Danger",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".toast.caution >> .toast-stripe", 473, {
+rule(sheet, ".toast.caution >> .toast-stripe", 495, {
 	BackgroundColor3 = "$Caution",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".toast-text", 254, {
+rule(sheet, ".toast-text", 255, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
-	TextSize = 15,
+	TextSize = 17,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextWrapped = false,
 	TextTruncate = Enum.TextTruncate.AtEnd,
@@ -5112,29 +5128,29 @@ rule(sheet, ".toast-text", 254, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".toast-text::UIPadding", 254, {
+rule(sheet, ".toast-text::UIPadding", 255, {
 	PaddingTop = UDim.new(0, 8),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 8),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".toast-text::UIFlexItem", 254, {
+rule(sheet, ".toast-text::UIFlexItem", 255, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".toast.danger >> .toast-text", 474, {
+rule(sheet, ".toast.danger >> .toast-text", 496, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".toast.caution >> .toast-text", 475, {
+rule(sheet, ".toast.caution >> .toast-text", 497, {
 	TextColor3 = "$Caution",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial", 255, {
+rule(sheet, ".tutorial", 256, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 	Position = UDim2.new(0.5, 0, 0, 16),
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -5142,18 +5158,18 @@ rule(sheet, ".tutorial", 255, {
 	Interactable = false,
 })
 
-rule(sheet, ".tutorial::UIListLayout", 255, {
+rule(sheet, ".tutorial::UIListLayout", 256, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".tutorial.below-resources", 427, {
+rule(sheet, ".tutorial.below-resources", 439, {
 	Position = UDim2.new(0.5, 0, 0, 88),
 })
 
-rule(sheet, ".tutorial-kicker", 256, {
+rule(sheet, ".tutorial-kicker", 257, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -5161,7 +5177,7 @@ rule(sheet, ".tutorial-kicker", 256, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tutorial-kicker::UIStroke", 256, {
+rule(sheet, ".tutorial-kicker::UIStroke", 257, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -5169,13 +5185,13 @@ rule(sheet, ".tutorial-kicker::UIStroke", 256, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".tutorial-title", 257, {
+rule(sheet, ".tutorial-title", 258, {
 	TextSize = 26,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tutorial-title::UIStroke", 257, {
+rule(sheet, ".tutorial-title::UIStroke", 258, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 3,
@@ -5183,7 +5199,7 @@ rule(sheet, ".tutorial-title::UIStroke", 257, {
 	Transparency = 0.15,
 })
 
-rule(sheet, ".tutorial-status", 258, {
+rule(sheet, ".tutorial-status", 259, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -5191,7 +5207,7 @@ rule(sheet, ".tutorial-status", 258, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tutorial-status::UIStroke", 258, {
+rule(sheet, ".tutorial-status::UIStroke", 259, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
@@ -5199,17 +5215,17 @@ rule(sheet, ".tutorial-status::UIStroke", 258, {
 	Transparency = 0.2,
 })
 
-rule(sheet, ".tutorial-status.advancing", 428, {
+rule(sheet, ".tutorial-status.advancing", 440, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".tutorial-cards", 259, {
+rule(sheet, ".tutorial-cards", 260, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tutorial-cards::UIListLayout", 259, {
+rule(sheet, ".tutorial-cards::UIListLayout", 260, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	ItemLineAlignment = Enum.ItemLineAlignment.Stretch,
@@ -5217,7 +5233,7 @@ rule(sheet, ".tutorial-cards::UIListLayout", 259, {
 })
 
 do
-	local r1 = rule(sheet, ".tutorial-card", 260, {
+	local r1 = rule(sheet, ".tutorial-card", 261, {
 		TextTransparency = 0.03,
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 0.03,
@@ -5234,12 +5250,12 @@ do
 	})
 end
 
-rule(sheet, ".tutorial-card::UIGradient", 260, {
+rule(sheet, ".tutorial-card::UIGradient", 261, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".tutorial-card::UIPadding", 260, {
+rule(sheet, ".tutorial-card::UIPadding", 261, {
 	PaddingTop = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 12),
@@ -5247,7 +5263,7 @@ rule(sheet, ".tutorial-card::UIPadding", 260, {
 })
 
 do
-	local r1 = rule(sheet, ".tutorial-card::UIStroke", 260, {
+	local r1 = rule(sheet, ".tutorial-card::UIStroke", 261, {
 		Enabled = true,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		Thickness = 1,
@@ -5260,7 +5276,7 @@ do
 	})
 end
 
-rule(sheet, ".tutorial-card::UIListLayout", 260, {
+rule(sheet, ".tutorial-card::UIListLayout", 261, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -5268,47 +5284,47 @@ rule(sheet, ".tutorial-card::UIListLayout", 260, {
 })
 
 do
-	local r1 = rule(sheet, ".tutorial-card::UIScale", 260, nil)
+	local r1 = rule(sheet, ".tutorial-card::UIScale", 261, nil)
 	r1:SetPropertyTransitions({
 		Scale = TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
 	})
 end
 
-rule(sheet, ".tutorial-card.done", 429, {
+rule(sheet, ".tutorial-card.done", 441, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tutorial-card.done::UIScale", 429, {
+rule(sheet, ".tutorial-card.done::UIScale", 441, {
 	Scale = 1.04,
 })
 
-rule(sheet, ".tutorial-card.done::UIStroke", 429, {
+rule(sheet, ".tutorial-card.done::UIStroke", 441, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".tutorial-card.refused", 430, {
+rule(sheet, ".tutorial-card.refused", 442, {
 	BackgroundColor3 = Color3.fromRGB(194, 76, 66),
 	BackgroundTransparency = 0.03,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tutorial-card.refused::UIStroke", 430, {
+rule(sheet, ".tutorial-card.refused::UIStroke", 442, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".tutorial-card-art", 261, {
+rule(sheet, ".tutorial-card-art", 262, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(0, 196, 0, 112),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".art-fallback", 262, {
+rule(sheet, ".art-fallback", 263, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 22,
@@ -5316,7 +5332,7 @@ rule(sheet, ".art-fallback", 262, {
 	FontFace = Font.new("rbxasset://fonts/families/RobotoMono.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
 })
 
-rule(sheet, ".tutorial-caption", 263, {
+rule(sheet, ".tutorial-caption", 264, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 15,
@@ -5326,7 +5342,7 @@ rule(sheet, ".tutorial-caption", 263, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tutorial-hint", 264, {
+rule(sheet, ".tutorial-hint", 265, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(238, 88, 74),
@@ -5339,25 +5355,25 @@ rule(sheet, ".tutorial-hint", 264, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tutorial-hint::UICorner", 264, {
+rule(sheet, ".tutorial-hint::UICorner", 265, {
 	CornerRadius = UDim.new(0, 4),
 })
 
-rule(sheet, ".tutorial-hint::UIPadding", 264, {
+rule(sheet, ".tutorial-hint::UIPadding", 265, {
 	PaddingTop = UDim.new(0, 4),
 	PaddingRight = UDim.new(0, 8),
 	PaddingBottom = UDim.new(0, 4),
 	PaddingLeft = UDim.new(0, 8),
 })
 
-rule(sheet, ".tutorial-hint.next", 431, {
+rule(sheet, ".tutorial-hint.next", 443, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 	BackgroundColor3 = Color3.fromRGB(96, 224, 128),
 	BackgroundTransparency = 0.8,
 })
 
-rule(sheet, ".tutorial-progress", 265, {
+rule(sheet, ".tutorial-progress", 266, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 26,
@@ -5367,24 +5383,24 @@ rule(sheet, ".tutorial-progress", 265, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tutorial-progress.done", 432, {
+rule(sheet, ".tutorial-progress.done", 444, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial-rate", 266, {
+rule(sheet, ".tutorial-rate", 267, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".tutorial-rate::UIListLayout", 266, {
+rule(sheet, ".tutorial-rate::UIListLayout", 267, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".tutorial-rate-have", 267, {
+rule(sheet, ".tutorial-rate-have", 268, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 20,
@@ -5392,22 +5408,22 @@ rule(sheet, ".tutorial-rate-have", 267, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tutorial-rate-have.metal", 433, {
+rule(sheet, ".tutorial-rate-have.metal", 445, {
 	TextColor3 = "$Metal",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial-rate-have.energy", 434, {
+rule(sheet, ".tutorial-rate-have.energy", 446, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial-rate-have.done", 435, {
+rule(sheet, ".tutorial-rate-have.done", 447, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial-rate-track", 268, {
+rule(sheet, ".tutorial-rate-track", 269, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 40, 0, 8),
@@ -5416,7 +5432,7 @@ rule(sheet, ".tutorial-rate-track", 268, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".tutorial-rate-track::UIStroke", 268, {
+rule(sheet, ".tutorial-rate-track::UIStroke", 269, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5424,12 +5440,12 @@ rule(sheet, ".tutorial-rate-track::UIStroke", 268, {
 	Transparency = 0,
 })
 
-rule(sheet, ".tutorial-rate-track::UIFlexItem", 268, {
+rule(sheet, ".tutorial-rate-track::UIFlexItem", 269, {
 	FlexMode = Enum.UIFlexMode.Custom,
 	GrowRatio = 1,
 })
 
-rule(sheet, ".tutorial-rate-goal", 269, {
+rule(sheet, ".tutorial-rate-goal", 270, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 14,
@@ -5437,13 +5453,13 @@ rule(sheet, ".tutorial-rate-goal", 269, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".tutorial-build-unit", 270, {
+rule(sheet, ".tutorial-build-unit", 271, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tutorial-mark", 271, {
+rule(sheet, ".tutorial-mark", 272, {
 	TextColor3 = "$TextFaint",
 	TextTransparency = 0,
 	BackgroundTransparency = 1,
@@ -5453,17 +5469,17 @@ rule(sheet, ".tutorial-mark", 271, {
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".tutorial-mark.done", 436, {
+rule(sheet, ".tutorial-mark.done", 448, {
 	TextColor3 = "$Gain",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial-mark.cross", 437, {
+rule(sheet, ".tutorial-mark.cross", 449, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".tutorial-demo", 272, {
+rule(sheet, ".tutorial-demo", 273, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.25,
 	Size = UDim2.new(0, 196, 0, 120),
@@ -5472,7 +5488,7 @@ rule(sheet, ".tutorial-demo", 272, {
 	ClipsDescendants = true,
 })
 
-rule(sheet, ".tutorial-demo::UIStroke", 272, {
+rule(sheet, ".tutorial-demo::UIStroke", 273, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5480,14 +5496,14 @@ rule(sheet, ".tutorial-demo::UIStroke", 272, {
 	Transparency = 0,
 })
 
-rule(sheet, ".tutorial-demo-unit", 273, {
+rule(sheet, ".tutorial-demo-unit", 274, {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(0, 72, 0, 72),
 	AutomaticSize = Enum.AutomaticSize.None,
 	ZIndex = 1,
 })
 
-rule(sheet, ".tutorial-demo-selected", 274, {
+rule(sheet, ".tutorial-demo-selected", 275, {
 	BackgroundColor3 = Color3.fromRGB(126, 240, 154),
 	BackgroundTransparency = 0.88,
 	Size = UDim2.new(0, 56, 0, 56),
@@ -5496,22 +5512,22 @@ rule(sheet, ".tutorial-demo-selected", 274, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tutorial-demo-selected::UICorner", 274, {
+rule(sheet, ".tutorial-demo-selected::UICorner", 275, {
 	CornerRadius = UDim.new(0.5, 0),
 })
 
-rule(sheet, ".tutorial-demo-selected::UIStroke", 274, {
+rule(sheet, ".tutorial-demo-selected::UIStroke", 275, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
 	Transparency = 0,
 })
 
-rule(sheet, ".tutorial-demo-box", 275, {
+rule(sheet, ".tutorial-demo-box", 276, {
 	ZIndex = 2,
 })
 
-rule(sheet, ".tutorial-demo-marker", 276, {
+rule(sheet, ".tutorial-demo-marker", 277, {
 	BackgroundColor3 = Color3.fromRGB(126, 240, 154),
 	BackgroundTransparency = 0.9,
 	Size = UDim2.new(0, 34, 0, 34),
@@ -5520,29 +5536,29 @@ rule(sheet, ".tutorial-demo-marker", 276, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".tutorial-demo-marker::UICorner", 276, {
+rule(sheet, ".tutorial-demo-marker::UICorner", 277, {
 	CornerRadius = UDim.new(0.5, 0),
 })
 
-rule(sheet, ".tutorial-demo-marker::UIStroke", 276, {
+rule(sheet, ".tutorial-demo-marker::UIStroke", 277, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
 	Transparency = 0,
 })
 
-rule(sheet, ".tutorial-demo-marker.ordered", 438, {
+rule(sheet, ".tutorial-demo-marker.ordered", 450, {
 	BackgroundColor3 = Color3.fromRGB(126, 240, 154),
 	BackgroundTransparency = 0.55,
 })
 
-rule(sheet, ".tutorial-demo-anchor", 277, {
+rule(sheet, ".tutorial-demo-anchor", 278, {
 	BackgroundTransparency = 1,
 	ZIndex = 3,
 	ClipsDescendants = false,
 })
 
-rule(sheet, ".tutorial-demo-cursor", 278, {
+rule(sheet, ".tutorial-demo-cursor", 279, {
 	BackgroundTransparency = 1,
 	TextSize = 20,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -5552,7 +5568,7 @@ rule(sheet, ".tutorial-demo-cursor", 278, {
 	ZIndex = 3,
 })
 
-rule(sheet, ".tutorial-demo-mouse", 279, {
+rule(sheet, ".tutorial-demo-mouse", 280, {
 	BackgroundTransparency = 1,
 	TextSize = 9,
 	Size = UDim2.new(0, 40, 0, 44),
@@ -5562,7 +5578,7 @@ rule(sheet, ".tutorial-demo-mouse", 279, {
 	ZIndex = 2,
 })
 
-rule(sheet, ".tutorial-finished", 280, {
+rule(sheet, ".tutorial-finished", 281, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -5570,19 +5586,253 @@ rule(sheet, ".tutorial-finished", 280, {
 	GroupTransparency = 0.03,
 })
 
-rule(sheet, ".tutorial-finished::UIGradient", 280, {
+rule(sheet, ".tutorial-finished::UIGradient", 281, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".tutorial-finished::UIPadding", 280, {
+rule(sheet, ".tutorial-finished::UIPadding", 281, {
 	PaddingTop = UDim.new(0, 16),
 	PaddingRight = UDim.new(0, 40),
 	PaddingBottom = UDim.new(0, 16),
 	PaddingLeft = UDim.new(0, 40),
 })
 
-rule(sheet, ".pilot-crosshair", 281, {
+do
+	local r1 = rule(sheet, ".tutorial-demo-command", 282, {
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0,
+		Size = UDim2.new(0, 140, 0, 28),
+		AutomaticSize = Enum.AutomaticSize.None,
+		ZIndex = 1,
+		BorderSizePixel = 0,
+	})
+	r1:SetPropertyTransitions({
+		BackgroundColor3 = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		BackgroundTransparency = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	})
+end
+
+rule(sheet, ".tutorial-demo-command::UIGradient", 282, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(44, 53, 63)), ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 32, 41))}),
+	Rotation = 90,
+})
+
+rule(sheet, ".tutorial-demo-command::UIPadding", 282, {
+	PaddingTop = UDim.new(0, 0),
+	PaddingRight = UDim.new(0, 8),
+	PaddingBottom = UDim.new(0, 0),
+	PaddingLeft = UDim.new(0, 8),
+})
+
+rule(sheet, ".tutorial-demo-command::UIStroke", 282, {
+	Enabled = true,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Thickness = 1,
+	Color = Color3.fromRGB(78, 96, 118),
+	Transparency = 0,
+})
+
+rule(sheet, ".tutorial-demo-command::UIListLayout", 282, {
+	FillDirection = Enum.FillDirection.Horizontal,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	Padding = UDim.new(0, 8),
+})
+
+rule(sheet, ".tutorial-demo-command:Hover", 451, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	BorderSizePixel = 0,
+})
+
+rule(sheet, ".tutorial-demo-command:Hover::UIStroke", 451, {
+	Enabled = true,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Thickness = 1,
+	Transparency = 0,
+})
+
+rule(sheet, ".tutorial-demo-command:Press", 452, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+})
+
+rule(sheet, ".tutorial-demo-command:NonInteractable", 453, {
+	TextTransparency = 0.6,
+	BackgroundTransparency = 0.6,
+	ImageTransparency = 0.6,
+	GroupTransparency = 0.6,
+})
+
+rule(sheet, ".tutorial-demo-command:NonInteractable::UIStroke", 453, {
+	Transparency = 0.6,
+})
+
+rule(sheet, ".tutorial-demo-command.active", 454, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	BorderSizePixel = 0,
+})
+
+rule(sheet, ".tutorial-demo-command.active::UIStroke", 454, {
+	Enabled = true,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Thickness = 1,
+	Transparency = 0,
+})
+
+rule(sheet, ".tutorial-demo-circle", 283, {
+	BackgroundColor3 = Color3.fromRGB(176, 96, 240),
+	BackgroundTransparency = 0.88,
+	ZIndex = 2,
+	BorderSizePixel = 0,
+})
+
+rule(sheet, ".tutorial-demo-circle::UICorner", 283, {
+	CornerRadius = UDim.new(0.5, 0),
+})
+
+rule(sheet, ".tutorial-demo-circle::UIStroke", 283, {
+	Enabled = true,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Thickness = 2,
+	Transparency = 0,
+})
+
+rule(sheet, ".tutorial-demo-circle.ordered", 455, {
+	BackgroundColor3 = Color3.fromRGB(176, 96, 240),
+	BackgroundTransparency = 0.65,
+})
+
+rule(sheet, ".tutorial-demo-wreck", 284, {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(0, 48, 0, 48),
+	AutomaticSize = Enum.AutomaticSize.None,
+	ZIndex = 1,
+})
+
+rule(sheet, ".tutorial-objective", 285, {
+	TextTransparency = 0.03,
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0.03,
+	ImageTransparency = 0.03,
+	GroupTransparency = 0.03,
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BorderSizePixel = 0,
+})
+
+rule(sheet, ".tutorial-objective::UIGradient", 285, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
+	Rotation = 90,
+})
+
+rule(sheet, ".tutorial-objective::UIPadding", 285, {
+	PaddingTop = UDim.new(0, 12),
+	PaddingRight = UDim.new(0, 40),
+	PaddingBottom = UDim.new(0, 12),
+	PaddingLeft = UDim.new(0, 40),
+})
+
+rule(sheet, ".tutorial-objective::UIStroke", 285, {
+	Enabled = true,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Thickness = 1,
+	Color = Color3.fromRGB(78, 96, 118),
+	Transparency = 0.03,
+})
+
+rule(sheet, ".tutorial-objective::UIListLayout", 285, {
+	FillDirection = Enum.FillDirection.Vertical,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	HorizontalAlignment = Enum.HorizontalAlignment.Center,
+	Padding = UDim.new(0, 4),
+})
+
+rule(sheet, ".wave-box", 286, {
+	TextTransparency = 0.03,
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0.03,
+	ImageTransparency = 0.03,
+	GroupTransparency = 0.03,
+	AutomaticSize = Enum.AutomaticSize.XY,
+	BorderSizePixel = 0,
+})
+
+rule(sheet, ".wave-box::UIGradient", 286, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
+	Rotation = 90,
+})
+
+rule(sheet, ".wave-box::UIPadding", 286, {
+	PaddingTop = UDim.new(0, 8),
+	PaddingRight = UDim.new(0, 24),
+	PaddingBottom = UDim.new(0, 8),
+	PaddingLeft = UDim.new(0, 24),
+})
+
+rule(sheet, ".wave-box::UIStroke", 286, {
+	Enabled = true,
+	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	Thickness = 1,
+	Color = Color3.fromRGB(158, 92, 96),
+	Transparency = 0.03,
+})
+
+rule(sheet, ".wave-box::UIListLayout", 286, {
+	FillDirection = Enum.FillDirection.Horizontal,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+	Padding = UDim.new(0, 20),
+})
+
+rule(sheet, ".wave-readout", 287, {
+	AutomaticSize = Enum.AutomaticSize.XY,
+})
+
+rule(sheet, ".wave-readout::UIListLayout", 287, {
+	FillDirection = Enum.FillDirection.Vertical,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	HorizontalAlignment = Enum.HorizontalAlignment.Center,
+	Padding = UDim.new(0, 0),
+})
+
+rule(sheet, ".wave-caption", 288, {
+	TextColor3 = "$TextDim",
+	TextTransparency = 0,
+	TextSize = 13,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
+	AutomaticSize = Enum.AutomaticSize.XY,
+})
+
+rule(sheet, ".wave-value", 289, {
+	TextColor3 = "$Text",
+	TextTransparency = 0,
+	TextSize = 30,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	AutomaticSize = Enum.AutomaticSize.XY,
+})
+
+rule(sheet, ".wave-value.danger", 456, {
+	TextColor3 = "$Danger",
+	TextTransparency = 0,
+})
+
+rule(sheet, ".wave-divider", 290, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	Size = UDim2.new(0, 2, 0, 44),
+	AutomaticSize = Enum.AutomaticSize.None,
+})
+
+rule(sheet, ".wave-divider::UIGradient", 290, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)), ColorSequenceKeypoint.new(0.35, Color3.fromRGB(78, 96, 118)), ColorSequenceKeypoint.new(0.65, Color3.fromRGB(78, 96, 118)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))}),
+	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.35, 0), NumberSequenceKeypoint.new(0.65, 0), NumberSequenceKeypoint.new(1, 1)}),
+	Rotation = 90,
+})
+
+rule(sheet, ".pilot-crosshair", 291, {
 	Size = UDim2.new(0, 22, 0, 22),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Position = UDim2.new(0.5, 0, 0.5, 0),
@@ -5591,11 +5841,11 @@ rule(sheet, ".pilot-crosshair", 281, {
 	Interactable = false,
 })
 
-rule(sheet, ".pilot-crosshair::UICorner", 281, {
+rule(sheet, ".pilot-crosshair::UICorner", 291, {
 	CornerRadius = UDim.new(0.5, 0),
 })
 
-rule(sheet, ".pilot-crosshair::UIStroke", 281, {
+rule(sheet, ".pilot-crosshair::UIStroke", 291, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 2,
@@ -5603,13 +5853,13 @@ rule(sheet, ".pilot-crosshair::UIStroke", 281, {
 	Transparency = 0,
 })
 
-rule(sheet, ".pilot-crosshair.locked", 439, {
+rule(sheet, ".pilot-crosshair.locked", 457, {
 	Size = UDim2.new(0, 16, 0, 16),
 	AutomaticSize = Enum.AutomaticSize.None,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-crosshair.locked::UIStroke", 439, {
+rule(sheet, ".pilot-crosshair.locked::UIStroke", 457, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
@@ -5617,7 +5867,7 @@ rule(sheet, ".pilot-crosshair.locked::UIStroke", 439, {
 	Transparency = 0,
 })
 
-rule(sheet, ".pilot-crosshair-dot", 282, {
+rule(sheet, ".pilot-crosshair-dot", 292, {
 	BackgroundColor3 = "$Accent",
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 4, 0, 4),
@@ -5626,65 +5876,65 @@ rule(sheet, ".pilot-crosshair-dot", 282, {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 })
 
-rule(sheet, ".pilot-crosshair-dot::UICorner", 282, {
+rule(sheet, ".pilot-crosshair-dot::UICorner", 292, {
 	CornerRadius = UDim.new(0.5, 0),
 })
 
-rule(sheet, ".pilot-crosshair.locked >> .pilot-crosshair-dot", 476, {
+rule(sheet, ".pilot-crosshair.locked >> .pilot-crosshair-dot", 498, {
 	BackgroundColor3 = "$Danger",
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 6, 0, 6),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".pilot-danger", 283, {
+rule(sheet, ".pilot-danger", 293, {
 	Size = UDim2.new(1, 0, 1, 0),
 	AutomaticSize = Enum.AutomaticSize.None,
 	Position = UDim2.new(0, 0, 0, 0),
 	Interactable = false,
 })
 
-rule(sheet, ".pilot-bar", 284, {
+rule(sheet, ".pilot-bar", 294, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 	Position = UDim2.new(0.5, 0, 1, -24),
 	AnchorPoint = Vector2.new(0.5, 1),
 	Interactable = false,
 })
 
-rule(sheet, ".pilot-bar::UIListLayout", 284, {
+rule(sheet, ".pilot-bar::UIListLayout", 294, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".pilot-health", 285, {
+rule(sheet, ".pilot-health", 295, {
 	Size = UDim2.new(0, 520, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".pilot-health >> .vitals-track", 440, {
+rule(sheet, ".pilot-health >> .vitals-track", 458, {
 	Size = UDim2.new(1, 0, 0, 30),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".pilot-health >> .vitals-label", 441, {
+rule(sheet, ".pilot-health >> .vitals-label", 459, {
 	TextSize = 18,
 	LineHeight = 1.6666666667,
 })
 
-rule(sheet, ".pilot-abilities", 286, {
+rule(sheet, ".pilot-abilities", 296, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".pilot-abilities::UIListLayout", 286, {
+rule(sheet, ".pilot-abilities::UIListLayout", 296, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Bottom,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".pilot-army", 287, {
+rule(sheet, ".pilot-army", 297, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -5697,25 +5947,25 @@ rule(sheet, ".pilot-army", 287, {
 	Interactable = false,
 })
 
-rule(sheet, ".pilot-army::UIGradient", 287, {
+rule(sheet, ".pilot-army::UIGradient", 297, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".pilot-army::UIPadding", 287, {
+rule(sheet, ".pilot-army::UIPadding", 297, {
 	PaddingTop = UDim.new(0, 12),
 	PaddingRight = UDim.new(0, 12),
 	PaddingBottom = UDim.new(0, 12),
 	PaddingLeft = UDim.new(0, 12),
 })
 
-rule(sheet, ".pilot-army::UIListLayout", 287, {
+rule(sheet, ".pilot-army::UIListLayout", 297, {
 	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".pilot-army-title", 288, {
+rule(sheet, ".pilot-army-title", 298, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -5725,19 +5975,19 @@ rule(sheet, ".pilot-army-title", 288, {
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".pilot-army-row", 289, {
+rule(sheet, ".pilot-army-row", 299, {
 	Size = UDim2.new(1, 0, 0, 0),
 	AutomaticSize = Enum.AutomaticSize.Y,
 })
 
-rule(sheet, ".pilot-army-row::UIListLayout", 289, {
+rule(sheet, ".pilot-army-row::UIListLayout", 299, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	HorizontalFlex = Enum.UIFlexAlignment.SpaceBetween,
 	Padding = UDim.new(0, 8),
 })
 
-rule(sheet, ".pilot-army-name", 290, {
+rule(sheet, ".pilot-army-name", 300, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -5746,7 +5996,7 @@ rule(sheet, ".pilot-army-name", 290, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".pilot-army-count", 291, {
+rule(sheet, ".pilot-army-count", 301, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -5755,7 +6005,7 @@ rule(sheet, ".pilot-army-count", 291, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".pilot-ability", 292, {
+rule(sheet, ".pilot-ability", 302, {
 	TextTransparency = 0.03,
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 0.03,
@@ -5766,12 +6016,12 @@ rule(sheet, ".pilot-ability", 292, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability::UIGradient", 292, {
+rule(sheet, ".pilot-ability::UIGradient", 302, {
 	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.03, Color3.fromRGB(52, 66, 82)), ColorSequenceKeypoint.new(0.04, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(0.55, Color3.fromRGB(20, 26, 34)), ColorSequenceKeypoint.new(1, Color3.fromRGB(1, 1, 2))}),
 	Rotation = 90,
 })
 
-rule(sheet, ".pilot-ability::UIStroke", 292, {
+rule(sheet, ".pilot-ability::UIStroke", 302, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5779,24 +6029,24 @@ rule(sheet, ".pilot-ability::UIStroke", 292, {
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability.large", 442, {
+rule(sheet, ".pilot-ability.large", 460, {
 	Size = UDim2.new(0, 100, 0, 100),
 	AutomaticSize = Enum.AutomaticSize.None,
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability.large::UIStroke", 442, {
+rule(sheet, ".pilot-ability.large::UIStroke", 460, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability.charging", 443, {
+rule(sheet, ".pilot-ability.charging", 461, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability.charging::UIStroke", 443, {
+rule(sheet, ".pilot-ability.charging::UIStroke", 461, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 1,
@@ -5804,18 +6054,18 @@ rule(sheet, ".pilot-ability.charging::UIStroke", 443, {
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability.lit", 444, {
+rule(sheet, ".pilot-ability.lit", 462, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability.lit::UIStroke", 444, {
+rule(sheet, ".pilot-ability.lit::UIStroke", 462, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability-tint", 293, {
+rule(sheet, ".pilot-ability-tint", 303, {
 	BackgroundColor3 = Color3.fromRGB(96, 210, 242),
 	BackgroundTransparency = 0.72,
 	Size = UDim2.new(1, 0, 1, 0),
@@ -5824,7 +6074,7 @@ rule(sheet, ".pilot-ability-tint", 293, {
 	ZIndex = 1,
 })
 
-rule(sheet, ".pilot-ability-mark", 294, {
+rule(sheet, ".pilot-ability-mark", 304, {
 	BackgroundColor3 = "$Accent",
 	BackgroundTransparency = 0,
 	Size = UDim2.new(1, 0, 0, 5),
@@ -5833,39 +6083,39 @@ rule(sheet, ".pilot-ability-mark", 294, {
 	ZIndex = 4,
 })
 
-rule(sheet, ".pilot-ability.lit >> .pilot-ability-key", 477, {
+rule(sheet, ".pilot-ability.lit >> .pilot-ability-key", 499, {
 	TextColor3 = "$Accent",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".pilot-ability.danger", 445, {
+rule(sheet, ".pilot-ability.danger", 463, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability.danger::UIStroke", 445, {
+rule(sheet, ".pilot-ability.danger::UIStroke", 463, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability.danger >> .pilot-ability-name", 478, {
+rule(sheet, ".pilot-ability.danger >> .pilot-ability-name", 500, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".pilot-ability.failed", 446, {
+rule(sheet, ".pilot-ability.failed", 464, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability.failed::UIStroke", 446, {
+rule(sheet, ".pilot-ability.failed::UIStroke", 464, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability-failed", 295, {
+rule(sheet, ".pilot-ability-failed", 305, {
 	BackgroundColor3 = Color3.fromRGB(238, 88, 74),
 	BackgroundTransparency = 0.3,
 	Size = UDim2.new(1, 0, 1, 0),
@@ -5874,18 +6124,18 @@ rule(sheet, ".pilot-ability-failed", 295, {
 	ZIndex = 3,
 })
 
-rule(sheet, ".pilot-ability.flash", 447, {
+rule(sheet, ".pilot-ability.flash", 465, {
 	BorderSizePixel = 0,
 })
 
-rule(sheet, ".pilot-ability.flash::UIStroke", 447, {
+rule(sheet, ".pilot-ability.flash::UIStroke", 465, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	Thickness = 3,
 	Transparency = 0.03,
 })
 
-rule(sheet, ".pilot-ability-flash", 296, {
+rule(sheet, ".pilot-ability-flash", 306, {
 	BackgroundColor3 = Color3.fromRGB(96, 210, 242),
 	BackgroundTransparency = 0.25,
 	Size = UDim2.new(1, 0, 1, 0),
@@ -5894,7 +6144,7 @@ rule(sheet, ".pilot-ability-flash", 296, {
 	ZIndex = 3,
 })
 
-rule(sheet, ".pilot-ability-key", 297, {
+rule(sheet, ".pilot-ability-key", 307, {
 	TextColor3 = "$TextDim",
 	TextTransparency = 0,
 	TextSize = 13,
@@ -5904,7 +6154,7 @@ rule(sheet, ".pilot-ability-key", 297, {
 	ZIndex = 5,
 })
 
-rule(sheet, ".pilot-ability-name", 298, {
+rule(sheet, ".pilot-ability-name", 308, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 11,
@@ -5916,11 +6166,11 @@ rule(sheet, ".pilot-ability-name", 298, {
 	ZIndex = 5,
 })
 
-rule(sheet, ".pilot-ability.large >> .pilot-ability-name", 479, {
+rule(sheet, ".pilot-ability.large >> .pilot-ability-name", 501, {
 	TextSize = 15,
 })
 
-rule(sheet, ".pilot-ability-cost", 299, {
+rule(sheet, ".pilot-ability-cost", 309, {
 	TextColor3 = "$Energy",
 	TextTransparency = 0,
 	TextSize = 12,
@@ -5932,52 +6182,52 @@ rule(sheet, ".pilot-ability-cost", 299, {
 	ZIndex = 5,
 })
 
-rule(sheet, ".pilot-ability-shade", 300, {
+rule(sheet, ".pilot-ability-shade", 310, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.3,
 	Position = UDim2.new(0, 0, 0, 0),
 	ZIndex = 2,
 })
 
-rule(sheet, ".pilot-callout", 301, {
+rule(sheet, ".pilot-callout", 311, {
 	BackgroundColor3 = Color3.fromRGB(8, 11, 15),
 	BackgroundTransparency = 0.18,
 	AutomaticSize = Enum.AutomaticSize.XY,
 	Interactable = false,
 })
 
-rule(sheet, ".pilot-callout::UIPadding", 301, {
+rule(sheet, ".pilot-callout::UIPadding", 311, {
 	PaddingTop = UDim.new(0, 0),
 	PaddingRight = UDim.new(0, 16),
 	PaddingBottom = UDim.new(0, 0),
 	PaddingLeft = UDim.new(0, 0),
 })
 
-rule(sheet, ".pilot-callout::UIListLayout", 301, {
+rule(sheet, ".pilot-callout::UIListLayout", 311, {
 	FillDirection = Enum.FillDirection.Horizontal,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 	Padding = UDim.new(0, 12),
 })
 
-rule(sheet, ".pilot-callout-bar", 302, {
+rule(sheet, ".pilot-callout-bar", 312, {
 	BackgroundColor3 = "$Accent",
 	BackgroundTransparency = 0,
 	Size = UDim2.new(0, 6, 0, 34),
 	AutomaticSize = Enum.AutomaticSize.None,
 })
 
-rule(sheet, ".pilot-callout.danger >> .pilot-callout-bar", 480, {
+rule(sheet, ".pilot-callout.danger >> .pilot-callout-bar", 502, {
 	BackgroundColor3 = "$Danger",
 	BackgroundTransparency = 0,
 })
 
-rule(sheet, ".pilot-callout.danger >> .pilot-callout-text", 481, {
+rule(sheet, ".pilot-callout.danger >> .pilot-callout-text", 503, {
 	TextColor3 = "$Danger",
 	TextTransparency = 0,
 })
 
-rule(sheet, ".pilot-callout-text", 303, {
+rule(sheet, ".pilot-callout-text", 313, {
 	TextColor3 = "$Text",
 	TextTransparency = 0,
 	TextSize = 18,
@@ -5985,12 +6235,83 @@ rule(sheet, ".pilot-callout-text", 303, {
 	AutomaticSize = Enum.AutomaticSize.XY,
 })
 
-rule(sheet, ".pilot-callout-text::UIStroke", 303, {
+rule(sheet, ".pilot-callout-text::UIStroke", 313, {
 	Enabled = true,
 	ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
 	Thickness = 2,
 	Color = Color3.fromRGB(8, 11, 15),
 	Transparency = 0.2,
+})
+
+rule(sheet, ".commander-hurt", 314, {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, 0, 1, 0),
+	AutomaticSize = Enum.AutomaticSize.None,
+	Position = UDim2.new(0, 0, 0, 0),
+	ZIndex = 100,
+	Interactable = false,
+})
+
+rule(sheet, ".hurt-edge", 315, {
+	Interactable = false,
+})
+
+rule(sheet, ".hurt-edge.top", 467, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	Size = UDim2.new(1, 0, 0.3, 0),
+	AutomaticSize = Enum.AutomaticSize.None,
+	Position = UDim2.new(0, 0, 0, 0),
+})
+
+rule(sheet, ".hurt-edge.top::UIGradient", 467, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))}),
+	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)}),
+	Rotation = 90,
+})
+
+rule(sheet, ".hurt-edge.bottom", 468, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	Size = UDim2.new(1, 0, 0.3, 0),
+	AutomaticSize = Enum.AutomaticSize.None,
+	Position = UDim2.new(0, 0, 1, 0),
+	AnchorPoint = Vector2.new(0, 1),
+})
+
+rule(sheet, ".hurt-edge.bottom::UIGradient", 468, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))}),
+	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)}),
+	Rotation = -90,
+})
+
+rule(sheet, ".hurt-edge.left", 469, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	Size = UDim2.new(0.22, 0, 1, 0),
+	AutomaticSize = Enum.AutomaticSize.None,
+	Position = UDim2.new(0, 0, 0, 0),
+})
+
+rule(sheet, ".hurt-edge.left::UIGradient", 469, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))}),
+	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)}),
+	Rotation = 0,
+})
+
+rule(sheet, ".hurt-edge.right", 470, {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0,
+	Size = UDim2.new(0.22, 0, 1, 0),
+	AutomaticSize = Enum.AutomaticSize.None,
+	Position = UDim2.new(1, 0, 0, 0),
+	AnchorPoint = Vector2.new(1, 0),
+})
+
+rule(sheet, ".hurt-edge.right::UIGradient", 470, {
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))}),
+	Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)}),
+	Rotation = 180,
 })
 
 return sheet

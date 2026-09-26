@@ -1,11 +1,22 @@
-"""Headless Blender entry point for the procedural model pipeline.
+"""Headless Blender entry point for the procedural model pipeline. Run it through build.ps1, or Blender itself (bpy
+only exists inside Blender):
 
-Run via Blender itself, not plain python — bpy only exists inside Blender:
-
-    blender --background --python tools/model_pipeline/build.py -- \\
-        --generator building_basic --params '{"width":16}' --out build/building_basic.glb
+    blender --background --python tools/model_pipeline/build.py -- grunt [more generators...]
+    blender --background --python tools/model_pipeline/build.py -- --all
+    blender --background --python tools/model_pipeline/build.py -- --stale
 
 Everything after the lone `--` is this script's own argv; Blender strips its own flags before it.
+
+Each generator (generators/<name>.py) builds one model and declares its CATEGORY, which says where its art module
+goes, what it may spend and how it is placed (manifest.CATEGORIES). One that dresses a def declares DEF, the def's name, and
+gets that def's collider and colour from the game (tools/game_data.py) in its params, as `collider` and `color`; a unit
+with a capsule collider is then stretched to fill its BAR collision volume, and every model of a def is checked
+against its collider (see `fit_problems`). A generator may declare what it is allowed past those checks, each with its
+reason: ENVELOPE, how far it may reach instead of its collider ({"width": ..., "length": ..., "height": ...}, studs,
+any of them), and TRIANGLES, the triangles it may spend instead of its category's.
+
+A build writes the model's art module (art_format.py), its upload file (build/<name>_art.glb: the meshes not on
+Roblox yet, for roblox/upload_art.py), a preview render (build/<name>.png) and its entry in built.json.
 """
 
 import argparse
@@ -13,7 +24,6 @@ import hashlib
 import importlib
 import json
 import math
-import re
 import sys
 from pathlib import Path
 
@@ -22,84 +32,63 @@ import bpy
 import mathutils
 
 PIPELINE_ROOT = Path(__file__).resolve().parent
-GENERATORS_DIR = PIPELINE_ROOT / "generators"
-# Where the client finds each model's data, synced by Rojo into ReplicatedStorage.Shared.art.
-ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "art"
-# Which meshes are already on Roblox, by content hash (see roblox/upload_art.py). A part whose hash is in it is
-# written as its asset id instead of its vertices.
-UPLOADS_PATH = PIPELINE_ROOT / "roblox" / "uploads.json"
-# The game is meant to carry thousands of units, so a model is a handful of strong low-poly shapes.
-MAX_TRIANGLES_WARNING = 100
+sys.path.insert(0, str(PIPELINE_ROOT))
+sys.path.insert(0, str(PIPELINE_ROOT.parent))
+
+import art_format  # noqa: E402
+import game_data  # noqa: E402
+import manifest  # noqa: E402
+import turret_mounts  # noqa: E402
+from generators.shared import common  # noqa: E402
+
+# Edges sharper than this are split before export, so each side keeps its own vertex normal: Roblox would otherwise
+# average normals across shared vertices and round a box's corners off.
+SHARP_EDGE_DEGREES = 40.0
+# How much more one axis of a unit may be stretched than the one stretched least, so that filling its collision
+# volume widens a long tank or heightens a flat one without turning it into a cube.
+MAX_STRETCH = 1.35
+# How far a model may reach past its collision volume before the fit check calls it a misfit, in studs.
+FIT_TOLERANCE = 1e-3
 
 
 def parse_args():
-    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
-    parser.add_argument("--generator", help="module name under generators/, e.g. building_basic")
-    parser.add_argument("--params", default="{}", help="JSON object passed to generate(params)")
-    parser.add_argument("--out", default=None, help="output .glb path (default: build/<generator>.glb)")
-    parser.add_argument(
-        "--luau-out",
-        default=None,
-        help="also write the model's art data module, which the client builds meshes from at runtime "
-        "(default: src/shared/art/<generator>.luau); pass --no-luau to skip it",
-    )
-    parser.add_argument("--no-luau", action="store_true", help="skip writing the art data module")
-    parser.add_argument(
-        "--render-out",
-        default=None,
-        help="also render a quick three-quarter view PNG for visual review "
-        "(default: build/<generator>.png); pass --no-render to skip it",
-    )
+    parser.add_argument("generators", nargs="*", help="generators to build, by name (generators/<name>.py)")
+    parser.add_argument("--all", action="store_true", help="build every generator")
+    parser.add_argument("--stale", action="store_true", help="build every generator whose module is out of date")
+    parser.add_argument("--list", action="store_true", help="list the generators and exit")
+    parser.add_argument("--params", default="{}", help="JSON object merged into generate(params)")
     parser.add_argument("--no-render", action="store_true", help="skip the preview render")
-    parser.add_argument("--list", action="store_true", help="list available generators and exit")
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help="write the art modules here instead of the game's source, leaving built.json alone (to compare builds)",
+    )
+    parser.add_argument("--game-root", default=None, help="read the game's numbers from another checkout")
     return parser.parse_args(argv)
 
 
-def list_generators():
-    for path in sorted(GENERATORS_DIR.glob("*.py")):
-        if path.stem in ("__init__", "common"):
-            continue
-        print(path.stem)
-
-
 def clear_scene():
-    bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.object.delete()
-    for mesh in list(bpy.data.meshes):
-        if mesh.users == 0:
-            bpy.data.meshes.remove(mesh)
+    """Back to an empty file, so nothing (a material cached by name above all) carries from one build to the next."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
 def triangle_count(objects):
-    total = 0
-    for obj in objects:
-        mesh = obj.data
-        total += sum(len(p.vertices) - 2 for p in mesh.polygons)
-    return total
-
-
-# Edges sharper than this are split before export, so each side keeps its own vertex normal: Roblox computes
-# an EditableMesh's normals by averaging across shared vertices, which would round a box's corners off.
-SHARP_EDGE_DEGREES = 40.0
+    return sum(len(p.vertices) - 2 for obj in objects for p in obj.data.polygons)
 
 
 def material_of(obj):
-    """(name, rgba color, glows) for an object's first material. An emissive material (apply_material's
-    `emission`) glows, which becomes Neon in Roblox: the only way a part there actually lights up."""
-    color = (1.0, 1.0, 1.0, 1.0)
-    glows = False
-    name = ""
-    if obj.data.materials and obj.data.materials[0] is not None:
-        mat = obj.data.materials[0]
-        name = mat.name
-        if mat.use_nodes:
-            bsdf = mat.node_tree.nodes.get("Principled BSDF")
-            if bsdf is not None:
-                color = tuple(bsdf.inputs["Base Color"].default_value)
-                if "Emission Strength" in bsdf.inputs:
-                    glows = bsdf.inputs["Emission Strength"].default_value > 0.0
-    return name, color, glows
+    """(name, rgba color, glows, team) for an object's first material. An emissive material (apply_material's
+    `emission`) glows, which becomes Neon in Roblox: the only way a part there actually lights up. A `team` one
+    (apply_material's `team`) takes its team's colour in the game."""
+    if not obj.data.materials or obj.data.materials[0] is None:
+        return "", (1.0, 1.0, 1.0, 1.0), False, False
+    mat = obj.data.materials[0]
+    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    color = tuple(bsdf.inputs["Base Color"].default_value)
+    glows = bsdf.inputs["Emission Strength"].default_value > 0.0
+    return mat.name, color, glows, bool(mat.get("art_team", False))
 
 
 def world_triangles(obj):
@@ -124,39 +113,27 @@ def world_triangles(obj):
 
 
 def to_roblox(location):
-    return (location.x, location.z, -location.y)
+    x, y, z = location
+    return (x, z, -y)
 
 
 def collect_groups(objects):
     """The model's rigid pieces, by the `art_group` a generator set on each object (common.art_group): "base"
     for anything that set none. A piece's pivot is the location of its object marked `art_pivot`, or the model's
-    origin; the rest of what the generator set (kind, weapon, axis, speed, swing, phase, stride) describes how it
-    moves."""
+    origin; the rest of what the generator set (art_format.META_FIELDS) describes how it moves."""
     groups = {}
     for obj in objects:
         name = obj.get("art_group", "base")
-        group = groups.setdefault(name, {"pivot": (0.0, 0.0, 0.0), "objects": [], "meta": {}})
+        group = groups.setdefault(name, {"objects": [], "fields": {"pivot": (0.0, 0.0, 0.0)}})
         group["objects"].append(obj)
         if obj.get("art_pivot"):
-            group["pivot"] = to_roblox(obj.location)
-        for key in ("kind", "weapon", "speed", "swing", "phase", "stride", "radius", "open"):
+            group["fields"]["pivot"] = to_roblox(obj.location)
+        for key, kind, _ in art_format.META_FIELDS:
             if f"art_{key}" in obj:
-                group["meta"][key] = obj[f"art_{key}"]
-        if "art_axis" in obj:
-            x, y, z = obj["art_axis"]
-            group["meta"]["axis"] = (x, z, -y)
+                value = obj[f"art_{key}"]
+                # a direction the generator gave in Blender's axes
+                group["fields"][key] = to_roblox(value) if kind == "point" else value
     return groups
-
-
-def lua_number(value):
-    text = f"{value:.4f}".rstrip("0").rstrip(".")
-    return "0" if text in ("-0", "") else text
-
-
-def load_uploads():
-    if UPLOADS_PATH.is_file():
-        return json.loads(UPLOADS_PATH.read_text(encoding="utf-8"))
-    return {"meshes": {}, "models": {}}
 
 
 def art_parts(objects):
@@ -168,46 +145,43 @@ def art_parts(objects):
     for group_name, group in groups.items():
         by_material = {}
         for obj in group["objects"]:
-            mat_name, color, glows = material_of(obj)
-            entry = by_material.setdefault(mat_name, {"color": color, "glows": glows, "verts": [], "tris": []})
+            mat_name, color, glows, team = material_of(obj)
+            entry = by_material.setdefault(
+                mat_name, {"color": color, "glows": glows, "team": team, "verts": [], "tris": []}
+            )
             verts, tris = world_triangles(obj)
             base = len(entry["verts"])
             entry["verts"].extend(verts)
             entry["tris"].extend((a + base, b + base, c + base) for a, b, c in tris)
 
-        px, py, pz = group["pivot"]
-        for mat_name, entry in by_material.items():
+        px, py, pz = group["fields"]["pivot"]
+        for entry in by_material.values():
             verts = entry["verts"]
             lo = [min(v[i] for v in verts) for i in range(3)]
             hi = [max(v[i] for v in verts) for i in range(3)]
             centre = [(lo[i] + hi[i]) / 2 for i in range(3)]
-            packed_verts = "|".join(",".join(lua_number(v[i] - centre[i]) for i in range(3)) for v in verts)
+            packed_verts = "|".join(",".join(art_format.lua_number(v[i] - centre[i]) for i in range(3)) for v in verts)
             # in a canonical order, each rotated to start at its lowest vertex (which keeps its winding): the order
             # Blender hands faces back in can vary between runs, and should not change the hash
             tris = sorted(min((t, t[1:] + t[:1], t[2:] + t[:2])) for t in entry["tris"])
-            entry["tris"] = tris
             packed_tris = "|".join(f"{a},{b},{c}" for a, b, c in tris)
-            digest = hashlib.sha1(f"{packed_verts}#{packed_tris}".encode("utf-8")).hexdigest()[:16]
             parts.append({
                 "group": group_name,
-                "material": mat_name,
                 "color": entry["color"],
                 "glows": entry["glows"],
+                "team": entry["team"],
                 "offset": (centre[0] - px, centre[1] - py, centre[2] - pz),
                 "size": tuple(hi[i] - lo[i] for i in range(3)),
                 "centred": [tuple(v[i] - centre[i] for i in range(3)) for v in verts],
-                "tris": entry["tris"],
-                "packed_verts": packed_verts,
-                "packed_tris": packed_tris,
-                "hash": digest,
+                "tris": tris,
+                "hash": hashlib.sha1(f"{packed_verts}#{packed_tris}".encode("utf-8")).hexdigest()[:16],
             })
     return groups, parts
 
 
 def muzzle_of(group_name, parts):
-    """Where a turret's shots leave it, relative to its pivot and at rest (Roblox axes, facing +Z): the point of
-    its meshes that reaches furthest forward, which is the tip of its barrel, launcher or glowing muzzle. The server
-    fires its weapon from there, turned with the turret's aim (server/combat.luau's weapon_origin)."""
+    """Where a turret's art puts its muzzle, relative to its pivot and at rest (Roblox axes, facing +Z): the point of
+    its meshes that reaches furthest forward, which is the tip of its barrel, launcher or glowing muzzle."""
     best = None
     for part in parts:
         if part["group"] != group_name:
@@ -220,82 +194,49 @@ def muzzle_of(group_name, parts):
     return best
 
 
-def export_art(objects, out_path, model_name):
-    """The model as a Luau data module the client dresses its entities from (src/client/art.luau).
+def export_art(groups, parts, out_path, model_name, meshes):
+    """The model as its art module (art_format.py), which the client dresses its entities from (src/client/art.luau).
 
     Each rigid piece (see collect_groups) becomes one MeshPart per material: everything that shares a color and
-    moves together is one mesh. Each part's vertices are centred on their own bounds, and `offset` places that
-    centre relative to its piece's pivot, which is relative to the model's origin: the middle of its footprint, on
-    the ground, facing +Z. A mesh that has been uploaded (roblox/uploads.json) is written as its asset id; one
-    that has not is written as its vertices and triangles, packed as "x,y,z|x,y,z|..." strings, which the client
-    builds with EditableMesh. Returns the parts, for export_upload_glb."""
-    groups, parts = art_parts(objects)
-    uploaded = load_uploads()["meshes"]
-    lines = [
-        f"-- Generated by tools/model_pipeline from generators/{model_name}.py. Do not edit: rebuild it instead.",
-        "return {",
-        "\tgroups = {",
-    ]
-    for name, group in groups.items():
-        fields = [f'pivot = {{ {", ".join(lua_number(c) for c in group["pivot"])} }}']
-        meta = group["meta"]
-        if "kind" in meta:
-            fields.append(f'kind = "{meta["kind"]}"')
-        if "weapon" in meta:
-            fields.append(f'weapon = {int(meta["weapon"])}')
-        if "axis" in meta:
-            fields.append(f'axis = {{ {", ".join(lua_number(c) for c in meta["axis"])} }}')
-        for key in ("speed", "swing", "phase", "stride", "radius", "open"):
-            if key in meta:
-                fields.append(f"{key} = {lua_number(meta[key])}")
-        muzzle = muzzle_of(name, parts) if meta.get("kind") == "turret" else None
-        if muzzle is not None:
-            fields.append(f'muzzle = {{ {", ".join(lua_number(c) for c in muzzle)} }}')
-        lines.append(f'\t\t{name} = {{ {", ".join(fields)} }},')
-    lines.append("\t},")
-    lines.append("\tparts = {")
-
-    missing = 0
+    moves together is one mesh. Each part's `offset` places the centre of its mesh's bounds relative to its piece's
+    pivot, which is relative to the model's origin: the middle of its footprint, on the ground, facing +Z. A part
+    names its uploaded mesh (`meshes`, roblox/uploads.json's assets) by asset id; one whose mesh is not uploaded yet has
+    only its hash, and the model needs uploading (roblox/upload_art.py) before the game can show it."""
+    group_fields = {name: group["fields"] for name, group in groups.items()}
+    part_fields = []
     for part in parts:
-        r, g, b, _ = part["color"]
-        fields = [
-            f'group = "{part["group"]}"',
-            f"color = {{ {lua_number(r)}, {lua_number(g)}, {lua_number(b)} }}",
-            f'offset = {{ {", ".join(lua_number(c) for c in part["offset"])} }}',
-            f'size = {{ {", ".join(lua_number(c) for c in part["size"])} }}',
-            f'hash = "{part["hash"]}"',
-        ]
-        if part["glows"]:
-            fields.append("neon = true")
-        # the family's accent is what takes the team's colour, as a "Team" part does on any other model
-        if "accent" in part["material"]:
-            fields.append("team = true")
-        mesh = uploaded.get(part["hash"])
-        if mesh is not None:
-            fields.append(f'mesh = "{mesh}"')
-            lines.append(f"\t\t{{ {', '.join(fields)} }},")
-        else:
-            missing += 1
-            lines.append(f"\t\t{{ {', '.join(fields)},")
-            lines.append(f'\t\t\tvertices = "{part["packed_verts"]}",')
-            lines.append(f'\t\t\ttriangles = "{part["packed_tris"]}" }},')
-    lines.append("\t},")
-    lines.append("}")
-    lines.append("")
-
+        mesh = meshes.get(part["hash"])
+        part_fields.append({
+            "group": part["group"],
+            "color": part["color"],
+            "offset": part["offset"],
+            "size": part["size"],
+            "hash": part["hash"],
+            "neon": part["glows"],
+            "team": part["team"],
+            "mesh": mesh["id"] if mesh is not None else None,
+        })
+    text = art_format.module_text(model_name, group_fields, part_fields)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"wrote {out_path} ({len(parts)} parts, {missing} not uploaded)")
-    return parts
+    out_path.write_text(text, encoding="utf-8")
+    pending = sum(1 for part in part_fields if part["mesh"] is None)
+    print(f"wrote {out_path} ({len(parts)} parts, {pending} waiting for an upload)")
+    return text
+
+
+def new_object(name):
+    obj = bpy.data.objects.new(name, bpy.data.meshes.new(name))
+    bpy.context.collection.objects.link(obj)
+    return obj
 
 
 def export_upload_glb(parts, out_path):
-    """Every mesh of the art as one node of a .glb, named by its hash and centred as the art has it, for
+    """`parts`' meshes as one node each of a .glb, named by its hash and centred as the art has it, for
     roblox/upload_art.py to upload as one Model. Uploading makes one mesh asset per node, which is what the art
     module then refers to."""
     made = []
     for part in parts:
-        obj = common_new_object(part["hash"])
+        obj = new_object(part["hash"])
         bm = bmesh.new()
         # back from Roblox's (x, y, z) to Blender's: the glTF export's Y-up conversion then gives (x, y, z) again
         verts = [bm.verts.new((x, -z, y)) for x, y, z in part["centred"]]
@@ -318,13 +259,6 @@ def export_upload_glb(parts, out_path):
     print(f"wrote {out_path} ({len(made)} meshes)")
     for obj in made:
         bpy.data.objects.remove(obj, do_unlink=True)
-
-
-def common_new_object(name):
-    mesh = bpy.data.meshes.new(name)
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    return obj
 
 
 def render_preview(objects, out_path):
@@ -371,12 +305,7 @@ def render_preview(objects, out_path):
         bg.inputs[0].default_value = (0.08, 0.09, 0.11, 1.0)
 
     scene = bpy.context.scene
-    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
-        try:
-            scene.render.engine = engine
-            break
-        except TypeError:
-            continue
+    scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = 900
     scene.render.resolution_y = 900
     scene.render.film_transparent = False
@@ -390,28 +319,37 @@ def render_preview(objects, out_path):
     print(f"wrote {out_path}")
 
 
-# BAR measures in elmos, 11 to a stud (src/shared/unit_defs/conversions.luau).
-ELMOS_PER_STUD = 11.0
-UNIT_DEFS_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "unit_defs"
-# How much more one axis of a unit may be stretched than the one stretched least, so that filling its collision
-# volume widens a long tank or heightens a flat one without turning it into a cube.
-MAX_STRETCH = 1.35
+def bar_volume(collider):
+    """A capsule collider's BAR collision volume, (width, length, height) in Blender's (x, y, z) studs."""
+    return (collider["width"], collider["length"], collider["height"])
 
 
-def unit_volume(def_name):
-    """A unit's BAR collision volume in studs, (width, length, height) in Blender's (x, y, z), from the
-    `capsule(width, height, length)` its def is given in elmos; None for anything that is not a unit."""
-    for path in UNIT_DEFS_DIR.glob("*.luau"):
-        source = path.read_text(encoding="utf-8")
-        block = re.search(rf"\n\t{re.escape(def_name)} = \{{\n(.*?)\n\t\}},", source, re.S)
-        if block is None:
-            continue
-        capsule = re.search(r"collider = capsule\(([\d.]+), ([\d.]+), ([\d.]+)\)", block.group(1))
-        if capsule is None:
-            return None
-        width, height, length = (float(v) / ELMOS_PER_STUD for v in capsule.groups())
-        return (width, length, height)
-    return None
+def world_points(obj):
+    """An object's vertices in world space, and for a walking leg also where they swing to at either end of its
+    stride (turned its `swing` either way about its hip), which is as far as it reaches while the unit walks."""
+    points = [obj.matrix_world @ v.co for v in obj.data.vertices]
+    if obj.get("art_kind") != "leg":
+        return points
+    pivot = obj.location.copy()
+    axis = mathutils.Vector(tuple(obj["art_axis"]))
+    swung = []
+    for sign in (1.0, -1.0):
+        turn = mathutils.Matrix.Rotation(sign * obj["art_swing"], 4, axis)
+        swung += [pivot + turn @ (p - pivot) for p in points]
+    return points + swung
+
+
+def world_bounds(objects, swinging=False):
+    """The bounds of `objects` in world space, (lo, hi); with `swinging`, of every walking leg's whole stride."""
+    lo = [math.inf] * 3
+    hi = [-math.inf] * 3
+    for obj in objects:
+        points = world_points(obj) if swinging else [obj.matrix_world @ v.co for v in obj.data.vertices]
+        for w in points:
+            for i in range(3):
+                lo[i] = min(lo[i], w[i])
+                hi[i] = max(hi[i], w[i])
+    return lo, hi
 
 
 def fill_volume(objects, volume):
@@ -420,14 +358,7 @@ def fill_volume(objects, volume):
     length. Each axis is stretched as far as it takes to fill, but never shrunk and never more than MAX_STRETCH times
     the axis stretched least, so the design keeps its proportions. The model is scaled about its origin (the middle
     of its footprint, on the ground) and every rotation is baked into its mesh, so each piece keeps its pivot."""
-    lo = [math.inf] * 3
-    hi = [-math.inf] * 3
-    for obj in objects:
-        for v in obj.data.vertices:
-            w = obj.matrix_world @ v.co
-            for i in range(3):
-                lo[i] = min(lo[i], w[i])
-                hi[i] = max(hi[i], w[i])
+    lo, hi = world_bounds(objects)
     # the footprint straddles the origin, so fill by the reach on each side, and the height from the ground
     reach = [max(abs(lo[0]), abs(hi[0])) * 2, max(abs(lo[1]), abs(hi[1])) * 2, hi[2]]
     wanted = [max(volume[i] / reach[i], 1.0) if reach[i] > 1e-6 else 1.0 for i in range(3)]
@@ -456,88 +387,213 @@ def fill_volume(objects, volume):
     print(f"scaled to its collision volume by ({sx:.2f}, {sy:.2f}, {sz:.2f})")
 
 
-def build(generator_name, params, out_path, luau_out_path=None, render_out_path=None):
+def bounds_of(collider):
+    """The (width, length, height) a def's collider gives its art: a box's own, and for a capsule the square the
+    game gives its footprint (unit_defs' footprint_half_extents) by its height."""
+    if collider["shape"] == "box":
+        return (collider["width"], collider["length"], collider["height"])
+    return (collider["radius"] * 2, collider["radius"] * 2, collider["height"])
+
+
+def fit_problems(objects, def_entry, envelope):
+    """How the finished model, as it is exported, misses its def's collider (`bounds_of`), standing centred on its
+    origin, where its generator's `envelope` ({"width": ..., "length": ..., "height": ...}, any of them) does not
+    let it reach further. Nothing may reach past its top, or
+    below the ground unless the def floats (its origin is then the water's surface). Across, a unit is held to its
+    capsule whole, a walking leg at either end of its stride included; a building's box is its footprint on the grid,
+    which what stands still has to stay on, while its turrets, dishes and hatches swing out over its neighbours as
+    BAR's do."""
+    collider = def_entry["collider"]
+    width, length, height = bounds_of(collider)
+    bounds = [envelope.get("width", width), envelope.get("length", length), envelope.get("height", height)]
+    lo, hi = world_bounds(objects, swinging=True)
+    footing = objects if collider["shape"] == "capsule" else [o for o in objects if o.get("art_group", "base") == "base"]
+    side_lo, side_hi = world_bounds(footing, swinging=True)
+    problems = []
+    for axis, name in ((0, "width"), (1, "length")):
+        reach = max(abs(side_lo[axis]), abs(side_hi[axis]))
+        if reach > bounds[axis] / 2 + FIT_TOLERANCE:
+            problems.append(f"{name} {reach * 2:.3f} over {bounds[axis]:.3f}")
+    if hi[2] > bounds[2] + FIT_TOLERANCE:
+        problems.append(f"height {hi[2]:.3f} over {bounds[2]:.3f}")
+    ground = world_bounds(objects)[0][2]
+    if ground < -FIT_TOLERANCE and not def_entry["floats"]:
+        problems.append(f"reaches {-ground:.3f} below the ground")
+    return problems
+
+
+def def_params(def_entry):
+    """What a generator that declares a DEF gets from it: its collider (studs) and colour (0-1 RGBA)."""
+    if def_entry is None:
+        return {}
+    r, g, b = def_entry["color"]
+    return {"collider": def_entry["collider"], "color": (r / 255.0, g / 255.0, b / 255.0, 1.0)}
+
+
+def def_of(module, defs):
+    """The game's numbers for the def generator `module` declares (DEF), or None if it declares none."""
+    def_name = getattr(module, "DEF", None)
+    if def_name is None:
+        return None
+    if def_name not in defs:
+        raise SystemExit(f"{module.__name__} declares DEF = {def_name!r}, which is not a def")
+    return defs[def_name]
+
+
+def mount_problems(mounts, groups, parts):
+    """How the model's turrets disagree with the MOUNTS its generator declares (turret_mounts.py): each turret piece
+    has to have a mount for its weapon, pivoting where the piece does and with its muzzle at the tip of its barrel."""
+    turrets = {g["fields"]["weapon"]: name for name, g in groups.items() if g["fields"].get("kind") == "turret"}
+    problems = []
+    for weapon in sorted(set(turrets) | set(mounts)):
+        if weapon not in mounts:
+            problems.append(f"turret {turrets[weapon]} fires weapon {weapon}, which has no MOUNTS")
+            continue
+        if weapon not in turrets:
+            problems.append(f"MOUNTS has weapon {weapon}, which no turret piece fires")
+            continue
+        art = {"pivot": groups[turrets[weapon]]["fields"]["pivot"], "muzzle": muzzle_of(turrets[weapon], parts)}
+        for key, point in art.items():
+            off = max(abs(a - b) for a, b in zip(point, mounts[weapon][key]))
+            if off > turret_mounts.TOLERANCE:
+                at = ", ".join(art_format.lua_number(c) for c in point)
+                problems.append(f"weapon {weapon}'s {key} is at ({at}) in its art, {off:.3f} from its MOUNTS")
+    return problems
+
+
+def budget_problems(module, triangles, parts):
+    """How the model overspends its category (or the TRIANGLES its generator declares instead)."""
+    category = manifest.CATEGORIES[module.CATEGORY]
+    allowed = getattr(module, "TRIANGLES", category["triangles"])
+    problems = []
+    if triangles > allowed:
+        problems.append(f"{triangles} triangles, over the {allowed} it may spend")
+    if category["parts"] is not None and parts > category["parts"]:
+        problems.append(f"{parts} MeshParts, over the {category['parts']} a {module.CATEGORY} may have")
+    return problems
+
+
+def build(name, params, defs, out_dir, render, uploads):
+    """Builds generator `name`; returns (its built.json entry, what is wrong with it)."""
     clear_scene()
+    module = importlib.import_module(f"generators.{name}")
+    category = manifest.CATEGORIES[module.CATEGORY]
+    def_entry = def_of(module, defs)
 
-    sys.path.insert(0, str(PIPELINE_ROOT))
-    module = importlib.import_module(f"generators.{generator_name}")
-    importlib.reload(module)
-
-    objects = module.generate(params)
+    objects = module.generate({**def_params(def_entry), **params})
     if not objects:
-        raise RuntimeError(f"generators.{generator_name}.generate() returned nothing")
+        raise RuntimeError(f"generators.{name}.generate() returned nothing")
+    # every location a generator set is in each object's matrix_world before the build reads it
+    bpy.context.view_layer.update()
+    collider = def_entry["collider"] if def_entry is not None else None
+    if collider is not None and collider["shape"] == "capsule":
+        fill_volume(objects, bar_volume(collider))
+        bpy.context.view_layer.update()
+    if category["centred"]:
+        common.centre_footprint(objects)
+        bpy.context.view_layer.update()
+    problems = []
+    if collider is not None and category["fits"]:
+        problems += fit_problems(objects, def_entry, getattr(module, "ENVELOPE", {}))
 
-    # a generator for something that is not a unit (a UI icon, a one-off landmark) may set its own MAX_TRIANGLES
-    max_tris = getattr(module, "MAX_TRIANGLES", MAX_TRIANGLES_WARNING)
+    groups, parts = art_parts(objects)
+    problems += mount_problems(getattr(module, "MOUNTS", {}), groups, parts)
     tris = triangle_count(objects)
-    if tris > max_tris:
-        print(f"warning: {tris} triangles, above the {max_tris} a model may have")
+    problems += budget_problems(module, tris, len(parts))
+    print(f"{name}: {tris} triangles, {len(parts)} parts")
 
-    bpy.ops.object.select_all(action="DESELECT")
-    for obj in objects:
-        obj.select_set(True)
-    bpy.context.view_layer.objects.active = objects[0]
+    output = Path(out_dir) if out_dir is not None else manifest.OUTPUT_DIRS[category["output"]]
+    module_path = output / f"{name}.luau"
+    text = export_art(groups, parts, module_path, name, uploads["assets"])
+    pending = [part for part in parts if part["hash"] not in uploads["assets"]]
+    glb = manifest.glb_path(name)
+    if pending:
+        export_upload_glb(pending, glb)
+    elif glb.is_file():
+        glb.unlink()
+    if render:
+        render_preview(objects, manifest.BUILD_DIR / f"{name}.png")
 
-    # Recenter on X/Y (Blender) so the model's footprint straddles its own origin, the way the game centres an
-    # entity's model on its collider. The footprint is the first object a generator returns (its footing):
-    # centring on everything would pull a model off its collider by half of whatever reaches out past it,
-    # like a tower's barrel.
-    # A generator that places its own origin (a UI icon centred on its layout, a cursor on its tip) sets
-    # RECENTRE = False.
-    corners = [objects[0].matrix_world @ mathutils.Vector(corner) for corner in objects[0].bound_box]
-    min_x = min(c.x for c in corners)
-    max_x = max(c.x for c in corners)
-    min_y = min(c.y for c in corners)
-    max_y = max(c.y for c in corners)
-    center_x = (min_x + max_x) / 2
-    center_y = (min_y + max_y) / 2
-    if getattr(module, "RECENTRE", True) and (abs(center_x) > 1e-6 or abs(center_y) > 1e-6):
-        for obj in objects:
-            obj.location.x -= center_x
-            obj.location.y -= center_y
+    entry = {
+        "module": module_path.relative_to(manifest.REPO_ROOT).as_posix() if out_dir is None else "",
+        "digest": manifest.module_digest(text),
+        "hashes": [part["hash"] for part in parts],
+        "blender": bpy.app.version_string,
+        "inputs": manifest.fingerprint(name, def_entry),
+        "pending": [part["hash"] for part in pending],
+    }
+    return entry, problems
 
-    volume = unit_volume(generator_name)
-    if volume is not None:
-        fill_volume(objects, volume)
-        tris = triangle_count(objects)
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    bpy.ops.export_scene.gltf(
-        filepath=str(out_path),
-        export_format="GLB",
-        use_selection=True,
-        export_apply=True,
-        export_yup=True,  # glTF is Y-up; Roblox importer expects this
-    )
-    print(f"wrote {out_path} ({tris} triangles)")
+def declared_def(name):
+    """The DEF generator `name` declares, read without running it."""
+    return getattr(importlib.import_module(f"generators.{name}"), "DEF", None)
 
-    if luau_out_path is not None:
-        parts = export_art(objects, luau_out_path, generator_name)
-        export_upload_glb(parts, PIPELINE_ROOT / "build" / f"{generator_name}_art.glb")
 
-    if render_out_path is not None:
-        render_preview(objects, render_out_path)
+def stale(names, built, defs, uploads):
+    """Of `names`, the generators whose art module is out of date: never built, built from other inputs or by
+    another Blender, or holding meshes uploaded since."""
+    found = []
+    for name in names:
+        entry = built.get(name)
+        def_name = declared_def(name)
+        if (
+            entry is None
+            or entry["inputs"] != manifest.fingerprint(name, defs.get(def_name) if def_name is not None else None)
+            or entry["blender"] != bpy.app.version_string
+            or any(h in uploads["assets"] for h in entry["pending"])
+        ):
+            found.append(name)
+    return found
 
 
 def main():
     args = parse_args()
+    names = manifest.generator_names()
     if args.list:
-        list_generators()
+        print("\n".join(names))
         return
-    if not args.generator:
-        raise SystemExit("--generator is required (or pass --list)")
+    if not bpy.app.version_string.startswith(manifest.BLENDER_VERSION + "."):
+        raise SystemExit(
+            f"this is Blender {bpy.app.version_string}; the pipeline builds with Blender {manifest.BLENDER_VERSION} "
+            "(a mesh's hash depends on how Blender triangulates it)"
+        )
+    data = game_data.load(args.game_root) if args.game_root else game_data.load()
+    defs = data["defs"]
+    built = manifest.load_built()
+    uploads = manifest.load_uploads()
+    if args.all:
+        chosen = names
+    elif args.stale:
+        chosen = stale(names, built, defs, uploads)
+    else:
+        chosen = args.generators
+    if not chosen:
+        raise SystemExit("nothing to build: name generators, or pass --all or --stale (--list lists them)")
+    unknown = [n for n in chosen if n not in names]
+    if unknown:
+        raise SystemExit(f"no such generator: {', '.join(unknown)}")
 
     params = json.loads(args.params)
-    out_path = Path(args.out) if args.out else PIPELINE_ROOT / "build" / f"{args.generator}.glb"
-    if args.no_luau:
-        luau_out_path = None
-    else:
-        luau_out_path = Path(args.luau_out) if args.luau_out else ART_DIR / f"{args.generator}.luau"
-    if args.no_render:
-        render_out_path = None
-    else:
-        render_out_path = Path(args.render_out) if args.render_out else PIPELINE_ROOT / "build" / f"{args.generator}.png"
-    build(args.generator, params, out_path, luau_out_path, render_out_path)
+    failed = {}
+    for name in chosen:
+        print(f"== {name}")
+        entry, problems = build(name, params, defs, args.out_dir, not args.no_render, uploads)
+        if problems:
+            failed[name] = problems
+            print(f"PROBLEM {name}: {'; '.join(problems)}")
+        if args.out_dir is None:
+            built[name] = entry
+            manifest.save_built(built)
+    if args.out_dir is None:
+        turret_mounts.write({name: manifest.declarations(name) for name in names})
+    waiting = sorted(n for n in chosen if args.out_dir is None and built[n]["pending"])
+    print(f"built {len(chosen)}")
+    if waiting:
+        print(f"waiting for an upload (roblox/upload_art.py): {', '.join(waiting)}")
+    if failed:
+        print(f"past their collider, their budget or their mounts: {', '.join(sorted(failed))}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

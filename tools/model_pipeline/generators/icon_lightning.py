@@ -1,10 +1,11 @@
-"""HUD icon: a lightning gun, a bolt. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: a lightning gun, a bolt. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     bolt = ic.poly(ic.BOLT)
-    return ic.build("lightning", [ic.layer([bolt], ic.ICON)])
+    return ic.build("lightning", [ic.layer([bolt], palette.ICON_FILL)])

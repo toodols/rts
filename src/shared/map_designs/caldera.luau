@@ -1,3 +1,4 @@
+--!strict
 -- Caldera: a broad volcano in the middle of the map, its crater floor ringed with geothermal vents. The wind barely
 -- blows, so the vents are where the energy is: one beside each start, and six down in the crater, with the richest
 -- metal on the map between them. The crater's walls are cliffs all round, and its rim shuts off the view into it from
@@ -126,16 +127,18 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "caldera",
+	display_name = "Caldera",
 	description = "A volcano with geothermal vents in its crater",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 52), kit.box_around(-WEST_START, 52) },
 	metal_layers = nil,
 	metal_spots = SPOTS,
-	geo_spots = VENTS,
+	geo_spots = function(): { Vector2 }
+		return VENTS
+	end,
 	reclaimables = nil,
 	wrecks = nil,
 	theme = THEME,

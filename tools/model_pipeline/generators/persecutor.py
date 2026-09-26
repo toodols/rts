@@ -1,4 +1,4 @@
-"""unit_defs `persecutor`: advanced plasma artillery, 3x3x3 cells (12x12x12 studs). Under 100 triangles.
+"""unit_defs `persecutor`: advanced plasma artillery. Under 100 triangles.
 
 The Agitator's big brother, made distinct by shape rather than size alone: a two-stepped sloped plinth, and
 on it a broad, angular armored housing (not the Agitator's round dome) with a bustle at the back and two
@@ -6,17 +6,23 @@ long gunmetal barrels side by side, lobbing forward and up out of one wide dark 
 heavy muzzle brake with the plasma glowing at its tip. The whole head yaws with weapon 1.
 """
 
-from . import defense_a_common as d
+from .shared import defense_a as d
+from .shared import palette
 
-KEY = "persecutor"
+CATEGORY = "entity"
+DEF = "persecutor"
+MOUNTS = {
+    1: {"pivot": (0, 3, 0), "muzzle": (-0.85, 5.1569, 7.6654)},
+}
 TIER_Z = 1.8
 SWIVEL_Z = 3.0
 ELEV = 35.0
 
 
 def generate(params):
+    w = params["collider"]["width"]
     base = d.Parts()
-    base.loft([d.square(11.7, 0.0), d.square(9.0, TIER_Z)], side="trim", top="body")
+    base.loft([d.square(w - 0.3, 0.0), d.square(9.0, TIER_Z)], side="trim", top="body")
     base.loft([d.square(7.4, TIER_Z), d.square(6.4, SWIVEL_Z)], side="body", top="trim")
 
     head = d.Parts()
@@ -32,6 +38,6 @@ def generate(params):
         head.block_f(gun, x, 0.0, 5.3, 6.05, (1.0, 0.95), (0.92, 0.86), tags={"all": "trim", "back": None, "bottom": None})
         head.cone_f(gun, 4, 0.36, 6.05, 0.5, x=x)
 
-    objects = d.base_objects(base, KEY, "trim")
-    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), KEY, glow_color=d.PLASMA_GLOW)
+    objects = d.base_objects(base, "trim", params["color"])
+    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), params["color"], glow_color=palette.AMBER)
     return objects

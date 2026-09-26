@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `advanced_bot_lab` (BAR coralab): a 3x2x3 cell (12 x 8 x 12 stud) factory for T2 bots.
+"""unit_defs/factory.luau `advanced_bot_lab` (BAR coralab): a factory for T2 bots.
 
 The bot lab's layout grown heavier on the same footprint: taller shoulders with a steeper glacis, each carrying a
 massive team-coloured armour block, a dark bridge across the top of the doorway with two yellow nanolathes
@@ -6,11 +6,15 @@ hanging from it and aimed out over the front lip, where production.luau builds e
 Roblox +Z), and a tall command tower at the back. Under 100 triangles.
 """
 
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "advanced_bot_lab"
 
 
 def generate(params):
-    k = fc.Kit("advbotlab")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     trim, body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     floor = 0.6
     bay = 2.4
@@ -18,7 +22,7 @@ def generate(params):
     sh_top = 5.0
     glacis_top = -3.6
 
-    footing = fc.Shape().hull((-6, 6, -6, 6), (-5.6, 5.6, -5.6, 5.6), 0.0, floor)
+    footing = fc.Shape().hull((-hw, hw, -hl, hl), (-5.6, 5.6, -5.6, 5.6), 0.0, floor)
 
     for sx in (-1, 1):
         inner, outer, outer_top = sx * bay, sx * 5.8, sx * 5.0
@@ -40,11 +44,11 @@ def generate(params):
     fc.chevron(nano, 0.0, front - 0.1, floor + 0.02, 3.4, 0.6)
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.trim(trim.build("trim")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.trim_mat(trim.build("trim")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
-    return fc.finish(objs)
+    return objs

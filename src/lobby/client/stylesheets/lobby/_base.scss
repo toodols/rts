@@ -1,0 +1,263 @@
+@use "sass:color";
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Base -------------------------------------------------------------------------------------------------
+
+ScrollingFrame {
+	border: none;
+	background-color: transparent;
+	scrollbar-width: thin;
+	scrollbar-color: $edge transparent;
+	overflow-y: auto;
+}
+
+ImageLabel {
+	border: none;
+	background-color: transparent;
+}
+
+// The small lit block at the start of a title, as the HUD's panels have.
+.accent-bar {
+	width: 4px;
+	height: 14px;
+	background-color: var(--Accent);
+
+	&.tall {
+		height: 34px;
+	}
+}
+
+.title-row {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.badge {
+	width: auto;
+	height: 18px;
+	padding: 0 space(2);
+	outline: 1px solid $edge;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+// A word stamped on a row: who is host, who is you, who may join.
+.tag {
+	width: auto;
+	height: 16px;
+	padding: 0 space(1);
+	outline: 1px solid $edge;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 10px;
+	font-weight: bold;
+
+	&.friends,
+	&.you {
+		color: var(--Accent);
+		outline: 1px solid var(--Accent);
+	}
+
+	&.host {
+		color: var(--Energy);
+		outline: 1px solid var(--Energy);
+	}
+
+	&.ready {
+		color: var(--Gain);
+		outline: 1px solid var(--Gain);
+	}
+}
+
+.seam {
+	@include seam;
+}
+
+// Lit, for :hover, and for .selected, which ui/controls.luau sets while a gamepad has the button selected: the face
+// brightens, the edge and the words take the accent, and the rail runs out along the bottom from the middle.
+@mixin button-lit {
+	background-color: $steel-lit;
+	background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.18));
+	outline: 1px solid $accent;
+
+	.button-label {
+		color: $accent;
+	}
+
+	.button-rail {
+		width: 100%;
+	}
+}
+
+// A command button. The primary one is filled with the accent, the way the lit rail is. Its words are in a label
+// inside it (see ui/controls.luau for why), and the label sizes it: the button has no layout, so the rail and the sheen
+// inside it can sit over the label rather than be laid out beside it.
+//
+// Every lit face below is written out whole, gradient and all: outlass bakes the gradient together with the
+// background-color of the rule it is declared in, so a rule changing only background-color shows nothing. Edges are lit
+// with the Sass colour, since outlass drops the colour of `outline: ... var(--Accent)`.
+.button {
+	width: auto;
+	height: 36px;
+	@include cell;
+	overflow: hidden;
+
+	&:hover,
+	&.selected {
+		@include button-lit;
+	}
+
+	&:active {
+		background-color: $steel;
+		background-image: linear-gradient(180deg, veil(black, 0.1), veil(white, 0.04));
+		outline: 1px solid $accent;
+	}
+
+	&.primary {
+		background-color: color.adjust($accent, $lightness: -22%);
+		background-image: linear-gradient(180deg, veil(white, 0.18), veil(black, 0.25));
+		outline: 1px solid $accent;
+
+		&:hover,
+		&.selected {
+			background-color: color.adjust($accent, $lightness: -10%);
+			background-image: linear-gradient(180deg, veil(white, 0.3), veil(black, 0.2));
+			outline: 1px solid color.adjust($accent, $lightness: 18%);
+
+			.button-label {
+				color: white;
+			}
+
+			.button-rail {
+				background-color: white;
+			}
+		}
+
+		&:active {
+			background-color: color.adjust($accent, $lightness: -30%);
+			background-image: linear-gradient(180deg, veil(black, 0.15), veil(white, 0.1));
+		}
+	}
+
+	&.locked,
+	&:disabled {
+		opacity: 0.4;
+	}
+
+	// the join button on each row of the browser, as wide as its column
+	&.join {
+		width: 96px;
+	}
+}
+
+// As tall as the button, so its words sit in the middle; a fixed-width button's label spans it too.
+.button-label {
+	width: auto;
+	height: 100%;
+	padding: 0 space(5);
+	font-family: Michroma;
+	font-size: 12px;
+	font-weight: bold;
+	transition: color $fast $ease-out;
+
+	.button.join > &,
+	.button.play > & {
+		width: 100%;
+	}
+}
+
+// The lit line along the bottom of a lit button, run out from the middle.
+.button-rail {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 0;
+	height: 2px;
+	z-index: 2;
+	background-color: $accent;
+	pointer-events: none;
+	transition: width $medium $ease-out;
+}
+
+// A band of light across the button, swept over it once each time it lights: ui/controls.luau moves the band by the
+// offset of a gradient of its own, so the frame itself stays put over the button.
+.button-sheen {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	background-color: white;
+	pointer-events: none;
+}
+
+// One choice among several. The one in effect is lit; a locked one (anyone but the host) does not light on hover.
+.chip {
+	width: auto;
+	height: 30px;
+	padding: 0 space(3);
+	@include cell;
+	@include stack(row, 0);
+	justify-content: center;
+	align-items: center;
+
+	// Lit with the accent, so the choice in effect reads at a glance and not only on a closer look at its edge. The
+	// gradient is written out again because outlass bakes the cell's translucent gradient together with the
+	// background-color of the rule it is declared in; changing only background-color here would not show.
+	&.active {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
+		outline: 1px solid $accent;
+	}
+
+	// Lit, written out whole for the same reason as .active's (and the edge in the Sass colour; see .button).
+	&:hover {
+		background-color: $steel-lit;
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.18));
+		outline: 1px solid $accent;
+
+		> .chip-label {
+			color: var(--Text);
+		}
+	}
+
+	&.active:hover {
+		background-color: color.adjust($accent, $lightness: -20%);
+		background-image: linear-gradient(180deg, veil(white, 0.22), veil(black, 0.18));
+		outline: 1px solid color.adjust($accent, $lightness: 18%);
+	}
+
+	&:active {
+		background-color: $steel;
+		background-image: linear-gradient(180deg, veil(black, 0.1), veil(white, 0.04));
+		outline: 1px solid $accent;
+	}
+
+	&.locked:hover {
+		background-color: $steel-raised;
+		outline: 1px solid $edge;
+	}
+
+	&.locked.active:hover {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.12), veil(black, 0.2));
+		outline: 1px solid $accent;
+	}
+}
+
+.chip-label {
+	color: var(--TextDim);
+	font-size: 13px;
+	font-weight: bold;
+	transition: color $fast $ease-out;
+}
+
+.chip.active > .chip-label {
+	color: var(--Text);
+}

@@ -1,5 +1,5 @@
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // The panel shown while the game waits for everyone to be ready: a plate over the top middle of the screen, the
 // title, a line on what to do, and every player in a list.

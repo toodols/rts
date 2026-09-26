@@ -5,7 +5,7 @@
 -- at the surface so the ground reads as a smooth slope rather than a staircase. That one-to-one
 -- mapping is what lets deformation rewrite only the voxels whose cells actually changed (`rewrite`).
 --
--- Over the low ground lies a flat water part at `config.WATER_LEVEL`. It only draws the sea: what the
+-- Over the low ground lies a flat water part at `ground_levels.WATER_LEVEL`. It only draws the sea: what the
 -- sea means is worked out from the heightmap, where ground below that level is under water, and each
 -- def says how deep it may stand in it.
 --
@@ -15,20 +15,22 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local Workspace = game:GetService "Workspace"
 
-local config = require(ReplicatedStorage.Shared.config)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
-local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local map_state = require(ReplicatedStorage.Shared.map_state)
+local map_types = require(ReplicatedStorage.Shared.map_types)
 local passability = require(ReplicatedStorage.Shared.passability)
 local ground_paint = require(ReplicatedStorage.Shared.ground_paint)
 
-type Theme = map_presets.Theme
+type Theme = map_types.Theme
 type Painter = ground_paint.Painter
 
-local CELL_STUDS = config.CELL_STUDS
+local CELL_STUDS = world_scale.CELL_STUDS
 -- Voxels are written in blocks rather than all at once to keep any single WriteVoxels call small.
 local CHUNK_CELLS = 32
--- Below the deepest the basins can go, and a multiple of the voxel size.
-local FLOOR_HEIGHT = -32
+-- Below the deepest the basins, and the craters dug into them, can go, and a multiple of the voxel size.
+local FLOOR_HEIGHT = ground_levels.TERRAIN_FLOOR_HEIGHT
 
 -- Measured, not documented: with occupancy taken as the filled fraction of the voxel from its
 -- bottom, Roblox draws the surface half a voxel (2 studs) above where the heightmap says it is
@@ -37,7 +39,7 @@ local FLOOR_HEIGHT = -32
 -- and building is stood on.
 local SURFACE_BIAS = CELL_STUDS / 2
 
-local WATER_HEIGHT = config.WATER_LEVEL
+local WATER_HEIGHT = ground_levels.WATER_LEVEL
 local WATER_THICKNESS = 4
 -- Wide enough that its own edge falls outside the fog, which ends at 3.1 map half-widths.
 local WATER_SPAN_FACTOR = 4
@@ -236,8 +238,8 @@ local function color_materials(theme: Theme)
 end
 
 local function render()
-	local theme = map_presets.get(heightmap.get_preset()).theme
-	painter = ground_paint.make_painter(theme, heightmap.get_seed())
+	local theme = map_state.preset().theme
+	painter = ground_paint.make_painter(theme, (map_state.get() :: map_state.MapState).seed)
 	Workspace.Terrain:Clear()
 	color_materials(theme)
 	render_water(theme)

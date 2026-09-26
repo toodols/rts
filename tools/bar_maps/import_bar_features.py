@@ -38,33 +38,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "..", "src", "shared", "bar_maps")
 CACHE = os.path.join(tempfile.gettempdir(), "bar_map_archives")
 
-BAR_RAW = "https://raw.githubusercontent.com/beyond-all-reason/Beyond-All-Reason/master/"
+# BAR's repository as it was when the committed feature modules were made, so a rerun reads the same defs
+BAR_COMMIT = "c958cfa908986831a2e4973543b21ff84987e29c"
+BAR_RAW = f"https://raw.githubusercontent.com/beyond-all-reason/Beyond-All-Reason/{BAR_COMMIT}/"
 # BAR's own features, which a map can place without defining them
 BAR_FEATURES = ["features/rocks30.lua", "features/enginetrees_override.lua"]
 
-# Each map by its name here and its springName in BAR's maps-metadata map_list.yaml
-MAPS = {
-    "supreme_isthmus": "Supreme Isthmus v2.1",
-    "hooked": "Hooked 1.1.1",
-    "center_command": "Center Command BAR v1.0",
-    "rifted": "Rifted_V2",
-    "comet_catcher": "Comet Catcher Remake 1.8",
-    "altair_crossing": "Altair_Crossing_V4.1",
-    "ancient_bastion": "Ancient Bastion Remake 0.5",
-    "folsom_dam": "FolsomDamR 1.17",
-    "pinewood_derby": "Pinewood_Derby_V1",
-    "acidic_quarry": "AcidicQuarry 5.17",
-    "aurelia": "Aurelia v4.1",
-    "canis_river": "Canis River v1.4",
-    "boulder_beach": "Boulder_Beach_V1",
-    "charlie_in_the_hills": "Charlie In The Hills Remake v1.1.1",
-    "coast_to_coast": "Coast To Coast BAR v1.0",
-    "devils_postpiles": "Devil's Postpiles 1.1.1",
-    "faster_than_light": "Faster Than Light 1.1",
-    "gasbag_grabens": "Gasbag Grabens 1.1.1",
-    "great_divide": "Great Divide V1",
-    "greenest_fields": "Greenest Fields 1.3.1",
-}
+# Each map by its name here and its springName in BAR's maps-metadata map_list.yaml (maps.json, as import_bar_maps.py
+# has them)
+with open(os.path.join(HERE, "maps.json"), encoding="utf-8") as maps_file:
+    MAPS = {entry["name"]: entry["spring_name"] for entry in json.load(maps_file)}
 
 # How what a feature holds decides which of the game's reclaimables it is drawn as (unit_defs/reclaimable.luau): metal
 # makes a rock, sized by its footprint; energy alone makes a tree, or a shrub if it holds little.

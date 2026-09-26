@@ -1,3 +1,4 @@
+--!strict
 -- What the lobby server says this player can see, as a hook, and the one way to ask it for anything.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -7,14 +8,16 @@ local React = require(ReplicatedStorage.Packages.react)
 local protocol = require(ReplicatedStorage.Lobby.protocol)
 
 type State = protocol.State
+type Action = protocol.Action
 
 local lobby_request: RemoteFunction = ReplicatedStorage.Lobby.LobbyRequest
 local lobby_state: RemoteEvent = ReplicatedStorage.Lobby.LobbyState
 
 local EMPTY: State = { lobbies = {}, current = nil, notice = nil }
 
--- Asks the server to `action` (see protocol.ACTIONS) and returns its answer: whether it did, and why not if not.
-local function request(action: string, argument: any?): (boolean, string?)
+-- Asks the server to `action` (see protocol.ACTIONS for what argument it takes) and returns its answer: whether it did,
+-- and why not if not.
+local function request(action: Action, argument: any?): (boolean, string?)
 	local ok, done, message = pcall(function()
 		return lobby_request:InvokeServer(action, argument)
 	end)
@@ -34,7 +37,7 @@ local function use_state(): (State, boolean)
 			set_state(next_state)
 			set_received(true)
 		end)
-		task.spawn(request, protocol.ACTIONS.refresh)
+		task.spawn(request, "refresh" :: Action)
 		return function()
 			connection:Disconnect()
 		end

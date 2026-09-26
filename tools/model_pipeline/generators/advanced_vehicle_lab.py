@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `advanced_vehicle_lab` (BAR coravp): a 3x2x3 cell (12 x 8 x 12 stud) factory for T2
+"""unit_defs/factory.luau `advanced_vehicle_lab` (BAR coravp): a factory for T2
 vehicles.
 
 The vehicle lab's wide bay walled in and roofed over: tall armoured side walls with a steep front glacis, a big
@@ -7,11 +7,15 @@ doorway high above the bay, from which two yellow nanolathes reach down and out 
 production.luau builds each unit (Blender -Y, Roblox +Z). Under 100 triangles.
 """
 
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "advanced_vehicle_lab"
 
 
 def generate(params):
-    k = fc.Kit("advvehlab")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     trim, body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     floor = 0.5
     bay = 3.6
@@ -19,7 +23,7 @@ def generate(params):
     wall_top = 5.2
     glacis_top = -4.2
 
-    footing = fc.Shape().hull((-6, 6, -6, 6), (-5.8, 5.8, -5.8, 5.8), 0.0, floor)
+    footing = fc.Shape().hull((-hw, hw, -hl, hl), (-5.8, 5.8, -5.8, 5.8), 0.0, floor)
 
     for sx in (-1, 1):
         inner, outer, outer_top = sx * bay, sx * 6.0, sx * 5.2
@@ -45,11 +49,11 @@ def generate(params):
     fc.chevron(nano, 0.0, front - 0.1, floor + 0.02, 4.0, 0.7)
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.trim(trim.build("trim")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.trim_mat(trim.build("trim")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
-    return fc.finish(objs)
+    return objs

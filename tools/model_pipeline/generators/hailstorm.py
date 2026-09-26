@@ -1,19 +1,21 @@
 """unit_defs/air_t2.luau `hailstorm`: the heavy bomber.
 
-Collider capsule(56, 30, 64): radius 64/22 = 2.91 studs, height 30/11 = 2.73. Faceted low-poly, under 100
+Faceted low-poly, under 100
 triangles. The Whirlwind's big brother: a long, deep hexagonal fuselage with a glazed nose, broad swept wings (the
 team-coloured accent) carrying two big engine pods, a twin tail on a wide tailplane, and a long dark bomb bay
 under the belly. Nothing moves: its bombs just drop.
 """
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(150, 104, 78)
-RADIUS, HEIGHT = 64 / 22, 30 / 11
+CATEGORY = "entity"
+DEF = "hailstorm"
 
 
 def generate(params):
+    accent = params["color"]
     zc = 1.25
     objects = []
 
@@ -62,7 +64,7 @@ def generate(params):
             (side * 1.25, 2.40, zc + 0.26),
         ))
     for obj in accents:
-        air.accent_mat(obj, "hailstorm", ACCENT)
+        common.accent_mat(obj, accent)
         objects.append(obj)
 
     trims, glows = [], []
@@ -82,9 +84,7 @@ def generate(params):
         common.trim_mat(obj)
         objects.append(obj)
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
         objects.append(obj)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "hailstorm")
     return objects

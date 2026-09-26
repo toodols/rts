@@ -1,6 +1,6 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // The end of the game: the whole screen dimmed, and a plate in the middle of it with the result, big, and how it was
 // won beneath. Its edge and title take the result's colour: green for a win, red for a loss, plain for a spectator.

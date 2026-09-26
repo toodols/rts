@@ -1,0 +1,3 @@
+// The HUD's palette on its own (stylesheets/_theme.scss's `:root` tokens), compiled by outlass into theme_stylesheet.lua
+// (see build_stylesheets.bat) for Luau to read the same colours the stylesheets draw in (palette.luau).
+@use "stylesheets/theme";

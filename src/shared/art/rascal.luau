@@ -2,14 +2,14 @@
 return {
 	groups = {
 		base = { pivot = { 0, 0, 0 } },
-		wheel_fl = { pivot = { -0.6003, 0.4049, 0.7718 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
-		wheel_fr = { pivot = { 0.6003, 0.4049, 0.7718 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
-		wheel_bl = { pivot = { -0.6003, 0.4049, -0.7718 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
-		wheel_br = { pivot = { 0.6003, 0.4049, -0.7718 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
-		turret_1 = { pivot = { 0, 0.6857, -0.3859 }, kind = "turret", weapon = 1, muzzle = { 0, 0.187, 1.1095 } },
+		wheel_fl = { pivot = { -0.6003, 0.4049, 0.7236 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
+		wheel_fr = { pivot = { 0.6003, 0.4049, 0.7236 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
+		wheel_bl = { pivot = { -0.6003, 0.4049, -0.82 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
+		wheel_br = { pivot = { 0.6003, 0.4049, -0.82 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.4049 },
+		turret_1 = { pivot = { 0, 0.6857, -0.4341 }, kind = "turret", weapon = 1 },
 	},
 	parts = {
-		{ group = "base", color = { 0.7686, 0.3765, 0.3137 }, offset = { 0, 0.4364, 0.0482 }, size = { 0.6926, 0.4987, 2.2672 }, hash = "1f8a4d819e0f853b", team = true, mesh = "rbxassetid://102337327662559" },
+		{ group = "base", color = { 0.7686, 0.3765, 0.3137 }, offset = { 0, 0.4364, 0 }, size = { 0.6926, 0.4987, 2.2672 }, hash = "1f8a4d819e0f853b", team = true, mesh = "rbxassetid://102337327662559" },
 		{ group = "wheel_fl", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0, 0 }, size = { 0.254, 0.8098, 0.9351 }, hash = "08ac71abb8697f33", mesh = "rbxassetid://134655665376741" },
 		{ group = "wheel_fr", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0, 0 }, size = { 0.254, 0.8098, 0.9351 }, hash = "d75c57ed5068e8ed", mesh = "rbxassetid://104284835313996" },
 		{ group = "wheel_bl", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0, 0 }, size = { 0.254, 0.8098, 0.9351 }, hash = "08ac71abb8697f33", mesh = "rbxassetid://134655665376741" },

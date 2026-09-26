@@ -1,5 +1,5 @@
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // Piloting a unit: a thin lit ring in the very middle of the view, with a dot at its heart, where the shots go. Over an
 // enemy the chosen weapon reaches, it closes in, thicker and red. The ring's colour is the Sass value, since outlass

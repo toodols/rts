@@ -13,12 +13,14 @@
 			"Client": {
 				"$path": "src/client"
 			},
-			"Models": {
-				"$path": "src/models",
-				"$ignoreUnknownInstances": true
+			"ClientShared": {
+				"$path": "src/client_shared"
 			}
 		},
 		"ServerScriptService": {
+			"ServerShared": {
+				"$path": "src/server_shared"
+			},
 			"Server": {
 				"$path": "src/server",
 				"pow": {

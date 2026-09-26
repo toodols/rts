@@ -1,16 +1,22 @@
-"""unit_defs/bot_t2.luau `mammoth` (corsumo in BAR): the heaviest bot there is, capsule(60, 60, 60) -- 2.7 studs
-of radius, 5.45 tall, at most 100 triangles. Where the Sumo is a squat block on stubby legs, the Mammoth is built
+"""unit_defs/bot_t2.luau `mammoth` (corsumo in BAR): the heaviest bot there is, at most 100 triangles. Where the Sumo is a squat block on stubby legs, the Mammoth is built
 like its name: thick bent pillar legs flaring into round-shouldered elephant feet, a hunched hull whose armored back
 slopes down to the front, great shoulder humps, and one huge heavy laser pushed out of the chest like a trunk.
 Everything above the waist turns to aim.
 """
 
-from . import bot_t2_common as bt
-from .bot_t2_common import FRONT, UP, hring, vring
+from .shared import bot_t2 as bt
+from .shared import palette
+from .shared.bot_t2 import FRONT, UP, hring, vring
+
+CATEGORY = "entity"
+DEF = "mammoth"
+MOUNTS = {
+    1: {"pivot": (0, 2.5, 0.1003), "muzzle": (0.2301, 0.6591, 2.627)},
+}
 
 
 def generate(params):
-    bot = bt.Bot("mammoth", bt.rgb(226, 178, 74), glow=(1.0, 0.22, 0.12, 1.0), collider=bt.collider(60, 60, 60))
+    bot = bt.Bot("mammoth", params["color"], glow=palette.HEAVY_LASER)
 
     # legs: one sweep each from a broad foot on the ground, through the ankle and a forward knee, up into the hull
     leg = bt.sweep_faces([hring(1.2, -0.1, 0.0, 1.15, 1.55), hring(1.2, -0.05, 0.45, 0.8, 0.95),

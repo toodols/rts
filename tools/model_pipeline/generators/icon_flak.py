@@ -1,11 +1,12 @@
-"""HUD icon: flak (anti-air cannon), a burst in a puff of smoke, with shrapnel flying out. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: flak (anti-air cannon), a burst in a puff of smoke, with shrapnel flying out. Written to src/shared/ui_art/ (see shared/icon)."""
 
 import math
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     smoke = [ic.circle(-0.62, 0.3, 0.85, 18), ic.circle(0.6, 0.45, 0.9, 18), ic.circle(0.0, -0.45, 0.9, 18)]
@@ -13,7 +14,7 @@ def generate(params):
     return ic.build(
         "flak",
         [
-            ic.layer(smoke + shrapnel, ic.ICON),
-            ic.layer([ic.star(0.0, 0.05, 1.15, 0.52, points=8, angle=0.0)], ic.ICON),
+            ic.layer(smoke + shrapnel, palette.ICON_FILL),
+            ic.layer([ic.star(0.0, 0.05, 1.15, 0.52, points=8, angle=0.0)], palette.ICON_FILL),
         ],
     )

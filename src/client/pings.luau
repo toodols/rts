@@ -10,13 +10,16 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local TweenService = game:GetService "TweenService"
 local UserInputService = game:GetService "UserInputService"
-local Workspace = game:GetService "Workspace"
 
+local signal = require(ReplicatedStorage.Shared.signal)
 local types = require(ReplicatedStorage.Shared.types)
-local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local appearance = require(ReplicatedStorage.Shared.appearance)
 
-local sounds = require(ReplicatedStorage.Client.sounds)
+local cursor = require(ReplicatedStorage.Client.cursor)
+local input_router = require(ReplicatedStorage.Client.input_router)
+local world_fx = require(ReplicatedStorage.Client.world_fx)
+
+local sounds = require(ReplicatedStorage.ClientShared.sounds)
 
 local ping: RemoteEvent = ReplicatedStorage.Shared.Ping
 
@@ -24,7 +27,6 @@ local ping: RemoteEvent = ReplicatedStorage.Shared.Ping
 -- button is down or between the clicks, for them to still count as clicks on one spot.
 local DOUBLE_CLICK_SECONDS = 0.4
 local CLICK_SLOP = 6
-local GROUND_RAY_LENGTH = 3000
 
 -- How a ping looks: a column BEAM_HEIGHT studs tall standing for PING_SECONDS, and RING_COUNT flat discs, one every
 -- RING_GAP seconds, each spreading out to RING_RADIUS studs as it fades over RING_SECONDS.
@@ -45,37 +47,20 @@ export type Ping = {
 	ends: number,
 }
 
--- The pings standing now, oldest first, and those told when one comes or goes.
+-- The pings standing now, oldest first; `changed` tells whoever subscribes whenever one comes or goes.
 local active: { Ping } = {}
-local listeners: { () -> () } = {}
-
-local function announce()
-	for _, listener in listeners do
-		listener()
-	end
-end
+local changed = signal.new()
 
 local function add(ping_info: Ping)
 	table.insert(active, ping_info)
-	announce()
+	changed.fire()
 	task.delay(PING_SECONDS, function()
 		local index = table.find(active, ping_info)
 		if index ~= nil then
 			table.remove(active, index)
-			announce()
+			changed.fire()
 		end
 	end)
-end
-
--- Calls `listener` whenever a ping comes or goes. Returns a function that stops it.
-local function subscribe(listener: () -> ()): () -> ()
-	table.insert(listeners, listener)
-	return function()
-		local index = table.find(listeners, listener)
-		if index ~= nil then
-			table.remove(listeners, index)
-		end
-	end
 end
 
 local function all_active(): { Ping }
@@ -86,51 +71,23 @@ local press_location: Vector2? = nil
 local last_click_time = -math.huge
 local last_click_location = Vector2.zero
 
-local function ping_folder(): Folder
-	local folder = Workspace:FindFirstChild "Pings"
-	if folder == nil then
-		folder = Instance.new "Folder"
-		folder.Name = "Pings"
-		folder.Parent = Workspace
-	end
-	return folder :: Folder
-end
-
--- Where the cursor meets the ground, as input.luau finds it: from the heightmap, so that units and scenery under the
--- cursor are looked through.
-local function ground_under_cursor(): Vector3?
-	local camera = Workspace.CurrentCamera
-	if camera == nil then
-		return nil
-	end
-	local location = UserInputService:GetMouseLocation()
-	local ray = camera:ViewportPointToRay(location.X, location.Y)
-	return heightmap.ray_to_ground(ray.Origin, ray.Direction, GROUND_RAY_LENGTH)
-end
-
-local function neon_part(color: Color3): Part
-	local part = Instance.new "Part"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
+-- A glowing part in `color` for a ping, in the Pings folder of the Effects.
+local function neon_part(name: string, color: Color3): Part
+	local part = world_fx.part(name)
 	part.Color = color
+	part.Parent = world_fx.folder "Pings"
 	return part
 end
 
 local function draw(at: Vector3, team: types.TeamId)
 	local color = appearance.team_color(team)
-	local folder = ping_folder()
 
-	local beam = neon_part(color)
+	local beam = neon_part("PingBeam", color)
 	beam.Shape = Enum.PartType.Cylinder
-	-- a cylinder's length runs along its own x, so it is stood on end
+	-- a cylinder's length runs along its own x, so rolled as one lying flat is, it stands on end
 	beam.Size = Vector3.new(BEAM_HEIGHT, BEAM_WIDTH, BEAM_WIDTH)
-	beam.CFrame = CFrame.new(at + Vector3.yAxis * (BEAM_HEIGHT / 2)) * CFrame.Angles(0, 0, math.pi / 2)
+	beam.CFrame = world_fx.lying_flat(at + Vector3.yAxis * (BEAM_HEIGHT / 2))
 	beam.Transparency = 0.2
-	beam.Parent = folder
 	TweenService
 		:Create(beam, TweenInfo.new(PING_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Transparency = 1 })
 		:Play()
@@ -138,31 +95,30 @@ local function draw(at: Vector3, team: types.TeamId)
 
 	for index = 0, RING_COUNT - 1 do
 		task.delay(index * RING_GAP, function()
-			local ring = neon_part(color)
+			local ring = neon_part("PingRing", color)
 			ring.Shape = Enum.PartType.Cylinder
 			ring.Size = Vector3.new(RING_THICKNESS, 1, 1)
-			ring.CFrame = CFrame.new(at + Vector3.yAxis * 0.2) * CFrame.Angles(0, 0, math.pi / 2)
+			ring.CFrame = world_fx.lying_flat(at + Vector3.yAxis * 0.2)
 			ring.Transparency = 0.1
-			ring.Parent = folder
-			TweenService:Create(
+			world_fx.fade(
 				ring,
-				TweenInfo.new(RING_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				RING_SECONDS,
 				{ Size = Vector3.new(RING_THICKNESS, RING_RADIUS * 2, RING_RADIUS * 2), Transparency = 1 }
-			):Play()
-			task.delay(RING_SECONDS, ring.Destroy, ring)
+			)
 		end)
 	end
 end
 
-local function on_input_began(input: InputObject, processed: boolean)
+local function on_input_began(input: InputObject, processed: boolean): boolean
 	if processed or input.UserInputType ~= Enum.UserInputType.MouseButton3 then
-		return
+		return false
 	end
 	press_location = UserInputService:GetMouseLocation()
+	return true
 end
 
-local function on_input_ended(input: InputObject)
-	if input.UserInputType ~= Enum.UserInputType.MouseButton3 or press_location == nil then
+local function on_input_ended(_: InputObject)
+	if press_location == nil then
 		return
 	end
 	local location = UserInputService:GetMouseLocation()
@@ -176,7 +132,7 @@ local function on_input_ended(input: InputObject)
 	local now = os.clock()
 	if now - last_click_time <= DOUBLE_CLICK_SECONDS and (location - last_click_location).Magnitude <= CLICK_SLOP then
 		last_click_time = -math.huge
-		local at = ground_under_cursor()
+		local at = cursor.ground_point()
 		if at ~= nil then
 			ping:FireServer(at)
 		end
@@ -187,8 +143,7 @@ local function on_input_ended(input: InputObject)
 end
 
 local function init()
-	UserInputService.InputBegan:Connect(on_input_began)
-	UserInputService.InputEnded:Connect(on_input_ended)
+	input_router.push({ began = on_input_began, ended = on_input_ended, exclusive = false })
 	ping.OnClientEvent:Connect(function(message: { at: Vector3, team: types.TeamId, name: string })
 		draw(message.at, message.team)
 		add({ at = message.at, team = message.team, name = message.name, ends = os.clock() + PING_SECONDS })
@@ -198,7 +153,7 @@ end
 
 return table.freeze({
 	init = init,
-	subscribe = subscribe,
+	subscribe = changed.subscribe,
 	active = all_active,
 	-- how tall a ping's column stands, so its label can float over it
 	BEAM_HEIGHT = BEAM_HEIGHT,

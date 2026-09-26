@@ -5,7 +5,7 @@ return {
 		wheel_1 = { pivot = { 0, 0.496, 1.2247 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.481 },
 		wheel_2 = { pivot = { 0, 0.496, -0.2449 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.481 },
 		wheel_3 = { pivot = { 0, 0.496, -1.2915 }, kind = "wheel", axis = { 1, 0, 0 }, radius = 0.481 },
-		turret_1 = { pivot = { 0, 1.1724, -0.334 }, kind = "turret", weapon = 1, muzzle = { 0, 1.6245, 1.0041 } },
+		turret_1 = { pivot = { 0, 1.1724, -0.334 }, kind = "turret", weapon = 1 },
 	},
 	parts = {
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.9169, 0 }, size = { 2.946, 0.511, 3.6742 }, hash = "8bbe77a89c454c89", mesh = "rbxassetid://95680211188024" },

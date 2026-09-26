@@ -1,9 +1,10 @@
-"""HUD icon: the Fight order (attack-move), two crossed swords. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: the Fight order (attack-move), two crossed swords. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def sword(angle):
     blade = ic.poly(((-0.25, -0.5), (0.25, -0.5), (0.25, 1.35), (0.0, 1.85), (-0.25, 1.35)))
@@ -12,4 +13,4 @@ def sword(angle):
 
 
 def generate(params):
-    return ic.build("fight", [ic.layer(sword(40.0), ic.ICON), ic.layer(sword(-40.0), ic.ICON)])
+    return ic.build("fight", [ic.layer(sword(40.0), palette.ICON_FILL), ic.layer(sword(-40.0), palette.ICON_FILL)])

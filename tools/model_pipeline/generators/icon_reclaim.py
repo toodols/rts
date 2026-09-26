@@ -1,11 +1,12 @@
-"""HUD icon: the Reclaim order, three arrows chasing one another round (recycling). Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: the Reclaim order, three arrows chasing one another round (recycling). Written to src/shared/ui_art/ (see shared/icon)."""
 
 import math
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def arrow(a0, a1, r_in=0.78, r_out=1.42, head=0.36, lead=32.0):
     mid = (r_in + r_out) / 2
@@ -20,4 +21,4 @@ def arrow(a0, a1, r_in=0.78, r_out=1.42, head=0.36, lead=32.0):
 
 def generate(params):
     arrows = [arrow(k * 120.0 + 12.0, k * 120.0 + 78.0) for k in range(3)]
-    return ic.build("reclaim", [ic.layer(arrows, ic.ICON)])
+    return ic.build("reclaim", [ic.layer(arrows, palette.ICON_FILL)])

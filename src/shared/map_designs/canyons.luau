@@ -1,3 +1,4 @@
+--!strict
 -- Canyons: a tableland between the two sides' low ground, cut through by a maze of narrow canyons with sheer walls.
 -- Down in them nothing sees past the next bend, so a fight is close and sudden, and an ambush at a junction beats a
 -- longer range. The canyons open out where they meet, and the metal is in those plazas.
@@ -207,12 +208,12 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "canyons",
+	display_name = "Canyons",
 	description = "A maze of canyons through a tableland",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 46), kit.box_around(-WEST_START, 46) },
 	metal_layers = nil,
 	metal_spots = SPOTS,

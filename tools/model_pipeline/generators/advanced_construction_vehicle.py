@@ -2,19 +2,18 @@
 
 A broad tracked hull with a team-colour cab up front on the left, and on the back deck a high-vis yellow
 nanolathe crane -- turntable, raised boom, a forearm angled down and a glowing emitter nozzle -- that turns
-toward whatever it is building. Collider capsule(36, 36, 47): radius 2.136, height 3.27 studs. 100-triangle
-budget.
-"""
+toward whatever it is building."""
 
-from . import common
-from . import vehicle_t2_common as v
+from .shared import common
+from .shared import palette
+from .shared import vehicle_t2 as v
 
-ACCENT = v.rgb(226, 178, 74)
+CATEGORY = "entity"
+DEF = "advanced_construction_vehicle"
 
 
 def generate(params):
-    radius, height = v.collider(36, 36, 47)
-    m = v.Mats("advanced_construction_vehicle", tuple(params.get("accent_color", ACCENT)))
+    m = common.Materials(params["color"], palette.HEADLIGHT)
     objects = []
 
     L, W = 3.6, 2.16
@@ -33,8 +32,7 @@ def generate(params):
 
     # Cab forward on the left (10 tris) with a dark windscreen (2); headlights on the bow (2 each).
     cx, cy0, cy1, ch = -0.5, -hl + 0.62, -hl + 1.62, 0.66
-    cab = v.block("cab", 0.98, cy1 - cy0, ch, origin=(cx, (cy0 + cy1) / 2.0, deck), top=(0.8, 0.62),
-                  top_offset=(0.0, 0.16))
+    cab = common.block("cab", 0.98, cy1 - cy0, ch, top=(0.8, 0.62), top_offset=(0.0, 0.16), at=(cx, (cy0 + cy1) / 2.0, deck), drop=('bottom',))
     objects.append(m.accent(cab))
     fy_top = (cy0 + cy1) / 2.0 + 0.16 - 0.31
 
@@ -59,7 +57,7 @@ def generate(params):
 
     # Nanolathe crane about its turntable: turntable (10 tris), boom and forearm (8 each), emitter (10).
     pivot = (0.25, 0.55, deck)
-    turntable = v.block("turntable", 0.8, 0.8, 0.28, top=(0.64, 0.64))
+    turntable = common.block("turntable", 0.8, 0.8, 0.28, top=(0.64, 0.64), drop=('bottom',))
     shoulder = (0.0, 0.2, 0.2)
     boom, elbow = v.rod("boom", 0.15, 1.2, shoulder, pitch=50.0, front_cap=False)
     fore, wrist = v.rod("forearm", 0.12, 0.72, elbow, pitch=-52.0, front_cap=False)
@@ -69,9 +67,8 @@ def generate(params):
     crane = common.merge("crane", arm, origin=pivot)
     objects.append(common.art_group(crane, "nanolathe", pivot=True, kind="work"))
     nozzle, _ = v.rod("emitter", 0.08, 0.22, wrist, pitch=-52.0, radius2=0.19)
-    m.glow(nozzle, color=v.NANO_COLOR, name="nano")
+    m.glow(nozzle, palette.NANO)
     nozzle = common.merge("emitter", [nozzle], origin=pivot)
     objects.append(common.art_group(nozzle, "nanolathe", kind="work"))
 
-    v.check_fit(objects, radius, height, "advanced_construction_vehicle")
     return objects

@@ -1,3 +1,4 @@
+--!strict
 -- Who is in the lobby and on which side, with the empty places left. In a team game each team is a column, and a
 -- player moves to the other team by clicking one of its empty places; against the scavengers and in a free for all
 -- everyone is in one list. Under them are the spectators, who come to the game only to watch: a player moves to
@@ -18,10 +19,12 @@ local protocol = require(ReplicatedStorage.Lobby.protocol)
 
 local controls = require(script.Parent.controls)
 
-type LobbyView = protocol.LobbyView
-type SeatView = protocol.SeatView
+local format = require(ReplicatedStorage.ClientShared.format)
 
-local ACTIONS = protocol.ACTIONS
+type LobbyView = protocol.LobbyView
+
+-- An element's properties: strict mode cannot type a table of them that mixes tags, properties and handlers.
+type Props = { [any]: any }
 
 local local_player = Players.LocalPlayer
 
@@ -29,7 +32,7 @@ local local_player = Players.LocalPlayer
 type BonusProps = {
 	bonuses: { [string]: number },
 	can_change: boolean,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 }
 
 local function bonus_text(percent: number): string
@@ -52,7 +55,7 @@ local function Bonus(props: { user_id: number, bonus: BonusProps, LayoutOrder: n
 		})
 	end
 	local function step(by: number)
-		bonus.act(ACTIONS.set_bonus, { user_id = props.user_id, percent = percent + by })
+		bonus.act("set_bonus", { user_id = props.user_id, percent = percent + by })
 	end
 	return React.createElement("Frame", {
 		[React.Tag] = "bonus",
@@ -90,7 +93,9 @@ local function Bonus(props: { user_id: number, bonus: BonusProps, LayoutOrder: n
 end
 
 -- `bonus` is given to a player's seat, not a spectator's.
-local function Seat(props: { seat: SeatView, host: number, ready: boolean, bonus: BonusProps?, LayoutOrder: number })
+local function Seat(
+	props: { seat: game_modes.Seat, host: number, ready: boolean, bonus: BonusProps?, LayoutOrder: number }
+)
 	local you = props.seat.user_id == local_player.UserId
 	return React.createElement("Frame", {
 		[React.Tag] = if you then "seat you" else "seat",
@@ -99,7 +104,7 @@ local function Seat(props: { seat: SeatView, host: number, ready: boolean, bonus
 		Name = React.createElement("TextLabel", {
 			[React.Tag] = "seat-name grow",
 			LayoutOrder = 1,
-			Text = props.seat.name,
+			Text = format.escape(props.seat.name),
 		}),
 		Host = if props.seat.user_id == props.host
 			then React.createElement("TextLabel", {
@@ -133,20 +138,23 @@ local function Seat(props: { seat: SeatView, host: number, ready: boolean, bonus
 end
 
 local function OpenSeat(props: { can_move: boolean, move_label: string, on_move: () -> (), LayoutOrder: number })
-	return React.createElement("TextButton", {
-		[React.Tag] = if props.can_move then "seat open movable" else "seat open",
-		LayoutOrder = props.LayoutOrder,
-		Text = if props.can_move then props.move_label else "Open",
-		AutoButtonColor = false,
-		Interactable = props.can_move,
-		[React.Event.Activated] = props.on_move,
-	})
+	return React.createElement(
+		"TextButton",
+		{
+			[React.Tag] = if props.can_move then "seat open movable" else "seat open",
+			LayoutOrder = props.LayoutOrder,
+			Text = if props.can_move then props.move_label else "Open",
+			AutoButtonColor = false,
+			Interactable = props.can_move,
+			[React.Event.Activated] = props.on_move,
+		} :: Props
+	)
 end
 
 local function Side(
 	props: {
 		label: string,
-		seats: { SeatView },
+		seats: { game_modes.Seat },
 		room: number,
 		-- how many empty places to draw, if not all of them
 		open: number?,
@@ -209,15 +217,15 @@ end
 
 local function SeatsPanel(props: {
 	lobby: LobbyView,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 })
 	local lobby = props.lobby
-	local mode = game_modes.get(lobby.mode) :: game_modes.Mode
+	local mode = game_modes.get(lobby.match.mode) :: game_modes.Mode
 
 	local my_side: number? = nil
-	local players: { SeatView } = {}
-	local spectators: { SeatView } = {}
-	for _, seat in lobby.seats do
+	local players: { game_modes.Seat } = {}
+	local spectators: { game_modes.Seat } = {}
+	for _, seat in lobby.match.seats do
 		if seat.user_id == local_player.UserId then
 			my_side = seat.side
 		end
@@ -225,13 +233,13 @@ local function SeatsPanel(props: {
 	end
 	local watching = my_side == game_modes.SPECTATOR_SIDE
 	local bonus: BonusProps = {
-		bonuses = lobby.bonuses,
+		bonuses = lobby.match.bonuses,
 		can_change = developers.is_developer(local_player),
 		act = props.act,
 	}
 
 	local sides: { [string]: any } = {}
-	if mode.kind == "teams" then
+	if mode.picks_sides then
 		for side = 1, mode.sides do
 			local on_side = {}
 			for _, seat in players do
@@ -240,7 +248,7 @@ local function SeatsPanel(props: {
 				end
 			end
 			sides[`Side{side}`] = React.createElement(Side, {
-				label = `TEAM {side}`,
+				label = `{mode.side_label} {side}`,
 				seats = on_side,
 				room = mode.per_side,
 				host = lobby.host,
@@ -248,7 +256,7 @@ local function SeatsPanel(props: {
 				bonus = bonus,
 				on_move = if side ~= my_side
 					then function()
-						props.act(ACTIONS.move, side)
+						props.act("move", side)
 					end
 					else nil,
 				LayoutOrder = side,
@@ -256,10 +264,7 @@ local function SeatsPanel(props: {
 		end
 	else
 		sides.Everyone = React.createElement(Side, {
-			label = if mode.kind == "scavengers"
-				then "AGAINST THE SCAVENGERS"
-				elseif mode.kind == "campaign" then "CO-OP: ALLIED"
-				else "EVERY PLAYER FOR THEMSELVES",
+			label = mode.side_label,
 			seats = players,
 			room = mode.capacity,
 			host = lobby.host,
@@ -268,7 +273,7 @@ local function SeatsPanel(props: {
 			-- a spectator takes whichever seat is free
 			on_move = if watching
 				then function()
-					props.act(ACTIONS.move, 1)
+					props.act("move", 1)
 				end
 				else nil,
 			move_label = "Play",
@@ -308,7 +313,7 @@ local function SeatsPanel(props: {
 			LayoutOrder = 3,
 		}, {
 			Teams = React.createElement("Frame", {
-				[React.Tag] = if mode.kind == "teams" then "teams split" else "teams",
+				[React.Tag] = if mode.picks_sides then "teams split" else "teams",
 				LayoutOrder = 1,
 			}, sides),
 			-- one place to move to is enough to show there is room to watch
@@ -322,7 +327,7 @@ local function SeatsPanel(props: {
 				on_move = if watching
 					then nil
 					else function()
-						props.act(ACTIONS.move, game_modes.SPECTATOR_SIDE)
+						props.act("move", game_modes.SPECTATOR_SIDE)
 					end,
 				move_label = "Watch",
 				LayoutOrder = 2,

@@ -1,0 +1,53 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+
+$hurt: rgb(255, 0, 0);
+
+// The red vignette over the whole screen when your commander is hurt out of view: a strip down each edge, red at the
+// edge and clear toward the middle. How strongly it shows is set from code, on the group.
+.commander-hurt {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	background-color: transparent;
+	pointer-events: none;
+	z-index: 100;
+}
+
+.hurt-edge {
+	position: absolute;
+	pointer-events: none;
+
+	&.top {
+		top: 0px;
+		left: 0px;
+		width: 100%;
+		height: 30%;
+		background-image: linear-gradient(180deg, $hurt, veil($hurt, 0));
+	}
+
+	&.bottom {
+		bottom: 0px;
+		left: 0px;
+		width: 100%;
+		height: 30%;
+		background-image: linear-gradient(0deg, $hurt, veil($hurt, 0));
+	}
+
+	&.left {
+		top: 0px;
+		left: 0px;
+		width: 22%;
+		height: 100%;
+		background-image: linear-gradient(90deg, $hurt, veil($hurt, 0));
+	}
+
+	&.right {
+		top: 0px;
+		right: 0px;
+		width: 22%;
+		height: 100%;
+		background-image: linear-gradient(270deg, $hurt, veil($hurt, 0));
+	}
+}

@@ -1,19 +1,16 @@
 """One of the pool skin's floats (src/shared/skins/pool.luau): a lifebuoy. A white ring with four narrow bands of the
-team's colour round it, a quarter turn apart. See pool_float_common for how it is laid out.
+team's colour round it, a quarter turn apart. See shared/pool_float for how it is laid out.
 """
 
-from . import common
-from . import pool_float_common as ring
+from .shared import common
+from .shared import palette
+from .shared import pool_float as ring
 
-MAX_TRIANGLES = 200
-RECENTRE = False
-
+CATEGORY = "prop"
+SKIN = "pool"
 SEGMENTS = 16
 SIDES = 6
 BANDS = 4
-
-BAND_COLOR = (0.9, 0.2, 0.18, 1.0)
-WHITE_COLOR = (0.96, 0.96, 0.94, 1.0)
 
 
 def banded(i, _j):
@@ -22,7 +19,7 @@ def banded(i, _j):
 
 def generate(params):
     bands = ring.ring("bands", SEGMENTS, SIDES, banded)
-    common.apply_material(bands, "pool_lifebuoy_accent", BAND_COLOR, roughness=0.3)
+    common.accent_mat(bands, palette.LIFEBUOY_RED)
     white = ring.ring("white", SEGMENTS, SIDES, lambda i, j: not banded(i, j))
-    common.apply_material(white, "pool_lifebuoy_white", WHITE_COLOR, roughness=0.3)
+    common.paint(white, palette.FLOAT_WHITE)
     return [bands, white]

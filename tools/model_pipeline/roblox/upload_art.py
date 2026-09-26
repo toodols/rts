@@ -1,145 +1,79 @@
-"""Upload the art's meshes to Roblox through Open Cloud, so the client can load them as assets.
+"""Upload the art's meshes to Roblox through Open Cloud, so the game can load them as assets.
 
-Plain python3 (not Blender's bpy); only needs `requests`. Run a build first: it writes each model's art module
-(src/shared/art/<def>.luau) and, next to its .glb, build/<def>_art.glb, one node per mesh named by the mesh's hash.
+Plain python3 (not Blender's bpy); needs `requests`. Build first (build.ps1): a build records each model in built.json
+and writes build/<name>_art.glb, one node per mesh of it that is not on Roblox yet, named by the mesh's hash.
 
-    python tools/model_pipeline/roblox/upload_art.py --creator-type User --creator-id 123456 [def ...]
+    python tools/model_pipeline/roblox/upload_art.py [name ...]
 
-With no defs it goes through every art module. A def whose meshes are all uploaded already is skipped. Each
-other def's _art.glb is uploaded as one Model; Roblox makes a mesh asset of every node in it. Which asset ids
-those are is only visible from inside Studio (InsertService:LoadAsset), so the model's id is recorded in
-roblox/uploads.json as pending, and roblox/record_meshes.py fills in its meshes once Studio has read them. The
-next build then writes each uploaded mesh into the art module as its asset id.
+With no names it goes through every model in built.json, and skips those whose meshes are all on Roblox already. Each
+other model's _art.glb is uploaded as one Model, of which Roblox makes a mesh asset per node. Which asset ids those are
+only Studio can see, so the model is recorded in uploads.json as pending, with its asset id and the hashes it was
+uploaded with; then `record_meshes.py script` writes the Luau that reads them in Studio, and `record_meshes.py record`
+takes what it printed. The next build writes each uploaded mesh into its art module by asset id.
 
-The API key is read from roblox/.api_key or rbxopencloudkey.txt at the repo root (both gitignored), or
-$ROBLOX_API_KEY, or --api-key. It needs asset:read and
-asset:write for the creator.
+Nothing is uploaded twice: a model already uploaded with the meshes it is waiting for is waiting for `record` instead,
+and one whose .glb no longer holds what it is waiting for (some of its meshes were recorded since it was built) has to be
+rebuilt first, so that its .glb holds only what is still missing.
+
+The key and the creator are tools/roblox_open_cloud.py's.
 """
 
 import argparse
-import json
-import os
-import re
 import sys
-import time
 from pathlib import Path
 
-import requests
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-ROBLOX_DIR = Path(__file__).resolve().parent
-PIPELINE_ROOT = ROBLOX_DIR.parent
-ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "art"
-# the HUD's pictures (the tutorial's keys and mouse), which belong to no def but are uploaded the same way
-UI_ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "ui_art"
-# the rocks and trees strewn over the maps, which the server builds from their meshes itself
-RECLAIMABLE_ART_DIR = PIPELINE_ROOT.parent.parent / "src" / "shared" / "reclaimable_art"
-ART_DIRS = (ART_DIR, UI_ART_DIR, RECLAIMABLE_ART_DIR)
-BUILD_DIR = PIPELINE_ROOT / "build"
-UPLOADS_PATH = ROBLOX_DIR / "uploads.json"
-# where the key may be kept, first found wins; both are gitignored
-KEY_PATHS = [ROBLOX_DIR / ".api_key", PIPELINE_ROOT.parent.parent / "rbxopencloudkey.txt"]
-ASSETS_URL = "https://apis.roblox.com/assets/v1/assets"
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("defs", nargs="*", help="defs to upload (default: every art module)")
-    parser.add_argument("--creator-type", choices=["User", "Group"], required=True)
-    parser.add_argument("--creator-id", required=True)
-    parser.add_argument("--api-key", default=None)
-    parser.add_argument("--poll-seconds", type=float, default=3.0)
-    parser.add_argument("--timeout-seconds", type=float, default=300.0)
-    return parser.parse_args()
-
-
-def api_key(args):
-    if args.api_key:
-        return args.api_key
-    for path in KEY_PATHS:
-        if path.is_file():
-            return path.read_text(encoding="utf-8").strip()
-    return os.environ.get("ROBLOX_API_KEY")
-
-
-def load_uploads():
-    if UPLOADS_PATH.is_file():
-        return json.loads(UPLOADS_PATH.read_text(encoding="utf-8"))
-    return {"meshes": {}, "models": {}}
-
-
-def save_uploads(uploads):
-    UPLOADS_PATH.write_text(json.dumps(uploads, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
-def module_path(def_name):
-    for directory in ART_DIRS:
-        path = directory / f"{def_name}.luau"
-        if path.is_file():
-            return path
-    return ART_DIR / f"{def_name}.luau"
-
-
-def hashes_of(def_name):
-    source = module_path(def_name).read_text(encoding="utf-8")
-    return re.findall(r'hash = "([0-9a-f]+)"', source)
-
-
-def upload(glb_path, def_name, args, key):
-    request_payload = {
-        "assetType": "Model",
-        "displayName": f"rts_{def_name}_art",
-        "description": f"Procedurally generated by tools/model_pipeline ({def_name})",
-        "creationContext": {
-            "creator": {("userId" if args.creator_type == "User" else "groupId"): str(args.creator_id)}
-        },
-    }
-    with glb_path.open("rb") as glb_file:
-        response = requests.post(
-            ASSETS_URL,
-            headers={"x-api-key": key},
-            data={"request": json.dumps(request_payload)},
-            files={"fileContent": (glb_path.name, glb_file, "model/gltf-binary")},
-        )
-    if response.status_code >= 400:
-        sys.exit(f"{def_name}: upload refused ({response.status_code}): {response.text}")
-    operation_path = response.json()["path"]
-
-    deadline = time.time() + args.timeout_seconds
-    while time.time() < deadline:
-        status_response = requests.get(f"https://apis.roblox.com/assets/v1/{operation_path}", headers={"x-api-key": key})
-        if status_response.status_code >= 400:
-            sys.exit(f"{def_name}: could not read the upload's status ({status_response.status_code}): {status_response.text}")
-        status = status_response.json()
-        if status.get("done"):
-            if "error" in status:
-                sys.exit(f"{def_name}: upload failed: {status['error']}")
-            return status["response"]["assetId"]
-        time.sleep(args.poll_seconds)
-    sys.exit(f"{def_name}: timed out waiting for Roblox to finish processing the upload")
+import manifest  # noqa: E402
+import roblox_open_cloud  # noqa: E402
 
 
 def main():
-    args = parse_args()
-    key = api_key(args)
-    if not key:
-        sys.exit(f"no API key: put one in {KEY_PATHS[0]}, set ROBLOX_API_KEY, or pass --api-key")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("names", nargs="*", help="models to upload (default: every built one)")
+    roblox_open_cloud.add_key_argument(parser)
+    args = parser.parse_args()
 
-    defs = args.defs or sorted(
-        p.stem for directory in ART_DIRS for p in directory.glob("*.luau") if p.stem != "init"
-    )
-    uploads = load_uploads()
-    for def_name in defs:
-        hashes = hashes_of(def_name)
-        if all(h in uploads["meshes"] for h in hashes):
-            print(f"{def_name}: already uploaded")
+    built = manifest.load_built()
+    uploads = manifest.load_uploads()
+    unknown = [name for name in args.names if name not in built]
+    if unknown:
+        sys.exit(f"never built: {', '.join(unknown)}")
+    to_upload = []
+    for name in args.names or sorted(built):
+        entry = built[name]
+        missing = manifest.pending_hashes(entry["hashes"], uploads)
+        if not missing:
             continue
-        glb_path = BUILD_DIR / f"{def_name}_art.glb"
-        if not glb_path.is_file():
-            sys.exit(f"{def_name}: no {glb_path}; build it first")
-        asset_id = upload(glb_path, def_name, args, key)
-        uploads["models"][def_name] = {"asset_id": str(asset_id), "hashes": hashes, "pending": True}
-        save_uploads(uploads)
-        print(f"{def_name}: uploaded as model {asset_id}")
+        model = uploads["models"].get(name)
+        if model is not None and model["pending"] and sorted(model["hashes"]) == sorted(missing):
+            print(f"{name}: uploaded already as model {model['asset_id']}, waiting for its meshes to be read "
+                  "(record_meshes.py script)")
+        elif sorted(entry["pending"]) != sorted(missing):
+            print(f"{name}: its upload file is out of date, some of its meshes were recorded since; rebuild it first "
+                  f"(build.ps1 {name})")
+        elif not manifest.glb_path(name).is_file():
+            print(f"{name}: no {manifest.glb_path(name)}; rebuild it first (build.ps1 {name})")
+        else:
+            to_upload.append((name, missing))
+    if not to_upload:
+        print("nothing to upload")
+        return
+    key = roblox_open_cloud.api_key(args.api_key)
+    for name, missing in to_upload:
+        asset_id = roblox_open_cloud.upload(
+            manifest.glb_path(name),
+            "Model",
+            "model/gltf-binary",
+            f"rts_{name}_art",
+            f"Procedurally generated by tools/model_pipeline ({name})",
+            key,
+        )
+        uploads["models"][name] = {"asset_id": asset_id, "hashes": missing, "pending": True}
+        manifest.save_uploads(uploads)
+        print(f"{name}: uploaded as model {asset_id}")
+    print("next: python tools/model_pipeline/roblox/record_meshes.py script, and run what it writes in Studio")
 
 
 if __name__ == "__main__":

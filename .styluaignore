@@ -1,0 +1,9 @@
+# outlass writes these (tools/stylesheets.py), and `stylesheets.py check` holds them to their SCSS instead
+src/client/ui/stylesheets/default_stylesheet.lua
+src/lobby/client/stylesheets/lobby_stylesheet.lua
+src/client_shared/theme_stylesheet.lua
+# the model pipeline writes these (tools/model_pipeline), and check_art.py holds them to it
+src/shared/art/*.luau
+!src/shared/art/init.luau
+src/shared/ui_art/*.luau
+src/shared/reclaimable_art/*.luau

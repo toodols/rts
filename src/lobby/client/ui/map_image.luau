@@ -1,3 +1,4 @@
+--!strict
 -- A map's picture, fitted into whatever box it is put in without being stretched: as wide against as deep as the map
 -- is, and centred. With `grid`, a line is drawn over it every BAR map unit (512 elmos), the unit BAR gives map sizes
 -- in, so two maps' grids side by side show which is bigger and by how much.
@@ -5,6 +6,8 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local React = require(ReplicatedStorage.Packages.react)
+
+local map_presets = require(ReplicatedStorage.Shared.map_presets)
 
 local map_preview = require(ReplicatedStorage.LobbyClient.map_preview)
 
@@ -35,12 +38,12 @@ local function MapImage(
 		LayoutOrder: number?,
 	}
 )
-	local info = map_preview.info(props.preset)
+	local preset = map_presets.presets[props.preset]
 	local image = map_preview.use_image(props.preset, props.seed)
 
 	local children: { [string]: any } = {
 		Aspect = React.createElement("UIAspectRatioConstraint", {
-			AspectRatio = info.size.X / info.size.Y,
+			AspectRatio = preset.size.X / preset.size.Y,
 			AspectType = Enum.AspectType.FitWithinMaxSize,
 			DominantAxis = Enum.DominantAxis.Width,
 		}),
@@ -58,7 +61,7 @@ local function MapImage(
 	if props.grid then
 		children.Grid = React.createElement("Frame", {
 			[React.Tag] = "map-grid",
-		}, grid_lines(info.units))
+		}, grid_lines(map_preview.units_of(preset)))
 	end
 
 	return React.createElement("Frame", {

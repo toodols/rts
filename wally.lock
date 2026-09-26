@@ -5,22 +5,7 @@ registry = "test"
 [[package]]
 name = "ethan/rts"
 version = "0.1.0"
-dependencies = [["janitor", "howmanysmall/janitor@1.18.3"], ["promise", "evaera/promise@4.0.0"], ["react", "jsdotlua/react@17.2.1"], ["react-roblox", "jsdotlua/react-roblox@17.2.1"]]
-
-[[package]]
-name = "evaera/promise"
-version = "4.0.0"
-dependencies = []
-
-[[package]]
-name = "howmanysmall/janitor"
-version = "1.18.3"
-dependencies = [["Promise", "howmanysmall/typed-promise@4.0.6"]]
-
-[[package]]
-name = "howmanysmall/typed-promise"
-version = "4.0.6"
-dependencies = [["Promise", "evaera/promise@4.0.0"]]
+dependencies = [["react", "jsdotlua/react@17.2.1"], ["react-roblox", "jsdotlua/react-roblox@17.2.1"]]
 
 [[package]]
 name = "jsdotlua/boolean"

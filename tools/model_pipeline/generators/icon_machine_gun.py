@@ -1,9 +1,10 @@
-"""HUD icon: machine guns (EMG and the like), three rounds side by side. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: machine guns (EMG and the like), three rounds side by side. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def bullet(x, y):
     casing = ic.rect(x - 0.32, y - 1.45, x + 0.32, y + 0.1)
@@ -13,4 +14,4 @@ def bullet(x, y):
 
 def generate(params):
     rounds = [bullet(-0.85, 0.25), bullet(0.0, 0.0), bullet(0.85, -0.25)]
-    return ic.build("machine_gun", [ic.layer([c for c, _ in rounds], ic.ICON), ic.layer([t for _, t in rounds], ic.ICON)])
+    return ic.build("machine_gun", [ic.layer([c for c, _ in rounds], palette.ICON_FILL), ic.layer([t for _, t in rounds], palette.ICON_FILL)])

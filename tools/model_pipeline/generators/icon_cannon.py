@@ -1,9 +1,10 @@
-"""HUD icon: cannons, a fat shell in flight with a dark driving band and speed lines behind. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: cannons, a fat shell in flight with a dark driving band and speed lines behind. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     body = ic.poly(((-0.62, -1.25), (0.62, -1.25), (0.62, 0.35), (0.55, 0.8), (0.36, 1.2), (0.0, 1.6), (-0.36, 1.2), (-0.55, 0.8), (-0.62, 0.35)))
@@ -13,8 +14,8 @@ def generate(params):
     return ic.build(
         "cannon",
         [
-            ic.layer(ic.place(lines, shift, angle), ic.ICON),
-            ic.layer(ic.place([body], shift, angle), ic.ICON),
-            ic.layer(ic.place([band], shift, angle), ic.OUTLINE, rim=None),
+            ic.layer(ic.place(lines, shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([body], shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([band], shift, angle), palette.ICON_OUTLINE, rim=None),
         ],
     )

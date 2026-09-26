@@ -1,26 +1,43 @@
+--!strict
 -- The campaign: missions played alone, which are how a player unlocks what they may build.
 --
 -- Every player starts with almost everything locked. What they may build is STARTING_UNLOCKS, and each mission they
--- finish adds its `unlocks`. A def is only ever locked if something can build it (it is in some def's
--- `build_options`): a commander, a scavenger beacon or the tutorial's boulder is never locked, since nobody builds it.
+-- finish adds its `unlocks`. A def is only ever locked if something can build it (it is in some def's builder's
+-- `options`): a commander, a scavenger beacon or the tutorial's boulder is never locked, since nobody builds it.
 --
--- The game server keeps each player's progress in a DataStore (PROGRESS_STORE, keyed by `progress_key`) and publishes
--- what they have unlocked as the UNLOCKS_ATTRIBUTE of their Player, a comma separated list of def names, which both
--- the build menu (to show what is locked) and the lobby read. The server refuses to build anything locked.
+-- What each player has finished and unlocked is their progress (campaign_progress.luau), kept in a DataStore and
+-- published on their Player, which both the build menu (to show what is locked) and the lobby read. The server refuses
+-- to build anything locked.
 --
 -- A mission is played alone from the campaign screen, and one with `coop` may also be played together: its co-op lobby
 -- is a lobby like any other, but it plays that mission on its map, and nobody can change either. Everyone who wins it
--- has it marked complete.
+-- has it marked complete. Played together, its players are either allied teams of their own or all on one team, as
+-- its `coop_kind` says.
 --
--- A campaign mission is played as a match of its own mode (game_modes, kind "campaign"), on its own map. While one is
--- being played the server sets MISSION_ATTRIBUTE on Workspace to the mission's id, and the client puts the HUD into
--- that mission's state.
+-- A mission may have a hard mode: the same map and mostly the same start, with no guide and a harder enemy (what is
+-- harder is the mission's own, server/missions'), open once the mission has been finished. It is named by the key
+-- `key(id, true)`, the id with HARD_SUFFIX after it ("overlook_hard"), wherever one id has to name either: among the
+-- missions a player has finished, and when the campaign screen asks for one to be played. Finishing it finishes the
+-- mission as well, and unlocks its `hard_mode_unlocks` besides its `unlocks` (`unlocks_for`).
+--
+-- A campaign mission is played as a match of its own mode (game_modes, kind "campaign"), on its own map, whose preset
+-- names the places the mission is built around (shared/mission_map.luau). The player has no start to choose: their
+-- commander goes down at the map's PLAYER_START, unless it names none, as one of the usual maps a game against the
+-- computer is played on (`ai_profile`) does. What the mission starts with and how it is won is the game server's
+-- (server/missions), what it guides its player through the client's (client/missions); both find a mission's part by
+-- its id. While one is being played the server publishes its id (shared/mission_state.luau), and the client puts the
+-- HUD into that mission's state: its `hud`.
+--
+-- The missions are played in the order MISSIONS lists them: one is open to a player once they have finished every one
+-- before it (`is_open`), and winning one offers the next (`next_mission`).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local Workspace = game:GetService "Workspace"
 
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
-local heightmap = require(ReplicatedStorage.Shared.heightmap)
+
+-- How a mission played together seats its players: each on a team of their own, the teams allied ("allied"), or all
+-- on one team, commanding everything it has and spending from one bank, as StarCraft's archon mode has it ("shared").
+export type CoopKind = "allied" | "shared"
 
 export type Mission = {
 	id: string,
@@ -31,146 +48,84 @@ export type Mission = {
 	preset: string,
 	-- what finishing it unlocks, def names
 	unlocks: { string },
+	-- whether it has a hard mode (see the top of this file), what finishing that unlocks besides `unlocks`, and what the
+	-- campaign screen says about it, if anything
+	hard_mode: boolean,
+	hard_mode_unlocks: { string }?,
+	hard_mode_description: string?,
 	-- how many may play it together, from a co-op lobby (lobby/server/lobbies.luau), for a mission that may be played
-	-- that way; nil for one only ever played alone
+	-- that way, and how they are seated; nil for one only ever played alone
 	coop: number?,
+	coop_kind: CoopKind?,
+	-- for a mission played as a game against the computer, the AI profile (shared/ai_profiles.luau) its enemy plays by,
+	-- and in its hard mode: the enemy is then an AI with a commander like any opponent's (server/missions/skirmish.luau);
+	-- nil for a mission that puts its enemy down
+	ai_profile: string?,
+	hard_mode_ai_profile: string?,
+	-- How much of the HUD it shows: "simple" pares the selection panel down to a name, a team and a health bar (the
+	-- tutorial's); "full" is the usual. What its guide keeps off the HUD until a step has taught it is the guide's.
+	hud: "full" | "simple",
 }
-
--- What a player has done in the campaign, as it is stored.
-export type Progress = {
-	-- mission ids
-	completed: { [string]: boolean },
-	-- def names, the starting ones included
-	unlocks: { [string]: boolean },
-}
-
--- The tutorial's map, in world (x, z). The map is small: the player's side to the west, the enemy's to the east, and
--- one narrow pass between them, which the boulder fills.
-export type TutorialLayout = {
-	player_start: Vector2,
-	enemy_start: Vector2,
-	-- the middle of the pass, where the boulder stands
-	chokepoint: Vector2,
-	-- where the move step asks the commander to be sent: beside a metal spot, since extractors are built next
-	move_target: Vector2,
-	-- how close to the move target a right click, or the commander, has to be to count
-	move_tolerance: number,
-	-- how long a step waits, once it is done, before the next begins
-	advance_seconds: number,
-	-- how many solar collectors, and how many grunts, their steps ask for
-	solars: number,
-	grunts: number,
-}
-
--- The second mission's map, in world (x, z) (see map_presets' "overlook", whose numbers these have to agree with). The
--- player starts on a plateau to the west, whose eastern edge is a cliff overlooking the enemy's base on the low ground,
--- with a ramp down near each of the map's north and south edges.
-export type OverlookLayout = {
-	player_start: Vector2,
-	enemy_start: Vector2,
-	-- the x the plateau's edge wanders about, where the cliff falls to the low ground
-	edge_x: number,
-	-- how many thugs the mission's guide asks to be put at the edge, and how far back from it one may stand and count
-	edge_thugs: number,
-	edge_depth: number,
-	-- the metal and the energy a second the guide asks for before the thugs, as the resource bar shows them: the metal
-	-- is what the commander and an extractor on each of the player's four spots make together
-	metal: number,
-	energy: number,
-}
-
--- The third mission's, played on the overlook's map just after the second (so campaign.OVERLOOK's numbers hold for it
--- too), in world (x, z). The enemy's base below the cliff is wrecks now, and the player holds the plateau with what they
--- took it with; after `prep_seconds` the enemy's reinforcements start to arrive in waves at the far, east end of the
--- map, half of each at each of `arrivals`, and make for the player's base up the ramps. The way to hold is to raise the
--- old base's guards with rezbots before they come, and turn them on the waves.
-export type CounterattackLayout = {
-	-- where the waves come in: the north one's make for the north ramp, and the south one's for the south
-	arrivals: { Vector2 },
-	-- The west edge of the enemy zone, the strip of the map's east end the waves arrive in: whatever the player has east
-	-- of it is destroyed when a wave arrives, and they are warned of that as they build there. All of the old base lies
-	-- west of it, so that whatever is raised of it stays.
-	zone_x: number,
-	-- how long the player has to prepare before the first wave, in seconds
-	prep_seconds: number,
-	-- how many guards' wrecks the old base leaves, which the mission's guide asks to be raised
-	old_guards: number,
-}
-
--- The Workspace attributes the server publishes the third mission's state in (server/counterattack.luau), for the HUD:
--- the enemy zone's west edge (a number, set as the mission is set up), how many waves have arrived (0 while the player
--- prepares) and how many there are, the whole seconds until the next arrives (none once the last has), and how many of
--- the enemy's things are left standing.
-local COUNTERATTACK_ATTRIBUTES = table.freeze({
-	zone_x = "campaign_zone_x",
-	wave = "campaign_wave",
-	waves = "campaign_waves",
-	wave_in = "campaign_wave_in",
-	enemies_left = "campaign_enemies_left",
-})
 
 local STARTING_UNLOCKS: { string } =
 	{ "bot_lab", "construction_bot", "grunt", "guard", "solar_collector", "metal_extractor" }
 
-local UNLOCKS_ATTRIBUTE = "campaign_unlocks"
-local MISSION_ATTRIBUTE = "campaign_mission"
-local PROGRESS_STORE = "campaign_progress_v1"
-
-local TUTORIAL: TutorialLayout = table.freeze({
-	player_start = Vector2.new(-110, 0),
-	enemy_start = Vector2.new(110, 0),
-	chokepoint = Vector2.new(0, 0),
-	move_target = Vector2.new(-82, -38),
-	move_tolerance = 12,
-	advance_seconds = 3,
-	solars = 3,
-	grunts = 3,
-})
-
-local OVERLOOK: OverlookLayout = table.freeze({
-	player_start = Vector2.new(-53, 0),
-	enemy_start = Vector2.new(42, 0),
-	edge_x = -18,
-	edge_thugs = 4,
-	edge_depth = 8,
-	metal = 10,
-	energy = 60,
-})
-local COUNTERATTACK: CounterattackLayout = table.freeze({
-	arrivals = table.freeze({ Vector2.new(68, 26), Vector2.new(68, -26) }),
-	zone_x = 60,
-	prep_seconds = 300,
-	old_guards = 8,
-})
--- Going east, the overlook's cliff edge is where the ground first falls more steeply than this (rise over run, about 40
--- degrees), looked for every EDGE_STEP studs.
-local EDGE_STEEPNESS = 0.85
-local EDGE_STEP = 0.5
+local HARD_SUFFIX = "_hard"
 
 local MISSIONS: { Mission } = {
 	{
 		id = "tutorial",
 		label = "Tutorial",
-		description = "Learn the basics.",
+		description = "Learn the basics!",
 		preset = "tutorial",
 		unlocks = { "wind_turbine", "energy_storage", "thug", "aggravator" },
+		hard_mode = false,
 		coop = nil,
+		coop_kind = nil,
+		hud = "simple",
 	},
 	{
 		id = "overlook",
 		label = "The Overlook",
-		description = "Destroy a fortified base from the heights.",
+		description = "Destroy a fortified base from the heights. With so much defense, grunts are not going to cut it.",
 		preset = "overlook",
-		unlocks = { "graverobber", "thistle", "twin_guard", "warden" },
-		coop = 4,
+		unlocks = { "graverobber", "thistle", "trasher", "twin_guard", "construction_turret" },
+		-- the enemy has an agitator in its base as well
+		hard_mode = true,
+		hard_mode_unlocks = { "warden", "centurion" },
+		coop = 2,
+		coop_kind = "shared",
+		hud = "full",
 	},
 	{
 		id = "counterattack",
-		label = "Counterattack",
-		description = "Raise the old base's guards. Hold the heights.",
+		label = "Look Who's Back",
+		description = "Guess who's back? The enemy, and they are not happy that you destroyed their base.",
 		preset = "overlook",
-		unlocks = { "vehicle_lab", "incisor", "brute", "tick", "rascal" },
-		coop = 4,
+		unlocks = { "vehicle_lab", "construction_vehicle", "incisor", "brute", "tick", "rascal" },
+		-- fifteen waves rather than eight, with pounders and januses among them (server/missions/counterattack.luau)
+		hard_mode = true,
+		hard_mode_unlocks = { "pounder", "janus", "lasher", "wolverine" },
+		hard_mode_description = "This time with way more waves",
+		coop = 2,
+		coop_kind = "shared",
+		hud = "full",
+	},
+	{
+		id = "prairie",
+		label = "Prairie Skirmish",
+		description = "A real game on open grassland against a computer opponent. Kill its commander.",
+		preset = "prairie",
+		unlocks = { "tidal_generator", "shipyard", "supporter", "riptide", "construction_ship" },
+		-- the enemy plays as BARb does, with the fight predictor
+		hard_mode = true,
+		hard_mode_description = "This time with a smarter enemy",
+		hard_mode_ai_profile = "sim_barb",
+		hard_mode_unlocks = { "energy_converter", "advanced_solar_collector", "metal_storage" },
+		coop = 2,
+		coop_kind = "allied",
+		ai_profile = "passive",
+		hud = "full",
 	},
 }
 
@@ -182,15 +137,46 @@ end
 -- Everything some def can build: only these are ever locked.
 local lockable: { [string]: boolean } = {}
 for _, def in unit_defs.defs do
-	if def.build_options ~= nil then
-		for _, option in def.build_options do
-			lockable[option] = true
-		end
+	for _, option in unit_defs.build_options(def) do
+		lockable[option] = true
 	end
 end
 
 local function get(id: string): Mission?
 	return mission_by_id[id]
+end
+
+-- The key that names `id`'s hard mode, or `id` itself for its normal one (see HARD_SUFFIX).
+local function key(id: string, hard: boolean): string
+	return if hard then id .. HARD_SUFFIX else id
+end
+
+-- The mission a key names (`key`), and whether it names its hard mode; nil for no mission, or the hard mode of one
+-- that has none.
+local function parse_key(value: string): (Mission?, boolean)
+	local plain = mission_by_id[value]
+	if plain ~= nil then
+		return plain, false
+	end
+	if string.sub(value, -#HARD_SUFFIX) == HARD_SUFFIX then
+		local mission = mission_by_id[string.sub(value, 1, -#HARD_SUFFIX - 1)]
+		if mission ~= nil and mission.hard_mode then
+			return mission, true
+		end
+	end
+	return nil, false
+end
+
+-- What finishing `mission` unlocks, in its hard mode for `hard`: its hard mode's unlocks as well.
+local function unlocks_for(mission: Mission, hard: boolean): { string }
+	local names = table.clone(mission.unlocks)
+	local hard_unlocks: { string } = mission.hard_mode_unlocks or {}
+	if hard then
+		for _, name in hard_unlocks do
+			table.insert(names, name)
+		end
+	end
+	return names
 end
 
 -- The mission after `id` in MISSIONS, which finishing it leads on to; nil after the last, or for no mission.
@@ -201,6 +187,28 @@ local function next_mission(id: string): Mission?
 		end
 	end
 	return nil
+end
+
+-- Whether the mission the key `mission_key` names (`key`) may be played by someone who has finished `completed`: every
+-- one before it has to be finished, and for a hard mode, the mission itself. Any mission already finished may be played
+-- again.
+local function is_open(completed: { [string]: boolean }, mission_key: string): boolean
+	local named, hard = parse_key(mission_key)
+	if named == nil then
+		return false
+	end
+	if hard then
+		return completed[named.id] == true
+	end
+	for _, mission in MISSIONS do
+		if mission.id == named.id then
+			return true
+		end
+		if completed[mission.id] ~= true then
+			return false
+		end
+	end
+	return false
 end
 
 local function is_lockable(def_name: string): boolean
@@ -221,110 +229,16 @@ local function is_unlocked(unlocks: { [string]: boolean }, def_name: string): bo
 	return lockable[def_name] ~= true or unlocks[def_name] == true
 end
 
--- `unlocks` as the attribute carries it: the names, sorted, comma separated.
-local function encode_unlocks(unlocks: { [string]: boolean }): string
-	local names: { string } = {}
-	for name, unlocked in unlocks do
-		if unlocked then
-			table.insert(names, name)
-		end
-	end
-	table.sort(names)
-	return table.concat(names, ",")
-end
-
--- The unlocks an attribute holds. The starting ones are always in it, and anything that is not a string is nothing
--- more than them.
-local function decode_unlocks(value: any): { [string]: boolean }
-	local set = starting_unlocks()
-	if typeof(value) ~= "string" then
-		return set
-	end
-	for _, name in string.split(value, ",") do
-		if name ~= "" then
-			set[name] = true
-		end
-	end
-	return set
-end
-
--- What `player` has unlocked, as published on them; only the starting unlocks until the server has published any.
-local function unlocks_of(player: Player): { [string]: boolean }
-	return decode_unlocks(player:GetAttribute(UNLOCKS_ATTRIBUTE))
-end
-
--- The mission being played in this game, or nil for any other game.
-local function current_mission(): string?
-	local value = Workspace:GetAttribute(MISSION_ATTRIBUTE)
-	return if typeof(value) == "string" and value ~= "" then value else nil
-end
-
--- The x of the overlook's cliff edge at `z`, on the map as it is built: where, going east across the plateau, the ground
--- first starts to fall away steeply, which is as far east as anything on the plateau can stand there.
-local function overlook_edge_at(z: number): number
-	local x = OVERLOOK.player_start.X
-	while x < OVERLOOK.enemy_start.X do
-		if heightmap.height_at(x, z) - heightmap.height_at(x + EDGE_STEP, z) > EDGE_STEEPNESS * EDGE_STEP then
-			return x
-		end
-		x += EDGE_STEP
-	end
-	return OVERLOOK.edge_x
-end
-
-local function progress_key(user_id: number): string
-	return `player_{user_id}`
-end
-
--- A fresh player's progress.
-local function new_progress(): Progress
-	return { completed = {}, unlocks = starting_unlocks() }
-end
-
--- The progress a value read from the store holds; a new player's for anything that is not one.
-local function decode_progress(value: any): Progress
-	local progress = new_progress()
-	if typeof(value) ~= "table" then
-		return progress
-	end
-	if typeof(value.completed) == "table" then
-		for id, done in value.completed do
-			if typeof(id) == "string" and done == true then
-				progress.completed[id] = true
-			end
-		end
-	end
-	if typeof(value.unlocks) == "table" then
-		for name, unlocked in value.unlocks do
-			if typeof(name) == "string" and unlocked == true then
-				progress.unlocks[name] = true
-			end
-		end
-	end
-	return progress
-end
-
 return table.freeze({
 	MISSIONS = MISSIONS,
 	STARTING_UNLOCKS = STARTING_UNLOCKS,
-	UNLOCKS_ATTRIBUTE = UNLOCKS_ATTRIBUTE,
-	MISSION_ATTRIBUTE = MISSION_ATTRIBUTE,
-	PROGRESS_STORE = PROGRESS_STORE,
-	TUTORIAL = TUTORIAL,
-	OVERLOOK = OVERLOOK,
-	COUNTERATTACK = COUNTERATTACK,
-	COUNTERATTACK_ATTRIBUTES = COUNTERATTACK_ATTRIBUTES,
 	get = get,
+	key = key,
+	parse_key = parse_key,
+	unlocks_for = unlocks_for,
 	next_mission = next_mission,
+	is_open = is_open,
 	is_lockable = is_lockable,
 	starting_unlocks = starting_unlocks,
 	is_unlocked = is_unlocked,
-	encode_unlocks = encode_unlocks,
-	decode_unlocks = decode_unlocks,
-	unlocks_of = unlocks_of,
-	current_mission = current_mission,
-	overlook_edge_at = overlook_edge_at,
-	progress_key = progress_key,
-	new_progress = new_progress,
-	decode_progress = decode_progress,
 })

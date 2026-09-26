@@ -1,3 +1,4 @@
+--!strict
 -- The lobby this player is in: the map on the left, the mode and the players on the right, and leaving or starting
 -- along the bottom of them. Every player but the host marks themselves ready there, and the host can start once they
 -- all have.
@@ -12,15 +13,12 @@ local game_modes = require(ReplicatedStorage.Shared.game_modes)
 
 local protocol = require(ReplicatedStorage.Lobby.protocol)
 
-local map_preview = require(ReplicatedStorage.LobbyClient.map_preview)
 local map_panel = require(script.Parent.map_panel)
 local settings_panel = require(script.Parent.settings_panel)
 local seats_panel = require(script.Parent.seats_panel)
 local controls = require(script.Parent.controls)
 
 type LobbyView = protocol.LobbyView
-
-local ACTIONS = protocol.ACTIONS
 
 local local_player = Players.LocalPlayer
 
@@ -36,11 +34,11 @@ local function status_of(lobby: LobbyView, is_host: boolean): (string, boolean)
 		return lobby.blocked, true
 	end
 	-- in a co-op mission everyone starts where the mission says, however many starts its map has
-	local mode = game_modes.get(lobby.mode)
-	local mission = mode ~= nil and mode.kind == "campaign"
-	if mission == false and map_presets.presets[lobby.preset] ~= nil then
-		local starts = map_preview.info(lobby.preset).starts
-		local players = game_modes.player_count(lobby.seats)
+	local mode = game_modes.get(lobby.match.mode)
+	local map = map_presets.presets[lobby.match.preset]
+	if mode ~= nil and mode.mission == nil and map ~= nil then
+		local starts = #map.starts
+		local players = game_modes.player_count(lobby.match.seats)
 		if players > starts then
 			return `{players} players on a map with {starts} starts: some will share`, true
 		end
@@ -53,16 +51,16 @@ end
 
 local function Room(props: {
 	lobby: LobbyView,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 })
 	local lobby = props.lobby
-	local mode = game_modes.get(lobby.mode)
+	local mode = game_modes.get(lobby.match.mode)
 	local is_host = lobby.host == local_player.UserId
 	local status, warning = status_of(lobby, is_host)
 	local can_start = is_host and lobby.blocked == nil and lobby.starting == false
 	-- whether this is a player who is not the host, who has to say they are ready
 	local must_ready = false
-	for _, seat in lobby.seats do
+	for _, seat in lobby.match.seats do
 		if seat.user_id == local_player.UserId and is_host == false and seat.side ~= game_modes.SPECTATOR_SIDE then
 			must_ready = true
 		end
@@ -73,11 +71,11 @@ local function Room(props: {
 		[React.Tag] = "room",
 	}, {
 		Map = React.createElement(map_panel.MapPanel, {
-			preset = lobby.preset,
-			seed = lobby.seed,
+			preset = lobby.match.preset,
+			seed = lobby.match.seed,
 			is_host = is_host,
-			fixed = mode ~= nil and mode.kind == "campaign",
-			players = game_modes.player_count(lobby.seats),
+			fixed = mode ~= nil and mode.mission ~= nil,
+			players = game_modes.player_count(lobby.match.seats),
 			act = props.act,
 		}),
 		Side = React.createElement("Frame", {
@@ -85,10 +83,10 @@ local function Room(props: {
 			LayoutOrder = 2,
 		}, {
 			Settings = React.createElement(settings_panel.SettingsPanel, {
-				mode = lobby.mode,
+				mode = lobby.match.mode,
 				visibility = lobby.visibility,
-				ally_griefing = lobby.ally_griefing,
-				end_mode = lobby.end_mode,
+				ally_griefing = lobby.match.ally_griefing,
+				end_mode = lobby.match.end_mode,
 				is_host = is_host,
 				act = props.act,
 			}),
@@ -104,7 +102,7 @@ local function Room(props: {
 					kind = "button",
 					label = "Leave",
 					on_press = function()
-						props.act(ACTIONS.leave)
+						props.act "leave"
 					end,
 					LayoutOrder = 1,
 				}),
@@ -120,7 +118,7 @@ local function Room(props: {
 						label = "Start game",
 						locked = not can_start,
 						on_press = function()
-							props.act(ACTIONS.start)
+							props.act "start"
 						end,
 						LayoutOrder = 3,
 					})
@@ -130,7 +128,7 @@ local function Room(props: {
 						label = if ready then "Not ready" else "Ready",
 						locked = lobby.starting,
 						on_press = function()
-							props.act(ACTIONS.set_ready, not ready)
+							props.act("set_ready", not ready)
 						end,
 						LayoutOrder = 3,
 					})

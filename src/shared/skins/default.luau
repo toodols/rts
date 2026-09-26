@@ -1,10 +1,9 @@
+--!strict
 -- Units as they are, with nothing on them.
 
-local ReplicatedStorage = game:GetService "ReplicatedStorage"
+local skin_types = require(script.Parent.types)
 
-local types = require(ReplicatedStorage.Shared.types)
-
-type Skin = types.Skin
+type Skin = skin_types.Skin
 
 local skin: Skin = {
 	name = "default",
@@ -14,7 +13,7 @@ local skin: Skin = {
 	stats = nil,
 	art = nil,
 	paint = nil,
-	attachments = {},
+	donut = nil,
 }
 
 return table.freeze(skin)

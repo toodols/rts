@@ -1,4 +1,4 @@
-"""unit_defs `screamer` (corscreamer): a long range anti-air missile tower, 2x2x2 cells (8x8x8 studs). Under 100
+"""unit_defs `screamer` (corscreamer): a long range anti-air missile tower. Under 100
 triangles.
 
 The tower line's sloped plinth, broad, with the four hatches of its missile stockpile on the deck, a thick
@@ -6,17 +6,22 @@ tapered column, and on it an armored cradle holding two long launch tubes almost
 big missile standing out of each. The whole head yaws with weapon 1.
 """
 
-from . import defense_a_common as d
+from .shared import defense_a as d
 
-KEY = "screamer"
+CATEGORY = "entity"
+DEF = "screamer"
+MOUNTS = {
+    1: {"pivot": (0, 3, 0), "muzzle": (-1.85, 3.5546, 1.7681)},
+}
 SWIVEL_Z = 3.0
 DECK_Z = 1.4
 ELEV = 62.0
 
 
 def generate(params):
+    w = params["collider"]["width"]
     base = d.Parts()
-    base.loft([d.square(7.8, 0.0), d.square(6.2, DECK_Z)], side="trim", top="body")
+    base.loft([d.square(w - 0.2, 0.0), d.square(6.2, DECK_Z)], side="trim", top="body")
     deck = d.Frame(origin=(0.0, 0.0, DECK_Z + 0.01))
     for sx in (-1.0, 1.0):
         for sy in (-1.0, 1.0):
@@ -33,6 +38,6 @@ def generate(params):
         # a dark clamp where the tube is held to the cradle
         head.block_f(tube, 0.0, 0.0, -0.35, 0.35, (1.2, 1.34), tags={"all": "trim", "back": None, "front": None})
 
-    objects = d.base_objects(base, KEY, "trim")
-    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), KEY)
+    objects = d.base_objects(base, "trim", params["color"])
+    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), params["color"])
     return objects

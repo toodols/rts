@@ -2,16 +2,16 @@
 return {
 	groups = {
 		base = { pivot = { 0, 0, 0 } },
-		turret_1 = { pivot = { 0, 0.9485, 1.9285 }, kind = "turret", weapon = 1, muzzle = { 0, 0.2316, 1.5636 } },
-		radar = { pivot = { 0, 3.3872, -0.0313 }, kind = "spin", axis = { 0, 1, 0 }, speed = 1.8 },
+		radar = { pivot = { -0.8203, 2.722, -0.6172 }, kind = "spin", axis = { 0, 1, 0 }, speed = 1.8 },
+		turret_1 = { pivot = { 0, 1.2796, 2.8804 }, kind = "turret", weapon = 1 },
 	},
 	parts = {
-		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.767, 0 }, size = { 2.7442, 1.5341, 7.8182 }, hash = "a88bc9ea282e8989", mesh = "rbxassetid://127614732471530" },
-		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 2.6914, 0 }, size = { 2.7442, 3.7081, 7.8182 }, hash = "2d16ff47cb06443d", mesh = "rbxassetid://134927846656416" },
-		{ group = "base", color = { 0.7686, 0.549, 0.3294 }, offset = { 0, 1.7226, -0.9721 }, size = { 1.2947, 0.7812, 3.3931 }, hash = "14556000ca12ae04", team = true, mesh = "rbxassetid://96376683736625" },
-		{ group = "base", color = { 1, 0.72, 0.15 }, offset = { 0, 1.8931, 0.5024 }, size = { 0.9288, 0.139, 0.0896 }, hash = "b498a856ad7dd731", neon = true, mesh = "rbxassetid://71918409326274" },
-		{ group = "turret_1", color = { 0.7686, 0.549, 0.3294 }, offset = { 0, 0.2085, 0.443 }, size = { 1.2665, 0.417, 1.9285 }, hash = "fbc8fba4d34a2d2b", team = true, mesh = "rbxassetid://92354574801356" },
-		{ group = "turret_1", color = { 1, 0.5, 0 }, offset = { 0, 0.2316, 1.475 }, size = { 0.2533, 0.2085, 0.1772 }, hash = "0fd7960fc8b10b26", neon = true, mesh = "rbxassetid://105476275773111" },
-		{ group = "radar", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.0579, 0 }, size = { 1.2665, 0.1158, 0.1459 }, hash = "506f3345b87ef9d6", mesh = "rbxassetid://76116092894269" },
+		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 1.1527, 0 }, size = { 2.4237, 2.3053, 7.7153 }, hash = "edc453ef6aafb532", mesh = "rbxassetid://99379312195242" },
+		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0.1895, 1.2381, 0 }, size = { 2.8027, 0.4763, 7.7153 }, hash = "94f4940bb6fdf1a0", mesh = "rbxassetid://95413923153035" },
+		{ group = "base", color = { 0.7686, 0.549, 0.3294 }, offset = { -0.1678, 2.0901, -1.6819 }, size = { 1.8768, 1.2638, 3.1581 }, hash = "52a832013641cb3b", team = true, mesh = "rbxassetid://130647605778631" },
+		{ group = "base", color = { 1, 0.72, 0.15 }, offset = { 0.0559, 2.0206, -0.2829 }, size = { 2.1751, 1.1249, 3.3433 }, hash = "c7ceb617124508df", neon = true, mesh = "rbxassetid://98839530489318" },
+		{ group = "radar", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.0694, 0 }, size = { 0.9943, 0.1389, 0.144 }, hash = "067ad7eb75632ea6", mesh = "rbxassetid://73579212264300" },
+		{ group = "turret_1", color = { 0.7686, 0.549, 0.3294 }, offset = { 0, 0.2361, 0.2469 }, size = { 0.87, 0.4722, 1.3167 }, hash = "a5a7b6a137e47c5f", team = true, mesh = "rbxassetid://122098816309973" },
+		{ group = "turret_1", color = { 1, 0.5, 0 }, offset = { 0, 0.2639, 0.9618 }, size = { 0.1989, 0.2222, 0.1337 }, hash = "76b4ebd27daf35c6", neon = true, mesh = "rbxassetid://82661486162463" },
 	},
 }

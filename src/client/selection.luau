@@ -1,38 +1,37 @@
+--!strict
 -- The local player's selection: which entities are selected, the outline drawn on them, and a
 -- subscription the HUD listens to.
 --
--- Selection is purely local. The server never hears about it; orders name entity ids explicitly.
+-- Selection is purely local. The server never hears about it; orders name entity ids explicitly. An entity that goes
+-- leaves the selection as the world hears it go (world's `subscribe_removed`).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local RunService = game:GetService "RunService"
 
+local signal = require(ReplicatedStorage.Shared.signal)
 local types = require(ReplicatedStorage.Shared.types)
 
 local world = require(ReplicatedStorage.Client.world)
 
+local palette = require(ReplicatedStorage.ClientShared.palette)
+
 type EntityId = types.EntityId
 
-local OUTLINE_COLOR = Color3.fromRGB(126, 240, 154)
 local OUTLINE_TRANSPARENCY = 0.35
 
 local selected: { [EntityId]: boolean } = {}
-local highlights: { [EntityId]: Highlight } = {}
-local listeners: { (ids: { EntityId }) -> () } = {}
+local highlights: { [EntityId]: Highlight? } = {}
+-- The selected ids in order, worked out once each time the selection changes; frozen, since everyone is handed it.
+local ordered: { EntityId } = table.freeze({})
+local changed = signal.new() :: signal.Signal<{ EntityId }>
 
-local function ordered_ids(): { EntityId }
+local function notify()
 	local ids = {}
 	for id in selected do
 		table.insert(ids, id)
 	end
 	table.sort(ids)
-	return ids
-end
-
-local function notify()
-	local ids = ordered_ids()
-	for _, listener in listeners do
-		listener(ids)
-	end
+	ordered = table.freeze(ids)
+	changed.fire(ordered)
 end
 
 local function clear_highlight(id: EntityId)
@@ -56,7 +55,7 @@ local function add_highlight(id: EntityId)
 	highlight.Name = "SelectionOutline"
 	highlight.FillTransparency = 1
 	highlight.OutlineTransparency = OUTLINE_TRANSPARENCY
-	highlight.OutlineColor = OUTLINE_COLOR
+	highlight.OutlineColor = palette.buildpower
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.Adornee = model
 	highlight.Parent = model
@@ -115,46 +114,22 @@ local function contains(id: EntityId): boolean
 	return selected[id] ~= nil
 end
 
+-- The selected ids, lowest first. The list is shared and frozen: it is only replaced, never changed.
 local function get(): { EntityId }
-	return ordered_ids()
+	return ordered
 end
 
 local function count(): number
-	local total = 0
-	for _ in selected do
-		total += 1
-	end
-	return total
-end
-
-local function subscribe(listener: (ids: { EntityId }) -> ()): () -> ()
-	table.insert(listeners, listener)
-	return function()
-		local index = table.find(listeners, listener)
-		if index ~= nil then
-			table.remove(listeners, index)
-		end
-	end
-end
-
--- Entities die without telling the selection, so drop ids whose model has gone.
-local function prune()
-	local removed = false
-	for id in selected do
-		if world.get(id) == nil then
-			selected[id] = nil
-			clear_highlight(id)
-			removed = true
-		end
-	end
-	if removed then
-		notify()
-	end
+	return #ordered
 end
 
 local function init()
-	RunService.Heartbeat:Connect(function()
-		prune()
+	world.subscribe_removed(function(_model: Model, id: EntityId)
+		if selected[id] ~= nil then
+			selected[id] = nil
+			clear_highlight(id)
+			notify()
+		end
 	end)
 end
 
@@ -167,5 +142,5 @@ return table.freeze({
 	contains = contains,
 	get = get,
 	count = count,
-	subscribe = subscribe,
+	subscribe = changed.subscribe,
 })

@@ -7,90 +7,60 @@
 -- the wreck having supplied that. When it is done the wreck is gone and the thing stands in its place,
 -- on the team that raised it, with part of its health, and every rezzer that raised it goes on to repair it
 -- to full before whatever else it was told to do.
+--
+-- Either is work (server/work.luau), paid for as it goes with every other builder's once the tick's work is gathered.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
-local economy = require(script.Parent.economy)
+local deaths = require(script.Parent.deaths)
+local work = require(script.Parent.work)
 
 type Entity = types.Entity
 
-type Request = {
-	rezzer_id: types.EntityId,
-	team: types.TeamId,
-	target_id: types.EntityId,
-	buildpower: number,
-}
-
 -- Metal left short of full by less than this counts as full, so that rounding cannot hold a wreck back.
 local FULL_TOLERANCE = 1e-6
+-- How much of its health what is raised comes back with.
+local RESURRECT_HEALTH_FRACTION = 0.5
 
-local pending: { Request } = {}
-
-local function begin_tick()
-	table.clear(pending)
-end
-
-local function can_resurrect(rezzer: Entity, target: Entity): boolean
-	local def = unit_defs.of(rezzer)
-	if def.resurrecting == false or def.buildpower == nil or rezzer.state ~= "active" then
-		return false
-	end
-	local wreck = target.wreck
-	if target.kind ~= "wreck" or wreck == nil then
-		return false
-	end
-	-- units and buildings come back, as in BAR, where a building's corpse can be raised like a unit's
+-- Whether `wreck` can be raised at all: units and buildings come back, as in BAR, where a building's corpse can be
+-- raised like a unit's.
+local function raisable(wreck: types.Wreck): boolean
 	local kind = unit_defs.get(wreck.source_def_name).kind
 	return kind == "unit" or kind == "building"
 end
 
-local function request(rezzer: Entity, target: Entity)
-	local buildpower = unit_defs.of(rezzer).buildpower
-	if buildpower == nil or can_resurrect(rezzer, target) == false then
-		return
+local function can_resurrect(rezzer: Entity, target: Entity): boolean
+	if unit_defs.does(rezzer.def, "resurrect") == false or rezzer.state ~= "active" then
+		return false
 	end
-	table.insert(pending, {
-		rezzer_id = rezzer.id,
-		team = rezzer.team,
-		target_id = target.id,
-		buildpower = buildpower,
-	})
+	local wreck = target.wreck
+	return wreck ~= nil and raisable(wreck)
 end
 
--- The wreck `rezzer_id` worked on this tick, if it is still there. Read after the step.
-local function target_of(rezzer_id: types.EntityId): types.EntityId?
-	for _, entry in pending do
-		if entry.rezzer_id == rezzer_id then
-			local target = state.get(entry.target_id)
-			if target ~= nil and target.alive then
-				return target.id
-			end
-		end
-	end
-	return nil
+-- Raising, for whatever raises a wreck: a rezzer's work (`request`), and the scavengers' beacons ---------------------
+
+-- Puts `amount` of work, no more than is left, into raising `wreck`, and returns whether it is done. It takes as much
+-- as building what it was did.
+local function put_work(wreck: types.Wreck, amount: number): boolean
+	local cost = unit_defs.get(wreck.source_def_name).buildpower_cost
+	wreck.resurrect_progress += math.min(amount, cost - wreck.resurrect_progress)
+	return wreck.resurrect_progress >= cost - FULL_TOLERANCE
 end
 
--- Puts back the metal a wreck has lost, at the rate reclaiming took it out, and pays for it. It stalls
--- while the team cannot pay.
-local function refill(wreck: types.Wreck, applied: number, team: types.TeamId)
-	local missing = wreck.buildpower_total - wreck.buildpower_left
-	local restored = math.min(applied, missing)
-	local metal = restored * wreck.metal_total / wreck.buildpower_total
-	if economy.try_spend(team, metal, 0) == false then
-		return
-	end
-	wreck.buildpower_left = math.min(wreck.buildpower_total, wreck.buildpower_left + restored)
-	wreck.metal_left = math.min(wreck.metal_total, wreck.metal_left + metal)
-	if wreck.buildpower_left >= wreck.buildpower_total - FULL_TOLERANCE then
-		wreck.buildpower_left = wreck.buildpower_total
-		wreck.metal_left = wreck.metal_total
-	end
+-- The wreck `target` (whose `wreck` is `wreck`) stands up again as what it was, on team `team`, with
+-- RESURRECT_HEALTH_FRACTION of its health, and the wreck is gone. Returns what stands.
+local function raise(target: Entity, wreck: types.Wreck, team: types.TeamId): Entity
+	local raised = state.create_entity(wreck.source_def_name, team, target.position, target.facing, "active")
+	raised.health = raised.max_health * RESURRECT_HEALTH_FRACTION
+	deaths.destroy(target, "removed")
+	return raised
 end
+
+---------------------------------------------------------------------------------------------------------------------
 
 -- Gives every rezzer that worked on the wreck `wreck_id` this tick, and can repair, a repair order on `raised`, the
 -- order a player's repair gives, ahead of whatever it was told to do after: in place of the finished resurrect order
@@ -100,12 +70,8 @@ local function repair_after(wreck_id: types.EntityId, raised: Entity)
 	if raised.health >= raised.max_health then
 		return
 	end
-	for _, entry in pending do
-		if entry.target_id ~= wreck_id then
-			continue
-		end
-		local rezzer = state.get(entry.rezzer_id)
-		if rezzer == nil or unit_defs.of(rezzer).repairing == false then
+	for _, rezzer in work.workers_on(wreck_id, "resurrect") do
+		if rezzer.alive == false or unit_defs.does(rezzer.def, "repair") == false then
 			continue
 		end
 		local repair: types.Order = { kind = "repair", position = raised.position, target_id = raised.id }
@@ -118,52 +84,76 @@ local function repair_after(wreck_id: types.EntityId, raised: Entity)
 	end
 end
 
+-- The wreck `target` stands up again as what it was, on `team`.
 local function complete(target: Entity, wreck: types.Wreck, team: types.TeamId)
-	local raised = state.create_entity(wreck.source_def_name, team, target.position, target.facing, "active")
-	raised.health = raised.max_health * config.RESURRECT_HEALTH_FRACTION
-	state.mark_dead(target)
-	repair_after(target.id, raised)
+	repair_after(target.id, raise(target, wreck, team))
 end
 
-local function resolve(delta: number)
-	for _, entry in pending do
-		local target = state.get(entry.target_id)
-		-- one another rezzer finished earlier this tick is gone
-		if target == nil or target.alive == false then
-			continue
-		end
-		local wreck = target.wreck
-		if wreck == nil then
-			continue
-		end
-		local applied = entry.buildpower * delta
-
-		if wreck.buildpower_left < wreck.buildpower_total - FULL_TOLERANCE then
-			refill(wreck, applied, entry.team)
-			continue
-		end
-
-		local source = unit_defs.get(wreck.source_def_name)
-		if source.buildpower_cost <= 0 then
-			complete(target, wreck, entry.team)
-			continue
-		end
-		local step = math.min(applied, source.buildpower_cost - wreck.resurrect_progress)
-		local energy = source.energy_cost * step / source.buildpower_cost
-		if economy.try_spend(entry.team, 0, energy) == false then
-			continue
-		end
-		wreck.resurrect_progress += step
-		if wreck.resurrect_progress >= source.buildpower_cost - FULL_TOLERANCE then
-			complete(target, wreck, entry.team)
-		end
+-- `rezzer` puts its buildpower into raising `target` this tick, if it can: into refilling it with the metal taken out
+-- of it, paying that back, while it is short of any, and otherwise into raising it, paying its energy.
+local function request(rezzer: Entity, target: Entity)
+	local buildpower = work.buildpower_of(rezzer)
+	local wreck = target.wreck
+	local yield = target.yield
+	if buildpower == nil or wreck == nil or yield == nil or can_resurrect(rezzer, target) == false then
+		return
 	end
+	local team = rezzer.team
+	local source = unit_defs.get(wreck.source_def_name)
+	local function present(): boolean
+		return target.alive and state.get(target.id) ~= nil
+	end
+
+	if yield.buildpower_left < yield.buildpower_total - FULL_TOLERANCE then
+		work.take(rezzer, "resurrect", target, {
+			entity_id = rezzer.id,
+			team = team,
+			label = `Refilling {target.def.display_name}`,
+			rate = buildpower,
+			metal_per_work = yield.metal_total / yield.buildpower_total,
+			energy_per_work = 0,
+			room = function(): number?
+				return if present() then yield.buildpower_total - yield.buildpower_left else nil
+			end,
+			apply = function(restored: number, metal: number)
+				yield.buildpower_left = math.min(yield.buildpower_total, yield.buildpower_left + restored)
+				yield.metal_left = math.min(yield.metal_total, yield.metal_left + metal)
+				if yield.buildpower_left >= yield.buildpower_total - FULL_TOLERANCE then
+					yield.buildpower_left = yield.buildpower_total
+					yield.metal_left = yield.metal_total
+				end
+			end,
+		})
+		return
+	end
+
+	if source.buildpower_cost <= 0 then
+		complete(target, wreck, team)
+		return
+	end
+	work.take(rezzer, "resurrect", target, {
+		entity_id = rezzer.id,
+		team = team,
+		label = `Raising {source.display_name}`,
+		rate = buildpower,
+		metal_per_work = 0,
+		energy_per_work = source.energy_cost / source.buildpower_cost,
+		room = function(): number?
+			return if present() then source.buildpower_cost - wreck.resurrect_progress else nil
+		end,
+		apply = function(step: number)
+			if put_work(wreck, step) then
+				complete(target, wreck, team)
+			end
+		end,
+	})
 end
 
 return table.freeze({
-	begin_tick = begin_tick,
+	RESURRECT_HEALTH_FRACTION = RESURRECT_HEALTH_FRACTION,
 	request = request,
-	resolve = resolve,
 	can_resurrect = can_resurrect,
-	target_of = target_of,
+	raisable = raisable,
+	put_work = put_work,
+	raise = raise,
 })

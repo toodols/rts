@@ -1,0 +1,16 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Room -----------------------------------------------------------------------------------------------------
+
+.room {
+	width: 100%;
+	height: 100%;
+	@include stack(row, space(3));
+}
+
+.room-side {
+	width: 524px;
+	height: 100%;
+	@include stack(column, space(3));
+}

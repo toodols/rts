@@ -4,13 +4,13 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local React = require(ReplicatedStorage.Packages.react)
 local ReactRoblox = require(ReplicatedStorage.Packages["react-roblox"])
 
-local tutorial_steps = require(ReplicatedStorage.Client.tutorial)
 local stylesheets = require(ReplicatedStorage.Client.ui.stylesheets)
 local resource_bar = require(ReplicatedStorage.Client.ui.resource_bar)
 local selection_panel = require(ReplicatedStorage.Client.ui.selection_panel)
 local build_menu = require(ReplicatedStorage.Client.ui.build_menu)
 local command_panel = require(ReplicatedStorage.Client.ui.command_panel)
 local selection_box = require(ReplicatedStorage.Client.ui.selection_box)
+local cursor_hints = require(ReplicatedStorage.Client.ui.cursor_hints)
 local world_bars = require(ReplicatedStorage.Client.ui.world_bars)
 local ping_markers = require(ReplicatedStorage.Client.ui.ping_markers)
 local pilot_hud = require(ReplicatedStorage.Client.ui.pilot_hud)
@@ -19,9 +19,11 @@ local victory_screen = require(ReplicatedStorage.Client.ui.victory_screen)
 local pause_overlay = require(ReplicatedStorage.Client.ui.pause_overlay)
 local player_list = require(ReplicatedStorage.Client.ui.player_list)
 local notifications = require(ReplicatedStorage.Client.ui.notifications)
+local commander_hurt = require(ReplicatedStorage.Client.ui.commander_hurt)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
 local tutorial = require(ReplicatedStorage.Client.ui.tutorial)
-local use_mission = require(ReplicatedStorage.Client.ui.use_mission)
+local use_hud_features = require(ReplicatedStorage.Client.ui.use_hud_features)
+local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 
 local ResourceBar = resource_bar.ResourceBar
@@ -29,21 +31,22 @@ local SelectionPanel = selection_panel.SelectionPanel
 local BuildMenu = build_menu.BuildMenu
 local CommandPanel = command_panel.CommandPanel
 local SelectionBox = selection_box.SelectionBox
-local PlacementHint = selection_box.PlacementHint
-local PlacementProblem = selection_box.PlacementProblem
-local ModeHint = selection_box.ModeHint
+local PlacementHint = cursor_hints.PlacementHint
+local PlacementProblem = cursor_hints.PlacementProblem
+local ModeHint = cursor_hints.ModeHint
 
 local player = Players.LocalPlayer
 
 local function Main()
-	-- The tutorial pares the HUD down to what it teaches: no economy readout (nor the wind or scavengers beside it)
-	-- until it has had the player build extractors and solar collectors, and its own cards across the top.
-	local in_tutorial = use_mission.use_mission() == "tutorial"
+	-- A mission's guide keeps the economy readout (and the wind or scavengers beside it) off the HUD until it has
+	-- taught it, and puts its own cards across the top.
+	local features = use_hud_features.use_hud_features()
 	local tutorial_state = use_tutorial.use_tutorial()
-	local economy_shown = in_tutorial == false or (tutorial_state.active and tutorial_steps.shown "economy")
+	-- a spectator selects things only to look at them, and has nothing to order or build
+	local spectating = use_entities.use_spectating()
 	return React.createElement(React.Fragment, {}, {
 		StyleLink = React.createElement("StyleLink", {
-			StyleSheet = stylesheets.default_stylesheet,
+			StyleSheet = stylesheets.default(),
 		}),
 		-- Both bottom panels sit directly under the ScreenGui so that their percentage positions
 		-- resolve against the screen. Nesting them in a zero-height bar put the build menu 20px below
@@ -54,10 +57,10 @@ local function Main()
 			[React.Tag] = "bottom-left",
 		}, {
 			SelectionPanel = React.createElement(SelectionPanel),
-			CommandPanel = React.createElement(CommandPanel),
+			CommandPanel = if spectating then nil else React.createElement(CommandPanel),
 		}),
-		BuildMenu = React.createElement(BuildMenu),
-		ResourceBar = if economy_shown then React.createElement(ResourceBar) else nil,
+		BuildMenu = if spectating then nil else React.createElement(BuildMenu),
+		ResourceBar = if features.economy then React.createElement(ResourceBar) else nil,
 		-- the tutorial's cards, or the suggestions of another mission that makes them
 		Tutorial = if tutorial_state.active then React.createElement(tutorial.Tutorial) else nil,
 		SelectionBox = React.createElement(SelectionBox),
@@ -78,7 +81,7 @@ end
 local function Overlay()
 	return React.createElement(React.Fragment, {}, {
 		StyleLink = React.createElement("StyleLink", {
-			StyleSheet = stylesheets.default_stylesheet,
+			StyleSheet = stylesheets.default(),
 		}),
 		WorldBars = React.createElement(world_bars.WorldBars),
 		-- the crosshair has to be in the very middle of the view, which only a GUI that ignores the inset has
@@ -93,13 +96,25 @@ end
 local function Pings()
 	return React.createElement(React.Fragment, {}, {
 		StyleLink = React.createElement("StyleLink", {
-			StyleSheet = stylesheets.default_stylesheet,
+			StyleSheet = stylesheets.default(),
 		}),
 		PingMarkers = React.createElement(ping_markers.PingMarkers),
 	})
 end
 
+-- The red flash when your commander is hurt out of view, in a GUI of its own over everything, the HUD included, and
+-- ignoring the inset so that it reaches the very edges of the screen.
+local function Alerts()
+	return React.createElement(React.Fragment, {}, {
+		StyleLink = React.createElement("StyleLink", {
+			StyleSheet = stylesheets.default(),
+		}),
+		CommanderHurt = React.createElement(commander_hurt.CommanderHurt),
+	})
+end
+
 local function init_ui()
+	victory_screen.init()
 	local gui = Instance.new "ScreenGui"
 	gui.Name = "Hud"
 	gui.ResetOnSpawn = false
@@ -135,6 +150,16 @@ local function init_ui()
 	pings.Parent = player:WaitForChild "PlayerGui"
 
 	ReactRoblox.createRoot(pings):render(React.createElement(Pings))
+
+	local alerts = Instance.new "ScreenGui"
+	alerts.Name = "Alerts"
+	alerts.ResetOnSpawn = false
+	alerts.IgnoreGuiInset = true
+	alerts.DisplayOrder = 2
+	alerts.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	alerts.Parent = player:WaitForChild "PlayerGui"
+
+	ReactRoblox.createRoot(alerts):render(React.createElement(Alerts))
 end
 
 return table.freeze({

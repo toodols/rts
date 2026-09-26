@@ -12,3 +12,5 @@ selene = "Kampfkarren/selene@0.31.0"
 stylua = "JohnnyMorganz/StyLua@2.5.2"
 StyLua = "JohnnyMorganz/StyLua@2.5.2"
 luau-lsp = "JohnnyMorganz/luau-lsp@1.69.0"
+# runs the game headless: the AI arena, the tests, the tools that read the game's numbers (tools/lib)
+lune = "lune-org/lune@0.10.4"

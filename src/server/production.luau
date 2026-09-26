@@ -1,5 +1,5 @@
 -- Factory production. An active factory with a non-empty queue keeps a single blueprint alive inside
--- its own footprint - at its centre, or its def's `production_offset` from it - and pours its buildpower
+-- its own footprint, at its centre, and pours its buildpower
 -- into that blueprint until it finishes. The blueprint does not count as in the factory's way.
 --
 -- A finished unit drives straight out through the doorway before it does anything else. Until it is
@@ -16,45 +16,49 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local surface = require(ReplicatedStorage.Shared.surface)
 local geometry = require(ReplicatedStorage.Shared.geometry)
-local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
+local order_routes = require(ReplicatedStorage.Shared.order_routes)
 
 local state = require(script.Parent.state)
 local placement = require(script.Parent.placement)
 local construction = require(script.Parent.construction)
 local economy = require(script.Parent.economy)
 local movement = require(script.Parent.movement)
-local campaign = require(script.Parent.campaign)
-local emp = require(script.Parent.emp)
+local build_rules = require(script.Parent.build_rules)
+local control = require(script.Parent.control)
+local deaths = require(script.Parent.deaths)
+local orders = require(script.Parent.orders)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
 
--- The blueprint each factory is currently working on, keyed by factory id. Held outside the
--- entity so that Entity stays a flat serialisable record.
+-- How far past the edge of a factory's footprint its finished unit drives on its way out.
+local PRODUCTION_SPOT_GAP = 3
+-- How long one of a factory's own units may stand in the way of its next unit before it is told to
+-- move aside.
+local PRODUCTION_BLOCK_LIMIT = 3
+-- Where a finished unit is told to walk so the next one has room to appear.
+local PRODUCTION_RALLY_GAP = 10
+
+-- The blueprint each factory is currently working on, keyed by factory id: production's own, as what a system is doing
+-- with an entity is (`types.Entity`).
 local in_progress: { [EntityId]: EntityId } = {}
 -- How long each factory's next unit has been unable to appear, in seconds.
 local blocked_for: { [EntityId]: number } = {}
 -- Where each unit on its way out of its factory is driving to, just past the doorway.
 local exit_points: { [EntityId]: Vector3 } = {}
 
--- The most cells a search for a unit's way to its factory's rally point may settle, the same as for a player's move.
-local RALLY_MAX_EXPANSIONS = 8000
-
 -- The way out of a factory, through its doorway: the way it faces.
 local function doorway_vector(facing: number): Vector3
 	return Vector3.new(math.sin(facing), 0, math.cos(facing))
 end
 
--- Where the next unit appears: inside the factory's footprint, its def's `production_offset` from the centre.
+-- Where the next unit appears: in the middle of the factory's footprint.
 local function production_spot(factory: Entity, product_def_name: string): Vector3
-	local offset = unit_defs.of(factory).production_offset or Vector2.zero
-	local out = doorway_vector(factory.facing)
-	local right = Vector3.new(-out.Z, 0, out.X)
-	local spot = factory.position + right * offset.X + out * offset.Y
-	return placement.ground_center(product_def_name, spot.X, spot.Z)
+	return placement.ground_center(product_def_name, factory.position.X, factory.position.Z)
 end
 
 -- Where a unit of `product_def` at `from` inside the factory drives to on its way out: straight out through the
@@ -68,68 +72,45 @@ local function exit_point(factory: Entity, product_def: types.EntityDef, from: V
 	-- far enough that its footprint, which it is let go by, is clear too, and not only its collider
 	local footprint = unit_defs.footprint_half_extents(product_def)
 	local reach = math.max(unit_defs.collider_radius(product_def), footprint.X, footprint.Y)
-	local point = from + out * (edge + reach + config.PRODUCTION_SPOT_GAP - depth)
-	return unit_defs.surface_position(product_def, point.X, point.Z)
+	local point = from + out * (edge + reach + PRODUCTION_SPOT_GAP - depth)
+	return surface.position(product_def, point.X, point.Z)
 end
 
 -- Once a unit is finished it is told to walk on from the doorway, `from`, so the next one has room to get out,
 -- unless it was already given orders while it was being built, which are then carried out instead. Otherwise it
--- takes a copy of the factory's own orders, which the factory never carries out itself. The factory's
--- moves and fights find their own way, as a player's do (`pathfinder.route`), each from where the one before it
--- leaves the unit, a fight as a chain of fight waypoints.
+-- takes a copy of the factory's own orders, which the factory never carries out itself, each with the way to it laid
+-- ahead from where the one before it leaves the unit, as a player's are (`order_routes.routed`).
 local function rally_order(factory: Entity, product: Entity, from: Vector3)
 	if #product.orders > 0 then
 		return
 	end
 	local given = factory.orders
 	if #given > 0 then
-		local product_def = unit_defs.of(product)
+		local product_def = product.def
 		for _, order in given do
 			local copy = table.clone(order)
 			if copy.position ~= nil then
-				copy.position = unit_defs.surface_position(product_def, copy.position.X, copy.position.Z)
+				copy.position = surface.position(product_def, copy.position.X, copy.position.Z)
 			end
-			if
-				(copy.kind == "move" or copy.kind == "fight")
-				and copy.position ~= nil
-				and product_def.max_speed ~= nil
-			then
-				local route = pathfinder.route(product_def, from, copy.position, RALLY_MAX_EXPANSIONS)
-				for _, step in route do
-					step.kind = copy.kind
-					table.insert(product.orders, step)
-				end
-				from = copy.position
-				continue
+			for _, step in order_routes.routed(product_def, from, copy) do
+				table.insert(product.orders, step)
 			end
-			table.insert(product.orders, copy)
 			if copy.position ~= nil then
 				from = copy.position
 			end
 		end
 		return
 	end
-	local destination = from + doorway_vector(factory.facing) * config.PRODUCTION_RALLY_GAP
-	product.orders = {
-		{
-			kind = "move",
-			position = unit_defs.surface_position(unit_defs.of(product), destination.X, destination.Z),
-			target_id = nil,
-		},
-	}
+	local destination = from + doorway_vector(factory.facing) * PRODUCTION_RALLY_GAP
+	orders.push_move(product, surface.position(product.def, destination.X, destination.Z), false)
 end
 
 local function enqueue(factory: Entity, def_name: string): boolean
-	local factory_def = unit_defs.of(factory)
-	local builds = factory_def.build_options
-	if builds == nil then
-		return false
-	end
-	if table.find(builds, def_name) == nil then
+	if table.find(unit_defs.build_options(factory.def), def_name) == nil then
 		return false
 	end
 	-- nothing its team has not unlocked in the campaign
-	if campaign.can_build(factory.team, def_name) == false then
+	if build_rules.allows(factory.team, def_name) == false then
 		return false
 	end
 	table.insert(factory.queue, def_name)
@@ -151,7 +132,7 @@ local function cancel(factory: Entity, index: number): boolean
 		if current ~= nil and current.state == "blueprint" then
 			economy.add_metal(current.team, current.metal_paid)
 			economy.add_energy(current.team, current.energy_paid)
-			state.mark_dead(current)
+			deaths.destroy(current, "cancelled")
 		end
 		in_progress[factory.id] = nil
 	end
@@ -159,11 +140,10 @@ local function cancel(factory: Entity, index: number): boolean
 end
 
 -- Orders every unit of the factory's own team that is standing in the doorway, where the next unit would drive
--- out of it, to move clear, ahead of whatever else it was doing.
+-- out of it, to move clear, ahead of whatever else it was doing, and never back into the factory (`orders.vacate`).
 local function vacate_blockers(factory: Entity, product_def_name: string, spot: Vector3)
 	local product_def = unit_defs.get(product_def_name)
 	local product_half = geometry.rotated_half_extents(unit_defs.footprint_half_extents(product_def), factory.facing)
-	local forward = doorway_vector(factory.facing)
 	spot = exit_point(factory, product_def, spot)
 
 	for _, other in state.all() do
@@ -176,23 +156,7 @@ local function vacate_blockers(factory: Entity, product_def_name: string, spot: 
 		if geometry.aabb_overlap(spot, product_half, other.position, placement.half_extents_for(other), 0) == false then
 			continue
 		end
-
-		-- away from the spot, but never back toward the factory itself
-		local away = geometry.flatten(other.position - spot)
-		if away.Magnitude < 1e-3 or away:Dot(forward) < 0 then
-			away = forward
-		else
-			away = away.Unit
-		end
-		local clearance = unit_defs.collider_radius(product_def)
-			+ unit_defs.collider_radius(unit_defs.of(other))
-			+ config.PRODUCTION_RALLY_GAP
-		local destination = spot + away * clearance
-		table.insert(other.orders, 1, {
-			kind = "move",
-			position = unit_defs.surface_position(unit_defs.of(other), destination.X, destination.Z),
-			target_id = nil,
-		})
+		orders.vacate(other, spot, product_half, doorway_vector(factory.facing))
 	end
 end
 
@@ -200,8 +164,8 @@ local function tick_factory(factory: Entity, delta: number)
 	if factory.state ~= "active" then
 		return
 	end
-	local factory_def = unit_defs.of(factory)
-	if factory_def.build_options == nil or factory_def.buildpower == nil then
+	local factory_def = factory.def
+	if factory_def.builder == nil or factory_def.builder.options == nil then
 		return
 	end
 
@@ -217,7 +181,7 @@ local function tick_factory(factory: Entity, delta: number)
 			return
 		else
 			-- finished this tick's predecessor: send it out and move on
-			local way_out = exit_point(factory, unit_defs.of(current), current.position)
+			local way_out = exit_point(factory, current.def, current.position)
 			exit_points[current.id] = way_out
 			movement.begin_exit(current, factory)
 			rally_order(factory, current, way_out)
@@ -233,19 +197,19 @@ local function tick_factory(factory: Entity, delta: number)
 		return
 	end
 	-- something queued while its team had it unlocked, and has not now, is dropped rather than started
-	if campaign.can_build(factory.team, next_def_name) == false then
+	if build_rules.allows(factory.team, next_def_name) == false then
 		blocked_for[factory.id] = nil
 		table.remove(factory.queue, 1)
 		return
 	end
 
 	local spot = production_spot(factory, next_def_name)
-	local placeable = placement.can_place(next_def_name, spot, factory.facing, factory.id)
+	local placeable = placement.can_place(next_def_name, spot, factory.facing, factory)
 	if placeable == false then
 		-- blocked; hold the queue and try again next tick, and if it goes on for too long, tell the
 		-- factory's own units in the way to move. Restarting the count gives them time to do it.
 		local waited = (blocked_for[factory.id] or 0) + delta
-		if waited >= config.PRODUCTION_BLOCK_LIMIT then
+		if waited >= PRODUCTION_BLOCK_LIMIT then
 			waited = 0
 			vacate_blockers(factory, next_def_name, spot)
 		end
@@ -264,7 +228,7 @@ end
 local function drive_exits()
 	for id, point in exit_points do
 		local unit = state.get(id)
-		if unit == nil or unit.alive == false then
+		if unit == nil then
 			exit_points[id] = nil
 			movement.end_exit(id)
 			continue
@@ -272,7 +236,6 @@ local function drive_exits()
 		local factory_id = movement.exiting_from(id)
 		local factory = if factory_id ~= nil then state.get(factory_id) else nil
 		local inside = factory ~= nil
-			and factory.alive
 			and geometry.aabb_overlap(
 				unit.position,
 				placement.half_extents_for(unit),
@@ -285,18 +248,15 @@ local function drive_exits()
 			movement.end_exit(id)
 			continue
 		end
-		movement.set_goal(unit, point, config.ARRIVAL_RADIUS, true)
+		movement.set_goal(unit, point, movement.ARRIVAL_RADIUS, true)
 	end
 end
 
 local function tick(delta: number)
 	drive_exits()
 	for _, entity in state.all() do
-		if entity.alive == false then
-			continue
-		end
 		-- a stunned lab makes nothing until it is not
-		if (#entity.queue == 0 and in_progress[entity.id] == nil) or emp.is_stunned(entity) then
+		if (#entity.queue == 0 and in_progress[entity.id] == nil) or control.can_act(entity) == false then
 			continue
 		end
 		tick_factory(entity, delta)
@@ -308,21 +268,15 @@ local function forget(factory_id: EntityId)
 	blocked_for[factory_id] = nil
 end
 
-local function current_blueprint(factory_id: EntityId): EntityId?
-	return in_progress[factory_id]
-end
-
--- Whether the factory has a unit to start and cannot put its blueprint down, for something standing where it goes.
-local function is_blocked(factory_id: EntityId): boolean
-	return blocked_for[factory_id] ~= nil
+-- Publishes whether a lab's next unit cannot be started for something standing where it goes (`exit_blocked`).
+local function publish(entity: Entity, _def: types.EntityDef, write: entity_attrs.Publish)
+	write("exit_blocked", blocked_for[entity.id] ~= nil)
 end
 
 return table.freeze({
+	forget = forget,
 	tick = tick,
 	enqueue = enqueue,
 	cancel = cancel,
-	forget = forget,
-	production_spot = production_spot,
-	current_blueprint = current_blueprint,
-	is_blocked = is_blocked,
+	publish = publish,
 })

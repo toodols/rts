@@ -1,10 +1,12 @@
-"""unit_defs `energy_converter`: 1-tier energy converter, 1x1x1 cells (4x4x4 studs). See converter_common.py."""
+"""unit_defs `energy_converter`: the tier-1 energy converter (see shared/converter.py)."""
 
-from . import converter_common
+from .shared import converter
+
+CATEGORY = "entity"
+DEF = "energy_converter"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"length": 4.72}
 
 
 def generate(params):
-    params.setdefault("width", 4.0)
-    params.setdefault("depth", 4.0)
-    params.setdefault("height", 4.0)
-    return converter_common.generate(params, tier=1)
+    return converter.generate(params, tier=1)

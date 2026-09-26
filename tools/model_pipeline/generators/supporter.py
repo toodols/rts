@@ -1,52 +1,56 @@
 """unit_defs/ship_t1.luau `supporter` (BAR coresupp): a light gun boat, a laser turret at each end.
 
-Collider capsule(20, 16, 40): radius 1.82, height 1.45 studs. A low, fast, sharp-bowed hull with a small two-tier
-bridge amidships under a mast and a spinning radar bar, and two small laser turrets, the first forward (weapon 1,
-offset +1.4 forward) and the second aft (weapon 2, offset -1.4). Built to the 100-triangle limit
-(ship_t1_common).
+The only catamaran: two slim, sharp hulls with open
+water between them, bridged by a broad team-coloured deck, so from above it is a two-pronged fork. A low wheelhouse
+sits in the middle of the bridging deck, and the two small laser turrets stand on its ends, the first forward
+(weapon 1, offset +1.4 forward) and the second aft (weapon 2, offset -1.4). Built to the 100-triangle limit
+(shared/ship_t1.py).
 """
 
-from . import common
-from . import ship_t1_common as ship
+from .shared import common
+from .shared import palette
+from .shared import ship_t1 as ship
 
-NAME = "supporter"
-ACCENT = ship.rgb(198, 86, 72)
-RADIUS, HEIGHT = 40 / 22, 16 / 11
+CATEGORY = "ship"
+DEF = "supporter"
+MOUNTS = {
+    1: {"pivot": (0, 0.6353, 0.8556), "muzzle": (-0.0328, 0.0801, 0.6417)},
+    2: {"pivot": (0, 0.6353, -1.016), "muzzle": (-0.0328, 0.0801, 0.6417)},
+}
+SPAN = 0.46  # each hull's centreline off the middle
 
 
-def _laser_turret(prefix, swivel):
+def _laser_turret(prefix, swivel, accent):
     # 17 triangles: a sloped gun house and one long, thin emitter
-    house = ship.block(f"{prefix}_house", 0.3, 0.36, 0.13, 0.22, 0.2, off=(0.0, 0.07))
-    emitter = ship.bar(f"{prefix}_emitter", 0.06, 0.06, 0.46, -0.1, 0.07, taper=0.7)
+    house = ship.block(f"{prefix}_house", 0.32, 0.38, 0.14, 0.22, 0.2, off=(0.0, 0.07))
+    emitter = ship.bar(f"{prefix}_emitter", 0.07, 0.07, 0.5, -0.1, 0.08, taper=0.7)
     for p in (house, emitter):
-        ship.accent_mat(p, NAME, ACCENT)
+        common.accent_mat(p, accent)
     return common.merge(prefix, [house, emitter], origin=swivel)
 
 
 def generate(params):
-    hull = ship.Hull(3.36, 0.96, 0.42, [(0.0, 0.7), (0.3, 1.0), (0.6, 0.92), (1.0, 0.0)], sheer=0.16, rake=0.1)
-    objects = [ship.body(hull.build())]
-    objects.append(ship.trim(hull.build_deck()))
+    # the two hulls, the first of which is the footprint build.py centres on: so both straddle the middle, the
+    # footprint is a thin deck plate spanning them, built first
+    accent = params["color"]
+    deck_z = 0.34
+    plate = common.accent_mat(ship.block("bridge_deck", 2 * SPAN + 0.34, 2.3, 0.1, 2 * SPAN + 0.22, 2.2, origin=(0.0, 0.0, deck_z)), accent)
+    objects = [plate]
+    for side in (-1.0, 1.0):
+        hull = ship.Hull(3.4, 0.44, deck_z + 0.02, [(0.0, 0.8), (0.3, 1.0), (0.65, 0.9), (1.0, 0.0)],
+                         sheer=0.12, flare=0.7, rake=0.12, x=side * SPAN)
+        objects.append(common.body_mat(hull.build(f"hull_{side:+.0f}")))
+        objects.append(common.trim_mat(hull.build_deck(f"hull_deck_{side:+.0f}")))
 
-    # Bridge: a sloped deckhouse and a team-coloured wheelhouse on it, with its window strip.
-    by = 0.0
-    dz = hull.deck_at(by)
-    objects.append(ship.body(ship.block("house", 0.58, 0.9, 0.24, 0.48, 0.66, off=(0.0, 0.1), origin=(0.0, by, dz))))
-    wz = dz + 0.24
-    wy = by - 0.04
-    objects.append(ship.accent_mat(ship.block("wheelhouse", 0.42, 0.4, 0.2, 0.34, 0.24, off=(0.0, 0.06), origin=(0.0, wy, wz)), NAME, ACCENT))
-    # the wheelhouse's front face runs from y = wy - 0.2 at its foot to wy - 0.06 at its top
-    objects.append(ship.glow_mat(ship.front_window("windows", 0.34, 0.07, wy - 0.2 + 0.056 - 0.006, wz + 0.08, lean=0.049), NAME))
+    # Low wheelhouse in the middle of the deck, its windows looking forward.
+    top = deck_z + 0.1
+    wy = 0.12
+    objects.append(common.body_mat(ship.block("wheelhouse", 0.56, 0.62, 0.2, 0.44, 0.38, off=(0.0, 0.08), origin=(0.0, wy, top))))
+    # the wheelhouse's front face runs from y = wy - 0.31 at its foot to wy - 0.11 at its top
+    objects.append(common.glow_mat(ship.front_window("windows", 0.42, 0.07, wy - 0.31 + 0.07 - 0.006, top + 0.07, lean=0.07), palette.AMBER))
 
-    # Mast behind the wheelhouse, with a radar bar spinning at its top.
-    my = wy + 0.17
-    objects.append(ship.trim(ship.spire("mast", 0.07, 0.07, 0.6, origin=(0.0, my, wz))))
-    radar = ship.trim(ship.block("radar", 0.34, 0.06, 0.05, 0.3, 0.03, origin=(0.0, my, wz + 0.46)))
-    objects.append(common.art_group(radar, "radar", pivot=True, kind="spin", axis=(0.0, 0.0, 1.0), speed=2.5))
-
-    for name, y, weapon in (("turret_1", -0.95, 1), ("turret_2", 1.1, 2)):
-        turret = _laser_turret(name, (0.0, y, hull.deck_at(y)))
+    for name, y, weapon in (("turret_1", -0.8, 1), ("turret_2", 0.95, 2)):
+        turret = _laser_turret(name, (0.0, y, top), accent)
         objects.append(common.art_group(turret, name, pivot=True, kind="turret", weapon=weapon))
 
-    ship.report(NAME, objects, RADIUS, HEIGHT)
     return objects

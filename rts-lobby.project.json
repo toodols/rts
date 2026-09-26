@@ -10,8 +10,8 @@
 			"Packages": {
 				"$path": "Packages"
 			},
-			"Client": {
-				"$path": "src/client"
+			"ClientShared": {
+				"$path": "src/client_shared"
 			},
 			"Lobby": {
 				"$path": "src/lobby/shared"
@@ -21,6 +21,9 @@
 			}
 		},
 		"ServerScriptService": {
+			"ServerShared": {
+				"$path": "src/server_shared"
+			},
 			"LobbyServer": {
 				"$path": "src/lobby/server",
 				"pow": {

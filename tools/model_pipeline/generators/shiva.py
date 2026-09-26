@@ -1,6 +1,6 @@
 """unit_defs/t3.luau `shiva` (BAR corshiva): the amphibious siege mech.
 
-Collider capsule(61, 60, 61): radius 61/22 = 2.77 studs, height 60/11 = 5.45. Held to 100 triangles. A
+Held to 100 triangles. A
 reverse-jointed "chicken walker", unlike the Juggernaut's upright columns or the Vanguard's four legs: a wedge of
 a team-coloured hull carried high on two backward-bending legs with clawed wedge feet, a glowing cockpit slit, a
 heavy plasma cannon slung along its right flank, a rocket box on its left and a tall snorkel intake on its back
@@ -13,52 +13,56 @@ weapons have no turret, so for now it simply stays facing forward).
 
 import math
 
-from . import air_t1_common as air
-from . import common
-from . import t3_common as t3
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
+from .shared import t3 as t3
 
-ACCENT = air.rgb(150, 176, 120)
-RADIUS, HEIGHT = 61 / 22, 60 / 11
+CATEGORY = "entity"
 DEF = "shiva"
+MOUNTS = {
+    1: {"pivot": (0, 3.4286, 0), "muzzle": (1.3745, 0.7481, 2.7727)},
+}
 HIP_Z = 3.6
 SWING = 0.25
 STRIDE = round(4.0 * HIP_Z * math.sin(SWING), 2)
 
 
 def generate(params):
+    accent = params["color"]
+    m = common.Materials(accent, palette.HEAT_ORANGE)
     hull_z = 3.3
     upper = []
 
-    hull = air.block("hull", 2.0, 2.7, 1.15, 1.5, 1.9, top_offset=(0.0, 0.3), origin=(0.0, 0.0, hull_z),
-                     open_bottom=True)
-    t3.mat(hull, "accent", DEF, ACCENT)
+    hull = common.drop_bottom(common.block("hull", 2.0, 2.7, 1.15, top=(1.5, 1.9), top_offset=(0.0, 0.3), origin=(0.0, 0.0, hull_z)))
+    m.accent(hull)
     upper.append(hull)
     # cockpit slit across the sloped nose
     slit = air.plate("cockpit", (0.0, -1.24, hull_z + 0.62), (0.5, 0, 0), (0, 0.06, 0.1), (0, -0.9, 0.45))
-    t3.mat(slit, "glow")
+    m.glow(slit)
     upper.append(slit)
     # snorkel stack at the back
-    snorkel = air.block("snorkel", 0.5, 0.6, 1.0, 0.36, 0.46, top_offset=(0.0, 0.12), origin=(-0.45, 1.0, hull_z + 0.95))
-    air.drop_faces(snorkel, [0])
-    t3.mat(snorkel, "accent", DEF, ACCENT)
+    snorkel = common.block("snorkel", 0.5, 0.6, 1.0, top=(0.36, 0.46), top_offset=(0.0, 0.12), origin=(-0.45, 1.0, hull_z + 0.95))
+    common.drop_faces(snorkel, [0])
+    m.accent(snorkel)
     upper.append(snorkel)
 
     # Plasma cannon along the right flank.
     cannon = air.beam("cannon", (1.12, 0.7, hull_z + 0.8), (1.12, -2.3, hull_z + 0.85), 0.5, 0.46, top_scale=0.65,
                       open_start=True)
-    t3.drop_facing(cannon, (0, 0, -1), threshold=0.7)
-    t3.mat(cannon, "trim")
+    common.drop_facing(cannon, (0, 0, -1), threshold=0.7)
+    m.trim(cannon)
     upper.append(cannon)
     muzzle = air.plate("muzzle", (1.12, -2.31, hull_z + 0.85), (0.14, 0, 0), (0, 0, 0.13), (0, -1, 0))
-    t3.mat(muzzle, "glow")
+    m.glow(muzzle)
     upper.append(muzzle)
     # Rocket box on the left flank, its tube face glowing.
-    rockets = air.block("rockets", 0.85, 1.4, 0.95, 0.75, 1.2, origin=(-1.3, -0.05, hull_z + 0.2))
-    air.drop_faces(rockets, [0])
-    t3.mat(rockets, "trim")
+    rockets = common.block("rockets", 0.85, 1.4, 0.95, top=(0.75, 1.2), origin=(-1.3, -0.05, hull_z + 0.2))
+    common.drop_faces(rockets, [0])
+    m.trim(rockets)
     upper.append(rockets)
     tubes = air.plate("tubes", (-1.3, -0.765, hull_z + 0.68), (0.3, 0, 0), (0, 0, 0.3), (0, -1, 0))
-    t3.mat(tubes, "glow")
+    m.glow(tubes)
     upper.append(tubes)
 
     for obj in upper:
@@ -77,9 +81,7 @@ def generate(params):
         shin = t3.tube(f"shin_{side:+.0f}", knee, ankle, 0.34, sides=3, radius2=0.26, open_start=True, open_end=True,
                        roll=3.14159)
         foot = t3.wedge(f"foot_{side:+.0f}", 0.95, 1.9, 0.55, 0.55, origin=(side * 0.95, 0.0, 0.0), ridge_x=0.6)
-        objects.append(t3.leg_piece(f"leg_{side:+.0f}", [thigh, shin, foot], hip, "trim", group,
+        objects.append(t3.leg_piece(f"leg_{side:+.0f}", [thigh, shin, foot], hip, m.trim, group,
                                     axis=(1.0, 0.0, 0.0), swing=SWING, phase=phase, stride=STRIDE))
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, DEF)
     return objects

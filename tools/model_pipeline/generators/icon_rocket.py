@@ -1,9 +1,10 @@
-"""HUD icon: unguided rockets, a stubby rocket with fins flying up and to the right on a flame. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: unguided rockets, a stubby rocket with fins flying up and to the right on a flame. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     flame = ic.teardrop(0.0, -1.45, 0.36, 1.05, angle=-90.0)
@@ -17,8 +18,8 @@ def generate(params):
     return ic.build(
         "rocket",
         [
-            ic.layer(ic.place([flame] + fins, shift, angle), ic.ICON),
-            ic.layer(ic.place([body], shift, angle), ic.ICON),
-            ic.layer(ic.place([nose], shift, angle), ic.ICON),
+            ic.layer(ic.place([flame] + fins, shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([body], shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([nose], shift, angle), palette.ICON_FILL),
         ],
     )

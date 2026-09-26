@@ -1,4 +1,4 @@
-"""unit_defs `scorpion`: a sabot battery, 1x2x1 cells (4x8x4 studs), in its own gold. Under 100 triangles.
+"""unit_defs `scorpion`: a sabot battery, in its own gold. Under 100 triangles.
 
 The tower line's sloped plinth and tapered column under a flat, heavy launcher head: a low armored
 housing with a magazine at the back and two square launch rails side by side, held nearly level (the sabot
@@ -6,18 +6,23 @@ is a rocket-boosted shell fired at ground targets that drops only a little), tie
 collar. The head yaws with weapon 1.
 """
 
-from . import defense_a_common as d
+from .shared import defense_a as d
+from .shared import palette
 
-KEY = "scorpion"
-ACCENT = (226 / 255, 178 / 255, 74 / 255, 1.0)  # Color3.fromRGB(226, 178, 74)
-GLOW = (1.0, 0.36, 0.1, 1.0)  # a hot rocket orange, clear of the gold
+CATEGORY = "entity"
+DEF = "scorpion"
+MOUNTS = {
+    1: {"pivot": (0, 4.5, 0), "muzzle": (-0.33, 1.1607, 3.7778)},
+}
 SWIVEL_Z = 4.5
 ELEV = 8.0
 
 
 def generate(params):
+    w = params["collider"]["width"]
+    accent = params["color"]
     base = d.Parts()
-    base.loft([d.square(3.9, 0.0), d.square(2.9, 1.2)], side="trim", top="trim")
+    base.loft([d.square(w - 0.1, 0.0), d.square(2.9, 1.2)], side="trim", top="trim")
     base.loft([d.square(1.3, 1.2), d.square(1.0, SWIVEL_Z)], side="body")
 
     head = d.Parts()
@@ -36,6 +41,6 @@ def generate(params):
     head.block_f(rails, 0.0, 0.0, 1.55, 1.75, (1.0, 0.38), tags={"all": "trim"})
     head.block_f(rails, 0.0, 0.0, 2.72, 3.05, (1.12, 0.42), (1.06, 0.38), tags={"all": "trim"})
 
-    objects = d.base_objects(base, KEY, "trim")
-    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), KEY, accent_color=ACCENT, glow_color=GLOW)
+    objects = d.base_objects(base, "trim", params["color"])
+    objects += d.head_objects(head, (0.0, 0.0, SWIVEL_Z), accent, glow_color=palette.ROCKET_FLAME)
     return objects

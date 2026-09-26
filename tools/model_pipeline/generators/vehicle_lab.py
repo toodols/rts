@@ -1,4 +1,4 @@
-"""unit_defs/factory.luau `vehicle_lab` (BAR corvp): a 3x1x3 cell (12 x 4 x 12 stud) factory for T1 vehicles.
+"""unit_defs/factory.luau `vehicle_lab` (BAR corvp): a factory for T1 vehicles.
 
 Low and wide where the bot lab is tall and narrow: a broad open vehicle bay between two low armoured side walls,
 a sloped control block across the back, and two tall yellow nanolathe cranes rising from the side walls and
@@ -6,11 +6,17 @@ leaning in over the front edge, where production.luau builds each unit (Blender 
 elbows poke a little above the 4-stud box. Under 100 triangles.
 """
 
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "vehicle_lab"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"height": 4.86}
 
 
 def generate(params):
-    k = fc.Kit("vehlab")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     floor = 0.45
     bay = 3.8
@@ -18,7 +24,7 @@ def generate(params):
     wall_top = 2.3
     glacis_top = -4.3
 
-    footing = fc.Shape().hull((-6, 6, -6, 6), (-5.8, 5.8, -5.8, 5.8), 0.0, floor)
+    footing = fc.Shape().hull((-hw, hw, -hl, hl), (-5.8, 5.8, -5.8, 5.8), 0.0, floor)
 
     for sx in (-1, 1):
         inner, outer, outer_top = sx * bay, sx * 6.0, sx * 5.3
@@ -42,10 +48,10 @@ def generate(params):
     fc.chevron(nano, 0.0, front + 1.5, floor + 0.02, 4.0, 0.7)
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
-    return fc.finish(objs)
+    return objs

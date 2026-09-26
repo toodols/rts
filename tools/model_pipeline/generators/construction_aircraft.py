@@ -1,7 +1,6 @@
 """unit_defs/air_t1.luau `construction_aircraft` (BAR corca): the flying builder.
 
-Collider capsule(34, 18, 46): radius 46/22 = 2.09 studs, height 18/11 = 1.64 -- flat, so the whole thing is
-low. Faceted low-poly, under 100 triangles. A stubby utility airframe, nothing like the combat planes: a short
+Faceted low-poly, under 100 triangles. A stubby utility airframe, nothing like the combat planes: a short
 deep hexagonal fuselage, a straight wing with a big square engine pod on each tip (wing, pods and V tail are
 the team-coloured accent), and on its back a high-vis yellow nanolathe turret whose arm reaches forward over
 the cockpit to a glowing emitter. The turret is the "work" piece: it turns toward what the aircraft builds.
@@ -10,14 +9,16 @@ Parts: body, trim (the canopy is dark trim glass, to stay within six parts), acc
 turret's yellow and emitter glow.
 """
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(226, 178, 74)
-RADIUS, HEIGHT = 46 / 22, 18 / 11
+CATEGORY = "entity"
+DEF = "construction_aircraft"
 
 
 def generate(params):
+    accent = params["color"]
     zc = 0.72
     objects = []
 
@@ -64,17 +65,16 @@ def generate(params):
             (side * 0.22, 1.10, zc + 0.14),
         ))
     for obj in accents:
-        air.accent_mat(obj, "construction_aircraft", ACCENT)
+        common.accent_mat(obj, accent)
         objects.append(obj)
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
         objects.append(obj)
 
     # The nanolathe turret, built about its swivel point on the fuselage's back.
     pivot = (0.0, 0.25, zc + 0.26)
     px, py, pz = pivot
-    housing = air.block("turret_housing", 0.56, 0.62, 0.30, 0.36, 0.40, top_offset=(0.0, 0.06),
-                        origin=pivot, open_bottom=True)
+    housing = common.drop_bottom(common.block("turret_housing", 0.56, 0.62, 0.30, top=(0.36, 0.40), top_offset=(0.0, 0.06), origin=pivot))
     arm = air.beam("arm", (px, py - 0.05, pz + 0.18), (px, py - 1.02, pz + 0.30), 0.17, 0.15,
                    top_scale=0.7, open_start=True)
     tip = (px, py - 1.02, pz + 0.30)
@@ -86,12 +86,10 @@ def generate(params):
         (px, tip[1] + 0.02, tip[2] + 0.10),
     )
     for obj in (housing, arm):
-        air.hivis_mat(obj)
+        common.hivis_mat(obj)
         objects.append(common.art_group(obj, "nanolathe"))
     common.art_group(housing, "nanolathe", pivot=True, kind="work")
-    air.nano_mat(emitter)
+    common.nano_mat(emitter)
     objects.append(common.art_group(emitter, "nanolathe"))
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "construction_aircraft")
     return objects

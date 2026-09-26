@@ -1,3 +1,4 @@
+--!strict
 -- The lobby's map: a large picture of it with its grid, what it is, and every map to pick from. Only the host can
 -- pick; everyone else sees the list but cannot change it. A co-op lobby's map is its mission's, so it has no list. BAR's
 -- maps are listed only to a developer (shared/developers.luau).
@@ -8,20 +9,26 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local React = require(ReplicatedStorage.Packages.react)
 
 local protocol = require(ReplicatedStorage.Lobby.protocol)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local developers = require(ReplicatedStorage.Shared.developers)
+local map_presets = require(ReplicatedStorage.Shared.map_presets)
 
 local map_preview = require(ReplicatedStorage.LobbyClient.map_preview)
 local map_image = require(script.Parent.map_image)
 
-type MapInfo = map_preview.MapInfo
+type Preset = map_presets.Preset
 
-local ACTIONS = protocol.ACTIONS
+-- An element's properties: strict mode cannot type a table of them that mixes tags, properties and handlers.
+type Props = { [any]: any }
+
+-- What the badge by a map's name says of where it comes from.
+local SOURCE_BADGES: { [map_presets.PresetSource]: string } = {
+	bar = "BAR",
+	design = "DESIGNED",
+	generated = "GENERATED",
+}
 
 local local_player = Players.LocalPlayer
-
-local function format_units(units: Vector2): string
-	return `{math.round(units.X)} × {math.round(units.Y)}`
-end
 
 local function Fact(props: { label: string, value: string, LayoutOrder: number })
 	return React.createElement("Frame", {
@@ -42,12 +49,12 @@ local function Fact(props: { label: string, value: string, LayoutOrder: number }
 end
 
 local function MapCard(props: {
-	map: MapInfo,
+	map: Preset,
 	seed: number,
 	selected: boolean,
 	locked: boolean,
 	players: number,
-	act: (action: string, argument: any?) -> (),
+	act: (action: protocol.Action, argument: any?) -> (),
 	LayoutOrder: number,
 })
 	local tag = "map-card"
@@ -57,36 +64,41 @@ local function MapCard(props: {
 	if props.locked then
 		tag ..= " locked"
 	end
-	local crowded = props.players > props.map.starts
+	local starts = #props.map.starts
+	local crowded = props.players > starts
 
-	return React.createElement("TextButton", {
-		[React.Tag] = tag,
-		LayoutOrder = props.LayoutOrder,
-		Text = "",
-		AutoButtonColor = false,
-		Interactable = not props.locked,
-		[React.Event.Activated] = function()
-			props.act(ACTIONS.set_map, props.map.preset)
-		end,
-	}, {
-		Thumb = React.createElement(map_image.MapImage, {
-			preset = props.map.preset,
-			seed = props.seed,
-			grid = false,
-			tag = "map-card-thumb",
-			LayoutOrder = 1,
-		}),
-		Name = React.createElement("TextLabel", {
-			[React.Tag] = "map-card-name",
-			LayoutOrder = 2,
-			Text = props.map.name,
-		}),
-		Size = React.createElement("TextLabel", {
-			[React.Tag] = if crowded then "map-card-size crowded" else "map-card-size",
-			LayoutOrder = 3,
-			Text = `{format_units(props.map.units)} · {props.map.starts} starts`,
-		}),
-	})
+	return React.createElement(
+		"TextButton",
+		{
+			[React.Tag] = tag,
+			LayoutOrder = props.LayoutOrder,
+			Text = "",
+			AutoButtonColor = false,
+			Interactable = not props.locked,
+			[React.Event.Activated] = function()
+				props.act("set_map", props.map.name)
+			end,
+		} :: Props,
+		{
+			Thumb = React.createElement(map_image.MapImage, {
+				preset = props.map.name,
+				seed = props.seed,
+				grid = false,
+				tag = "map-card-thumb",
+				LayoutOrder = 1,
+			}),
+			Name = React.createElement("TextLabel", {
+				[React.Tag] = "map-card-name",
+				LayoutOrder = 2,
+				Text = props.map.display_name,
+			}),
+			Size = React.createElement("TextLabel", {
+				[React.Tag] = if crowded then "map-card-size crowded" else "map-card-size",
+				LayoutOrder = 3,
+				Text = `{map_preview.units_text(props.map)} · {starts} starts`,
+			}),
+		}
+	)
 end
 
 local function MapPanel(
@@ -97,18 +109,20 @@ local function MapPanel(
 		-- the map is a co-op mission's, and cannot be changed
 		fixed: boolean,
 		players: number,
-		act: (action: string, argument: any?) -> (),
+		act: (action: protocol.Action, argument: any?) -> (),
 	}
 )
-	local info = map_preview.info(props.preset)
+	local preset = map_presets.presets[props.preset]
 
-	local maps: { MapInfo } = if props.fixed then {} else map_preview.all(developers.is_developer(local_player))
+	local maps: { Preset } = if props.fixed
+		then {}
+		else map_presets.lobby_choices(developers.is_developer(local_player))
 	local cards: { [string]: any } = {}
 	for index, map in maps do
-		cards[map.preset] = React.createElement(MapCard, {
+		cards[map.name] = React.createElement(MapCard, {
 			map = map,
 			seed = props.seed,
-			selected = map.preset == props.preset,
+			selected = map.name == props.preset,
 			locked = not props.is_host,
 			players = props.players,
 			act = props.act,
@@ -135,12 +149,12 @@ local function MapPanel(
 			Name = React.createElement("TextLabel", {
 				[React.Tag] = "heading",
 				LayoutOrder = 2,
-				Text = info.name,
+				Text = preset.display_name,
 			}),
 			Source = React.createElement("TextLabel", {
 				[React.Tag] = "badge",
 				LayoutOrder = 3,
-				Text = if info.from_bar then "BAR" else "GENERATED",
+				Text = SOURCE_BADGES[preset.source],
 			}),
 		}),
 		Stage = React.createElement(map_image.MapImage, {
@@ -156,29 +170,29 @@ local function MapPanel(
 		}, {
 			Units = React.createElement(Fact, {
 				label = "SIZE",
-				value = format_units(info.units),
+				value = map_preview.units_text(preset),
 				LayoutOrder = 1,
 			}),
 			Studs = React.createElement(Fact, {
 				label = "STUDS",
-				value = `{math.round(info.size.X)} × {math.round(info.size.Y)}`,
+				value = `{math.round(preset.size.X)} × {math.round(preset.size.Y)}`,
 				LayoutOrder = 2,
 			}),
 			Starts = React.createElement(Fact, {
 				label = "STARTS",
-				value = tostring(info.starts),
+				value = tostring(#preset.starts),
 				LayoutOrder = 3,
 			}),
 			Description = React.createElement("TextLabel", {
 				[React.Tag] = "map-description grow",
 				LayoutOrder = 4,
-				Text = info.description,
+				Text = preset.description,
 			}),
 		}),
 		Grid = React.createElement("TextLabel", {
 			[React.Tag] = "map-grid-note faint",
 			LayoutOrder = 5,
-			Text = `Grid: {math.round(map_preview.UNIT_STUDS)} studs`,
+			Text = `Grid: {math.round(world_scale.MAP_UNIT_STUDS)} studs`,
 		}),
 		List = React.createElement("ScrollingFrame", {
 			[React.Tag] = "map-list",

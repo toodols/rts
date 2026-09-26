@@ -1,11 +1,10 @@
+--!strict
 -- For developers only: everything cast in gold, and tougher, longer-ranged and harder-hitting than it should be. It is
 -- the one skin that changes the game, so no player can pick it (`skins.may_wear`); only the `skin` command puts it on.
 
-local ReplicatedStorage = game:GetService "ReplicatedStorage"
+local skin_types = require(script.Parent.types)
 
-local types = require(ReplicatedStorage.Shared.types)
-
-type Skin = types.Skin
+type Skin = skin_types.Skin
 
 local skin: Skin = {
 	name = "golden",
@@ -24,7 +23,7 @@ local skin: Skin = {
 		reflectance = 0.3,
 		keep_team = true,
 	},
-	attachments = {},
+	donut = nil,
 }
 
 return table.freeze(skin)

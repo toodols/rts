@@ -7,7 +7,7 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local config = require(ReplicatedStorage.Shared.config)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 
@@ -24,7 +24,7 @@ local FOOTPRINT_SAMPLES = 8
 -- not sink into the side that rises. It never goes under the sea: an aircraft that lands over the water hovers on
 -- its surface.
 local function resting_height(def: EntityDef, x: number, z: number): number
-	local ground = math.max(heightmap.height_at(x, z), config.WATER_LEVEL)
+	local ground = math.max(heightmap.height_at(x, z), ground_levels.WATER_LEVEL)
 	local radius = unit_defs.collider_radius(def)
 	for index = 0, FOOTPRINT_SAMPLES - 1 do
 		local angle = index * (2 * math.pi / FOOTPRINT_SAMPLES)
@@ -33,22 +33,16 @@ local function resting_height(def: EntityDef, x: number, z: number): number
 	return ground + unit_defs.collider_height(def) / 2
 end
 
--- Whether it is an aircraft, in the air or not. A wreck is not: what an aircraft leaves behind is on the ground.
-local function is_aircraft(entity: Entity): boolean
-	return entity.kind == "unit" and unit_defs.is_air(unit_defs.of(entity))
-end
-
--- Whether it is off the ground, which is what puts it out of the way of things that stand on it.
+-- Whether it is an aircraft off the ground, which is what puts it out of the way of things that stand on it.
 local function is_airborne(entity: Entity): boolean
-	if is_aircraft(entity) == false then
+	local def = entity.def
+	if unit_defs.is_air(def) == false then
 		return false
 	end
-	local def = unit_defs.of(entity)
 	return entity.position.Y > resting_height(def, entity.position.X, entity.position.Z) + AIRBORNE_MARGIN
 end
 
 return table.freeze({
 	resting_height = resting_height,
-	is_aircraft = is_aircraft,
 	is_airborne = is_airborne,
 })

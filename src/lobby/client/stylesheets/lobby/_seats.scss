@@ -1,0 +1,144 @@
+@use "sass:color";
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Seats -------------------------------------------------------------------------------------------------------
+
+.seats-panel {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+}
+
+.sides {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(4));
+
+	// clear of the scrollbar, which is drawn over the content
+	padding-right: space(3);
+}
+
+// The players' sides, above the spectators: one list, or the teams side by side.
+.teams {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(2));
+
+	&.split {
+		flex-direction: row;
+		gap: space(3);
+	}
+}
+
+.side {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+}
+
+// Side by side, the teams share the width evenly. `width: 0` stands in for `flex-basis: 0`, which outlass has no
+// equivalent for.
+.teams.split > .side {
+	width: 0;
+	flex: 1 1 0;
+}
+
+.side-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+
+	// the label takes what the count leaves, rather than the whole row: at `.group-label`'s full width it pushed the
+	// count out past the side's edge, over the next team's label
+	> .group-label {
+		width: 0;
+		flex: 1 1 0;
+		text-overflow: ellipsis;
+	}
+}
+
+.side-count {
+	width: auto;
+	height: 14px;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+}
+
+.seat {
+	width: 100%;
+	height: 30px;
+	@include stack(row, space(2));
+	align-items: center;
+	padding: 0 space(2);
+	background-color: veil($steel-raised, 0.85);
+	outline: 1px solid color.adjust($edge, $lightness: -15%);
+
+	&.you {
+		outline: 1px solid $accent;
+	}
+
+	// An empty place: a dim outline and faint text, so it reads as room rather than as someone.
+	&.open {
+		background-color: veil($void, 0.5);
+		outline: 1px solid color.adjust($edge, $lightness: -10%);
+		color: var(--TextFaint);
+		font-size: 12px;
+		font-style: italic;
+	}
+
+	&.movable:hover {
+		background-color: $steel-lit;
+		outline: 1px solid $accent;
+		color: $accent;
+	}
+}
+
+.seat-name {
+	height: auto;
+	font-size: 14px;
+	text-align: left;
+	text-overflow: ellipsis;
+}
+
+// A player's resource bonus: a developer's small stepper, a step down and up either side of the value, or the value alone
+// for everyone else. Green above none and red below it, so a handicap reads at a glance.
+.bonus {
+	width: auto;
+	height: auto;
+	@include stack(row, space(1));
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.chip.step {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+}
+
+.bonus-value {
+	width: auto;
+	min-width: 44px;
+	height: 14px;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+	text-align: center;
+	white-space: nowrap;
+
+	&.up {
+		color: $gain;
+	}
+
+	&.down {
+		color: $danger;
+	}
+}

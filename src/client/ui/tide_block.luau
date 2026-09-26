@@ -7,17 +7,10 @@ local React = require(ReplicatedStorage.Packages.react)
 
 local environment = require(ReplicatedStorage.Shared.environment)
 
-local function TideBlock(props: { LayoutOrder: number })
-	local strength, set_strength = React.useState(environment.tidal_strength())
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
-	React.useEffect(function()
-		local connection = environment.tidal_strength_changed():Connect(function()
-			set_strength(environment.tidal_strength())
-		end)
-		return function()
-			connection:Disconnect()
-		end
-	end, {})
+local function TideBlock(props: { LayoutOrder: number })
+	local strength = use_store.use_store(environment.tidal_strength, environment.tidal_strength_changed)
 
 	return React.createElement("Frame", {
 		[React.Tag] = "tide-block",

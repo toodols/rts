@@ -1,9 +1,9 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 // `.build-option.unaffordable` extends `.hazard`, which _main.scss declares: an @extend only
 // reaches the stylesheet it is written in and the ones that stylesheet loads.
-@use "main" as *;
+@use "../../../../client_shared/stylesheets/main" as *;
 
 .build-menu {
 	position: absolute;

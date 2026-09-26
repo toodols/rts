@@ -1,3 +1,4 @@
+--!strict
 -- The map's ground is a grid of height samples. Cell (cx, cz) spans CELL_STUDS studs and its four
 -- corners are grid samples, so world height is a bilinear blend of the four samples around a point.
 --
@@ -8,16 +9,17 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local config = require(ReplicatedStorage.Shared.config)
-local map_presets = require(ReplicatedStorage.Shared.map_presets)
+local craters = require(ReplicatedStorage.Shared.craters)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local world_scale = require(ReplicatedStorage.Shared.world_scale)
 
-local CELL_STUDS = config.CELL_STUDS
+local CELL_STUDS = world_scale.CELL_STUDS
 
 -- How big the map is, which is up to its preset (`Preset.size`), so these are set by `initialize` and not constants.
 -- Grid samples run 0..cells inclusive, so there is one more sample than cell on each axis. The map is centred on
--- (0, 0), so the origin, its low corner, is half of it back from there.
-local map_cells_x = config.MAP_CELLS_X
-local map_cells_z = config.MAP_CELLS_Z
+-- (0, 0), so the origin, its low corner, is half of it back from there. Until a map is built it is none at all.
+local map_cells_x = 0
+local map_cells_z = 0
 local samples_x = map_cells_x + 1
 local origin_x = -map_cells_x * CELL_STUDS / 2
 local origin_z = -map_cells_z * CELL_STUDS / 2
@@ -26,8 +28,6 @@ local heights: { number } = {}
 -- The height each edited sample was generated with, by sample index. Only samples that have been edited
 -- are here.
 local originals: { [number]: number } = {}
-local current_seed = 0
-local current_preset = map_presets.DEFAULT
 local lowest_height = 0
 local highest_height = 0
 local is_initialized = false
@@ -36,20 +36,11 @@ local function sample_index(cx: number, cz: number): number
 	return cz * samples_x + cx + 1
 end
 
--- Fills the grid from a map preset, which decides what the ground looks like. Every sample is the
--- preset's height at that grid point's world position.
-local function initialize(seed: number, preset_name: string?)
-	local preset = map_presets.get(preset_name)
-	current_seed = seed
-	current_preset = preset.name
-	local height_of = preset.build(seed)
-
-	-- to the nearest even number of cells: the map is centred on (0, 0), and only an even number puts its edges, and
-	-- so every cell, on the terrain's voxel grid, which is what lets a cell be drawn as exactly one column of voxels
-	local size = preset.size
-	map_cells_x = if size ~= nil then 2 * math.round(size.X / CELL_STUDS / 2) else config.MAP_CELLS_X
-	map_cells_z = if size ~= nil then 2 * math.round(size.Y / CELL_STUDS / 2) else config.MAP_CELLS_Z
-	assert(map_cells_x % 2 == 0 and map_cells_z % 2 == 0, "a map must be an even number of cells across")
+-- Fills the grid for a map `size` studs across (a preset's, which is a whole number of cells each way), each sample
+-- `height_of` its grid point's world position: what a map preset builds from the seed (see map_state.apply).
+local function initialize(size: Vector2, height_of: (x: number, z: number) -> number)
+	map_cells_x = size.X // CELL_STUDS
+	map_cells_z = size.Y // CELL_STUDS
 	samples_x = map_cells_x + 1
 	origin_x = -map_cells_x * CELL_STUDS / 2
 	origin_z = -map_cells_z * CELL_STUDS / 2
@@ -84,17 +75,9 @@ local function half_extents(): (number, number)
 	return map_cells_x * CELL_STUDS / 2, map_cells_z * CELL_STUDS / 2
 end
 
-local function get_preset(): string
-	return current_preset
-end
-
 -- The lowest and highest ground on the map.
 local function height_bounds(): (number, number)
 	return lowest_height, highest_height
-end
-
-local function get_seed(): number
-	return current_seed
 end
 
 local function initialized(): boolean
@@ -107,7 +90,7 @@ local function sample(cx: number, cz: number): number
 	local clamped_z = math.clamp(cz, 0, map_cells_z)
 	local height = heights[sample_index(clamped_x, clamped_z)]
 	if height == nil then
-		return config.TERRAIN_BASE_HEIGHT
+		return ground_levels.TERRAIN_BASE_HEIGHT
 	end
 	return height
 end
@@ -144,7 +127,7 @@ end
 
 -- How deep the water is over the ground at (x, z): nothing on dry land.
 local function water_depth(x: number, z: number): number
-	return math.max(0, config.WATER_LEVEL - height_at(x, z))
+	return math.max(0, ground_levels.WATER_LEVEL - height_at(x, z))
 end
 
 -- Lowest and highest ground height under an axis-aligned footprint, used to reject building
@@ -180,7 +163,7 @@ local function in_bounds(x: number, z: number): boolean
 end
 
 -- Sets the height of one grid sample. The first time a sample is edited, the height it was generated with
--- is kept, so that no amount of editing can carry it far from that.
+-- is kept: a rim's rise is measured from it, and it marks the sample as one a late client must be sent.
 local function write_height(index: number, height: number)
 	if originals[index] == nil then
 		originals[index] = heights[index]
@@ -211,9 +194,10 @@ end
 
 -- Presses a crater into the ground: a bowl `depth` studs deep at its centre, rising smoothly to the level
 -- of the ground at `radius`, with the ground it pushed aside heaped up in a low rim around it. The samples
--- `is_protected` says are not to be touched keep their heights. No sample ends up more than
--- `config.DEFORM_MAX_TOTAL` from where it was generated. Returns what changed, as a flat list of sample
--- index and new height, and leaves it to the caller to tell the renderer and the clients.
+-- `is_protected` says are not to be touched keep their heights. Ground can be dug as far down as
+-- `craters.DEFORM_FLOOR_HEIGHT`, but is never raised more than `craters.DEFORM_MAX_RISE` above where it was
+-- generated. Returns what changed, as a flat list of sample index and new height, and leaves it to the caller
+-- to tell the renderer and the clients.
 local function deform(
 	center_x: number,
 	center_z: number,
@@ -221,7 +205,7 @@ local function deform(
 	depth: number,
 	is_protected: ((x: number, z: number) -> boolean)?
 ): { number }
-	local rim_reach = config.DEFORM_RIM_REACH
+	local rim_reach = craters.DEFORM_RIM_REACH
 	local reach = radius * rim_reach
 	local gx0, gz0 = world_to_grid(center_x - reach, center_z - reach)
 	local gx1, gz1 = world_to_grid(center_x + reach, center_z + reach)
@@ -240,7 +224,7 @@ local function deform(
 				delta = -depth * bowl * bowl
 			elseif u < rim_reach then
 				local t = (u - 1) / (rim_reach - 1)
-				delta = depth * config.DEFORM_RIM_FRACTION * math.sin(math.pi * t)
+				delta = depth * craters.DEFORM_RIM_FRACTION * math.sin(math.pi * t)
 			end
 			if delta == 0 or (is_protected ~= nil and is_protected(wx, wz)) then
 				continue
@@ -249,8 +233,12 @@ local function deform(
 			local index = sample_index(cx, cz)
 			local current = heights[index]
 			local original = if originals[index] ~= nil then originals[index] else current
-			local target =
-				math.clamp(current + delta, original - config.DEFORM_MAX_TOTAL, original + config.DEFORM_MAX_TOTAL)
+			local target = current + delta
+			if delta > 0 then
+				target = math.min(target, math.max(current, original + craters.DEFORM_MAX_RISE))
+			else
+				target = math.max(target, math.min(current, craters.DEFORM_FLOOR_HEIGHT))
+			end
 			if target ~= current then
 				write_height(index, target)
 				table.insert(changes, index)
@@ -306,11 +294,9 @@ end
 return table.freeze({
 	water_depth = water_depth,
 	initialize = initialize,
-	get_preset = get_preset,
 	height_bounds = height_bounds,
 	ray_to_ground = ray_to_ground,
 	initialized = initialized,
-	get_seed = get_seed,
 	sample = sample,
 	height_at = height_at,
 	ground_position = ground_position,

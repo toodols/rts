@@ -1,3 +1,4 @@
+--!strict
 -- Tidal flats: two coasts, west and east, with a broad flat of shallow water between them. It is too deep for anything
 -- that cannot go in water, which is most of what walks and drives, and too shallow for all but the lightest boats; a
 -- hovercraft skims it, and an amphibious unit wades it. Sandbars stand out of it with metal on them, for whatever can
@@ -22,7 +23,8 @@ local COAST = 30
 local COAST_WANDER = 18
 local COAST_WANDER_FREQUENCY = 0.012
 -- The flat: this deep, give or take its ripple, which never brings it near enough the surface for anything to stand in
--- it that cannot go in water (see config.DROWN_DEPTH_MARGIN), and never deep enough for a tidal generator.
+-- it that cannot go in water (see shared/ground_levels.luau's DROWN_DEPTH_MARGIN), and never deep enough for a tidal
+-- generator.
 local FLAT = -1.35
 local FLAT_RIPPLE = 0.25
 local FLAT_RIPPLE_FREQUENCY = 0.05
@@ -138,12 +140,12 @@ local SPOTS = kit.spots(kit.twinned(ordinary), kit.twinned({ Vector2.new(-14, -1
 
 return table.freeze({
 	name = "tidal_flats",
+	display_name = "Tidal Flats",
 	description = "Mudflats, sandbars and one causeway",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 60), kit.box_around(-WEST_START, 60) },
 	metal_layers = nil,
 	metal_spots = SPOTS,

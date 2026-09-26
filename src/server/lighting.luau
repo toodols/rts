@@ -1,4 +1,5 @@
--- Scene lighting. Set on the server so it replicates to every client.
+-- Scene lighting the map's atmosphere does not cover (see shared/atmosphere.luau, which each client lights its view by).
+-- Set on the server so it replicates to every client.
 --
 -- The fog is doing real work, not just mood: render distance collapses on low graphics quality and
 -- the far edge of the terrain culls visibly. Fading the distance out to the horizon colour means
@@ -8,8 +9,7 @@ local Lighting = game:GetService "Lighting"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
-
-local HORIZON = Color3.fromRGB(108, 124, 142)
+local atmosphere = require(ReplicatedStorage.Shared.atmosphere)
 
 -- Start the fade a little inside the map's half width and finish it past the far corner, so the whole map is legible
 -- from a zoomed-out camera while the edge still dissolves. Called again whenever the map is replaced, since maps are
@@ -21,27 +21,13 @@ local function fit_fog()
 	Lighting.FogEnd = half_width * 3.1
 end
 
+-- The fog in the horizon's colour, and the haze a client dresses by the atmosphere, which it needs to be there.
 local function init()
-	Lighting.Ambient = Color3.fromRGB(88, 96, 110)
-	Lighting.OutdoorAmbient = Color3.fromRGB(104, 114, 130)
-	Lighting.Brightness = 2
-	Lighting.ClockTime = 15.5
-	Lighting.GeographicLatitude = 20
-	Lighting.ExposureCompensation = -0.1
-
-	Lighting.FogColor = HORIZON
+	Lighting.FogColor = atmosphere.DEFAULT.haze_color :: Color3
 	fit_fog()
-
-	local atmosphere = Lighting:FindFirstChildOfClass "Atmosphere"
-	if atmosphere == nil then
-		atmosphere = Instance.new "Atmosphere"
-		atmosphere.Parent = Lighting
+	if Lighting:FindFirstChildOfClass "Atmosphere" == nil then
+		Instance.new("Atmosphere").Parent = Lighting
 	end
-	atmosphere.Density = 0.32
-	atmosphere.Haze = 1.4
-	atmosphere.Glare = 0.15
-	atmosphere.Color = HORIZON
-	atmosphere.Decay = Color3.fromRGB(84, 96, 112)
 end
 
 return table.freeze({

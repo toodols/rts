@@ -1,6 +1,6 @@
 """unit_defs/air_t1.luau `hercules` (BAR corvalk): the light transport.
 
-Collider capsule(40, 20, 56): radius 56/22 = 2.55 studs, height 20/11 = 1.82. Faceted low-poly, under 100
+Faceted low-poly, under 100
 triangles. A flying cargo box on four lift fans: a squared-off fuselage with a cockpit on its sloped nose, two
 cross beams carrying four flared fan housings at its corners (beams and housings are the team-coloured accent),
 each with a dark rotor across its glowing mouth -- four fans is what reads as "transport"
@@ -9,14 +9,16 @@ from above -- and a dark cargo clamp under the belly. Nothing moves.
 
 import math
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(226, 178, 74)
-RADIUS, HEIGHT = 56 / 22, 20 / 11
+CATEGORY = "entity"
+DEF = "hercules"
 
 
 def generate(params):
+    accent = params["color"]
     zc = 1.0
     objects = []
 
@@ -46,13 +48,12 @@ def generate(params):
     z0 = zc - 0.10
     for sy in (-1.0, 1.0):
         beam = air.beam(f"beam_{sy:+.0f}", (-fx, sy * fy, zc + 0.02), (fx, sy * fy, zc + 0.02), 0.22, 0.16)
-        air.drop_faces(beam, [0, 1])  # both ends are buried in the fan housings
+        common.drop_faces(beam, [0, 1])  # both ends are buried in the fan housings
         accents.append(beam)
         for sx in (-1.0, 1.0):
             cx, cy = sx * fx, sy * fy
-            housing = air.block(f"fan_{sx:+.0f}{sy:+.0f}", half_bottom * 2, half_bottom * 2, fan_h,
-                                half_top * 2, half_top * 2, origin=(cx, cy, z0))
-            air.drop_faces(housing, [0, 1])  # open top and bottom: the glowing fan fills the mouth
+            housing = common.block(f"fan_{sx:+.0f}{sy:+.0f}", half_bottom * 2, half_bottom * 2, fan_h, top=(half_top * 2, half_top * 2), origin=(cx, cy, z0))
+            common.drop_faces(housing, [0, 1])  # open top and bottom: the glowing fan fills the mouth
             accents.append(housing)
             # the fan's glowing disc filling the housing's mouth (it also closes the open box: Roblox draws no
             # back faces, so an open mouth would show straight through), a dark two-bladed rotor over it
@@ -67,17 +68,15 @@ def generate(params):
     glows.append(air.plate("tail_exhaust", (0.0, 1.555, zc + 0.04), (0.2, 0, 0), (0, 0, 0.15), (0, 1, 0)))
 
     # Cargo clamp under the belly: a dark tapered cradle (open on top, against the hull).
-    trims.append(air.block("clamp", 0.50, 1.40, 0.26, 0.70, 1.70, origin=(0.0, 0.15, zc - 0.56)))
-    air.drop_faces(trims[-1], [1])
+    trims.append(common.block("clamp", 0.50, 1.40, 0.26, top=(0.70, 1.70), origin=(0.0, 0.15, zc - 0.56)))
+    common.drop_faces(trims[-1], [1])
 
     for obj in accents:
-        air.accent_mat(obj, "hercules", ACCENT)
+        common.accent_mat(obj, accent)
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
     for obj in trims:
         common.trim_mat(obj)
     objects += accents + glows + trims
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "hercules")
     return objects

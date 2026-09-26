@@ -1,15 +1,19 @@
-"""unit_defs/factory.luau `bot_lab` (BAR corlab): a 3x2x3 cell (12 x 8 x 12 stud) factory for T1 bots.
+"""unit_defs/factory.luau `bot_lab` (BAR corlab): a factory for T1 bots.
 
 Two armoured shoulder blocks with sloped outer walls and front glacis flank an open bay under a roofed lintel; a
 taller machine hall closes the back. Two yellow nanolathe arms rise from the shoulders' front corners and lean
 out over the front lip, where production.luau builds each unit (Blender -Y, Roblox +Z). Under 100 triangles.
 """
 
-from . import factory_common as fc
+from .shared import common
+from .shared import factory as fc
+
+CATEGORY = "entity"
+DEF = "bot_lab"
 
 
 def generate(params):
-    k = fc.Kit("botlab")
+    hw, hl = params["collider"]["width"] / 2, params["collider"]["length"] / 2
     trim, body, accent, nano, glow = fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape(), fc.Shape()
     floor = 0.5
     bay = 2.6
@@ -17,7 +21,7 @@ def generate(params):
     sh_top = 4.9
     glacis_top = -3.3
 
-    footing = fc.Shape().hull((-6, 6, -6, 6), (-5.7, 5.7, -5.7, 5.7), 0.0, floor)
+    footing = fc.Shape().hull((-hw, hw, -hl, hl), (-5.7, 5.7, -5.7, 5.7), 0.0, floor)
 
     for sx in (-1, 1):
         inner, outer, outer_top = sx * bay, sx * 5.6, sx * 4.8
@@ -41,11 +45,11 @@ def generate(params):
     fc.chevron(nano, 0.0, front - 0.2, floor + 0.02, 3.6, 0.6)
 
     objs = [
-        k.trim(footing.build("footing")),
-        k.body(body.build("body")),
-        k.trim(trim.build("trim")),
-        k.accent(accent.build("accent")),
-        k.nano(nano.build("nano")),
-        k.glow(glow.build("glow")),
+        common.trim_mat(footing.build("footing")),
+        common.body_mat(body.build("body")),
+        common.trim_mat(trim.build("trim")),
+        common.accent_mat(accent.build("accent"), params["color"]),
+        common.hivis_mat(nano.build("nano")),
+        common.nano_mat(glow.build("glow")),
     ]
-    return fc.finish(objs)
+    return objs

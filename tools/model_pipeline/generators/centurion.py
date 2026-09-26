@@ -4,17 +4,24 @@ A heavy, broad-chested brawler on thick armored legs. Each shoulder carries its 
 team-coloured housing with twin dark emitter barrels -- on its own swivel, so the two can aim at
 different targets as the def's two weapons do (offsets x -0.7 and +0.7). The body itself is static; each leg swings about its hip as it walks.
 
-Collider capsule(30, 32, 30): radius 1.36, height 2.91 studs. Budget: 100 triangles.
+Budget: 100 triangles.
 """
 
-from . import bot_t1_common as bt
+from .shared import bot_t1 as bt
+from .shared import common
+from .shared import palette
 
-ACCENT = bt.rgb(120, 150, 196)
-GLOW = (0.55, 0.85, 1.0, 1.0)  # blue laser
+CATEGORY = "entity"
+DEF = "centurion"
+MOUNTS = {
+    1: {"pivot": (-1.0264, 2.3328, 0), "muzzle": (0, 0, 1.3636)},
+    2: {"pivot": (1.0264, 2.3328, 0), "muzzle": (0, 0, 1.3636)},
+}
 
 
 def generate(params):
-    m = bt.Mats("centurion", ACCENT, GLOW)
+    accent = params["color"]
+    m = common.Materials(accent, palette.ICE_BLUE)
 
     base = []
     chest = m.body(bt.slab("chest", 0.74, 0.56, 0.72, top_w=0.96, top_d=0.7, origin=(0.0, 0.0, 1.12)))
@@ -35,7 +42,7 @@ def generate(params):
         z = 1.7
         # the pod: shoulder and forearm in one, flaring out at the top
         pod = m.accent(bt.slab(f"pod_{weapon}", 0.3, 0.5, 0.6, top_w=0.4, top_d=0.62, top_offset=(side * 0.03, 0.0), origin=(x, 0.02, z - 0.34)))
-        bt.set_pivot(pod, (x, 0.0, z))
+        common.set_pivot(pod, (x, 0.0, z))
         # the emitter: a thick square barrel out of the pod's front, necking down to a glowing-less tip
         barrels = m.trim(bt.beam(f"barrels_{weapon}", (x, -0.2, z), (x, -0.8, z), 0.2, 0.2, 0.15, 0.15, caps=""))
         muzzle = m.accent(bt.pyramid(f"muzzle_{weapon}", (x, -0.8, z), 0.12, 0.12, (x, -0.92, z)))
@@ -43,6 +50,4 @@ def generate(params):
         guns += [pod, barrels, muzzle]
 
     objs = base + guns
-    bt.finish(objs)
-    bt.check_fit(objs, *bt.collider(30, 32, 30), "centurion")
     return objs

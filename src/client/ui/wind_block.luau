@@ -3,20 +3,23 @@
 -- ends. Behind them, streaks drift across the frame along the vector,
 -- faster and longer the harder it blows, for the look of it.
 --
--- The server sends the wind as the `wind` attribute of Workspace, a Vector2 of (x, z). The camera faces
--- -Z, so the top of the screen is -Z and the right is +X: the vector's x is across the frame and its z is
--- down it.
+-- It shows the wind as the client draws it (Client.wind), eased toward the one the server sends, as the rain and the
+-- grass do. The camera faces -Z, so the top of the screen is -Z and the right is +X: the wind's x is across the frame
+-- and its z is down it.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
-local Workspace = game:GetService "Workspace"
 
 local React = require(ReplicatedStorage.Packages.react)
 
 local environment = require(ReplicatedStorage.Shared.environment)
 
+local wind_mod = require(ReplicatedStorage.Client.wind)
+
+local palette = require(ReplicatedStorage.ClientShared.palette)
+
 local STREAK_COUNT = 14
-local STREAK_COLOR = Color3.fromRGB(96, 210, 242)
+local STREAK_COLOR = palette.accent
 local STREAK_TRANSPARENCY = 0.75
 local STREAK_THICKNESS = 1
 -- A streak is this long even in a calm, and this much longer for every unit of wind speed.
@@ -24,50 +27,36 @@ local STREAK_BASE_LENGTH = 4
 local STREAK_LENGTH_PER_SPEED = 1.5
 -- How fast streaks travel, in pixels a second for every unit of wind speed.
 local PIXELS_PER_SPEED = 8
--- The wind shown eases toward the wind the server sends rather than jumping to it: it closes most of the gap in a
--- couple of these time constants. The readout is redrawn at this interval, and only when it has moved enough to see.
-local EASE_SECONDS = 1
+-- The readout is redrawn at this interval, and only when the wind has moved enough to see.
 local READOUT_INTERVAL = 0.05
 local READOUT_MIN_CHANGE = 0.02
 
+-- The wind as it is drawn, across the frame (x) and down it (z).
 local function read_wind(): Vector2
-	local wind = Workspace:GetAttribute "wind"
-	if typeof(wind) == "Vector2" then
-		return wind
-	end
-	return Vector2.zero
+	local wind = wind_mod.now()
+	return Vector2.new(wind.X, wind.Z)
 end
 
 local function WindBlock(props: { LayoutOrder: number })
-	-- what is drawn: the wind eased toward the one the server has, which is `target_ref`
-	local wind, set_wind = React.useState(read_wind())
-	local target_ref = React.useRef(wind)
-	-- the drifting reads the wind being shown every frame without being re-created by it
-	local wind_ref = React.useRef(wind)
+	local wind, set_wind = React.useState(read_wind)
 	local field_ref = React.useRef(nil :: Frame?)
 
 	React.useEffect(function()
-		local connection = Workspace:GetAttributeChangedSignal("wind"):Connect(function()
-			target_ref.current = read_wind()
-		end)
-
 		local since_readout = 0
-		local last_readout = wind_ref.current
-		local ease = RunService.Heartbeat:Connect(function(delta: number)
-			local blend = 1 - math.exp(-delta / EASE_SECONDS)
-			wind_ref.current = wind_ref.current:Lerp(target_ref.current, blend)
+		local last_readout = read_wind()
+		local follow = RunService.Heartbeat:Connect(function(delta: number)
 			since_readout += delta
 			if since_readout >= READOUT_INTERVAL then
 				since_readout = 0
-				if (wind_ref.current - last_readout).Magnitude >= READOUT_MIN_CHANGE then
-					last_readout = wind_ref.current
-					set_wind(wind_ref.current)
+				local current = read_wind()
+				if (current - last_readout).Magnitude >= READOUT_MIN_CHANGE then
+					last_readout = current
+					set_wind(current)
 				end
 			end
 		end)
 		return function()
-			connection:Disconnect()
-			ease:Disconnect()
+			follow:Disconnect()
 		end
 	end, {})
 
@@ -96,7 +85,7 @@ local function WindBlock(props: { LayoutOrder: number })
 			if size.X <= 0 or size.Y <= 0 then
 				return
 			end
-			local current = wind_ref.current
+			local current = read_wind()
 			local speed = current.Magnitude
 			local angle = math.deg(math.atan2(current.Y, current.X))
 			local length = STREAK_BASE_LENGTH + speed * STREAK_LENGTH_PER_SPEED
@@ -157,7 +146,7 @@ local function WindBlock(props: { LayoutOrder: number })
 			}, {
 				Fill = React.createElement("Frame", {
 					[React.Tag] = "wind-gauge-fill",
-					Size = UDim2.new(fraction, 0, 1, 0),
+					Size = UDim2.fromScale(fraction, 1),
 				}),
 			}),
 			Range = React.createElement("Frame", {

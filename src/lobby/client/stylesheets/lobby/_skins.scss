@@ -1,0 +1,93 @@
+@use "sass:color";
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Skins ------------------------------------------------------------------------------------------------------
+
+// The skins this player may wear, as cards two to a row, under a line on what a skin is. The cards are laid out by a
+// UIGridLayout set in skins_tab.luau (a CSS grid, `grid-template-columns: 1fr 1fr`, is what this would be).
+.skins-tab {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(3));
+	padding: space(4);
+}
+
+.skins-hint {
+	width: 100%;
+	height: auto;
+	font-size: 14px;
+	text-align: left;
+	color: var(--TextDim);
+	white-space: normal;
+}
+
+.skins-cards {
+	width: 100%;
+	height: 0;
+	flex: 1;
+	background-color: transparent;
+	scrollbar-width: thin;
+}
+
+// One skin: its name and stamps, what it is, what floats it comes with, and the button to equip it. The equipped one is
+// outlined in the accent, which glows in from its left edge.
+.skin-card {
+	@include cell;
+	@include stack(column, space(2));
+	padding: space(3) space(4);
+
+	&.equipped {
+		background-color: color.adjust($accent, $lightness: -38%);
+		background-image: linear-gradient(90deg, veil($accent, 0.2), transparent 70%);
+		outline: 1px solid $accent;
+	}
+}
+
+.skin-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+// Takes what the row leaves; it starts from no width, as `.roster-lane` does, so the flex layout decides it.
+.skin-name {
+	width: 0;
+	flex-grow: 1;
+	height: 20px;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 16px;
+	text-align: left;
+	color: var(--Text);
+}
+
+.tag.developer {
+	color: var(--Caution);
+	outline: 1px solid var(--Caution);
+}
+
+.skin-description {
+	width: 100%;
+	height: auto;
+	font-size: 13px;
+	line-height: 1.3;
+	text-align: left;
+	color: var(--TextDim);
+	white-space: normal;
+}
+
+.skin-extras {
+	width: 100%;
+	height: auto;
+	font-family: RobotoMono;
+	font-size: 11px;
+	text-align: left;
+	color: var(--Accent);
+	white-space: normal;
+}
+
+.button.equip {
+	align-self: flex-end;
+}

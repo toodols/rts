@@ -2,16 +2,22 @@
 -- drawn on the ground, laid along it so it climbs the hills: the local player's own lit in their colour, and the rest in
 -- red. Where each player has chosen to start is a ring with their name over it. Clicking anywhere in the player's own
 -- box asks the server to start there, or on the nearest ground there a team can start on. It is all gone once the game
--- is playing.
+-- is playing, and never there in a campaign mission, whose player starts where it says (Shared.campaign).
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local UserInputService = game:GetService "UserInputService"
-local Workspace = game:GetService "Workspace"
 
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local mission_state = require(ReplicatedStorage.Shared.mission_state)
 local starts = require(ReplicatedStorage.Shared.starts)
+
+local cursor = require(ReplicatedStorage.Client.cursor)
+local map_events = require(ReplicatedStorage.Client.map_events)
+local input_router = require(ReplicatedStorage.Client.input_router)
+local world_fx = require(ReplicatedStorage.Client.world_fx)
+
+local palette = require(ReplicatedStorage.ClientShared.palette)
 
 local choose_start: RemoteEvent = ReplicatedStorage.Shared.ChooseStart
 
@@ -19,15 +25,14 @@ local local_player = Players.LocalPlayer
 
 -- A box's edge is laid in pieces this long, so it follows the ground, this thick and this far up off it.
 local EDGE_STEP = 4
-local EDGE_THICKNESS = 0.6
-local EDGE_LIFT = 0.5
+local EDGE_STYLE: world_fx.LineStyle = table.freeze({ lift = 0.5, thickness = 0.6, closed_corners = true })
 -- The ring where a player has chosen to start.
 local RING_RADIUS = 6
 local RING_HEIGHT = 0.4
 
-local MINE_COLOR = Color3.fromRGB(96, 210, 242)
-local OTHER_COLOR = Color3.fromRGB(238, 88, 74)
-local LABEL_COLOR = Color3.fromRGB(236, 244, 252)
+local MINE_COLOR = palette.accent
+local OTHER_COLOR = palette.danger
+local LABEL_COLOR = palette.text
 
 type Box = {
 	edges: { Part },
@@ -39,19 +44,34 @@ type Marker = {
 	label: TextLabel,
 }
 
-local folder: Folder? = nil
+-- A left click in the player's own start box asks the server to start there; the server moves it to the nearest ground
+-- there a team can start on.
+local function choose(input: InputObject, processed: boolean): boolean
+	if processed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+		return false
+	end
+	local own = game_phase.box_of(local_player)
+	local at = cursor.ground_point()
+	if own ~= nil and at ~= nil and starts.in_box(own, at.X, at.Z) then
+		choose_start:FireServer(heightmap.ground_position(at.X, at.Z))
+	end
+	return true
+end
+
+-- The start boxes' input layer, up while there is a start to choose.
+local LAYER: input_router.Layer = table.freeze({
+	began = choose,
+	ended = function(_: InputObject) end,
+	exclusive = false,
+})
+local pop_layer: (() -> ())? = nil
+
+local folder: Instance? = nil
 local boxes: { Box } = {}
 local markers: { [Player]: Marker } = {}
 
 local function effect_part(name: string, parent: Instance): Part
-	local part = Instance.new "Part"
-	part.Name = name
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
+	local part = world_fx.part(name)
 	part.Parent = parent
 	return part
 end
@@ -75,17 +95,16 @@ end
 
 -- The edge of a box from `from` to `to`, in (x, z), laid along the ground in short pieces.
 local function lay_edge(edges: { Part }, from: Vector2, to: Vector2, parent: Instance)
-	local steps = math.max(1, math.ceil((to - from).Magnitude / EDGE_STEP))
-	local previous = heightmap.ground_position(from.X, from.Y) + Vector3.new(0, EDGE_LIFT, 0)
-	for step = 1, steps do
-		local at = from:Lerp(to, step / steps)
-		local point = heightmap.ground_position(at.X, at.Y) + Vector3.new(0, EDGE_LIFT, 0)
+	local points = world_fx.ground_points(
+		heightmap.ground_position(from.X, from.Y),
+		heightmap.ground_position(to.X, to.Y),
+		EDGE_STEP
+	)
+	world_fx.lay_line(points, EDGE_STYLE, function(): Part
 		local piece = effect_part("StartBoxEdge", parent)
-		piece.Size = Vector3.new(EDGE_THICKNESS, EDGE_THICKNESS, (point - previous).Magnitude + EDGE_THICKNESS)
-		piece.CFrame = CFrame.lookAt((previous + point) / 2, point)
 		table.insert(edges, piece)
-		previous = point
-	end
+		return piece
+	end)
 end
 
 local function make_box(index: number, parent: Instance): Box
@@ -111,9 +130,16 @@ local function make_box(index: number, parent: Instance): Box
 	return { edges = edges, label = billboard }
 end
 
--- Colours the boxes for whose they are, and shows them and the chosen starts only while there is a start to choose.
+-- Colours the boxes for whose they are, and shows them and the chosen starts only while there is a start to choose,
+-- when a left click chooses one and does nothing else.
 local function refresh()
-	local visible = game_phase.has_begun() == false
+	local visible = game_phase.has_begun() == false and mission_state.mission() == nil
+	if visible and pop_layer == nil then
+		pop_layer = input_router.push(LAYER)
+	elseif visible == false and pop_layer ~= nil then
+		pop_layer()
+		pop_layer = nil
+	end
 	local own = game_phase.box_of(local_player)
 	for index, box in boxes do
 		local color = if index == own then MINE_COLOR else OTHER_COLOR
@@ -150,8 +176,7 @@ local function refresh()
 			markers[player] = marker
 		end
 		local shown = marker :: Marker
-		-- a Cylinder part's flat faces point along X, so it is rolled to lie flat on the ground
-		shown.ring.CFrame = CFrame.new(chosen + Vector3.new(0, RING_HEIGHT, 0)) * CFrame.Angles(0, 0, math.pi / 2)
+		shown.ring.CFrame = world_fx.lying_flat(chosen + Vector3.new(0, RING_HEIGHT, 0))
 		local color = if player == local_player then MINE_COLOR else OTHER_COLOR
 		shown.ring.Color = color
 		shown.label.Text = player.DisplayName
@@ -167,14 +192,10 @@ end
 
 -- Draws the boxes of the map there is now, replacing any from a map before it.
 local function rebuild()
-	if folder ~= nil then
-		folder:Destroy()
-	end
+	local made = world_fx.folder "StartBoxes"
+	made:ClearAllChildren()
 	table.clear(markers)
 	table.clear(boxes)
-	local made = Instance.new "Folder"
-	made.Name = "StartBoxes"
-	made.Parent = Workspace
 	folder = made
 	for index = 1, starts.box_count() do
 		boxes[index] = make_box(index, made)
@@ -182,30 +203,16 @@ local function rebuild()
 	refresh()
 end
 
--- Where on the ground the cursor points, as (x, z), or nil off the map.
-local function ground_under_cursor(): Vector2?
-	local camera = Workspace.CurrentCamera
-	if camera == nil then
-		return nil
-	end
-	local cursor = UserInputService:GetMouseLocation()
-	local ray = camera:ViewportPointToRay(cursor.X, cursor.Y)
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = { Workspace.Terrain }
-	params.IgnoreWater = true
-	local hit = Workspace:Raycast(ray.Origin, ray.Direction * 5000, params)
-	return if hit ~= nil then Vector2.new(hit.Position.X, hit.Position.Z) else nil
-end
-
 local function watch_player(player: Player)
-	player:GetAttributeChangedSignal(game_phase.START_ATTRIBUTE):Connect(refresh)
-	player:GetAttributeChangedSignal(game_phase.BOX_ATTRIBUTE):Connect(refresh)
+	game_phase.start_changed(player, refresh)
+	game_phase.box_changed(player, refresh)
 end
 
 local function init()
 	rebuild()
+	map_events.on_rebuilt(rebuild)
 	game_phase.changed(refresh)
+	mission_state.subscribe_mission(refresh)
 	for _, player in Players:GetPlayers() do
 		watch_player(player)
 	end
@@ -213,27 +220,8 @@ local function init()
 	Players.PlayerRemoving:Connect(function()
 		task.defer(refresh)
 	end)
-
-	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed or input.UserInputType ~= Enum.UserInputType.MouseButton1 then
-			return
-		end
-		if game_phase.has_begun() then
-			return
-		end
-		local own = game_phase.box_of(local_player)
-		local at = ground_under_cursor()
-		if own == nil or at == nil then
-			return
-		end
-		-- the server moves the start to the nearest ground it can be on
-		if starts.in_box(own, at.X, at.Y) then
-			choose_start:FireServer(heightmap.ground_position(at.X, at.Y))
-		end
-	end)
 end
 
 return table.freeze({
 	init = init,
-	rebuild = rebuild,
 })

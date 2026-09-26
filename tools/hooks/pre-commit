@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs every check before a commit (tools/check.py). Installed by `git config core.hooksPath tools/hooks`; skip it
+# once with `git commit --no-verify`.
+exec python tools/check.py

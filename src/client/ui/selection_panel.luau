@@ -6,50 +6,38 @@ local art = require(ReplicatedStorage.Shared.art)
 local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
-local input = require(ReplicatedStorage.Client.input)
-local tutorial = require(ReplicatedStorage.Client.tutorial)
-local art_icon = require(ReplicatedStorage.Client.ui.art_icon)
+local hover = require(ReplicatedStorage.Client.hover)
+local orders = require(ReplicatedStorage.Client.orders)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
-local unit_icon = require(ReplicatedStorage.Client.ui.unit_icon)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
-local use_mission = require(ReplicatedStorage.Client.ui.use_mission)
-local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
+local use_hud_features = require(ReplicatedStorage.Client.ui.use_hud_features)
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 
+local art_icon = require(ReplicatedStorage.ClientShared.art_icon)
+local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
+local format = require(ReplicatedStorage.ClientShared.format)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
+
 type EntityView = use_entities.EntityView
-type FlowSource = use_entities.FlowSource
+type HudFeatures = use_hud_features.HudFeatures
+type FlowSource = entity_attrs.FlowSource
 type Gauge = use_entities.Gauge
 type Content = tooltip.Content
 
 local ArtIcon = art_icon.ArtIcon
 local WithTooltip = tooltip.WithTooltip
-local UnitIcon = unit_icon.UnitIcon
+local UnitPicture = unit_picture.UnitPicture
 
 -- How numbers and weapons are put into words, shared with the lobby's encyclopedia (Shared.unit_facts).
 local figure = unit_facts.figure
-local studs = unit_facts.studs
 local weapon_kind = unit_facts.weapon_kind
 local weapon_dps = unit_facts.weapon_dps
 local MANUAL_WEAPON = unit_facts.MANUAL_WEAPON
 
-local cancel_production: RemoteEvent = ReplicatedStorage.Shared.CancelProduction
-
 -- Past this many a gauge is drawn as a meter rather than one pip each.
 local MAX_PIPS = 12
-
--- Rich text is on for every label, so user-made text such as a team name has to be escaped before it goes in.
-local function escape(text: string): string
-	return (
-		string.gsub(text, "[<>&\"']", {
-			["<"] = "&lt;",
-			[">"] = "&gt;",
-			["&"] = "&amp;",
-			['"'] = "&quot;",
-			["'"] = "&apos;",
-		})
-	)
-end
 
 -- A factory's pending items, each a picture of what it makes (or its first letters, for a def with no art). Clicking
 -- one cancels it.
@@ -63,11 +51,12 @@ local function Queue(props: { view: EntityView, LayoutOrder: number })
 			LayoutOrder = index,
 			Text = if pictured then "" elseif def ~= nil then string.sub(def.display_name, 1, 2) else "?",
 			[React.Event.Activated] = function()
-				cancel_production:FireServer({ factory_id = props.view.id, index = index })
+				orders.cancel(props.view.id, index)
 			end,
 		}, {
 			Icon = if pictured
-				then React.createElement(UnitIcon, {
+				then React.createElement(UnitPicture, {
+					framing = "card",
 					def_name = def_name,
 					team = props.view.team_color,
 					tag = "queue-chip-icon",
@@ -123,8 +112,8 @@ local function TeamTag(props: { view: EntityView, LayoutOrder: number })
 			[React.Tag] = "team-name",
 			LayoutOrder = 2,
 			Text = if color ~= nil
-				then `<font color="#{color:ToHex()}">{escape(string.upper(name))}</font>`
-				else escape(string.upper(name)),
+				then `<font color="#{color:ToHex()}">{format.escape(string.upper(name))}</font>`
+				else format.escape(string.upper(name)),
 		}),
 	})
 end
@@ -204,21 +193,13 @@ local function Vitals(props: { fraction: number, tone: string, label: string, La
 	}, {
 		Fill = React.createElement("Frame", {
 			[React.Tag] = `vitals-fill {props.tone}`,
-			Size = UDim2.new(math.clamp(props.fraction, 0, 1), 0, 1, 0),
+			Size = UDim2.fromScale(math.clamp(props.fraction, 0, 1), 1),
 		}),
 		Label = React.createElement("TextLabel", {
 			[React.Tag] = "vitals-label",
 			Text = props.label,
 		}),
 	})
-end
-
--- Health goes from green through amber to red as it runs down.
-local function health_tone(fraction: number): string
-	return if fraction > 0.6
-		then "vitals-fill-good"
-		elseif fraction > 0.3 then "vitals-fill-worn"
-		else "vitals-fill-critical"
 end
 
 -- One resource's tile: a figure in big type under the resource's name, with a line of small print under that. What
@@ -394,28 +375,17 @@ local function Economy(props: { view: EntityView, LayoutOrder: number })
 	})
 end
 
--- What there is to know about a unit or building that does not change as it goes: what it costs, how tough and how
--- quick it is. Shown over its title.
+-- What there is to know about a unit or building at a glance (unit_facts.summary_rows), and how many orders it has
+-- queued. Shown over its title.
 local function unit_tooltip(view: EntityView, def: types.EntityDef): Content
-	local rows: { tooltip.Row } = {
-		{ label = "Health", value = tostring(math.floor(view.max_health)) },
-		{ label = "Metal cost", value = tostring(def.metal_cost), tag = "metal" },
-		{ label = "Energy cost", value = tostring(def.energy_cost), tag = "energy" },
-		{ label = "Buildpower cost", value = tostring(def.buildpower_cost), tag = "buildpower" },
-	}
-	if def.max_speed ~= nil and def.max_speed > 0 then
-		table.insert(rows, { label = "Speed", value = `{studs(def.max_speed)}/s` })
-	end
-	if def.transport ~= nil then
-		table.insert(rows, { label = "Carries", value = `{def.transport.capacity} {def.transport.carries}` })
-	end
+	local rows = unit_facts.summary_rows(def)
 	if view.order_count > 0 then
 		table.insert(rows, { label = "Orders queued", value = tostring(view.order_count) })
 	end
 	return {
 		kicker = if def.kind == "building" then "BUILDING" else "UNIT",
 		title = string.upper(def.display_name),
-		tone = "plain",
+		tone = unit_facts.tone(def),
 		text = def.subtitle,
 		rows = rows,
 	}
@@ -444,7 +414,7 @@ local function GaugeRow(props: { label: string, gauge: Gauge, tone: string, Layo
 		}, {
 			Fill = React.createElement("Frame", {
 				[React.Tag] = `gauge-fill {props.tone}-fill`,
-				Size = UDim2.new(math.clamp(gauge.value / math.max(1, gauge.most), 0, 1), 0, 1, 0),
+				Size = UDim2.fromScale(math.clamp(gauge.value / math.max(1, gauge.most), 0, 1), 1),
 			}),
 		})
 	end
@@ -570,7 +540,7 @@ local function Loadout(props: { def: types.EntityDef, LayoutOrder: number })
 	local def = props.def
 	local weapons = def.weapons or {}
 	local manual = def.manual_weapon
-	if def.buildpower == nil and #weapons == 0 and manual == nil then
+	if def.builder == nil and #weapons == 0 and manual == nil then
 		return nil
 	end
 
@@ -581,13 +551,13 @@ local function Loadout(props: { def: types.EntityDef, LayoutOrder: number })
 		return order
 	end
 
-	local buildpower = def.buildpower
-	if buildpower ~= nil then
+	local builder = def.builder
+	if builder ~= nil then
 		rows.Build = React.createElement(LoadoutRow, {
 			tone = "build",
 			slot = "BLD",
 			name = "BUILDPOWER",
-			value = tostring(buildpower),
+			value = tostring(builder.buildpower),
 			unit = "PER SEC",
 			tooltip = function()
 				return build_tooltip(def)
@@ -645,48 +615,20 @@ local function Loadout(props: { def: types.EntityDef, LayoutOrder: number })
 	}, rows)
 end
 
--- Something alive: a unit or a building, finished or still a blueprint. A `simple` one (the tutorial's) shows only
--- what it is called, whose it is, how healthy it is and what it is making, with `economy` what it makes and spends,
--- and with `weapons` what it fights with.
-local function Live(props: {
-	view: EntityView,
-	def: types.EntityDef,
-	simple: boolean,
-	economy: boolean,
-	weapons: boolean,
-})
+-- Something alive: a unit or a building, finished or still a blueprint: what it is called, whose it is and how healthy,
+-- with the `economy` feature what it makes and spends, with `weapons` what it fights with, and what a factory is making
+-- always (the tutorial has the player make units). A `simple` panel (the tutorial's) leaves out the rest: the card over
+-- the title, the line under it, and the gauges.
+local function Live(props: { view: EntityView, def: types.EntityDef, features: HudFeatures })
 	local view = props.view
 	local def = props.def
+	local features = props.features
+	local full = features.simple == false
 	local is_blueprint = view.state == "blueprint"
 
 	local vitals_fraction = if is_blueprint
 		then view.build_progress / math.max(1, view.buildpower_cost)
 		else view.health / math.max(1, view.max_health)
-	local vitals = React.createElement(Vitals, {
-		fraction = vitals_fraction,
-		tone = if is_blueprint then "vitals-fill-blueprint" else health_tone(vitals_fraction),
-		label = if is_blueprint
-			then `BUILDING  {math.floor(math.clamp(vitals_fraction, 0, 1) * 100)}%`
-			else `{math.floor(view.health)} / {math.floor(view.max_health)}`,
-		LayoutOrder = 4,
-	})
-
-	if props.simple then
-		return React.createElement(React.Fragment, {}, {
-			Title = React.createElement(Title, {
-				name = view.display_name,
-				badge = if is_blueprint then "BLUEPRINT" else nil,
-				badge_tag = if is_blueprint then "badge-blueprint" else nil,
-				team = view,
-				LayoutOrder = 1,
-			}),
-			Vitals = vitals,
-			Economy = if props.economy then React.createElement(Economy, { view = view, LayoutOrder = 5 }) else nil,
-			Loadout = if props.weapons then React.createElement(Loadout, { def = def, LayoutOrder = 8 }) else nil,
-			-- what a factory is making is always shown: the tutorial has the player make units
-			Queue = if #view.queue > 0 then React.createElement(Queue, { view = view, LayoutOrder = 10 }) else nil,
-		})
-	end
 
 	local gauges = {
 		Shield = if view.shield ~= nil
@@ -721,37 +663,54 @@ local function Live(props: {
 			badge = if is_blueprint then "BLUEPRINT" else nil,
 			badge_tag = if is_blueprint then "badge-blueprint" else nil,
 			team = view,
-			tooltip = function()
-				return unit_tooltip(view, def)
-			end,
+			tooltip = if full
+				then function(): Content
+					return unit_tooltip(view, def)
+				end
+				else nil,
 			LayoutOrder = 1,
 		}),
-		Subtitle = React.createElement(Subtitle, {
-			text = view.subtitle,
-			veterancy = veterancy_text(view),
-			LayoutOrder = 2,
-		}),
-		Vitals = vitals,
-		Economy = React.createElement(Economy, { view = view, LayoutOrder = 5 }),
-		Gauges = if next(gauges) ~= nil
+		Subtitle = if full
+			then React.createElement(Subtitle, {
+				text = view.subtitle,
+				veterancy = veterancy_text(view),
+				LayoutOrder = 2,
+			})
+			else nil,
+		-- what no weapon wears down has no health to show
+		Vitals = if is_blueprint or def.health ~= nil
+			then React.createElement(Vitals, {
+				fraction = vitals_fraction,
+				tone = if is_blueprint
+					then "vitals-fill-blueprint"
+					else `vitals-fill-{format.health_level(vitals_fraction)}`,
+				label = if is_blueprint
+					then `BUILDING  {math.floor(math.clamp(vitals_fraction, 0, 1) * 100)}%`
+					else `{math.floor(view.health)} / {math.floor(view.max_health)}`,
+				LayoutOrder = 4,
+			})
+			else nil,
+		Economy = if features.economy then React.createElement(Economy, { view = view, LayoutOrder = 5 }) else nil,
+		Gauges = if full and next(gauges) ~= nil
 			then React.createElement("Frame", {
 				[React.Tag] = "gauge-list",
 				LayoutOrder = 7,
 			}, gauges)
 			else nil,
-		Loadout = React.createElement(Loadout, { def = def, LayoutOrder = 8 }),
+		Loadout = if features.weapons then React.createElement(Loadout, { def = def, LayoutOrder = 8 }) else nil,
 		Queue = if #view.queue > 0 then React.createElement(Queue, { view = view, LayoutOrder = 10 }) else nil,
 	})
 end
 
--- Something left lying about: a wreck or a rock or tree. Nobody's, doing nothing, and there to be reclaimed, so it
--- shows what is left in it and how far reclaiming it has got, and for a wreck that can be raised, how far that has.
--- A `simple` one (the tutorial's) shows only its name, and a wreck's health.
-local function Remnant(props: { view: EntityView, def: types.EntityDef, simple: boolean })
+-- Something left lying about: a wreck or a rock or tree. Nobody's, doing nothing, and there to be reclaimed: its name,
+-- and a wreck's health, which can be shot away. A panel that is not `simple` (the tutorial's is) also shows what is left
+-- in it and how far reclaiming it has got, and for a wreck, how far raising it has.
+local function Remnant(props: { view: EntityView, def: types.EntityDef, features: HudFeatures })
 	local view = props.view
 	local def = props.def
+	local full = props.features.simple == false
+	-- a wreck is always of something that can be raised again
 	local is_wreck = view.kind == "wreck"
-	local raisable = is_wreck and (def.kind == "unit" or def.kind == "building")
 
 	local reclaim_total = view.reclaim_total or 0
 	local reclaimed = if reclaim_total > 0 then 1 - (view.reclaim_left or reclaim_total) / reclaim_total else 0
@@ -762,57 +721,42 @@ local function Remnant(props: { view: EntityView, def: types.EntityDef, simple: 
 	local show_metal = metal > 0 or not show_energy
 	local resurrected = view.resurrect_progress or 0
 
-	if props.simple then
-		return React.createElement(React.Fragment, {}, {
-			Title = React.createElement(Title, {
-				name = if is_wreck then `{view.display_name} Wreck` else view.display_name,
-				badge = if is_wreck then "WRECK" else "FEATURE",
-				badge_tag = "badge-remnant",
-				LayoutOrder = 1,
-			}),
-			Vitals = if is_wreck
-				then React.createElement(Vitals, {
-					fraction = view.health / math.max(1, view.max_health),
-					tone = "vitals-fill-wreck",
-					label = `{math.floor(view.health)} / {math.floor(view.max_health)}`,
-					LayoutOrder = 3,
-				})
-				else nil,
-		})
-	end
-
 	return React.createElement(React.Fragment, {}, {
 		Title = React.createElement(Title, {
 			name = if is_wreck then `{view.display_name} Wreck` else view.display_name,
 			badge = if is_wreck then "WRECK" else "FEATURE",
 			badge_tag = "badge-remnant",
-			tooltip = function(): Content
-				local rows: { tooltip.Row } = {}
-				if metal > 0 then
-					table.insert(rows, { label = "Metal left", value = figure(metal), tag = "metal" })
+			tooltip = if full
+				then function(): Content
+					local rows: { tooltip.Row } = {}
+					if metal > 0 then
+						table.insert(rows, { label = "Metal left", value = figure(metal), tag = "metal" })
+					end
+					if energy > 0 then
+						table.insert(rows, { label = "Energy left", value = figure(energy), tag = "energy" })
+					end
+					if view.reclaim_left ~= nil then
+						table.insert(rows, { label = "Buildpower to reclaim", value = figure(view.reclaim_left) })
+					end
+					if is_wreck then
+						table.insert(rows, { label = "Buildpower to resurrect", value = figure(def.buildpower_cost) })
+					end
+					return {
+						kicker = if is_wreck then "WRECK" else "FEATURE",
+						title = string.upper(if is_wreck then `{view.display_name} wreck` else view.display_name),
+						tone = "plain",
+						rows = rows,
+					}
 				end
-				if energy > 0 then
-					table.insert(rows, { label = "Energy left", value = figure(energy), tag = "energy" })
-				end
-				if view.reclaim_left ~= nil then
-					table.insert(rows, { label = "Buildpower to reclaim", value = figure(view.reclaim_left) })
-				end
-				if raisable then
-					table.insert(rows, { label = "Buildpower to resurrect", value = figure(def.buildpower_cost) })
-				end
-				return {
-					kicker = if is_wreck then "WRECK" else "FEATURE",
-					title = string.upper(if is_wreck then `{view.display_name} wreck` else view.display_name),
-					tone = "plain",
-					rows = rows,
-				}
-			end,
+				else nil,
 			LayoutOrder = 1,
 		}),
-		Subtitle = React.createElement(Subtitle, {
-			text = if raisable then "Reclaim or resurrect" elseif is_wreck then "Reclaim for metal" else view.subtitle,
-			LayoutOrder = 2,
-		}),
+		Subtitle = if full
+			then React.createElement(Subtitle, {
+				text = if is_wreck then "Reclaim or resurrect" else view.subtitle,
+				LayoutOrder = 2,
+			})
+			else nil,
 		-- a wreck can be shot to pieces, so how much it has left matters; a rock or tree takes no harm
 		Vitals = if is_wreck
 			then React.createElement(Vitals, {
@@ -822,63 +766,61 @@ local function Remnant(props: { view: EntityView, def: types.EntityDef, simple: 
 				LayoutOrder = 3,
 			})
 			else nil,
-		Yield = React.createElement("Frame", {
-			[React.Tag] = "economy-row",
-			LayoutOrder = 4,
-		}, {
-			Metal = if show_metal
-				then React.createElement(ResourceTile, {
-					resource = "metal",
-					value = figure(metal),
-					tone = "tile-rate-metal",
-					caption = "TO RECLAIM",
+		Yield = if full
+			then React.createElement("Frame", {
+				[React.Tag] = "economy-row",
+				LayoutOrder = 4,
+			}, {
+				Metal = if show_metal
+					then React.createElement(ResourceTile, {
+						resource = "metal",
+						value = figure(metal),
+						tone = "tile-rate-metal",
+						caption = "TO RECLAIM",
+						LayoutOrder = 1,
+					})
+					else nil,
+				Energy = if show_energy
+					then React.createElement(ResourceTile, {
+						resource = "energy",
+						value = figure(energy),
+						tone = "tile-rate-energy",
+						caption = "TO RECLAIM",
+						LayoutOrder = 2,
+					})
+					else nil,
+			})
+			else nil,
+		Progress = if full
+			then React.createElement("Frame", {
+				[React.Tag] = "gauge-list",
+				LayoutOrder = 5,
+			}, {
+				Reclaimed = React.createElement(GaugeRow, {
+					label = "RECLAIMED",
+					gauge = { value = math.round(reclaimed * 100), most = 100 },
+					tone = "reclaim",
 					LayoutOrder = 1,
-				})
-				else nil,
-			Energy = if show_energy
-				then React.createElement(ResourceTile, {
-					resource = "energy",
-					value = figure(energy),
-					tone = "tile-rate-energy",
-					caption = "TO RECLAIM",
-					LayoutOrder = 2,
-				})
-				else nil,
-		}),
-		Progress = React.createElement("Frame", {
-			[React.Tag] = "gauge-list",
-			LayoutOrder = 5,
-		}, {
-			Reclaimed = React.createElement(GaugeRow, {
-				label = "RECLAIMED",
-				gauge = { value = math.round(reclaimed * 100), most = 100 },
-				tone = "reclaim",
-				LayoutOrder = 1,
-			}),
-			Resurrected = if raisable and resurrected > 0
-				then React.createElement(GaugeRow, {
-					label = "RAISED",
-					gauge = { value = math.round(resurrected * 100), most = 100 },
-					tone = "resurrect",
-					LayoutOrder = 2,
-				})
-				else nil,
-		}),
+				}),
+				Resurrected = if is_wreck and resurrected > 0
+					then React.createElement(GaugeRow, {
+						label = "RAISED",
+						gauge = { value = math.round(resurrected * 100), most = 100 },
+						tone = "resurrect",
+						LayoutOrder = 2,
+					})
+					else nil,
+			})
+			else nil,
 	})
 end
 
-local function Single(props: { view: EntityView, simple: boolean, economy: boolean, weapons: boolean })
+local function Single(props: { view: EntityView, features: HudFeatures })
 	local view = props.view
-	local def = unit_defs.get(view.def_name)
-	if view.kind == "wreck" or view.kind == "reclaimable" then
-		return React.createElement(Remnant, { view = view, def = def, simple = props.simple })
-	end
-	return React.createElement(Live, {
+	return React.createElement(if unit_defs.is_remains_kind(view.kind) then Remnant else Live, {
 		view = view,
-		def = def,
-		simple = props.simple,
-		economy = props.economy,
-		weapons = props.weapons,
+		def = unit_defs.get(view.def_name),
+		features = props.features,
 	})
 end
 
@@ -927,20 +869,9 @@ local function Many(props: { views: { EntityView } })
 	})
 end
 
--- The entity the cursor is over, if any.
-local function use_hovered(): number?
-	local hovered, set_hovered = React.useState(nil :: number?)
-	React.useEffect(function()
-		return input.subscribe_hover(function(id: number?)
-			set_hovered(id)
-		end)
-	end, {})
-	return hovered
-end
-
 local function SelectionPanel()
 	local selected = use_entities.use_selection()
-	local hovered = use_hovered()
+	local hovered = use_store.use_store(hover.get, hover.subscribe)
 	-- What the panel showed when the cursor came onto it, held while the cursor stays there. The world is still under
 	-- the panel, and without this whatever stood behind it would take the panel over just as a section was clicked.
 	local held, set_held = React.useState(nil :: { number }?)
@@ -956,13 +887,8 @@ local function SelectionPanel()
 	local shown = held or ids
 	local views = use_entities.use_views(shown)
 	local ui_scale = use_viewport.use_ui_scale()
-	-- the tutorial pares the panel down to a name, a team and a health bar, and brings weapons back once it has had
-	-- units made
-	local simple = use_mission.use_mission() == "tutorial"
-	use_tutorial.use_tutorial()
-	local weapons = simple == false or tutorial.shown "weapons"
-	-- and what things make and spend, once the metal and energy bar is up
-	local economy = simple == false or tutorial.shown "economy"
+	-- a mission may pare the panel down, and its guide keep weapons and economy off it until it has taught them
+	local features = use_hud_features.use_hud_features()
 	-- what was held is gone, say it died, and with it the panel the cursor was on, which then never hears it leave
 	React.useEffect(function()
 		if held ~= nil and #views == 0 then
@@ -989,7 +915,7 @@ local function SelectionPanel()
 			[React.Tag] = "rail",
 		}),
 		Content = if #views == 1
-			then React.createElement(Single, { view = views[1], simple = simple, economy = economy, weapons = weapons })
+			then React.createElement(Single, { view = views[1], features = features })
 			else React.createElement(Many, { views = views }),
 	})
 end

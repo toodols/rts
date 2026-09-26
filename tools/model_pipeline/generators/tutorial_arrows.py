@@ -9,10 +9,10 @@ ground. Written to src/shared/ui_art/, not src/shared/art/.
 
 import math
 
-from . import tutorial_common as tc
+from .shared import tutorial as tc
 
-MAX_TRIANGLES = tc.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 # in tc.INVERTED_T order, with how far each arrow turns counter-clockwise (Blender, seen from above) from pointing +Y
 KEYS = (("up", 0.0), ("left", 90.0), ("down", 180.0), ("right", -90.0))

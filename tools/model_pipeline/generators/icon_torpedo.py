@@ -1,9 +1,10 @@
-"""HUD icon: torpedoes, a torpedo running through the water, bubbles behind it. Written to src/shared/ui_art/ (see icon_common)."""
+"""HUD icon: torpedoes, a torpedo running through the water, bubbles behind it. Written to src/shared/ui_art/ (see shared/icon)."""
 
-from . import icon_common as ic
+from .shared import icon as ic
+from .shared import palette
 
-MAX_TRIANGLES = ic.MAX_TRIANGLES
-RECENTRE = False
+CATEGORY = "hud"
+
 
 def generate(params):
     h = 0.4
@@ -16,8 +17,8 @@ def generate(params):
     return ic.build(
         "torpedo",
         [
-            ic.layer(ic.place(bubbles, shift, angle), ic.ICON),
-            ic.layer(ic.place([fins, body, tail], shift, angle), ic.ICON),
-            ic.layer(ic.place([nose], shift, angle), ic.ICON),
+            ic.layer(ic.place(bubbles, shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([fins, body, tail], shift, angle), palette.ICON_FILL),
+            ic.layer(ic.place([nose], shift, angle), palette.ICON_FILL),
         ],
     )

@@ -1,20 +1,23 @@
 """unit_defs/air_t2.luau `nighthawk`: the stealth fighter.
 
-Collider capsule(36, 22, 44): radius 44/22 = 2.0 studs, height 22/11 = 2.0. Faceted low-poly, under 100 triangles.
+Faceted low-poly, under 100 triangles.
 All flat facets and sharp edges, like a stealth jet: a flat faceted pyramid of a body swept straight into a wide
 arrowhead wing (the team-coloured accent, darkened), a faceted dark canopy, a V tail of two outward-canted fins, and a
 thin exhaust slit glowing a cold blue rather than the other jets' amber. Nothing moves.
 """
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(70, 74, 92)
-EXHAUST = (0.35, 0.65, 1.0, 1.0)
-RADIUS, HEIGHT = 44 / 22, 22 / 11
+CATEGORY = "entity"
+DEF = "nighthawk"
+# an aircraft's BAR collision volume is only its fuselage's: the rest of it reaches past, as BAR's model does
+ENVELOPE = {"width": 3.3, "length": 3.52}
 
 
 def generate(params):
+    accent = params["color"]
     zc = 0.95
     objects = []
 
@@ -68,13 +71,11 @@ def generate(params):
             (side * 0.16, 1.20, zc + 0.24),
         ))
     for obj in accents:
-        air.accent_mat(obj, "nighthawk", ACCENT)
+        common.accent_mat(obj, accent)
         objects.append(obj)
 
     slit = air.plate("exhaust", (0.0, 1.56, zc + 0.10), (0.30, 0, 0), (0, 0, 0.05), (0, 1, 0))
-    air.glow_mat(slit, EXHAUST, "air_glow_stealth")
+    common.glow_mat(slit, palette.ELECTRIC_BLUE)
     objects.append(slit)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "nighthawk")
     return objects

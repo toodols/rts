@@ -2,7 +2,7 @@
 return {
 	groups = {
 		base = { pivot = { 0, 0, 0 } },
-		turret_1 = { pivot = { 0, 1.5111, -0.1767 }, kind = "turret", weapon = 1, muzzle = { -0.5791, 0.3535, 2.8131 } },
+		turret_1 = { pivot = { 0, 1.5111, -0.1767 }, kind = "turret", weapon = 1 },
 	},
 	parts = {
 		{ group = "base", color = { 0.4, 0.4, 0.43 }, offset = { 0, 0.9544, 0 }, size = { 3.0655, 1.1134, 4.2416 }, hash = "1e8da11d9d87d5a8", mesh = "rbxassetid://98595233081585" },

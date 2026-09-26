@@ -1,0 +1,407 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Campaign -----------------------------------------------------------------------------------------------------
+
+// The way into the campaign, over the list of lobbies: a lit card rather than a row, so it reads as its own thing, and
+// the whole card is the button (ui/campaign_card.luau), with an arrow at its right end. Lit (hovered, or selected with
+// a gamepad) it brightens, its edge glows, a sheen sweeps across it, the title steps in and the arrow walks out with a
+// second chevron trailing it; pressed it dips; let go, the arrow shoots off before the campaign opens. The strip is
+// only the card's slot in the browser's column: the card is centred on it, so it scales about its middle.
+.campaign-strip {
+	width: 100%;
+	height: 64px;
+}
+
+// Everything the card does when lit, for :hover, and for .selected, which the card sets itself while a gamepad has
+// it selected (Roblox has no :focus-visible).
+@mixin campaign-card-lit {
+	background-color: veil($steel-lit, 0.9);
+	// written out again: outlass bakes the gradient together with the rule's background-color (see .chip)
+	background-image: linear-gradient(90deg, veil($accent, 0.34) 0%, veil($accent, 0.08) 65%, transparent 100%);
+	// outlass drops the colour of `outline: 1px solid var(--Accent)` (the stroke keeps its old colour and alpha), so
+	// the edge is lit with the Sass colour instead
+	outline: 1px solid $accent;
+
+	.campaign-card-glow {
+		opacity: 0.4;
+	}
+
+	.campaign-strip-title {
+		color: var(--Accent);
+	}
+
+	.campaign-strip-texts {
+		padding-left: space(1);
+	}
+
+	.campaign-card-chevron.lead {
+		transform: translateX(8px) translateY(-50%) rotate(45deg);
+	}
+
+	.campaign-card-chevron.trail {
+		opacity: 1;
+		transform: translateX(8px) translateY(-50%) rotate(45deg);
+
+		.campaign-card-chevron-bar {
+			background-color: veil($accent, 0.5);
+		}
+	}
+}
+
+.campaign-card {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 100%;
+	height: 100%;
+	transform: translate(-50%, -50%);
+	overflow: hidden;
+	background-color: veil($steel-raised, 0.85);
+	background-image: linear-gradient(90deg, veil($accent, 0.22) 0%, veil($accent, 0.04) 60%, transparent 100%);
+	outline: 1px solid veil($accent, 0.5);
+	// .campaign-card-edge draws the lit left edge, and .campaign-card-glow the glow off it
+	transition:
+		background-color $medium $ease-out,
+		outline-color $medium $ease-out,
+		transform $fast $ease-out;
+
+	// :active too: in CSS a pressed card is still hovered, but a Roblox button is in one GuiState at a time, and Press
+	// alone would drop everything the hover lit (the arrow would snap back under the finger)
+	&:hover,
+	&:active {
+		@include campaign-card-lit;
+	}
+
+	&.selected {
+		@include campaign-card-lit;
+	}
+
+	&:active {
+		background-color: veil($steel-raised, 0.95);
+		background-image: linear-gradient(90deg, veil($accent, 0.28) 0%, veil($accent, 0.06) 60%, transparent 100%);
+		transform: translate(-50%, -50%) scale(0.97);
+	}
+
+	// pressed and let go: the arrow shoots off to the right before the campaign screen replaces the browser
+	&.launching {
+		.campaign-card-chevron.lead,
+		.campaign-card-chevron.trail {
+			transform: translateX(56px) translateY(-50%) rotate(45deg);
+		}
+	}
+}
+
+// The layers inside the card, back to front: the glow off the lit edge, the edge, what the card says, the sheen.
+.campaign-card-glow {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 45%;
+	height: 100%;
+	z-index: 1;
+	background-image: linear-gradient(90deg, $accent, transparent);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity $medium $ease-out;
+}
+
+.campaign-card-edge {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 3px;
+	height: 100%;
+	z-index: 2;
+	background-color: var(--Accent);
+}
+
+.campaign-card-content {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	@include stack(row, space(3));
+	align-items: center;
+	padding: 0 space(2) 0 space(4);
+}
+
+// A band of light, parked off the card's right edge: ui/campaign_card.luau sweeps it across the card once each time the
+// card lights, and the card clips it. Its position is left out here because the component owns it.
+.campaign-card-sheen {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	z-index: 4;
+	background-image: linear-gradient(
+		105deg,
+		transparent 0%,
+		transparent 40%,
+		veil(white, 0.22) 50%,
+		transparent 60%,
+		transparent 100%
+	);
+	pointer-events: none;
+}
+
+// The arrow: a chevron, and a second one that trails in behind it when the card lights.
+.campaign-card-arrow {
+	position: relative;
+	width: 48px;
+	height: 100%;
+	overflow: hidden;
+}
+
+// A square turned 45 degrees with its top and right edges drawn as bars inside it (.campaign-card-chevron-bar), which
+// turn with it.
+.campaign-card-chevron {
+	position: absolute;
+	top: 50%;
+	width: 12px;
+	height: 12px;
+	transform: translateY(-50%) rotate(45deg);
+	transition:
+		transform $medium $ease-snap,
+		opacity $medium $ease-out;
+
+	&.lead {
+		left: 16px;
+	}
+
+	&.trail {
+		left: 4px;
+		// kept for the web; a Frame's own transparency doesn't reach its children, so the bars fade themselves
+		opacity: 0;
+
+		.campaign-card-chevron-bar {
+			background-color: veil($accent, 0);
+		}
+	}
+}
+
+.campaign-card-chevron-bar {
+	position: absolute;
+	top: 0;
+	right: 0;
+	background-color: var(--Accent);
+	transition: background-color $medium $ease-out;
+
+	&.top {
+		width: 100%;
+		height: 3px;
+	}
+
+	&.side {
+		width: 3px;
+		height: 100%;
+	}
+}
+
+.campaign-strip-texts {
+	height: auto;
+	@include stack(column, space(1));
+	transition: padding $medium $ease-snap;
+}
+
+.campaign-strip-title {
+	width: 100%;
+	height: 20px;
+	font-size: 16px;
+	transition:
+		color $medium $ease-out,
+		transform $medium $ease-snap;
+}
+
+.campaign-strip-progress {
+	@include caption;
+	width: 100%;
+	height: 16px;
+	font-family: RobotoMono;
+	font-size: 12px;
+}
+
+// The screen itself: the missions, across the whole of it. What they unlock is in the encyclopedia.
+.campaign {
+	width: 100%;
+	height: 100%;
+	@include stack(row, space(3));
+}
+
+.missions {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(3));
+}
+
+.mission-list {
+	width: 100%;
+	// grows into the rest of the column; see .body
+	height: 0;
+	flex: 1;
+	@include stack(column, space(2));
+	padding: 1px;
+}
+
+// A mission: its number large down the left, and what it is and the button to play it beside. The number and the
+// status tag are coloured by how it stands: accent, green when finished, grey when not yet open.
+.mission-card {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: flex-start;
+	padding: space(3);
+	background-color: veil($steel-raised, 0.8);
+	background-image: linear-gradient(90deg, veil(white, 0.06), veil(black, 0.2));
+	outline: 1px solid veil($edge, 0.7);
+
+	// not played yet, and not playable until the one before it is finished
+	&.closed {
+		opacity: 0.55;
+	}
+}
+
+.mission-card.closed .mission-title,
+.mission-card.closed .mission-number {
+	color: var(--TextFaint);
+}
+
+.mission-number {
+	width: 44px;
+	height: 36px;
+	color: var(--Accent);
+	font-size: 28px;
+	text-align: left;
+
+	.mission-card.completed > & {
+		color: var(--Gain);
+	}
+}
+
+.mission-details {
+	width: 0;
+	flex: 1 1 0;
+	height: auto;
+	@include stack(column, space(2));
+	align-items: flex-start;
+}
+
+.mission-head {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.mission-title {
+	width: auto;
+	height: 20px;
+	font-size: 16px;
+}
+
+.tag {
+	&.done {
+		color: var(--Gain);
+		outline: 1px solid var(--Gain);
+	}
+
+	&.fresh {
+		color: var(--Accent);
+		outline: 1px solid var(--Accent);
+	}
+}
+
+.mission-description {
+	width: 100%;
+	height: auto;
+	color: var(--TextDim);
+	font-size: 14px;
+	line-height: 1.35;
+	text-align: left;
+	white-space: normal;
+}
+
+// What a mission unlocks: a caption, then a link to each unit's encyclopedia entry, wrapping onto more lines as needed.
+.mission-unlocks {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(1));
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.mission-unlocks-label {
+	width: auto;
+	height: 20px;
+	padding-right: space(1);
+	color: var(--TextFaint);
+	font-family: RobotoMono;
+	font-size: 10px;
+	font-weight: bold;
+}
+
+// one with no entry to link to, named plainly; faint while it is not unlocked yet
+.mission-unlocks-name {
+	width: auto;
+	height: 20px;
+	color: var(--Energy);
+	font-family: RobotoMono;
+	font-size: 11px;
+
+	&.locked {
+		color: var(--TextFaint);
+	}
+}
+
+.button.play {
+	width: 140px;
+}
+
+// Play, and beside it Co-op for a mission that can be played together.
+.mission-buttons {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+// A mission's hard mode, under the mission once it has been finished: its title in the danger colour, how it stands,
+// what it unlocks besides and its own buttons.
+.mission-hard {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(2));
+	align-items: flex-start;
+	padding: space(2);
+	background-color: veil(black, 0.2);
+	outline: 1px solid veil($edge, 0.7);
+}
+
+.mission-hard-title {
+	width: auto;
+	height: 20px;
+	color: var(--Danger);
+	font-size: 14px;
+}
+
+.campaign-actions {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(3));
+	align-items: center;
+	padding-top: space(3);
+}
+
+// How the mission being started is going, or why it wasn't. Long (the Studio note is two sentences), so it wraps.
+.campaign-status {
+	height: auto;
+	min-height: 36px;
+	color: var(--TextDim);
+	font-size: 13px;
+	text-align: left;
+	white-space: normal;
+
+	&.warning {
+		color: $caution;
+	}
+}

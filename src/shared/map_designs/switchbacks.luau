@@ -1,3 +1,4 @@
+--!strict
 -- Switchbacks: a plateau in the middle of the map whose long faces a bot walks straight up and a tank cannot, between
 -- the two sides' low ground. A tank or a hovercraft climbs by the switchback roads cut into the faces, two on each side,
 -- so the same climb is a short walk for a bot and a long drive for the rest. The only other way from one side to the
@@ -158,13 +159,13 @@ local SPOTS = kit.spots(
 
 return table.freeze({
 	name = "switchbacks",
+	display_name = "Switchbacks",
 	description = "A plateau with switchback roads",
+	source = "design",
 	size = SIZE,
 	build = build,
 	-- one side's players start on the west, the other's on the east
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 60), kit.box_around(-WEST_START, 60) },
 	metal_layers = nil,
 	metal_spots = SPOTS,

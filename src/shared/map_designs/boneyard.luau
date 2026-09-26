@@ -1,3 +1,4 @@
+--!strict
 -- Boneyard: an old battlefield, grey and cratered, where a war was fought before this one and left its dead where they
 -- fell. There is little metal in the ground, a few spots near each start and a few in the middle, and a great deal lying
 -- on it: the wrecks of hundreds of units, thickest along the old front line across the middle, and the heaviest nearest
@@ -278,12 +279,12 @@ local THEME: Theme = {
 
 return table.freeze({
 	name = "boneyard",
+	display_name = "Boneyard",
 	description = "An old battlefield, strewn with wrecks",
+	source = "design",
 	size = SIZE,
 	build = build,
-	start_position = function(slot: number): Vector2
-		return if slot % 2 == 1 then WEST_START else -WEST_START
-	end,
+	starts = { WEST_START, -WEST_START },
 	start_boxes = { kit.box_around(WEST_START, 60), kit.box_around(-WEST_START, 60) },
 	metal_layers = nil,
 	metal_spots = SPOTS,

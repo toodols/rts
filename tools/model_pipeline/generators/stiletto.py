@@ -1,21 +1,26 @@
-"""unit_defs/air_t2.luau `stiletto`: the EMP bomber.
+"""unit_defs/air_t2.luau `stiletto`: the palette.EMP bomber.
 
-Collider capsule(24, 9, 24): radius 24/22 = 1.09 studs, height 9/11 = 0.82. BAR's collision volume is far smaller than
+BAR's collision volume is far smaller than
 its model, so this reaches past it, about as far as the Nighthawk. Faceted low-poly, under 100 triangles. A slim,
 fast dart: a long narrow hexagonal fuselage with a glazed canopy, a swept delta wing and small canards ahead of it (the
-team-coloured accent), two canted fins, twin exhausts, and under each wing an EMP pod glowing the pale turquoise of the
-EMP it drops. Nothing moves: its bombs just drop.
+team-coloured accent), two canted fins, twin exhausts, and under each wing an palette.EMP pod glowing the pale turquoise of the
+palette.EMP it drops. Nothing moves: its bombs just drop.
 """
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(96, 150, 190)
-EMP = air.rgb(130, 215, 255)
-RADIUS, HEIGHT = 24 / 22, 9 / 11
+CATEGORY = "entity"
+DEF = "stiletto"
+# an aircraft's BAR collision volume is only its fuselage's: the rest of it reaches past, as BAR's model does
+ENVELOPE = {"width": 3.1, "length": 3.61, "height": 1.48}
+# built over the budget before the build held it to one: trimming it means re-uploading its meshes
+TRIANGLES = 103
 
 
 def generate(params):
+    accent = params["color"]
     zc = 0.80
     objects = []
 
@@ -65,7 +70,7 @@ def generate(params):
             (side * 0.12, 1.30, zc + 0.22),
         ))
     for obj in accents:
-        air.accent_mat(obj, "stiletto", ACCENT)
+        common.accent_mat(obj, accent)
         objects.append(obj)
 
     glows, pods = [], []
@@ -82,12 +87,10 @@ def generate(params):
         ], sides=4)
         pods.append(pod)
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
         objects.append(obj)
     for obj in pods:
-        air.glow_mat(obj, EMP, "air_glow_emp")
+        common.glow_mat(obj, palette.EMP)
         objects.append(obj)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "stiletto")
     return objects

@@ -9,7 +9,7 @@ return {
 		{ group = "torso", color = { 0.4, 0.4, 0.43 }, offset = { 0, 2.0132, 0 }, size = { 1.3333, 1.1184, 0.7407 }, hash = "d9f2e8d938cc79d5", mesh = "rbxassetid://128026846700159" },
 		{ group = "torso", color = { 0.8863, 0.698, 0.2902 }, offset = { 0, 1.9713, -0.4938 }, size = { 1.1851, 0.9227, 0.4664 }, hash = "beb56cf1a66b9da9", team = true, mesh = "rbxassetid://124090532816883" },
 		{ group = "torso", color = { 0.35, 0.95, 0.75 }, offset = { 0.3796, 2.1469, 0.794 }, size = { 1.537, 0.6412, 0.8665 }, hash = "8d98839c2f67a62a", neon = true, mesh = "rbxassetid://90117070671315" },
-		{ group = "torso", color = { 0.95, 0.76, 0.1 }, offset = { 0.8204, 2.3271, 0.4172 }, size = { 0.5226, 0.8003, 1.2726 }, hash = "1326d36e430aa651", mesh = "rbxassetid://77618148368510" },
+		{ group = "torso", color = { 0.95, 0.78, 0.12 }, offset = { 0.8204, 2.3271, 0.4172 }, size = { 0.5226, 0.8003, 1.2726 }, hash = "1326d36e430aa651", mesh = "rbxassetid://77618148368510" },
 		{ group = "leg_l", color = { 0.17, 0.17, 0.19 }, offset = { -0.0745, -0.7376, 0 }, size = { 0.6288, 1.6006, 0.7681 }, hash = "f3fd836e5781976d", mesh = "rbxassetid://119835069112390" },
 		{ group = "leg_r", color = { 0.17, 0.17, 0.19 }, offset = { 0.0745, -0.7376, 0 }, size = { 0.6288, 1.6006, 0.7681 }, hash = "08da24e08405f25f", mesh = "rbxassetid://117473800337510" },
 	},

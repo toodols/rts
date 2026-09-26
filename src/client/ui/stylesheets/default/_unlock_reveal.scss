@@ -1,6 +1,6 @@
 @use "sass:color";
-@use "theme" as *;
-@use "mixins" as *;
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
 
 // A campaign mission's unlocks revealed on the end screen (ui/unlock_reveal.luau): a heading and tally over a row of
 // cards, each dealt face down and burst open onto its def's model, framed in its tier's colour under a tier banner.
@@ -9,16 +9,6 @@
 
 $card-width: 196px;
 $card-height: 284px;
-
-// Each tier's colour: its card's frame and its banner.
-$tiers: (
-	common: rgb(178, 190, 204),
-	uncommon: rgb(110, 222, 96),
-	rare: $accent,
-	epic: $resurrect,
-	legendary: rgb(255, 196, 64),
-	mythic: rgb(255, 98, 74),
-);
 
 // A shape of an effect: Luau gives it its size, place, colour and transparency, so this only keeps the default
 // automatic size from growing it and takes off the border Roblox draws.
@@ -186,14 +176,6 @@ $tiers: (
 	background-color: transparent;
 }
 
-// A def with no art shows its name in the model's place.
-.unlock-card-model.art-fallback {
-	font-family: Michroma;
-	font-size: 20px;
-	color: var(--Text);
-	text-wrap: wrap;
-}
-
 .unlock-card-name {
 	width: 100%;
 	height: auto;
@@ -248,6 +230,7 @@ $tiers: (
 	font-size: 15px;
 }
 
+// Each tier's colour (the theme's $tiers): its card's frame and its banner.
 @each $name, $tone in $tiers {
 	.unlock-card-face.#{$name} {
 		background-image: linear-gradient(180deg, color.mix($tone, $steel, 45%) 0%, $steel 50%, $void 100%);

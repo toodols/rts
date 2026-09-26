@@ -13,9 +13,7 @@ approved as it is built now, so a sound changed after it was approved has to be 
 """
 
 import argparse
-import hashlib
 import html
-import json
 import sys
 import webbrowser
 from pathlib import Path
@@ -24,20 +22,11 @@ import numpy as np
 from scipy.io import wavfile
 
 import synth
+from records import BUILD, UPLOADED, UPLOADS_PATH, digest, load_approved, save_approved
 
-PIPELINE = Path(__file__).resolve().parent
-BUILD = PIPELINE / "build"
-UPLOADED = BUILD / "uploaded"
-APPROVED_PATH = PIPELINE / "approved.json"
-UPLOADS_PATH = PIPELINE / "uploads.json"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-
-def digest(name: str) -> str:
-    return hashlib.sha256((BUILD / f"{name}.wav").read_bytes()).hexdigest()
-
-
-def load(path: Path) -> dict:
-    return json.loads(path.read_text()) if path.is_file() else {}
+import roblox_open_cloud  # noqa: E402
 
 
 def loudness(wav: Path) -> float:
@@ -55,7 +44,7 @@ def status(name: str, approved: dict, uploads: dict) -> str:
 
 
 def page() -> str:
-    approved, uploads = load(APPROVED_PATH), load(UPLOADS_PATH)
+    approved, uploads = load_approved(), roblox_open_cloud.load_store(UPLOADS_PATH)["assets"]
     rows = []
     for name, make in synth.SOUNDS.items():
         if not (BUILD / f"{name}.ogg").is_file():
@@ -133,13 +122,13 @@ def page() -> str:
 
 
 def approve(names: list[str]):
-    approved = load(APPROVED_PATH)
+    approved = load_approved()
     for name in names:
         if not (BUILD / f"{name}.wav").is_file():
             sys.exit(f"no build/{name}.wav: run synth.py first")
         approved[name] = digest(name)
         print(f"{name}: approved")
-    APPROVED_PATH.write_text(json.dumps(dict(sorted(approved.items())), indent=2) + "\n", newline="\n")
+    save_approved(approved)
 
 
 def main():

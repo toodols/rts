@@ -1,11 +1,16 @@
--- The tutorial's cards (the steps and what finishes them are Client.tutorial): across the top of the screen, the
--- step's title over a row of cards, one for each way of doing it. Each card shows the way in 3D (keys, a mouse, a
--- cursor dragging a box, Client.ui_art) with a caption, and a tick under it, or a cross for a way that does not work.
--- A card that is done lights green; once one is, the next step is on its way.
+-- A mission's guide's cards (the steps and what finishes them are Client.tutorial, each mission's in Client.missions):
+-- across the top of the screen, the step's title over a row of cards, one for each way of doing it. Each card shows the
+-- way in 3D (keys, a mouse, a cursor dragging a box, Shared.ui_art), as its `picture` says, with a caption, and a tick
+-- under it, or a cross for a way that does not work. A card that is done lights green; once one is, the next step is
+-- on its way.
 --
 -- The pictures answer the player: a key lights while it is held, the WASD card shakes and flashes red when one of
 -- its keys is pressed, and the mouse's wheel lights while the middle button is held. The select and move cards play
--- a short demonstration on a loop.
+-- a short demonstration on a loop, as do the counterattack's resurrect cards: the Resurrect command being clicked, and
+-- a circle dragged over wrecks, which rise.
+--
+-- A mission with waves has them in a box of their own above the step (ui/wave_block.luau), and once its steps are
+-- done, its objective under that; a guide that ends in a card of its own (its `finish`) shows that instead.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
@@ -14,18 +19,29 @@ local UserInputService = game:GetService "UserInputService"
 local React = require(ReplicatedStorage.Packages.react)
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
-local build_mode = require(ReplicatedStorage.Client.build_mode)
-local client_input = require(ReplicatedStorage.Client.input)
+local missions = require(ReplicatedStorage.Client.missions)
+local input_router = require(ReplicatedStorage.Client.input_router)
 local tutorial = require(ReplicatedStorage.Client.tutorial)
-local art_icon = require(ReplicatedStorage.Client.ui.art_icon)
-local unit_picture = require(ReplicatedStorage.Client.ui.unit_picture)
-local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local use_tutorial = require(ReplicatedStorage.Client.ui.use_tutorial)
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
+local wave_block = require(ReplicatedStorage.Client.ui.wave_block)
 
-type Card = tutorial.Card
+local art_icon = require(ReplicatedStorage.ClientShared.art_icon)
+local palette = require(ReplicatedStorage.ClientShared.palette)
+local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
+
+type Card = missions.Card
+type PictureKind = missions.PictureKind
+
+-- What every card's picture is drawn with: what it shows, and for the WASD card, how it tells the card that a key that
+-- does not work is pressed or held.
+type PictureProps = {
+	def_name: string,
+	on_refused: () -> (),
+	on_held: (held: boolean) -> (),
+}
 
 local ArtIcon = art_icon.ArtIcon
 local UnitPicture = unit_picture.UnitPicture
@@ -46,7 +62,6 @@ local MIDDLE_BUTTON: { [Enum.UserInputType]: string } = {
 	[Enum.UserInputType.MouseButton3] = "wheel",
 }
 
-local CROSS = Color3.fromRGB(238, 88, 74)
 -- how long a card stays marked as refused after a key that does not work is pressed
 local REFUSED_SECONDS = 0.45
 -- how far a mouse button sinks when it is pressed, in studs of the mouse's picture
@@ -63,6 +78,17 @@ local MOVE_TO = Vector2.new(0.78, 0.6)
 local BOX_LOOP = 3.2
 local CLICK_LOOP = 2.6
 local MOVE_LOOP = 3.4
+-- The resurrect demonstrations: where the Resurrect command's row is clicked; and the middle of the circle, where it is
+-- dragged out to, and the wrecks inside it.
+local COMMAND_AT = Vector2.new(0.62, 0.42)
+local CIRCLE_AT = Vector2.new(0.46, 0.5)
+local CIRCLE_TO = Vector2.new(0.76, 0.5)
+-- the circle's widest, in pixels of the picture: as far as CIRCLE_TO is from CIRCLE_AT, across a 196 wide picture
+local CIRCLE_RADIUS = 59
+local WRECKS_AT = { Vector2.new(0.26, 0.38), Vector2.new(0.5, 0.74), Vector2.new(0.64, 0.3) }
+-- how dark a wreck is, before it is raised
+local WRECK_TINT = Color3.fromRGB(80, 72, 90)
+local AREA_LOOP = 4
 
 local function ease(t: number): number
 	t = math.clamp(t, 0, 1)
@@ -111,11 +137,15 @@ local function use_held(
 				return next_held
 			end)
 		end
-		-- Straight from UserInputService, processed or not: nothing bound to these keys should keep the card from
-		-- answering them. Only typing into a box is not pressing them.
-		local began = UserInputService.InputBegan:Connect(function(input: InputObject)
+		-- Watched, processed or not and whichever layer takes it: nothing bound to these keys should keep the card
+		-- from answering them. Only typing into a box is not pressing them.
+		return input_router.watch(function(input: InputObject, phase: input_router.Phase)
 			local group = group_of(input)
-			if group == nil then
+			if group == nil or phase == "changed" then
+				return
+			end
+			if phase == "ended" then
+				set(group, false)
 				return
 			end
 			local is_key = keys[input.KeyCode] ~= nil
@@ -129,16 +159,6 @@ local function use_held(
 				end)
 			end
 		end)
-		local ended = UserInputService.InputEnded:Connect(function(input: InputObject)
-			local group = group_of(input)
-			if group ~= nil then
-				set(group, false)
-			end
-		end)
-		return function()
-			began:Disconnect()
-			ended:Disconnect()
-		end
 	end, {})
 
 	return held, presses
@@ -189,31 +209,19 @@ local function use_stage(phase: any, marks: { number }): number
 end
 
 -- What a building step asks for, in its own art, filling the card's picture.
-local function BuildPicture(props: { def_name: string })
+local function BuildPicture(props: PictureProps)
 	return React.createElement("Frame", {
 		[React.Tag] = "tutorial-card-art",
 		LayoutOrder = 1,
 	}, {
 		Unit = React.createElement(UnitPicture, {
+			framing = "field",
 			def_name = props.def_name,
 			tag = "tutorial-build-unit",
 			Position = UDim2.fromScale(0.5, 0.5),
 		}),
 	})
 end
-
--- What each building step's card shows, by card id.
-local BUILD_PICTURES: { [string]: string } = {
-	extractors = "metal_extractor",
-	solars = "solar_collector",
-	bot_lab = "bot_lab",
-	grunts = "grunt",
-	dgun = "commander",
-	destroy = "grunt",
-	edge_thugs = "thug",
-	metal = "metal_extractor",
-	energy = "solar_collector",
-}
 
 -- The cursor, its tip at the top left of its picture, where `Moving` puts it.
 local function Cursor()
@@ -246,9 +254,9 @@ local function Moving(props: { position: any, children: any? })
 	}, props.children)
 end
 
--- A box dragged over the commander: the cursor comes to one corner, drags the box out over it, and lets go, and the
--- commander is selected.
-local function BoxDemo()
+-- A box dragged over the unit: the cursor comes to one corner, drags the box out over it, and lets go, and the unit is
+-- selected.
+local function BoxDemo(props: PictureProps)
 	local phase = use_loop(BOX_LOOP)
 	-- to the corner, dragging, selected, back
 	local stage = use_stage(phase, { 0, 0.2, 0.62, 0.9 })
@@ -270,7 +278,8 @@ local function BoxDemo()
 		LayoutOrder = 1,
 	}, {
 		Unit = React.createElement(UnitPicture, {
-			def_name = "commander",
+			framing = "field",
+			def_name = props.def_name,
 			tag = "tutorial-demo-unit",
 			Position = at(UNIT_AT),
 		}),
@@ -295,8 +304,8 @@ local function BoxDemo()
 	})
 end
 
--- A left click on the commander: the cursor comes onto it and clicks, and it is selected.
-local function ClickDemo()
+-- A left click on the unit: the cursor comes onto it and clicks, and it is selected.
+local function ClickDemo(props: PictureProps)
 	local phase = use_loop(CLICK_LOOP)
 	-- onto it, clicking, selected, back
 	local stage = use_stage(phase, { 0, 0.35, 0.47, 0.88 })
@@ -312,7 +321,8 @@ local function ClickDemo()
 		LayoutOrder = 1,
 	}, {
 		Unit = React.createElement(UnitPicture, {
-			def_name = "commander",
+			framing = "field",
+			def_name = props.def_name,
 			tag = "tutorial-demo-unit",
 			Position = at(UNIT_AT),
 		}),
@@ -330,8 +340,8 @@ local function ClickDemo()
 	})
 end
 
--- A right click on the marker: the cursor goes to it and right clicks, and the commander walks there.
-local function MoveDemo()
+-- A right click on the marker: the cursor goes to it and right clicks, and the unit walks there.
+local function MoveDemo(props: PictureProps)
 	local phase = use_loop(MOVE_LOOP)
 	-- to the marker, clicking, walking, arrived
 	local stage = use_stage(phase, { 0, 0.3, 0.4, 0.85 })
@@ -355,7 +365,8 @@ local function MoveDemo()
 			Position = at(MOVE_TO),
 		}),
 		Unit = React.createElement(UnitPicture, {
-			def_name = "commander",
+			framing = "field",
+			def_name = props.def_name,
 			tag = "tutorial-demo-unit",
 			Position = unit,
 		}),
@@ -372,9 +383,98 @@ local function MoveDemo()
 	})
 end
 
+-- Resurrect mode: the cursor comes onto the Resurrect command, as the commands list shows it, and clicks it, and it
+-- is on.
+local function ResurrectModeDemo(_props: PictureProps)
+	local phase = use_loop(CLICK_LOOP)
+	-- onto it, clicking, on, back
+	local stage = use_stage(phase, { 0, 0.35, 0.47, 0.88 })
+	local cursor = phase:map(function(t: number): UDim2
+		if t < 0.35 then
+			return at(between(REST, COMMAND_AT, through(t, 0, 0.35)))
+		end
+		return at(between(COMMAND_AT, REST, through(t, 0.88, 1)))
+	end)
+
+	return React.createElement("Frame", {
+		[React.Tag] = "tutorial-demo",
+		LayoutOrder = 1,
+	}, {
+		Command = React.createElement("Frame", {
+			[React.Tag] = if stage >= 3 then "tutorial-demo-command active" else "tutorial-demo-command",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, COMMAND_AT.Y),
+		}, {
+			Name = React.createElement("TextLabel", {
+				[React.Tag] = "command-name grow",
+				LayoutOrder = 1,
+				Text = "Resurrect",
+			}),
+			Key = React.createElement("TextLabel", {
+				[React.Tag] = "command-key",
+				LayoutOrder = 2,
+				Text = "W",
+			}),
+		}),
+		Mouse = React.createElement(DemoMouse, { lit = if stage == 2 then { button_left = true } else {} }),
+		Cursor = React.createElement(Moving, { position = cursor }, {
+			Icon = React.createElement(Cursor),
+		}),
+	})
+end
+
+-- An area resurrect: the cursor comes to the middle of some wrecks of the unit, drags a circle out over them with the
+-- left button held and lets go, and they rise.
+local function AreaResurrectDemo(props: PictureProps)
+	local phase = use_loop(AREA_LOOP)
+	-- to the middle, dragging, let go, risen, back
+	local stage = use_stage(phase, { 0, 0.2, 0.55, 0.7, 0.92 })
+	local cursor = phase:map(function(t: number): UDim2
+		if t < 0.2 then
+			return at(between(REST, CIRCLE_AT, through(t, 0, 0.2)))
+		elseif t < 0.92 then
+			return at(between(CIRCLE_AT, CIRCLE_TO, through(t, 0.2, 0.55)))
+		end
+		return at(between(CIRCLE_TO, REST, through(t, 0.92, 1)))
+	end)
+	local circle_size = phase:map(function(t: number): UDim2
+		local diameter = 2 * CIRCLE_RADIUS * ease(through(t, 0.2, 0.55))
+		return UDim2.fromOffset(diameter, diameter)
+	end)
+
+	local children: { [string]: any } = {
+		Circle = if stage == 2 or stage == 3
+			then React.createElement("Frame", {
+				[React.Tag] = if stage == 3 then "tutorial-demo-circle ordered" else "tutorial-demo-circle",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = at(CIRCLE_AT),
+				Size = circle_size,
+			})
+			else nil,
+		Mouse = React.createElement(DemoMouse, { lit = if stage == 2 then { button_left = true } else {} }),
+		Cursor = React.createElement(Moving, { position = cursor }, {
+			Icon = React.createElement(Cursor),
+		}),
+	}
+	local risen = stage >= 4
+	for index, point in WRECKS_AT do
+		children[`Wreck{index}`] = React.createElement(UnitPicture, {
+			framing = "field",
+			def_name = props.def_name,
+			tag = "tutorial-demo-wreck",
+			Position = at(point),
+			tint = if risen then nil else WRECK_TINT,
+		})
+	end
+	return React.createElement("Frame", {
+		[React.Tag] = "tutorial-demo",
+		LayoutOrder = 1,
+	}, children)
+end
+
 -- WASD: its keys light as they are pressed, and every press shakes it and flashes it red, since they do not move the
 -- camera.
-local function WasdPicture(props: { on_refused: () -> (), on_held: (held: boolean) -> () })
+local function WasdPicture(props: PictureProps)
 	local held, presses = use_held(WASD_KEYS, {})
 	React.useEffect(function()
 		if presses > 0 then
@@ -389,7 +489,7 @@ local function WasdPicture(props: { on_refused: () -> (), on_held: (held: boolea
 		name = "tutorial_wasd",
 		view = "above",
 		lit = held,
-		lit_color = CROSS,
+		lit_color = palette.danger,
 		pressed = held,
 		shake = presses,
 		-- laid out as the keys are on a keyboard
@@ -399,7 +499,7 @@ local function WasdPicture(props: { on_refused: () -> (), on_held: (held: boolea
 	})
 end
 
-local function ArrowsPicture()
+local function ArrowsPicture(_props: PictureProps)
 	local held = use_held(ARROW_KEYS, {})
 	return React.createElement(ArtIcon, {
 		name = "tutorial_arrows",
@@ -412,7 +512,7 @@ local function ArrowsPicture()
 	})
 end
 
-local function MousePicture()
+local function MousePicture(_props: PictureProps)
 	local held = use_held({}, MIDDLE_BUTTON)
 	return React.createElement(ArtIcon, {
 		name = "tutorial_mouse",
@@ -425,6 +525,19 @@ local function MousePicture()
 		LayoutOrder = 1,
 	})
 end
+
+-- What draws each kind of card picture.
+local PICTURES: { [PictureKind]: (props: PictureProps) -> any } = table.freeze({
+	wasd = WasdPicture,
+	arrows = ArrowsPicture,
+	middle_mouse = MousePicture,
+	box_select = BoxDemo,
+	click = ClickDemo,
+	move = MoveDemo,
+	resurrect_mode = ResurrectModeDemo,
+	area_resurrect = AreaResurrectDemo,
+	unit = BuildPicture,
+})
 
 -- The tick or cross under a card.
 local function Mark(props: { mark: "check" | "cross", done: boolean })
@@ -464,7 +577,7 @@ local function RateMeter(props: { rate: { resource: string, goal: number }, prog
 			Fill = React.createElement("Frame", {
 				[React.Tag] = `resource-fill {props.rate.resource}-fill`,
 				-- set inline rather than in SCSS, as the resource bar's are
-				Size = UDim2.new(fraction, 0, 1, 0),
+				Size = UDim2.fromScale(fraction, 1),
 			}),
 		}),
 		Goal = React.createElement("TextLabel", {
@@ -475,17 +588,13 @@ local function RateMeter(props: { rate: { resource: string, goal: number }, prog
 	})
 end
 
-local function CardView(
-	props: {
-		card: Card,
-		done: boolean,
-		progress: string?,
-		hint: string?,
-		-- the hint is what to do next rather than what has to be done first
-		hint_is_next: boolean?,
-		LayoutOrder: number,
-	}
-)
+local function CardView(props: {
+	card: Card,
+	done: boolean,
+	progress: string?,
+	hint: tutorial.Hint?,
+	LayoutOrder: number,
+})
 	local card = props.card
 	-- when a key that does not work was last pressed on this card, to mark it refused for a moment
 	local refused, set_refused = React.useState(0)
@@ -504,27 +613,13 @@ local function CardView(
 		end
 	end, { refused })
 
-	local picture
-	if card.id == "wasd" then
-		picture = React.createElement(WasdPicture, {
-			on_refused = function()
-				set_refused(os.clock())
-			end,
-			on_held = set_refusing,
-		})
-	elseif card.id == "arrows" then
-		picture = React.createElement(ArrowsPicture)
-	elseif card.id == "middle_drag" then
-		picture = React.createElement(MousePicture)
-	elseif card.id == "box_select" then
-		picture = React.createElement(BoxDemo)
-	elseif card.id == "click_select" then
-		picture = React.createElement(ClickDemo)
-	elseif card.id == "right_click" then
-		picture = React.createElement(MoveDemo)
-	elseif BUILD_PICTURES[card.id] ~= nil then
-		picture = React.createElement(BuildPicture, { def_name = BUILD_PICTURES[card.id] })
-	end
+	local picture = React.createElement(PICTURES[card.picture.kind], {
+		def_name = card.picture.def_name or "",
+		on_refused = function()
+			set_refused(os.clock())
+		end,
+		on_held = set_refusing,
+	})
 
 	local tag = "tutorial-card"
 	if card.mark == "cross" then
@@ -545,9 +640,9 @@ local function CardView(
 		-- what to do before the caption can be, when it is not done yet
 		Hint = if props.hint ~= nil and props.done == false
 			then React.createElement("TextLabel", {
-				[React.Tag] = if props.hint_is_next == true then "tutorial-hint next" else "tutorial-hint",
+				[React.Tag] = if props.hint.next then "tutorial-hint next" else "tutorial-hint",
 				LayoutOrder = 2,
-				Text = props.hint,
+				Text = props.hint.text,
 			})
 			else nil,
 		Caption = React.createElement("TextLabel", {
@@ -568,60 +663,13 @@ local function CardView(
 	})
 end
 
--- What to select first, for a step that needs something selected to be done ("First select your commander"), or nil
--- when something that can do it is selected already.
-local function use_builder_hint(builder: string?): string?
-	local views = use_entities.use_views(use_entities.use_selection())
-	if builder == nil then
-		return nil
-	end
-	for _, view in views do
-		if view.def_name == builder then
-			return nil
-		end
-	end
-	local name = if builder == "commander" then "commander" else unit_defs.get(builder).display_name
-	return `First select your {name}`
-end
-
--- The mode the cursor is in right now (input's: "attack", "disintegrator", ...), if any.
-local function use_mode(): string?
-	local mode, set_mode = React.useState(nil :: string?)
-	React.useEffect(function()
-		return client_input.subscribe_mode(set_mode)
-	end, {})
-	return mode
-end
-
--- What is being placed right now, if anything.
-local function use_placing(): string?
-	local placing, set_placing = React.useState(build_mode.active())
-	React.useEffect(function()
-		set_placing(build_mode.active())
-		return build_mode.subscribe(set_placing)
-	end, {})
-	return placing
-end
-
 local function Tutorial()
 	local state = use_tutorial.use_tutorial()
 	local ui_scale = use_viewport.use_ui_scale()
 	-- hooks, so called on every render, whether or not there is a step to take them from
-	local shown = tutorial.current_step()
-	local placing = use_placing()
-	local mode = use_mode()
-	local builder_hint = use_builder_hint(if shown ~= nil then shown.builder else nil)
-	-- What the card says to do first: select the builder, or, once what the step asks for is being placed, where to
-	-- click next (the build menu stops pointing at it then).
-	local hint: string? = builder_hint
-	local hint_is_next = false
-	if hint == nil and shown ~= nil and shown.build ~= nil and placing == shown.build and shown.placing_hint ~= nil then
-		hint = shown.placing_hint
-		hint_is_next = true
-	elseif hint == nil and shown ~= nil and shown.command ~= nil and mode == shown.command then
-		hint = shown.command_hint
-		hint_is_next = hint ~= nil
-	end
+	local hint = use_store.use_store(tutorial.hint, tutorial.subscribe_hint)
+	-- nil outside a mission with waves
+	local waves = wave_block.use_waves()
 	if state.active == false then
 		return nil
 	end
@@ -630,13 +678,54 @@ local function Tutorial()
 
 	local steps = tutorial.steps()
 	local step = steps[state.step]
+	local guide = tutorial.guide()
+	local finish = if guide ~= nil then guide.finish else nil
 	local mission = campaign.get(state.mission or "")
-	local kicker = if mission ~= nil then string.upper(mission.label) else "TUTORIAL"
-	-- past the last suggestion of a mission that only suggests, there is nothing more to say: it has been won
-	if step == nil and state.mission ~= "tutorial" then
-		return nil
+	local kicker = if mission ~= nil then string.upper(mission.label) else "GUIDE"
+	local wave_box = if waves ~= nil
+		then React.createElement(wave_block.WaveBox, { LayoutOrder = 0, waves = waves })
+		else nil
+	-- Past the last step of a guide that does not end in a card of its own, what is left is its objective, if it says;
+	-- otherwise there is nothing more to say: it has been won.
+	if step == nil and finish == nil then
+		local objective = tutorial.objective()
+		if objective == nil and wave_box == nil then
+			return nil
+		end
+		local objective_children: { [string]: any } = {}
+		if objective ~= nil then
+			objective_children.Kicker = React.createElement("TextLabel", {
+				[React.Tag] = "tutorial-kicker",
+				LayoutOrder = 1,
+				Text = "OBJECTIVE",
+			})
+			objective_children.Title = React.createElement("TextLabel", {
+				[React.Tag] = "tutorial-title",
+				LayoutOrder = 2,
+				Text = objective.title,
+			})
+			for index, line in objective.lines do
+				objective_children[`Line{index}`] = React.createElement("TextLabel", {
+					[React.Tag] = "tutorial-status",
+					LayoutOrder = 2 + index,
+					Text = line,
+				})
+			end
+		end
+		return React.createElement("Frame", {
+			[React.Tag] = root_tag,
+		}, {
+			Scale = React.createElement("UIScale", { Scale = ui_scale }),
+			Waves = wave_box,
+			Objective = if objective ~= nil
+				then React.createElement("Frame", {
+					[React.Tag] = "tutorial-objective",
+					LayoutOrder = 1,
+				}, objective_children)
+				else nil,
+		})
 	end
-	if step == nil then
+	if step == nil and finish ~= nil then
 		return React.createElement("Frame", {
 			[React.Tag] = `{root_tag} tutorial-finished`,
 		}, {
@@ -644,17 +733,17 @@ local function Tutorial()
 			Kicker = React.createElement("TextLabel", {
 				[React.Tag] = "tutorial-kicker",
 				LayoutOrder = 1,
-				Text = "TUTORIAL",
+				Text = kicker,
 			}),
 			Title = React.createElement("TextLabel", {
 				[React.Tag] = "tutorial-title",
 				LayoutOrder = 2,
-				Text = "Nice work!",
+				Text = finish.title,
 			}),
 			Status = React.createElement("TextLabel", {
 				[React.Tag] = "tutorial-status",
 				LayoutOrder = 3,
-				Text = "That's all for now. More coming soon.",
+				Text = finish.status,
 			}),
 		})
 	end
@@ -670,7 +759,6 @@ local function Tutorial()
 			done = state.completed[card.id] == true,
 			progress = state.progress[card.id],
 			hint = hint,
-			hint_is_next = hint_is_next,
 			LayoutOrder = index,
 		})
 	end
@@ -684,6 +772,7 @@ local function Tutorial()
 		[React.Tag] = root_tag,
 	}, {
 		Scale = React.createElement("UIScale", { Scale = ui_scale }),
+		Waves = wave_box,
 		Kicker = React.createElement("TextLabel", {
 			[React.Tag] = "tutorial-kicker",
 			LayoutOrder = 1,

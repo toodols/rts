@@ -1,10 +1,12 @@
-"""unit_defs.luau `metal_storage`: 2x2x2 cells (8x8x8 studs), steel silo (see storage_common.py)."""
+"""unit_defs.luau `metal_storage`: a steel silo (see shared/storage.py)."""
 
-from . import storage_common
+from .shared import storage
+
+CATEGORY = "entity"
+DEF = "metal_storage"
+# built reaching past its collider before the build held it to one: refitting it means re-uploading its meshes
+ENVELOPE = {"width": 8.24}
 
 
 def generate(params):
-    params.setdefault("width", 8.0)
-    params.setdefault("depth", 8.0)
-    params.setdefault("height", 8.0)
-    return storage_common.generate(params, kind="metal")
+    return storage.silo(params)

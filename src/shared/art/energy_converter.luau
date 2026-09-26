@@ -4,7 +4,7 @@ return {
 		base = { pivot = { 0, 0, 0 } },
 	},
 	parts = {
-		{ group = "base", color = { 0.588, 0.627, 0.69 }, offset = { 0, 1.24, 0 }, size = { 3.8, 2.48, 3.8 }, hash = "2ed13dfcae9d24d0", team = true, mesh = "rbxassetid://138178942045606" },
+		{ group = "base", color = { 0.5882, 0.6275, 0.6902 }, offset = { 0, 1.24, 0 }, size = { 3.8, 2.48, 3.8 }, hash = "2ed13dfcae9d24d0", team = true, mesh = "rbxassetid://138178942045606" },
 		{ group = "base", color = { 0.35, 0.85, 1 }, offset = { 0, 2.58, 0 }, size = { 2.72, 0.2, 2.72 }, hash = "1d1386a1cf154f1c", neon = true, mesh = "rbxassetid://103779228116503" },
 		{ group = "base", color = { 0.17, 0.17, 0.19 }, offset = { 0, 0.682, 2 }, size = { 1.44, 1.364, 0.72 }, hash = "bb57c7d8db1d99a8", mesh = "rbxassetid://132282231495708" },
 	},

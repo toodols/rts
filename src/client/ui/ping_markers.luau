@@ -16,6 +16,9 @@ local appearance = require(ReplicatedStorage.Shared.appearance)
 
 local pings = require(ReplicatedStorage.Client.pings)
 
+local format = require(ReplicatedStorage.ClientShared.format)
+local use_store = require(ReplicatedStorage.ClientShared.use_store)
+
 type Ping = pings.Ping
 
 local PLACE_STEP = "rts_ping_markers"
@@ -147,7 +150,7 @@ local function Marker(props: { ping: Ping })
 	}, {
 		Name = React.createElement("TextLabel", {
 			[React.Tag] = "ping-name",
-			Text = ping_info.name,
+			Text = format.escape(ping_info.name),
 			TextColor3 = color:Lerp(Color3.new(1, 1, 1), NAME_LIGHTEN),
 			ref = name_ref,
 		}),
@@ -168,14 +171,13 @@ local function Marker(props: { ping: Ping })
 	})
 end
 
-local function PingMarkers()
-	local shown, set_shown = React.useState(table.clone(pings.active()))
+-- The pings up now, a list of its own each time, so that a change to it renders again.
+local function active_pings(): { pings.Ping }
+	return table.clone(pings.active())
+end
 
-	React.useEffect(function()
-		return pings.subscribe(function()
-			set_shown(table.clone(pings.active()))
-		end)
-	end, {})
+local function PingMarkers()
+	local shown = use_store.use_store(active_pings, pings.subscribe)
 
 	React.useEffect(function()
 		-- one step after the camera's, as the world bars are, so a marker never trails its ping

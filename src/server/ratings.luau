@@ -2,24 +2,28 @@
 -- games they have won, lost and drawn, on two ladders: duels (1v1) and small team games (2v2 to 5v5). Nothing here is
 -- shown to anyone; it is only kept, for matchmaking to use one day.
 --
--- A game is rated once it has ended (see shared/game_phase.luau), when it was a team game a lobby started with two
--- sides, and each side had a player here at some point: which ladder it is on is by how many the larger side seated,
--- one for a duel and two to five for a team game. A player seated who never came is not rated; one who left is, with
--- their side. The winning side ranks above the other, and a game with no winners is a draw. Free for alls, games
--- against the scavengers and campaign missions are not rated.
+-- A game is rated once it has ended (see shared/game_phase.luau), when it was a match a lobby started in a `rated` mode
+-- (game_modes: the team games) with two sides, and each side had a player here at some point: which ladder it is on is
+-- by how many the larger side seated, one for a duel and two to five for a team game. A player seated who never came is
+-- not rated; one who left is, with their side. The winning side ranks above the other, and a game with no winners is a
+-- draw.
 --
--- The ratings are kept in a DataStore (STORE), one key a player (`key_of`), holding a Record for each ladder they have
--- played on. Every player's is read before any is written, and if one cannot be the game is not rated, so that a
--- failed read is never saved over. In Studio nothing is read or written: every player starts fresh there, so a test
--- sees what a game would do (`last`) and the real ratings are never touched.
+-- The ratings are kept in the ratings store (server_shared/record_store.luau), one key a player, holding a Record for
+-- each ladder they have played on. Every player's is read before any is written, and if one cannot be the game is not
+-- rated, so that a failed read is never saved over. Where records are not kept (record_store.enabled: Studio) every
+-- player starts fresh and nothing is written, so a test sees what a game would do (`on_rated`) and the real ratings
+-- are never touched.
+--
+-- A new map is a new game, rated afresh once it ends (`reset`).
 
-local DataStoreService = game:GetService "DataStoreService"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local RunService = game:GetService "RunService"
-local Workspace = game:GetService "Workspace"
+local ServerScriptService = game:GetService "ServerScriptService"
 
 local game_modes = require(ReplicatedStorage.Shared.game_modes)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
+local signal = require(ReplicatedStorage.Shared.signal)
+
+local record_store = require(ServerScriptService.ServerShared.record_store)
 
 local match = require(script.Parent.match)
 local openskill = require(script.Parent.openskill)
@@ -38,7 +42,7 @@ export type Record = {
 	draws: number,
 }
 
--- What rating a game did, for a test to read.
+-- What rating a game did.
 export type Rated = {
 	ladder: Ladder,
 	-- by user id as a string
@@ -51,25 +55,17 @@ type Game = {
 	sides: { { users: { number }, outcome: Outcome } },
 }
 
-local STORE = "ratings"
--- A read or a write is tried this many times, this far apart, before it is given up on.
-local ATTEMPTS = 3
-local RETRY_SECONDS = 1
 -- How long a server shutting down waits for the ratings it is still writing.
 local CLOSE_WAIT_SECONDS = 25
 local LARGEST_DUEL = 1
 local LARGEST_TEAM = 5
-local PHASE_ATTRIBUTE = "phase"
 
 -- whether this server's game has been rated, or found not to be rated, already
 local settled = false
 -- how many games' ratings are still being worked out or written
 local pending = 0
-local last_rated: Rated? = nil
-
-local function key_of(user_id: number): string
-	return `user_{user_id}`
-end
+-- every game rated, once it has been
+local rated_signal = signal.new() :: signal.Signal<Rated>
 
 local function new_record(): Record
 	local rating = openskill.Rating()
@@ -97,7 +93,7 @@ local function game_to_rate(): Game?
 		return nil
 	end
 	local mode = game_modes.get(current.mode)
-	if mode == nil or mode.kind ~= "teams" then
+	if mode == nil or mode.rated == false then
 		return nil
 	end
 	local seated: { [number]: number } = {}
@@ -134,7 +130,7 @@ local function game_to_rate(): Game?
 		end
 		local won = false
 		for _, user_id in users do
-			local team_id = match.team_of_user(user_id)
+			local team_id = match.team_of(user_id)
 			if team_id ~= nil and table.find(winners, team_id) ~= nil then
 				won = true
 			end
@@ -145,60 +141,40 @@ local function game_to_rate(): Game?
 	return result
 end
 
-local function get_store(): DataStore
-	return DataStoreService:GetDataStore(STORE)
-end
-
--- Tries `attempt` a few times, and returns the last error if it never succeeded.
-local function retried(attempt: () -> ()): string?
-	local last = "not tried"
-	for index = 1, ATTEMPTS do
-		local ok, result = pcall(attempt)
-		if ok then
-			return nil
-		end
-		last = tostring(result)
-		if index < ATTEMPTS then
-			task.wait(RETRY_SECONDS)
-		end
-	end
-	return last
-end
-
--- Every stored ladder of `user_id`'s, or nil and why if they could not be read. Yields.
-local function load(user_id: number): ({ [string]: any }?, string?)
-	local stored: { [string]: any } = {}
-	local failed = retried(function()
-		local value = get_store():GetAsync(key_of(user_id))
-		stored = if typeof(value) == "table" then value else {}
-	end)
-	if failed ~= nil then
-		return nil, failed
-	end
-	return stored, nil
-end
+-- Each player's ladders, what is stored of them by ladder.
+local store = record_store.new({
+	store = "ratings",
+	decode = function(value: any): { [string]: any }
+		return if typeof(value) == "table" then value else {}
+	end,
+	encode = function(ladders: { [string]: any }): any
+		return ladders
+	end,
+})
 
 -- Writes `record` as `user_id`'s on `ladder`, counting `outcome` on top of whatever count is stored. Yields.
 local function save(user_id: number, ladder: Ladder, record: Record, outcome: Outcome): string?
-	return retried(function()
-		get_store():UpdateAsync(key_of(user_id), function(old: any): any
-			local stored = if typeof(old) == "table" then old else {}
-			local counts = decode_record(stored[ladder])
-			stored[ladder] = {
+	local _, problem = store.update(
+		record_store.legacy_player_key(user_id),
+		function(ladders: { [string]: any }): { [string]: any }
+			local counts = decode_record(ladders[ladder])
+			local changed = table.clone(ladders)
+			changed[ladder] = {
 				mu = record.mu,
 				sigma = record.sigma,
 				wins = counts.wins + if outcome == "won" then 1 else 0,
 				losses = counts.losses + if outcome == "lost" then 1 else 0,
 				draws = counts.draws + if outcome == "drew" then 1 else 0,
 			}
-			return stored
-		end)
-	end)
+			return changed
+		end
+	)
+	return problem
 end
 
 -- Rates `played`: reads everyone's rating on its ladder, works out the new ones and writes them. Yields.
 local function rate(played: Game)
-	local persist = RunService:IsStudio() == false
+	local persist = record_store.enabled()
 	local before: { [number]: Record } = {}
 	for _, side in played.sides do
 		for _, user_id in side.users do
@@ -206,7 +182,7 @@ local function rate(played: Game)
 				before[user_id] = new_record()
 				continue
 			end
-			local stored, reason = load(user_id)
+			local stored, reason = store.load(record_store.legacy_player_key(user_id))
 			if stored == nil then
 				warn(`not rating this game: could not read {user_id}'s rating: {reason}`)
 				return
@@ -250,12 +226,12 @@ local function rate(played: Game)
 			end
 		end
 	end
-	last_rated = rated
+	rated_signal.fire(rated)
 end
 
 -- Rates the game once it has ended, if it is one to rate, and only the first time it ends.
-local function on_phase_changed()
-	if settled or game_phase.phase() ~= "ended" then
+local function on_phase(phase: game_phase.Phase)
+	if settled or phase ~= "ended" then
 		return
 	end
 	settled = true
@@ -273,18 +249,19 @@ local function on_phase_changed()
 	end)
 end
 
--- What the last game rated did, or nil if none has been.
-local function last(): Rated?
-	return last_rated
+-- A new map is a new game, which is rated once it ends too.
+local function reset()
+	settled = false
 end
 
--- Whether ratings are still being worked out or written.
-local function is_pending(): boolean
-	return pending > 0
+-- Tells `listener` what rating each game did, once it has been rated and written, until the returned function is
+-- called.
+local function on_rated(listener: (Rated) -> ()): () -> ()
+	return rated_signal.subscribe(listener)
 end
 
 local function init()
-	Workspace:GetAttributeChangedSignal(PHASE_ATTRIBUTE):Connect(on_phase_changed)
+	game_phase.on_phase(on_phase)
 	-- the last player leaving may be what ended the game, and the server closes behind them
 	game:BindToClose(function()
 		local deadline = os.clock() + CLOSE_WAIT_SECONDS
@@ -296,6 +273,6 @@ end
 
 return table.freeze({
 	init = init,
-	last = last,
-	is_pending = is_pending,
+	reset = reset,
+	on_rated = on_rated,
 })

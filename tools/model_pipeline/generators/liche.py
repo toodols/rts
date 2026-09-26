@@ -1,20 +1,24 @@
 """unit_defs/air_t2.luau `liche`: the atomic bomber.
 
-Collider capsule(48, 30, 62): radius 62/22 = 2.82 studs, height 30/11 = 2.73. Faceted low-poly, under 100
+Faceted low-poly, under 100
 triangles. A flying wing, so nothing else in the air looks like it: one broad faceted wing (the team-coloured accent)
 with a sawtooth trailing edge, a raised crew hump down its middle with a dark glazed slot, two buried engines glowing at
 the trailing edge, and the bomb itself hanging from the belly: a fat dark casing with a hazard-yellow band. Nothing
 moves.
 """
 
-from . import air_t1_common as air
-from . import common
+from .shared import air_t1 as air
+from .shared import common
+from .shared import palette
 
-ACCENT = air.rgb(120, 108, 150)
-RADIUS, HEIGHT = 62 / 22, 30 / 11
+CATEGORY = "entity"
+DEF = "liche"
+# an aircraft's BAR collision volume is only its fuselage's: the rest of it reaches past, as BAR's model does
+ENVELOPE = {"width": 4.8}
 
 
 def generate(params):
+    accent = params["color"]
     zc = 1.40
     objects = []
 
@@ -33,7 +37,7 @@ def generate(params):
         (-2.40, 0.45, zc + 0.10),
     ], top=(0.0, -0.20, zc + 0.30), bottom=(0.0, -0.20, zc - 0.26)))
     for obj in accents:
-        air.accent_mat(obj, "liche", ACCENT)
+        common.accent_mat(obj, accent)
         objects.append(obj)
 
     # The crew hump down the middle.
@@ -55,7 +59,7 @@ def generate(params):
         glows.append(air.plate(f"exhaust_{side:+.0f}", (side * 0.55, 0.93, zc + 0.08), (0.24, 0, 0), (0, 0, 0.07),
                                (0, 1, 0)))
     for obj in glows:
-        air.glow_mat(obj)
+        common.glow_mat(obj, palette.JET_EXHAUST)
         objects.append(obj)
 
     # The bomb under the belly: a dark eight-sided casing with a pointed nose and a yellow band.
@@ -73,13 +77,11 @@ def generate(params):
         ((0.0, 0.55, zb - 0.10), (0.0, 1.05, zb - 0.10), (0.0, 1.00, zb - 0.42), (0.05, 0.80, zb - 0.12)),
     ):
         tail = air.tetra("bomb_fin", *fin)
-        air.hivis_mat(tail)
+        common.hivis_mat(tail)
         objects.append(tail)
     # the pylon it hangs from
-    pylon = air.block("pylon", 0.14, 0.60, zc - 0.20 - (zb + 0.28), origin=(0.0, -0.05, zb + 0.28), open_bottom=True)
+    pylon = common.drop_bottom(common.block("pylon", 0.14, 0.60, zc - 0.20 - (zb + 0.28), origin=(0.0, -0.05, zb + 0.28)))
     common.trim_mat(pylon)
     objects.append(pylon)
 
-    air.flat(objects)
-    air.check_fit(objects, RADIUS, HEIGHT, "liche")
     return objects

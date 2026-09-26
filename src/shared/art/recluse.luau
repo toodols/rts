@@ -2,7 +2,7 @@
 return {
 	groups = {
 		base = { pivot = { 0, 0, 0 } },
-		turret_1 = { pivot = { 0, 1.6372, 0 }, kind = "turret", weapon = 1, muzzle = { -0.6309, 0.1754, 0.8598 } },
+		turret_1 = { pivot = { 0, 1.6372, 0 }, kind = "turret", weapon = 1 },
 		leg_1 = { pivot = { 0.6225, 1.2279, -0.6225 }, kind = "leg", axis = { 0, 1, 0 }, swing = 0.3, phase = 0.5, stride = 1.6582 },
 		leg_2 = { pivot = { -0.6225, 1.2279, -0.6225 }, kind = "leg", axis = { 0, 1, 0 }, swing = 0.3, phase = 0, stride = 1.6582 },
 		leg_3 = { pivot = { -0.6225, 1.2279, 0.6225 }, kind = "leg", axis = { 0, 1, 0 }, swing = 0.3, phase = 0.5, stride = 1.6582 },

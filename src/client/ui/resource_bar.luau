@@ -3,52 +3,18 @@ local TweenService = game:GetService "TweenService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
+local teams = require(ReplicatedStorage.Shared.teams)
+
+local world = require(ReplicatedStorage.Client.world)
+local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 local wind_block = require(ReplicatedStorage.Client.ui.wind_block)
 local tide_block = require(ReplicatedStorage.Client.ui.tide_block)
 local scavenger_block = require(ReplicatedStorage.Client.ui.scavenger_block)
-local wave_block = require(ReplicatedStorage.Client.ui.wave_block)
+local use_team_resources = require(ReplicatedStorage.Client.ui.use_team_resources)
 
-type TeamState = {
-	metal: number,
-	energy: number,
-	metal_capacity: number,
-	energy_capacity: number,
-	metal_income: number,
-	energy_income: number,
-	metal_revenue: number,
-	metal_expense: number,
-	energy_revenue: number,
-	energy_expense: number,
-}
-
-local team_updated: RemoteEvent = ReplicatedStorage.Shared.TeamUpdated
-
-local EMPTY: TeamState = {
-	metal = 0,
-	energy = 0,
-	metal_capacity = 1,
-	energy_capacity = 1,
-	metal_income = 0,
-	energy_income = 0,
-	metal_revenue = 0,
-	metal_expense = 0,
-	energy_revenue = 0,
-	energy_expense = 0,
-}
-
--- The server sends the team's resources from the moment the player joins, long before the bar is mounted (the map
--- and the art load first, and the tutorial hides the bar for a while), so they are listened for as soon as this module
--- is required, and the bar picks up the latest when it mounts. Otherwise they queue up unheard and are dropped.
-local latest: TeamState = EMPTY
-local listeners: { [(TeamState) -> ()]: true } = {}
-
-team_updated.OnClientEvent:Connect(function(next_state: TeamState)
-	latest = next_state
-	for listener in listeners do
-		listener(next_state)
-	end
-end)
+local format = require(ReplicatedStorage.ClientShared.format)
 
 -- Under a few percent of storage the readout is called out as stalling, because that is the point
 -- where construction starts being throttled.
@@ -59,11 +25,16 @@ local STALL_FRACTION = 0.02
 local PULSE = TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
 local PULSE_TRANSPARENCY = 0.65
 
-local function format_amount(value: number): string
-	if value >= 10000 then
-		return string.format("%.1fk", value / 1000)
+-- The team of the first selected thing on a real team, whose resources a spectator is shown.
+local function selected_team(ids: { number }): number?
+	for _, id in ids do
+		local model = world.get(id)
+		local team = if model ~= nil then entity_attrs.team(model) else nil
+		if team ~= nil and team ~= teams.NEUTRAL then
+			return team
+		end
 	end
-	return string.format("%d", math.floor(value))
+	return nil
 end
 
 local function Resource(props: {
@@ -113,12 +84,12 @@ local function Resource(props: {
 				[React.Tag] = if stalling then "resource-amount stalling" else "resource-amount",
 				ref = amount_ref,
 				LayoutOrder = 3,
-				Text = format_amount(props.amount),
+				Text = format.amount(props.amount),
 			}),
 			Capacity = React.createElement("TextLabel", {
 				[React.Tag] = "resource-income faint",
 				LayoutOrder = 4,
-				Text = `/{format_amount(props.capacity)}`,
+				Text = `/{format.amount(props.capacity)}`,
 			}),
 		}),
 		Track = React.createElement("Frame", {
@@ -128,7 +99,7 @@ local function Resource(props: {
 			Fill = React.createElement("Frame", {
 				[React.Tag] = `resource-fill {props.tone}-fill`,
 				-- set inline rather than in SCSS: Roblox's Size covers both axes at once
-				Size = UDim2.new(fraction, 0, 1, 0),
+				Size = UDim2.fromScale(fraction, 1),
 			}),
 		}),
 		Flow = React.createElement("Frame", {
@@ -150,27 +121,23 @@ local function Resource(props: {
 end
 
 local function ResourceBar()
-	local team, set_team = React.useState(latest)
+	local own = use_team_resources.use_team_resources()
 	local ui_scale = use_viewport.use_ui_scale()
 	-- nil while the scavengers gamemode is off, when there is nothing more to show
 	local difficulty = scavenger_block.use_difficulty()
-	-- nil outside the counterattack, which shows its waves where the difficulty would be
-	local waves = wave_block.use_waves()
-
-	React.useEffect(function()
-		-- in case it changed between the first render and this
-		set_team(latest)
-		listeners[set_team] = true
-		return function()
-			listeners[set_team] = nil
-		end
-	end, {})
+	-- a spectator has no resources of their own, and is shown those of the team of what they have selected, if anything
+	local spectating = use_entities.use_spectating()
+	local selected = use_entities.use_selection()
+	local watched = if spectating then selected_team(selected) else nil
+	local watched_resources = use_team_resources.use_watched_resources(watched or teams.NEUTRAL)
+	if spectating and watched == nil then
+		return nil
+	end
+	local team = if watched ~= nil then watched_resources else own
 
 	return React.createElement("Frame", {
 		-- the bar is wider with the difficulty in it, so the readouts keep the room they had
-		[React.Tag] = if difficulty ~= nil or waves ~= nil
-			then "resource-bar panel with-scavengers"
-			else "resource-bar panel",
+		[React.Tag] = if difficulty ~= nil then "resource-bar panel with-scavengers" else "resource-bar panel",
 	}, {
 		Scale = React.createElement("UIScale", { Scale = ui_scale }),
 		Metal = React.createElement(Resource, {
@@ -201,7 +168,7 @@ local function ResourceBar()
 		}),
 		Wind = React.createElement(wind_block.WindBlock, { LayoutOrder = 5 }),
 		Tide = React.createElement(tide_block.TideBlock, { LayoutOrder = 6 }),
-		ScavengerDivider = if difficulty ~= nil or waves ~= nil
+		ScavengerDivider = if difficulty ~= nil
 			then React.createElement("Frame", {
 				[React.Tag] = "resource-divider",
 				LayoutOrder = 7,
@@ -209,9 +176,6 @@ local function ResourceBar()
 			else nil,
 		Scavengers = if difficulty ~= nil
 			then React.createElement(scavenger_block.ScavengerBlock, { LayoutOrder = 8, difficulty = difficulty })
-			else nil,
-		Waves = if waves ~= nil and difficulty == nil
-			then React.createElement(wave_block.WaveBlock, { LayoutOrder = 8, waves = waves })
 			else nil,
 	})
 end
