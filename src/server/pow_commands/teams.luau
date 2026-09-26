@@ -13,6 +13,8 @@ local teams = require(ReplicatedStorage.Shared.teams)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local pow_builders = require(ServerScriptService.ServerShared.pow_builders)
+local pow_common = require(ServerScriptService.ServerShared.pow_common)
+local skin_session = require(ServerScriptService.ServerShared.skin_session)
 
 local alliances = require(ServerScriptService.Server.alliances)
 local match_stats = require(ServerScriptService.Server.match_stats)
@@ -217,9 +219,8 @@ return function(extras: pow_types.Extras)
 
 	commands.team_skin = {
 		description = "Puts a team in a skin, and everything it has with it: your own team, or the one given. "
-			.. "Every skin is open to this command, the developer-only golden one too. It lasts until someone on the "
-			.. "team equips a skin, and is not saved: to change what a player wears for good, skin_equip. With no "
-			.. "arguments it says which skin your team wears.",
+			.. "Every skin is open to this command, the developer-only golden one too. Every player on the team has it "
+			.. "equipped, saved, as skin_equip does. With no arguments it says which skin your team wears.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -237,11 +238,16 @@ return function(extras: pow_types.Extras)
 				context:log({ type = "info", value = `Team {team_id} wears {skins.of_team(team_id) or "nothing"}` })
 				return
 			end
-			local ok = skins.set_team(team_id, skin_name)
-			context:log({
-				type = if ok then "info" else "error",
-				value = if ok then `Team {team_id} now wears {skin_name}` else `There is no team {team_id}`,
-			})
+			if skins.set_team(team_id, skin_name) == false then
+				context:log({ type = "error", value = `There is no team {team_id}` })
+				return
+			end
+			context:log({ type = "info", value = `Team {team_id} now wears {skin_name}` })
+			for _, player in players.players_on_team(team_id) do
+				local outcome, why = skin_session.equip(player, skin_name, true)
+				local kind, line = pow_common.outcome_line(`{player.Name} now has {skin_name} equipped`, outcome, why)
+				context:log({ type = kind, value = line })
+			end
 		end,
 	}
 
