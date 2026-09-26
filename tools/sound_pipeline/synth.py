@@ -396,6 +396,70 @@ def anti_air() -> np.ndarray:
     return trimmed(reverb(flyby(source, position, 1.6), 0.9, 0.12, 8000))
 
 
+def bubbles(t: np.ndarray, count: int, spread: float, low: float, high: float) -> np.ndarray:
+    """Bubbles rising through water: each a short blip that rings at its size's pitch and slides up as it shrinks,
+    scattered over the first `spread` seconds and thinning out."""
+    out = np.zeros_like(t)
+    for _ in range(count):
+        at = int(rng.exponential(spread / 3) * RATE)
+        length = int(0.06 * RATE)
+        if at >= min(len(t) - length, int(spread * RATE)):
+            continue
+        local = np.arange(length) / RATE
+        hz = rng.uniform(low, high) * (1 + rng.uniform(0.5, 2.5) * local / 0.06)
+        blip = np.sin(phase_of(hz)) * envelope(local, 0.001, rng.uniform(0.006, 0.02))
+        out[at : at + length] += blip * rng.uniform(0.3, 1)
+    return unit(out)
+
+
+def torpedo() -> np.ndarray:
+    """A torpedo launched, heard through water: everything muffled. A dull thump of compressed air from the tube, a
+    heavy splash as it goes in, then a burble of bubbles and the churn of its screw fading as it runs off."""
+    t = times(1.4)
+    n = len(t)
+    thump_phase = sweep_phase(95, 38, t, 0.12)
+    thump = (np.sin(thump_phase) + 0.3 * np.sin(2 * thump_phase)) * envelope(t, 0.003, 0.1)
+    puff = sosfilt(lowpass(1200), coloured(n, 1)) * envelope(t, 0.002, 0.05)
+    splash_at = np.maximum(t - 0.04, 0)
+    splash = swept(coloured(n, 1), path((0, 2500), (0.3, 700)), lowpass) * (t >= 0.04) * envelope(splash_at, 0.01, 0.16)
+    # the screw's churn: low noise, rolling slowly (a faster flutter would be heard as a buzz), dying away as it goes
+    churn = sosfilt(bandpass(220, 2.2), coloured(n, 2)) * np.clip(1 + 0.3 * slow_wander(n, 6), 0.5, 1.5)
+    going = np.clip((t - 0.08) / 0.15, 0, 1) * np.exp(-np.maximum(t - 0.25, 0) / 0.35)
+    dry = saturate(
+        1.1 * thump + 0.5 * unit(puff) + 0.7 * unit(splash) + 0.45 * unit(churn) * going
+        + 0.3 * bubbles(t, 70, 0.8, 250, 900) * np.exp(-t / 0.4),
+        1.4,
+    )
+    # the water: all but the lowest of it soaked up
+    wet = sosfilt(lowpass(1600, 4), dry)
+    return trimmed(reverb(wet, 0.8, 0.3, 1200))
+
+
+def torpedo_hit() -> np.ndarray:
+    """A torpedo or a depth charge going off under water: a deep, dull boom with no crack to it, the gas bubble
+    throbbing twice more as it swells and collapses, a boil of bubbles, and the thrown-up water falling back."""
+    t = times(2.0)
+    n = len(t)
+    boom = np.zeros(n)
+    # the blast, then the bubble's pulses, each later, weaker and lower
+    for start, gain, top, bottom, decay in ((0.0, 1.0, 90, 26, 0.3), (0.32, 0.7, 70, 28, 0.14),
+                                            (0.56, 0.4, 60, 28, 0.1)):
+        local = np.clip(t - start, 0, None)
+        phase = sweep_phase(top, bottom, local, 0.25)
+        boom += (t >= start) * gain * (np.sin(phase) + 0.3 * np.sin(2 * phase)) * envelope(local, 0.004, decay)
+    rumble = sosfilt(lowpass(350, 4), coloured(n, 2)) * envelope(t, 0.01, 0.25)
+    rumble *= np.clip(1 + 0.3 * slow_wander(n, 5), 0.5, 1.5)
+    # the water thrown up coming down again: a soft wash, rising as the column falls and dying away
+    fall = np.clip((t - 0.35) / 0.4, 0, 1) * np.exp(-np.maximum(t - 0.75, 0) / 0.4)
+    rain = sosfilt(lowpass(1400), coloured(n, 1)) * fall
+    dry = saturate(
+        1.5 * boom + 0.45 * unit(rumble) + 0.15 * unit(rain) + 0.3 * bubbles(t, 120, 1.0, 120, 600) * np.exp(-t / 0.5),
+        1.8,
+    )
+    wet = sosfilt(lowpass(900, 4), dry)
+    return trimmed(reverb(wet, 1.4, 0.3, 900), fade=0.3, most=2.6)
+
+
 def click() -> np.ndarray:
     """A short, soft UI tick: a tap that rings for an instant, like a small plastic key."""
     t = times(0.06)
@@ -429,6 +493,8 @@ SOUNDS = {
     "explosion_large": explosion_large,
     "dgun": dgun,
     "anti_air": anti_air,
+    "torpedo": torpedo,
+    "torpedo_hit": torpedo_hit,
     "click": click,
     "notify": notify,
 }

@@ -700,9 +700,14 @@ local function fly_projectiles(real_delta: number)
 	end
 end
 
--- The sound of an explosion drawn `radius` across at `at`.
-local function explosion_sound(at: Vector3, radius: number)
-	if radius >= LARGE_EXPLOSION_RADIUS then
+-- The sound of an explosion drawn `radius` across at `at`: under water (a torpedo's or a depth charge's), a muffled boom
+-- of any size.
+local function explosion_sound(at: Vector3, radius: number, underwater: boolean?)
+	if underwater == true then
+		local loudness =
+			math.clamp(radius / EXPLOSION_REFERENCE_RADIUS, SMALL_EXPLOSION_QUIETEST, SMALL_EXPLOSION_LOUDEST)
+		sounds.play_at("torpedo_hit", at, loudness)
+	elseif radius >= LARGE_EXPLOSION_RADIUS then
 		sounds.play_at("explosion_large", at)
 	else
 		local loudness =
@@ -738,6 +743,8 @@ local function on_impact(event: shot_events.Impact)
 		draw_explosion(event.at, event.radius * 2)
 		return
 	end
+	local flying = projectiles[event.id]
+	local underwater = flying ~= nil and flying.delivery.kind == "torpedo"
 	local look = remove_projectile(event.id)
 	if event.how == "airburst" then
 		draw_airburst(event.at, event.radius)
@@ -750,7 +757,7 @@ local function on_impact(event: shot_events.Impact)
 		explosion_sound(event.at, event.radius)
 	else
 		draw_explosion(event.at, event.radius * 2)
-		explosion_sound(event.at, event.radius * 2)
+		explosion_sound(event.at, event.radius * 2, underwater)
 	end
 end
 

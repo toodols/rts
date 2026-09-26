@@ -25,6 +25,8 @@ export type SoundName =
 	| "explosion_large"
 	| "dgun"
 	| "anti_air"
+	| "torpedo"
+	| "torpedo_hit"
 	| "click"
 	| "notify"
 
@@ -71,6 +73,25 @@ local KINDS: { [SoundName]: Kind } = {
 	explosion_large = { volume = 2.32, gap = 0.12, most = 3, pitch_spread = 0.08, near = 60, far = 1400 },
 	dgun = { volume = 1.6, gap = 0.1, most = 3, pitch_spread = 0.05, near = 40, far = 900 },
 	anti_air = { volume = 1.4, gap = 0.04, most = 6, pitch_spread = 0.06, near = 30, far = 600 },
+	-- a torpedo's launch and a blast under water (a torpedo's or a depth charge's), both muffled by the water
+	torpedo = {
+		volume = 1.23,
+		gap = 0.04,
+		most = 6,
+		pitch_spread = 0.08,
+		near = 30,
+		far = 600,
+		stand_in = "cannon",
+	},
+	torpedo_hit = {
+		volume = 3,
+		gap = 0.05,
+		most = 5,
+		pitch_spread = 0.1,
+		near = 40,
+		far = 800,
+		stand_in = "explosion_small",
+	},
 	click = { volume = 0.66, gap = 0.03, most = 2, pitch_spread = 0 },
 	-- loud enough to be heard over a battle, since a ping is a call for attention
 	notify = { volume = 1.2, gap = 0.08, most = 2, pitch_spread = 0 },

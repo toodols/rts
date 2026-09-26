@@ -23,7 +23,7 @@ local types = require(ReplicatedStorage.Shared.types)
 type WeaponKind = types.WeaponKind
 
 -- The sounds a weapon is heard firing as.
-export type FiringSound = "laser" | "heat_ray" | "pulsar" | "cannon" | "anti_air"
+export type FiringSound = "laser" | "heat_ray" | "pulsar" | "cannon" | "anti_air" | "torpedo"
 
 export type Info = {
 	name: string,
@@ -47,6 +47,7 @@ local CRACK = table.freeze({ name = "laser" :: FiringSound, pitch = 0.55 })
 local CANNON = table.freeze({ name = "cannon" :: FiringSound })
 local WHOOSH = table.freeze({ name = "cannon" :: FiringSound, pitch = 1.5 })
 local ANTI_AIR = table.freeze({ name = "anti_air" :: FiringSound })
+local TORPEDO = table.freeze({ name = "torpedo" :: FiringSound })
 
 local KINDS: { [WeaponKind]: Info } = {
 	laser = { name = "LASER", slot = "LSR", icon = "icon_laser", sound = LASER },
@@ -73,7 +74,7 @@ local KINDS: { [WeaponKind]: Info } = {
 	emp_missile = { name = "EMP MISSILE", slot = "EMP", icon = "icon_emp", sound = WHOOSH },
 	nuke = { name = "NUCLEAR MISSILE", slot = "NUK", icon = "icon_nuke", nuclear = true, sound = WHOOSH },
 	anti_nuke = { name = "ANTI-NUKE", slot = "ABM", icon = "icon_anti_nuke", anti_nuke = true, sound = CANNON },
-	torpedo = { name = "TORPEDO", slot = "TRP", icon = "icon_torpedo", sound = CANNON },
+	torpedo = { name = "TORPEDO", slot = "TRP", icon = "icon_torpedo", sound = TORPEDO },
 	depth_charge = { name = "DEPTH CHARGES", slot = "DPC", icon = "icon_depth_charge", sound = CANNON },
 	bombs = { name = "BOMBS", slot = "BMB", icon = "icon_bombs", sound = CANNON },
 	emp_bombs = { name = "EMP BOMBS", slot = "EMP", icon = "icon_emp", sound = CANNON },
