@@ -218,29 +218,30 @@ def frying(n: int, rate: float) -> np.ndarray:
 
 
 def heat_ray() -> np.ndarray:
-    """A heat ray: heavier than the laser's "pew". A thump as it lights, then a searing roar - a growl of detuned low
-    saws that sags in pitch as it burns - with the air frying and hissing around it, held for as long as a beam
-    lasts before it dies away."""
-    t = times(0.9)
+    """A heat ray: a blast of superheated air rather than a tone - nothing pitched in it at all, since a pitched drone
+    this low only buzzes. A deep whump as it lights, then a roaring jet like a giant blowtorch, its throat opening in a
+    "fwoosh" and rolling slowly as it burns, a hiss of scorching air over it and the odd crackle of something catching,
+    held for as long as a beam lasts before it dies away."""
+    t = times(0.95)
     n = len(t)
-    burn = np.clip(t / 0.012, 0, 1) * np.exp(-np.maximum(t - 0.32, 0) / 0.16)
-    shimmer = np.clip(1 + 0.2 * slow_wander(n, 22), 0.6, 1.4)
-    base = path((0, 150), (0.08, 118), (0.9, 92))(t)
-    growl = sum(saw(phase_of(base * ratio), 4000, 150 * ratio) for ratio in (0.992, 1.0, 1.011, 2.003)) / 4
-    growl = swept(growl, path((0, 5000), (0.1, 2400), (0.5, 1100), (0.9, 400)), lowpass)
-    # a rasp: the growl's octave below, frequency-modulated so it snarls rather than hums
-    rasp = fm(phase_of(base * 0.5), 1.5, 1.8 + 1.2 * envelope(t, 0.005, 0.08))
-    sizzle = unit(sosfilt(highpass(2500), coloured(n, 1))) * frying(n, 350)
-    hiss = unit(band(white(n), 5000, 14000)) * envelope(t, 0.001, 0.05)
-    thump_phase = sweep_phase(150, 45, t, 0.12)
-    thump = (np.sin(thump_phase) + 0.3 * np.sin(2 * thump_phase)) * envelope(t, 0.002, 0.09)
-    crack = unit(band(white(n), 1000, 6000)) * envelope(t, 0.0005, 0.008)
+    burn = np.clip(t / 0.015, 0, 1) * np.exp(-np.maximum(t - 0.34, 0) / 0.17)
+    # turbulence kept slow: flutter much faster than ten times a second is heard as a buzz
+    roll = np.clip(1 + 0.25 * slow_wander(n, 7), 0.6, 1.4)
+    # without its lowest few tens of hertz, whose slow drift is heard as the roar surging at random
+    air = sosfilt(highpass(50, 4), 0.8 * coloured(n, 2) + 0.6 * coloured(n, 1))
+    roar = swept(air, path((0, 1800), (0.035, 3200), (0.3, 1600), (0.95, 450)), lambda hz: lowpass(hz, 4))
+    # the jet's throat: a broad hollow band that sweeps up as it lights and settles, which makes it a "fwoosh"
+    throat = swept(coloured(n, 1), path((0, 400), (0.04, 1100), (0.4, 650), (0.95, 380)), lambda hz: bandpass(hz, 1.8))
+    hiss = unit(sosfilt(highpass(3500), coloured(n, 1))) * np.clip(1 + 0.3 * slow_wander(n, 5), 0.5, 1.5)
+    thump_phase = sweep_phase(120, 34, t, 0.15)
+    thump = (np.sin(thump_phase) + 0.25 * np.sin(2 * thump_phase)) * envelope(t, 0.004, 0.12)
+    whump = sosfilt(lowpass(400), coloured(n, 2)) * envelope(t, 0.005, 0.07)
     dry = saturate(
-        (0.8 * unit(growl) + 0.35 * rasp) * burn * shimmer + 0.38 * sizzle * burn + 0.08 * hiss + 1.0 * thump
-        + 0.25 * crack,
-        2.2,
+        (0.9 * unit(roar) + 0.6 * unit(throat)) * burn * roll + 0.13 * hiss * burn + 0.06 * crackle(t, 30, 0.5)
+        + 1.2 * thump + 0.7 * unit(whump),
+        1.6,
     )
-    return trimmed(reverb(dry, 0.8, 0.22, 4500))
+    return trimmed(reverb(dry, 0.9, 0.25, 4000))
 
 
 def pulsar() -> np.ndarray:
