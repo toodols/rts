@@ -208,6 +208,71 @@ def laser() -> np.ndarray:
     return trimmed(reverb(dry, 0.5, 0.2, 6000))
 
 
+def frying(n: int, rate: float) -> np.ndarray:
+    """Grains of sizzle coming and going about `rate` times a second, as fat spits in a pan, between 0.3 and 1."""
+    grains = np.zeros(n)
+    count = int(rate * n / RATE)
+    grains[rng.integers(0, n, count)] = rng.uniform(0.3, 1, count)
+    grains = sosfilt(lowpass(90), grains)
+    return 0.3 + 0.7 * grains / (np.max(grains) + 1e-12)
+
+
+def heat_ray() -> np.ndarray:
+    """A heat ray: a blast of superheated air rather than a tone - nothing pitched in it at all, since a pitched drone
+    this low only buzzes. A deep whump as it lights, then a roaring jet like a giant blowtorch, its throat opening in a
+    "fwoosh" and rolling slowly as it burns, a hiss of scorching air over it and the odd crackle of something catching,
+    held for as long as a beam lasts before it dies away."""
+    t = times(0.95)
+    n = len(t)
+    burn = np.clip(t / 0.015, 0, 1) * np.exp(-np.maximum(t - 0.34, 0) / 0.17)
+    # turbulence kept slow: flutter much faster than ten times a second is heard as a buzz
+    roll = np.clip(1 + 0.25 * slow_wander(n, 7), 0.6, 1.4)
+    # without its lowest few tens of hertz, whose slow drift is heard as the roar surging at random
+    air = sosfilt(highpass(50, 4), 0.8 * coloured(n, 2) + 0.6 * coloured(n, 1))
+    roar = swept(air, path((0, 1800), (0.035, 3200), (0.3, 1600), (0.95, 450)), lambda hz: lowpass(hz, 4))
+    # the jet's throat: a broad hollow band that sweeps up as it lights and settles, which makes it a "fwoosh"
+    throat = swept(coloured(n, 1), path((0, 400), (0.04, 1100), (0.4, 650), (0.95, 380)), lambda hz: bandpass(hz, 1.8))
+    hiss = unit(sosfilt(highpass(3500), coloured(n, 1))) * np.clip(1 + 0.3 * slow_wander(n, 5), 0.5, 1.5)
+    thump_phase = sweep_phase(120, 34, t, 0.15)
+    thump = (np.sin(thump_phase) + 0.25 * np.sin(2 * thump_phase)) * envelope(t, 0.004, 0.12)
+    whump = sosfilt(lowpass(400), coloured(n, 2)) * envelope(t, 0.005, 0.07)
+    dry = saturate(
+        (0.9 * unit(roar) + 0.6 * unit(throat)) * burn * roll + 0.13 * hiss * burn + 0.06 * crackle(t, 30, 0.5)
+        + 1.2 * thump + 0.7 * unit(whump),
+        1.6,
+    )
+    return trimmed(reverb(dry, 0.9, 0.25, 4000))
+
+
+def pulsar() -> np.ndarray:
+    """The Pulsar's tachyon accelerator: the heaviest beam there is. A giant "pew" - a metallic FM tone diving from
+    3 kHz to a growl - over a sub drop and a blast of air, then the beam itself for its second and a half: a deep hum
+    throbbing as its sheath does, crackling with arcs, dying away into a long tail."""
+    t = times(2.1)
+    n = len(t)
+    freq = path((0, 3200), (0.05, 900), (0.3, 110), (2.1, 70))(t)
+    index = 0.8 + 4.0 * envelope(t, 0.002, 0.07)
+    dive = sum(fm(phase_of(freq * (1 + detune)), 1.5, index) for detune in (-0.012, 0, 0.009)) / 3
+    dive *= envelope(t, 0.004, 0.22)
+    sub_phase = sweep_phase(110, 28, t, 0.5)
+    sub = (np.sin(sub_phase) + 0.35 * np.sin(2 * sub_phase)) * envelope(t, 0.004, 0.4)
+    blast = swept(coloured(n, 1), path((0, 8000), (0.15, 1500), (0.6, 300)), lowpass) * envelope(t, 0.001, 0.12)
+    # the beam: a stack of low saws, pulsing about eleven times a second as the drawn beam's sheath throbs
+    hold = np.clip(t / 0.05, 0, 1) * np.cos(np.clip((t - 1.2) / 0.5, 0, 1) * np.pi / 2) ** 2
+    throb = 0.5 + 0.5 * np.sin(2 * np.pi * 11 * t + 0.3 * slow_wander(n, 4))
+    hum_hz = path((0, 58), (1.7, 52))(t)
+    hum = sum(saw(phase_of(hum_hz * ratio), 1600, 58 * ratio) for ratio in (0.995, 1.0, 1.007, 1.502, 2.004)) / 5
+    hum = swept(hum, path((0, 2200), (0.3, 900), (1.7, 400)), lowpass)
+    arcs = unit(sosfilt(bandpass(4000, 2.2), crackle(t, 140, 1.4))) * frying(n, 60)
+    arcs *= hold
+    crack = unit(band(white(n), 1500, 9000)) * envelope(t, 0.0005, 0.01)
+    dry = saturate(
+        1.0 * dive + 1.4 * sub + 0.7 * blast + 0.4 * unit(hum) * hold * throb + 0.1 * arcs + 0.3 * crack,
+        2.0,
+    )
+    return trimmed(reverb(dry, 1.6, 0.3, 3000), fade=0.3, most=2.8)
+
+
 def cannon() -> np.ndarray:
     """A plasma cannon's thud: a dropping thump, a crack, and a burst of darkening noise ringing in the barrel."""
     t = times(0.7)
@@ -357,6 +422,8 @@ def notify() -> np.ndarray:
 
 SOUNDS = {
     "laser": laser,
+    "heat_ray": heat_ray,
+    "pulsar": pulsar,
     "cannon": cannon,
     "explosion_small": explosion_small,
     "explosion_large": explosion_large,

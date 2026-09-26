@@ -711,21 +711,24 @@ local function explosion_sound(at: Vector3, radius: number)
 	end
 end
 
--- The sound of `weapon` firing, from `at` (its kind's `sound`).
+-- The sound of `weapon` firing, from `at`.
 local function firing_sound(weapon: types.Weapon, at: Vector3)
-	local sound = weapon_kinds.get(weapon.kind).sound
+	local sound = weapon_kinds.sound_of(weapon)
 	sounds.play_at(sound.name, at, 1, sound.pitch)
 end
 
--- A projectile was launched: it is drawn flying, and heard leaving.
+-- A projectile was launched: it is drawn flying, and heard leaving, unless it is one of the shots a shell split into,
+-- which leave nothing to be heard.
 local function on_launched(event: shot_events.Launched)
-	local weapon = shot_events.weapon_of(event)
+	local weapon = shot_events.weapon_of(event, event.split)
 	local delivery = weapon.delivery
 	if delivery.kind == "beam" then
 		return
 	end
 	launch_projectile(event, weapon, delivery)
-	firing_sound(weapon, event.from)
+	if event.split ~= true then
+		firing_sound(weapon, event.from)
+	end
 end
 
 -- A projectile went off. A piercing shot going off inside what it is going through flies on, and is not heard for
