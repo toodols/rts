@@ -13,6 +13,7 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local events = require(ReplicatedStorage.Client.events)
 local modifiers = require(ReplicatedStorage.Client.modifiers)
 local input_router = require(ReplicatedStorage.Client.input_router)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 local RENDER_STEP = "rts_camera"
 -- How long a glide (`glide_to`) takes, in seconds.
@@ -235,7 +236,7 @@ local function init()
 
 	-- Bound at the camera's own priority so that everything that projects through the camera, which
 	-- binds just after it, sees this frame's position and not last frame's.
-	RunService:BindToRenderStep(RENDER_STEP, Enum.RenderPriority.Camera.Value, apply)
+	RunService:BindToRenderStep(RENDER_STEP, Enum.RenderPriority.Camera.Value, frame_profile.wrap("camera", apply))
 end
 
 return table.freeze({

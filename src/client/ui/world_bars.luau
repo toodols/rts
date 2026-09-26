@@ -40,6 +40,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
 local world = require(ReplicatedStorage.Client.world)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 local use_entities = require(ReplicatedStorage.Client.ui.use_entities)
 
 local format = require(ReplicatedStorage.ClientShared.format)
@@ -102,6 +103,22 @@ local SHOWN_ATTRIBUTES: { [entity_attrs.Name]: true } = table.freeze({
 
 local history: { [EntityId]: { Sample } } = {}
 local frames: { [EntityId]: Frame } = {}
+-- Where each bar was last put (`place_frames`), so that one whose entity and the camera have both held still since is
+-- not worked out and put there again: the frame, how far over its entity's pivot it hangs once its def is known, the
+-- pivot it was put over, and where on the screen, if it was on it.
+type Placement = {
+	frame: Frame,
+	above: number?,
+	pivot: CFrame?,
+	visible: boolean?,
+	x: number,
+	y: number,
+}
+local placements: { [EntityId]: Placement } = {}
+-- the camera the bars were last put for
+local placed_view: CFrame? = nil
+local placed_viewport: Vector2? = nil
+local placed_fov: number? = nil
 -- Each bar's way to have itself drawn again, and the bars whose entity has changed since they were last drawn.
 local redraws: { [EntityId]: () -> () } = {}
 local stale: { [EntityId]: boolean } = {}
@@ -199,6 +216,7 @@ local function bar_frame(id: EntityId, is_blueprint: boolean, children: { [strin
 				frames[id] = instance
 			else
 				frames[id] = nil
+				placements[id] = nil
 			end
 		end,
 	}, children)
@@ -400,12 +418,22 @@ end
 
 -- The point a bar hangs from: over the top of its entity's art where that stands taller than its collider, like the
 -- commander's. The model's position is its collider's middle, and its art stands on the collider's bottom.
-local function anchor_of(model: Model): Vector3
+-- How far over `model`'s pivot its bar hangs; nil while its def is not known yet, when it hangs a little over it.
+local function above_of(model: Model): number?
 	local def = world.def_of(model)
-	local half_height = if def ~= nil then unit_defs.collider_height(def) / 2 else 1
-	local art_height = if def ~= nil then art.height(def.name) else nil
+	if def == nil then
+		return nil
+	end
+	local half_height = unit_defs.collider_height(def) / 2
+	local art_height = art.height(def.name)
 	local above = if art_height ~= nil then math.max(half_height, art_height - half_height) else half_height
-	return world.position_of(model) + Vector3.new(0, above + BAR_GAP, 0)
+	return above + BAR_GAP
+end
+
+local UNKNOWN_ABOVE = 1 + BAR_GAP
+
+local function anchor_of(model: Model): Vector3
+	return world.position_of(model) + Vector3.new(0, above_of(model) or UNKNOWN_ABOVE, 0)
 end
 
 -- Puts every bar over its entity. The viewport point is in the same space as the frames because the
@@ -415,17 +443,39 @@ local function place_frames()
 	if camera == nil then
 		return
 	end
+	local view, viewport, fov = camera.CFrame, camera.ViewportSize, camera.FieldOfView
+	local camera_moved = view ~= placed_view or viewport ~= placed_viewport or fov ~= placed_fov
+	placed_view, placed_viewport, placed_fov = view, viewport, fov
 	for id, frame in frames do
 		local model = world.get(id)
 		if model == nil then
 			continue
 		end
+		local placement = placements[id]
+		if placement == nil or placement.frame ~= frame then
+			placement = { frame = frame, above = nil, pivot = nil, visible = nil, x = -math.huge, y = -math.huge }
+			placements[id] = placement
+		end
+		local pivot = model:GetPivot()
+		if camera_moved == false and pivot == placement.pivot and placement.above ~= nil then
+			continue
+		end
+		placement.pivot = pivot
+		local above = placement.above or above_of(model)
+		placement.above = above
 		-- nothing is hidden for being far away: past `BAR_MAX_DISTANCE` a bar is already cut down to its team's mark,
 		-- which stays up at any zoom
-		local point, on_screen = camera:WorldToViewportPoint(anchor_of(model))
-		frame.Visible = on_screen
+		local point, on_screen = camera:WorldToViewportPoint(pivot.Position + Vector3.new(0, above or UNKNOWN_ABOVE, 0))
+		if on_screen ~= placement.visible then
+			placement.visible = on_screen
+			frame.Visible = on_screen
+		end
 		if on_screen then
-			frame.Position = UDim2.fromOffset(math.floor(point.X), math.floor(point.Y))
+			local x, y = math.floor(point.X), math.floor(point.Y)
+			if x ~= placement.x or y ~= placement.y then
+				placement.x, placement.y = x, y
+				frame.Position = UDim2.fromOffset(x, y)
+			end
 		end
 	end
 end
@@ -531,7 +581,11 @@ local function WorldBars()
 
 	React.useEffect(function()
 		-- One step after the camera's: a bar placed by last frame's camera trails the entity it labels.
-		RunService:BindToRenderStep(PLACE_STEP, Enum.RenderPriority.Camera.Value + 1, place_frames)
+		RunService:BindToRenderStep(
+			PLACE_STEP,
+			Enum.RenderPriority.Camera.Value + 1,
+			frame_profile.wrap("world_bars", place_frames)
+		)
 		return function()
 			RunService:UnbindFromRenderStep(PLACE_STEP)
 		end

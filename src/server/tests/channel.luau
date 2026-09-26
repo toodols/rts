@@ -17,6 +17,7 @@ local mission_map = require(ReplicatedStorage.Shared.mission_map)
 local mission_state = require(ReplicatedStorage.Shared.mission_state)
 local mission_forces = require(ReplicatedStorage.Shared.mission_forces)
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
+local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local placement = require(ServerScriptService.Server.placement)
 local state = require(ServerScriptService.Server.state)
@@ -26,7 +27,6 @@ local spawning = require(ServerScriptService.Server.spawning)
 local damage = require(ServerScriptService.Server.damage)
 local orders = require(ServerScriptService.Server.orders)
 local ai = require(ServerScriptService.Server.ai)
-local channel = require(ServerScriptService.Server.missions.channel)
 local blockade_mission = require(ServerScriptService.Server.missions.blockade)
 
 local harness = require(script.Parent.harness)
@@ -36,8 +36,6 @@ local advance = harness.advance
 local round = harness.round
 local spawn = harness.spawn
 local ensure_team = harness.ensure_team
-
-local CROSSING = channel.CROSSING
 
 type Entity = types.Entity
 type TeamId = types.TeamId
@@ -72,20 +70,41 @@ local function placeable(def_name: string, at: Vector2): boolean
 	return center ~= nil and placement.can_place(def_name, center, 0, nil)
 end
 
--- The channel as built: the shores and the island stand above the water, both straits are deep all along, and nothing
--- that walks or drives gets from one shore to the other but a commander or a Garpike, which go along the floor, while a construction ship gets from the harbour to within its
--- build range of both landing beaches' shelves, a warship close behind it, and a ship to both ends of the channel, and a
--- commander wades across; bots and tanks get from a beach up to the enemy's ground. A shipyard goes down in the harbour and a bot lab on each
--- beach's shelf, and an extractor on every metal spot.
+-- The channel as built: the shores and the island stand above the water, both straits are deep all along, the east half
+-- is the west half mirrored, and nothing that walks or drives gets from one shore to the other but a commander or a
+-- Garpike, which go along the floor, while a construction ship gets from the harbour to the island's west shore and a
+-- warship to within its reach of the enemy's shore, and a ship to both ends of the channel. A Garpike gets from the
+-- harbour's shore up onto the enemy's ground. A shipyard goes down in the harbour and a bot lab on the island, and an
+-- extractor on every metal spot.
 local function channel_map(_args: Args): Findings
 	local player_start, enemy_start = point "player_start", point "enemy_start"
 	local harbor = point "harbor"
-	local beach_north, beach_south = point "beach_north", point "beach_south"
+	local east_shore = point "east_shore"
 	-- how deep each strait is at its middle, at its shallowest along its length
 	local shallowest = math.huge
 	for z = -250, 250, 5 do
-		shallowest = math.min(shallowest, ground_levels.WATER_LEVEL - heightmap.height_at(-110, z))
-		shallowest = math.min(shallowest, ground_levels.WATER_LEVEL - heightmap.height_at(125, z))
+		shallowest = math.min(shallowest, ground_levels.WATER_LEVEL - heightmap.height_at(-120, z))
+		shallowest = math.min(shallowest, ground_levels.WATER_LEVEL - heightmap.height_at(120, z))
+	end
+	-- how far the halves are from mirroring each other, at their worst
+	local asymmetry = 0
+	for x = 4, 316, 8 do
+		for z = -252, 252, 8 do
+			asymmetry = math.max(asymmetry, math.abs(heightmap.height_at(x, z) - heightmap.height_at(-x, z)))
+		end
+	end
+	-- where the east shore's waterline is, and how high the ground 10 and 20 studs inland of it, at each of its
+	-- Agitators' rows
+	local shore_rows: { string } = {}
+	for _, z in { -120, 0, 120 } do
+		local x = 100
+		while heightmap.height_at(x, z) < ground_levels.WATER_LEVEL and x < 300 do
+			x += 1
+		end
+		table.insert(
+			shore_rows,
+			`{z}:{x}/{round(heightmap.height_at(x + 10, z), 1)}/{round(heightmap.height_at(x + 20, z), 1)}`
+		)
 	end
 	local spot_rows: { string } = {}
 	local spots_ok = true
@@ -99,6 +118,7 @@ local function channel_map(_args: Args): Findings
 		player_height = round(heightmap.height_at(player_start.X, player_start.Y), 1),
 		enemy_height = round(heightmap.height_at(enemy_start.X, enemy_start.Y), 1),
 		shallowest_middle = round(shallowest, 1),
+		asymmetry = round(asymmetry, 2),
 		grunt_across = reaches("grunt", player_start, enemy_start),
 		tank_across = reaches("incisor", player_start, enemy_start),
 		commander_across = reaches("commander", player_start, enemy_start),
@@ -106,10 +126,8 @@ local function channel_map(_args: Args): Findings
 		ship_to_island = reaches("construction_ship", harbor, point "island" - Vector2.new(90, 0)),
 		lab_on_island = placeable("bot_lab", point "island"),
 		island_height = round(heightmap.height_at(point("island").X, point("island").Y), 1),
-		-- a construction ship gets within its build range (24) of each beach's shelf, and a warship close behind
-		ship_to_beach_north = reaches("construction_ship", harbor, beach_north - Vector2.new(18, 0)),
-		ship_to_beach_south = reaches("construction_ship", harbor, beach_south - Vector2.new(18, 0)),
-		warship_to_beach_north = reaches("riptide", harbor, beach_north - Vector2.new(24, 0)),
+		-- a warship gets within its reach (43) of an Agitator 20 studs inland on the enemy's shore
+		warship_to_east_shore = reaches("riptide", harbor, east_shore - Vector2.new(12, 0)),
 		ship_to_sea_north = reaches("riptide", harbor, point "sea_north"),
 		ship_to_sea_south = reaches("riptide", harbor, point "sea_south"),
 		-- Blockade's fleets: the biggest ship down each strait from end to end
@@ -118,17 +136,14 @@ local function channel_map(_args: Args): Findings
 		-- and the island's west shore: a construction ship within its build range (24) of a lab there
 		lab_on_island_west = placeable("bot_lab", point "island_west"),
 		ship_to_island_west = reaches("construction_ship", harbor, point "island_west" - Vector2.new(18, 0)),
-		bot_up_beach_north = reaches("grunt", beach_north, enemy_start),
-		bot_up_beach_south = reaches("grunt", beach_south, enemy_start),
-		tank_up_beach_north = reaches("incisor", beach_north, enemy_start),
 		shipyard_in_harbor = placeable("shipyard", harbor),
-		lab_on_beach_north = placeable("bot_lab", beach_north),
-		lab_on_beach_south = placeable("bot_lab", beach_south),
 		spots = table.concat(spot_rows, " "),
+		east_waterline = table.concat(shore_rows, " "),
 	}
 	findings.pass = findings.player_height > 3
 		and findings.enemy_height > 3
 		and shallowest >= 10
+		and asymmetry < 0.01
 		and findings.grunt_across == false
 		and findings.tank_across == false
 		and findings.commander_across
@@ -136,21 +151,14 @@ local function channel_map(_args: Args): Findings
 		and findings.ship_to_island
 		and findings.lab_on_island
 		and findings.island_height > 3
-		and findings.ship_to_beach_north
-		and findings.ship_to_beach_south
-		and findings.warship_to_beach_north
+		and findings.warship_to_east_shore
 		and findings.ship_to_sea_north
 		and findings.ship_to_sea_south
 		and findings.west_lane
 		and findings.east_lane
 		and findings.lab_on_island_west
 		and findings.ship_to_island_west
-		and findings.bot_up_beach_north
-		and findings.bot_up_beach_south
-		and findings.tank_up_beach_north
 		and findings.shipyard_in_harbor
-		and findings.lab_on_beach_north
-		and findings.lab_on_beach_south
 		and spots_ok
 	return findings
 end
@@ -200,21 +208,19 @@ local function missing(expected: { [string]: number }, found: { [string]: number
 end
 
 -- Channel Crossing (server/missions/channel.luau) played for `args.seconds` (120): its enemy should stand as the
--- mission lays it out, every floating defence afloat where it says, with its commander and the AI playing it by the
--- mission's profile; the HUD should show the time limit counting down from the layout's; and in that time the AI should
--- build nothing its roster leaves out (no ship, lab for one, aircraft or hovercraft) and nothing of its should come over
--- to the player's shore. Then, with the time limit cut to just past what has gone, the mission should be lost with
--- "Time ran out".
+-- mission lays it out, every Agitator within PLACED_SLACK of where it says, with its commander and no AI playing it;
+-- the HUD should show the time limit counting down from the layout's; and in that time the enemy should build nothing
+-- and nothing of its should come over to the player's shore. Then, with the time limit cut to just past what has gone,
+-- the mission should be lost with "Time ran out".
 local function channel_crossing(args: Args): Findings
 	local enemy = start_mission("channel", false)
 	local seconds = args.seconds or 120
 	local expected = tally(mission_forces.CHANNEL_ENEMY)
 	expected.commander = 1
 	local at_start = census(enemy)
-	local afloat, placed_off = 0, 0
+	local placed_off: { string } = {}
 	for _, each in mission_forces.CHANNEL_ENEMY do
-		local def = unit_defs.get(each.def_name)
-		if def.footing.water ~= "float" then
+		if each.def_name ~= "agitator" then
 			continue
 		end
 		local nearest = math.huge
@@ -223,10 +229,8 @@ local function channel_crossing(args: Args): Findings
 				nearest = math.min(nearest, (Vector2.new(entity.position.X, entity.position.Z) - each.at).Magnitude)
 			end
 		end
-		if nearest <= PLACED_SLACK then
-			afloat += 1
-		else
-			placed_off += 1
+		if nearest > PLACED_SLACK then
+			table.insert(placed_off, `{each.at.X},{each.at.Y}:{round(nearest, 1)}`)
 		end
 	end
 	missions.publish()
@@ -234,26 +238,26 @@ local function channel_crossing(args: Args): Findings
 	local profile = ai.profile_of(enemy)
 
 	local crossed = 0
-	local forbidden: { [string]: boolean } = {}
+	local things_at_start = 0
+	for _, count in at_start do
+		things_at_start += count
+	end
 	advance(seconds, function()
 		for _, entity in state.all() do
-			if entity.alive == false or entity.team ~= enemy then
-				continue
-			end
-			if entity.position.X < -150 then
+			if entity.alive and entity.team == enemy and entity.position.X < -150 then
 				crossed += 1
-			end
-			if CROSSING[entity.def_name] ~= true and expected[entity.def_name] == nil then
-				forbidden[entity.def_name] = true
 			end
 		end
 	end)
-	local built = census(enemy)
-	local forbidden_names: { string } = {}
-	for name in forbidden do
-		table.insert(forbidden_names, name)
+	local after = census(enemy)
+	local things_after, grown = 0, {}
+	for def_name, count in after do
+		things_after += count
+		if count > (at_start[def_name] or 0) then
+			table.insert(grown, def_name)
+		end
 	end
-	table.sort(forbidden_names)
+	table.sort(grown)
 
 	missions.publish()
 	local time_left_after = mission_state.time_left() or -1
@@ -261,24 +265,23 @@ local function channel_crossing(args: Args): Findings
 	advance(5)
 	local findings: Findings = {
 		missing_at_start = missing(expected, at_start),
-		afloat = afloat,
-		placed_off = placed_off,
+		placed_off = table.concat(placed_off, " "),
 		profile = if profile ~= nil then profile.name else "none",
 		time_left_at_start = time_left_at_start or -1,
 		time_left_after = time_left_after,
-		enemy_things_after = built,
-		forbidden = table.concat(forbidden_names, ", "),
+		things_at_start = things_at_start,
+		things_after = things_after,
+		built = table.concat(grown, ", "),
 		crossed = crossed,
 		result = missions.result() or "none",
 		reason = game_phase.end_reason() or "none",
 	}
 	findings.pass = findings.missing_at_start == ""
-		and placed_off == 0
-		and afloat > 0
-		and findings.profile == "channel"
+		and findings.placed_off == ""
+		and findings.profile == "none"
 		and math.abs((time_left_at_start or 0) - mission_forces.CHANNEL_LAYOUT.time_limit) <= 2
 		and time_left_after < (time_left_at_start or 0)
-		and findings.forbidden == ""
+		and findings.built == ""
 		and crossed == 0
 		and findings.result == "lost"
 		and findings.reason == "Time ran out"
@@ -309,10 +312,10 @@ local function channel_victory(_args: Args): Findings
 	return findings
 end
 
--- Channel Crossing's hard mode: its enemy should have what the hard mode adds as well (another Coral past each end of
--- the line and more Agitators), and the hard mode's time limit on the clock; and the first raid should come as the layout says, its
--- bombers in the air and sent at the player's base, by a few seconds after.
-local function channel_hard(_args: Args): Findings
+-- Channel Crossing's hard mode, played for `args.seconds` (450): its enemy should have what the hard mode adds as well
+-- (two Urchins and an Air Lab), and the hard mode's time limit on the clock. The Air Lab should make Whirlwinds, and the
+-- first raid should go at the player's base once raid_bombers of them wait by it; the raids that follow grow.
+local function channel_hard(args: Args): Findings
 	local enemy = start_mission("channel", true)
 	local expected = tally(mission_forces.CHANNEL_ENEMY)
 	for name, count in tally(mission_forces.CHANNEL_HARD_ENEMY) do
@@ -322,31 +325,53 @@ local function channel_hard(_args: Args): Findings
 	missions.publish()
 	local time_left = mission_state.time_left() or -1
 	local layout = mission_forces.CHANNEL_LAYOUT
-	-- something of the player's for the raid to go at
-	local target = spawn("solar_collector", OWN, -270, -30)
-	advance(layout.first_raid + 4)
-	local bombers, attacking = 0, 0
-	for _, entity in state.all() do
-		if entity.alive and entity.team == enemy and entity.def_name == "whirlwind" then
-			bombers += 1
-			local order = entity.orders[1]
-			if order ~= nil and order.kind == "attack" then
-				attacking += 1
+	-- something of the player's for the raids to go at, that they cannot kill
+	local target = harness.unkillable(spawn("solar_collector", OWN, -270, -30))
+	local made: { [number]: boolean } = {}
+	local first_raid_at: number? = nil
+	local first_raid_size = 0
+	local most_attacking = 0
+	local began = state.now()
+	advance(args.seconds or 450, function()
+		local attacking = 0
+		for _, entity in state.all() do
+			if
+				entity.alive
+				and entity.team == enemy
+				and entity.def_name == "whirlwind"
+				and entity.state == "active"
+			then
+				made[entity.id] = true
+				local order = entity.orders[1]
+				if order ~= nil and order.kind == "attack" then
+					attacking += 1
+				end
 			end
 		end
+		if first_raid_at == nil and attacking > 0 then
+			first_raid_at = state.now() - began
+			first_raid_size = attacking
+		end
+		most_attacking = math.max(most_attacking, attacking)
+	end)
+	local bombers = 0
+	for _ in made do
+		bombers += 1
 	end
 	local findings: Findings = {
 		missing_at_start = missing(expected, at_start),
 		time_left = time_left,
-		bombers = bombers,
-		attacking = attacking,
-		target_alive = target.alive,
+		bombers_made = bombers,
+		first_raid_at = if first_raid_at ~= nil then round(first_raid_at, 0) else -1,
+		first_raid_size = first_raid_size,
+		most_attacking = most_attacking,
+		target_hurt = round(harness.damage_to(target), 0),
 		played_hard = missions.hard(),
 	}
 	findings.pass = findings.missing_at_start == ""
 		and math.abs(time_left - layout.hard_time_limit) <= 2
-		and bombers == layout.raid_bombers
-		and attacking == bombers
+		and first_raid_size == layout.raid_bombers
+		and most_attacking > first_raid_size
 		and findings.played_hard
 	return findings
 end
@@ -471,91 +496,177 @@ local function blockade(args: Args): Findings
 	return findings
 end
 
--- Channel Crossing's balance, a combined assault on one beach: `args.riptides` (6) Riptides and `args.supporters` (6)
--- Supporters come up the east strait from off the island and are sent fighting to the water off the north beach, while
--- `args.garpikes` (10) Garpikes drive under the strait from the island's shore straight to the beach, and from there
--- fight their way to the Agitator over it; some 5,300 metal in all, what the player's economy pays for some twelve
--- minutes in (eight Garpikes are a coin toss). They fight for `args.seconds` (120). The beach's Urchin and guards and the Agitator over it should be gone, with something of the
--- assault left to cover a landing; and not all of the line should be, so that where the player lands matters. The
--- fleet alone (`garpikes = 0`) should not manage it: the Agitators outrange every ship.
-local function channel_assault(args: Args): Findings
+-- Channel Crossing's Agitators, one at a time: `args.riptides` (5) Riptides, some 2,100 metal, sail to a point off
+-- Agitator `args.target` (3, the island's south one, the nearest to the harbour; they are numbered as
+-- mission_forces.CHANNEL_ENEMY has them, 1 to 3 on the island and 4 to 6 on the shore) that none of the others reaches,
+-- and turn in at it. They set out from the harbour for one on the island, and from the south end of the east strait for
+-- one on the shore, whose island's Agitators are gone first. Those `args.gone` numbers are gone first as well, and
+-- with `args.alone` every other Agitator. They
+-- fight for `args.seconds` (120). The Agitator should be gone with something of the fleet left, and some of the others
+-- still standing, so that they are taken one at a time.
+local function channel_agitator(args: Args): Findings
 	local enemy = start_mission("channel", false)
 	advance(2)
-	local beach = mission_map.here "beach_north"
-	local from = Vector2.new(95, beach.Y)
-	local to = Vector2.new(beach.X - 20, beach.Y)
-	local assault: { Entity } = {}
-	local function launch(def_name: string, count: number, at: Vector2, chain: { types.Order })
-		for index = 1, count do
-			local here = at + Vector2.new(0, (index - count / 2) * 5)
-			local unit = spawning.spawn_near(def_name, OWN, stand(def_name, here), math.pi / 2)
-			if unit ~= nil then
-				table.insert(assault, unit)
-				orders.issue(unit, table.clone(chain), false, false)
+	local laid: { Vector2 } = {}
+	for _, each in mission_forces.CHANNEL_ENEMY do
+		if each.def_name == "agitator" then
+			table.insert(laid, each.at)
+		end
+	end
+	local agitators: { Entity } = {}
+	for _, at in laid do
+		local nearest: Entity? = nil
+		for _, entity in state.all() do
+			if
+				entity.alive
+				and entity.team == enemy
+				and entity.def_name == "agitator"
+				and (
+					nearest == nil
+					or geometry.distance_2d(entity.position, Vector3.new(at.X, 0, at.Y))
+						< geometry.distance_2d(nearest.position, Vector3.new(at.X, 0, at.Y))
+				)
+			then
+				nearest = entity
 			end
 		end
+		table.insert(agitators, nearest :: Entity)
 	end
-	-- what defends the beach: its Urchin, the guards over it, and the Agitator nearest it
-	local defenders: { Entity } = {}
-	local agitator: Entity? = nil
-	for _, entity in state.all() do
-		if entity.alive == false or entity.team ~= enemy or entity.kind ~= "building" then
-			continue
-		end
+	local target = agitators[args.target or 3]
+	assert(target ~= nil, "there is no such Agitator")
+	local on_island = target.position.X < 0
+	local gone: { number } = args.gone or {}
+	for index, agitator in agitators do
 		if
-			(entity.def_name == "urchin" or entity.def_name == "guard")
-			and entity.position.X > 100
-			and math.abs(entity.position.Z - beach.Y) <= 14
+			agitator ~= target
+			and (args.alone or table.find(gone, index) ~= nil or (on_island == false and agitator.position.X < 0))
 		then
-			table.insert(defenders, entity)
-		elseif
-			entity.def_name == "agitator"
-			and (agitator == nil or math.abs(entity.position.Z - beach.Y) < math.abs(agitator.position.Z - beach.Y))
-		then
-			agitator = entity
+			damage.apply(agitator, 1e9, nil)
 		end
 	end
-	assert(agitator ~= nil, "the enemy has no Agitator")
-	launch(
-		"riptide",
-		args.riptides or 6,
-		from - Vector2.new(0, 4),
-		{ { kind = "fight", position = stand("riptide", to) } }
-	)
-	launch(
-		"supporter",
-		args.supporters or 6,
-		from + Vector2.new(0, 4),
-		{ { kind = "fight", position = stand("supporter", to) } }
-	)
-	-- the Garpikes drive straight under the line to the beach, and only then fight their way up to the Agitator
-	launch("garpike", args.garpikes or 10, from - Vector2.new(20, 0), {
-		{ kind = "move", position = stand("garpike", beach) },
-		{ kind = "fight", position = agitator.position },
-	})
-	advance(args.seconds or 120)
-	local standing = 0
-	for _, defender in defenders do
-		if defender.alive then
-			standing += 1
+	-- the point the fleet sails to first: in the strait, beyond the target from the middle of its line
+	local strait_x = if on_island then -150 else 120
+	local ahead = if on_island then 25 else 100
+	local beyond = if target.position.Z >= 0 then ahead else -ahead
+	local fleet: { Entity } = {}
+	for index = 1, args.riptides or 5 do
+		local at = if on_island then Vector2.new(-165 + index * 6, 95) else Vector2.new(100 + index * 6, 235)
+		local unit = spawning.spawn_near("riptide", OWN, stand("riptide", at), math.pi / 2)
+		if unit ~= nil then
+			-- with `args.tough`, a fleet that cannot be sunk, to see how long it takes and how many of its shots land
+			if args.tough then
+				harness.unkillable(unit)
+			end
+			table.insert(fleet, unit)
+			orders.issue(unit, {
+				{
+					kind = "move",
+					position = stand("riptide", Vector2.new(strait_x + (index - 3) * 8, target.position.Z + beyond)),
+				},
+				{ kind = "attack", target_id = target.id },
+			}, false, false)
 		end
 	end
-	local left = 0
-	for _, unit in assault do
+	local closest = math.huge
+	local killed_at: number? = nil
+	local began = state.now()
+	advance(args.seconds or 120, function()
+		if killed_at == nil and target.alive == false then
+			killed_at = state.now() - began
+		end
+		for _, unit in fleet do
+			if unit.alive then
+				closest = math.min(closest, geometry.distance_2d(unit.position, target.position))
+			end
+		end
+	end)
+	local shots = 0
+	local left, others = 0, 0
+	for _, unit in fleet do
+		shots += harness.shots_of(unit.id, 1)
 		if unit.alive then
 			left += 1
 		end
 	end
-	local line_left = (census(enemy).urchin or 0) + (census(enemy).coral or 0)
+	local middle, orders_left = Vector3.zero, 0
+	for _, unit in fleet do
+		middle += unit.position / #fleet
+		orders_left += #unit.orders
+	end
+	local each_fired: { string } = {}
+	for index, agitator in agitators do
+		if agitator ~= target and agitator.alive then
+			others += 1
+			table.insert(each_fired, `{index}:{harness.shots_of(agitator.id, 1)}`)
+		end
+	end
 	local findings: Findings = {
-		assault = #assault,
-		assault_left = left,
-		beach_defenders = #defenders,
-		beach_defenders_left = standing,
-		agitator_standing = agitator.alive,
-		line_left = line_left,
+		fleet = #fleet,
+		fleet_left = left,
+		target_standing = target.alive,
+		target_health = round(target.health, 0),
+		target_at = `{round(target.position.X, 1)},{round(target.position.Y, 1)},{round(target.position.Z, 1)}`,
+		killed_at = if killed_at ~= nil then round(killed_at, 0) else -1,
+		closest = round(closest, 1),
+		fleet_shots = shots,
+		others_standing = others,
+		others_fired = table.concat(each_fired, " "),
+		fleet_at = `{round(middle.X, 0)},{round(middle.Z, 0)}`,
+		orders_left = orders_left,
 	}
-	findings.pass = #defenders >= 3 and standing == 0 and agitator.alive == false and left >= 3 and line_left >= 3
+	findings.pass = target.alive == false and left >= 2
+	return findings
+end
+
+-- Channel Crossing's landing: every Agitator gone, `args.garpikes` (8) Garpikes, some 1,800 metal, drive under the east
+-- strait from off the island to the enemy's shore and fight their way to its commander, for `args.seconds` (150). The
+-- enemy's commander should be dead, and the mission won.
+local function channel_landing(args: Args): Findings
+	local enemy = start_mission("channel", false)
+	advance(2)
+	for _, entity in state.all() do
+		if entity.alive and entity.team == enemy and entity.def_name == "agitator" then
+			damage.apply(entity, 1e9, nil)
+		end
+	end
+	advance(1)
+	local enemy_start = point "enemy_start"
+	local landing: { Entity } = {}
+	for index = 1, args.garpikes or 8 do
+		local at = Vector2.new(90, (index - 4.5) * 6)
+		local unit = spawning.spawn_near("garpike", OWN, stand("garpike", at), math.pi / 2)
+		if unit ~= nil then
+			table.insert(landing, unit)
+			orders.issue(unit, {
+				{ kind = "move", position = stand("garpike", point "east_shore" + Vector2.new(14, at.Y)) },
+				{ kind = "fight", position = stand("garpike", enemy_start) },
+			}, false, false)
+		end
+	end
+	advance(args.seconds or 150)
+	local left = 0
+	local where: { string } = {}
+	for _, unit in landing do
+		if unit.alive then
+			left += 1
+			table.insert(where, `{round(unit.position.X, 0)},{round(unit.position.Z, 0)}:{#unit.orders}`)
+		end
+	end
+	local commander_health = -1
+	for _, entity in state.all() do
+		if entity.alive and entity.team == enemy and unit_defs.is_commander(entity.def) then
+			commander_health = round(entity.health, 0)
+		end
+	end
+	local findings: Findings = {
+		garpikes = #landing,
+		garpikes_left = left,
+		garpikes_at = table.concat(where, " "),
+		commander_health = commander_health,
+		result = missions.result() or "none",
+		enemy_left = census(enemy),
+	}
+	findings.pass = findings.result == "won"
 	return findings
 end
 
@@ -585,7 +696,7 @@ local function blockade_balance(args: Args): Findings
 end
 
 -- The Garpike (unit_defs/vehicle_t1.luau), on the channel: one on the floor of the west strait holds fire at a Riptide
--- afloat over it, as nothing but a torpedo is fired from under the water; one ashore on the enemy's beach shelf fights a
+-- afloat over it, as nothing but a torpedo is fired from under the water; one ashore on the enemy's shore fights a
 -- guard beside it. Each gets `args.seconds` (15).
 local function garpike(args: Args): Findings
 	local seconds = args.seconds or 15
@@ -603,8 +714,8 @@ local function garpike(args: Args): Findings
 	ensure_team(OWN)
 	ensure_team(harness.ENEMY)
 	local under_shots, under_hurt, submerged = duel("riptide", Vector2.new(-110, -20), Vector2.new(-110, -8))
-	local beach = point "beach_north"
-	local ashore_shots, ashore_hurt, ashore_under = duel("guard", beach + Vector2.new(4, 10), beach)
+	local ashore = point "east_shore" + Vector2.new(14, 0)
+	local ashore_shots, ashore_hurt, ashore_under = duel("guard", ashore + Vector2.new(4, 10), ashore)
 	local findings: Findings = {
 		submerged = submerged,
 		under_water_shots = under_shots,
@@ -619,7 +730,8 @@ end
 
 local TESTS: { [string]: Test } = {
 	garpike = { run = garpike, defaults = { preset = "channel" } },
-	channel_assault = { run = channel_assault },
+	channel_agitator = { run = channel_agitator },
+	channel_landing = { run = channel_landing },
 	blockade_balance = { run = blockade_balance },
 	channel_map = { run = channel_map, defaults = { preset = "channel" } },
 	channel_crossing = { run = channel_crossing },

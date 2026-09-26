@@ -61,6 +61,7 @@ local placing = require(ReplicatedStorage.Client.placing)
 local drag_trace = require(ReplicatedStorage.Client.drag_trace)
 local hover = require(ReplicatedStorage.Client.hover)
 local mode_aim = require(ReplicatedStorage.Client.mode_aim)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 type State = command_state.State
 type ModeInfo = order_modes.ModeInfo
@@ -449,7 +450,11 @@ local function init()
 		covered = on_covered,
 	})
 	-- after the camera, which it casts rays through
-	RunService:BindToRenderStep("rts_input", Enum.RenderPriority.Camera.Value + 1, on_render)
+	RunService:BindToRenderStep(
+		"rts_input",
+		Enum.RenderPriority.Camera.Value + 1,
+		frame_profile.wrap("input", on_render)
+	)
 end
 
 return table.freeze({

@@ -14,6 +14,7 @@ local map_events = require(ReplicatedStorage.Client.map_events)
 local occupants = require(ReplicatedStorage.Client.occupants)
 
 local palette = require(ReplicatedStorage.ClientShared.palette)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 type Spot = spots.Spot
 
@@ -98,7 +99,7 @@ local function init()
 	map_events.on_rebuilt(rebuild)
 	world.subscribe_listed(mark_stale)
 	world.subscribe_removed(mark_stale)
-	RunService.Heartbeat:Connect(update)
+	RunService.Heartbeat:Connect(frame_profile.wrap("spot_markers", update))
 end
 
 return table.freeze({

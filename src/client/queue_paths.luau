@@ -23,6 +23,7 @@ local selection = require(ReplicatedStorage.Client.selection)
 local world_fx = require(ReplicatedStorage.Client.world_fx)
 local order_colors = require(ReplicatedStorage.Client.order_colors)
 local markers = require(ReplicatedStorage.Client.markers)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 type EntityDef = types.EntityDef
 type Step = order_path.Step
@@ -248,7 +249,7 @@ local function update()
 end
 
 local function init()
-	RunService.RenderStepped:Connect(update)
+	RunService.RenderStepped:Connect(frame_profile.wrap("queue_paths", update))
 end
 
 return table.freeze({

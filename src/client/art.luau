@@ -28,6 +28,7 @@ local art_pose = require(ReplicatedStorage.ClientShared.art_pose)
 local charged_beam = require(ReplicatedStorage.Client.charged_beam)
 local skin_wear = require(ReplicatedStorage.Client.skin_wear)
 local world = require(ReplicatedStorage.Client.world)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 local vector = art_build.vector
 
@@ -52,6 +53,18 @@ local GAIT_BLEND = 0.2
 -- How long a hatch stays open after its weapon fires, in seconds, and how fast it swings, in radians a second.
 local HATCH_HOLD = 1.5
 local HATCH_RATE = math.rad(240)
+-- The attributes a dressing's paint, skin and pose are read from (`Dressing.stale`).
+local READ_ATTRIBUTES: { [string]: boolean } = {
+	def_name = true,
+	skin = true,
+	kind = true,
+	state = true,
+	team_color = true,
+	carried = true,
+}
+-- How many frames apart art at rest looks at whether its model has been moved, as a wreck is when the ground under it is
+-- blown out, each on a frame of its own so that they do not all look at once.
+local RESTING_PIVOT_FRAMES = 16
 
 -- One entity's copy of a mesh.
 type Piece = {
@@ -106,6 +119,18 @@ type Dressing = {
 	-- its turrets whose weapon is a charged beam, whose muzzles glow (client/charged_beam.luau), and where on each
 	-- the muzzle is
 	charged: { ChargedMuzzle },
+	-- what it was last read as, from the attributes in READ_ATTRIBUTES, and whether one of those has changed since
+	-- (`stale`), which is when they are read again
+	stale: boolean,
+	finished: boolean,
+	carried: boolean,
+	-- anything but a unit, which never walks, drives or flies anywhere
+	still_kind: boolean,
+	-- the model's pivot as it was last drawn at, and whether its art is at rest there: something that is not a unit,
+	-- with every piece turned where it is going and nothing that goes on moving by itself, is not looked at again until
+	-- one of its attributes changes or its pivot does (`step`)
+	pivot: CFrame?,
+	resting: boolean,
 }
 
 type ChargedMuzzle = {
@@ -184,6 +209,12 @@ local function dress(model: Model, id: EntityId, def_name: string, art_name: str
 		gait = 0,
 		shattered = false,
 		charged = charged,
+		stale = true,
+		finished = false,
+		carried = false,
+		still_kind = false,
+		pivot = nil,
+		resting = false,
 	}
 end
 
@@ -248,14 +279,17 @@ local function approach(current: number, target: number, step: number): number
 end
 
 -- Where each moving piece of an entity's art should be turned to this frame; what is not `finished` holds still.
-local function animate(dressing: Dressing, origin: CFrame, finished: boolean, dt: number)
+-- Returns whether every piece is where it is going and stays there until something changes: none turned this frame,
+-- and none goes on by itself (a spinning piece, an open hatch, or a builder's head, whose work may be moving).
+local function animate(dressing: Dressing, origin: CFrame, finished: boolean, dt: number): boolean
 	local model = dressing.model
 	-- something being carried is inactive: everything on it holds still where it was, and being flown about is not
 	-- walking, so its legs do not take up a stride when it is set down
-	if entity_attrs.flag(model, "carried") == true then
+	if dressing.carried then
 		dressing.walk_speed = 0
-		return
+		return false
 	end
+	local still = dt > 0
 	-- how far it has walked forward since the last frame, which is what turns wheels; nothing for a jump no walk
 	-- would make, like the first frame or being set down by a transport, which the legs ignore too
 	local driven = 0
@@ -276,6 +310,7 @@ local function animate(dressing: Dressing, origin: CFrame, finished: boolean, dt
 	local def = unit_defs.get(dressing.def_name)
 	for _, group in dressing.groups do
 		local kind = group.def.kind
+		local before = group.angle
 		if kind == "turret" then
 			local index = group.def.weapon :: number
 			local aim = entity_attrs.weapon_number(model, group.aim_attribute :: entity_attrs.WeaponName)
@@ -288,6 +323,9 @@ local function animate(dressing: Dressing, origin: CFrame, finished: boolean, dt
 			local target = 0
 			local target_id = entity_attrs.number(model, "work_target")
 			local work = if finished and target_id ~= nil then world.get(target_id) else nil
+			if target_id ~= nil then
+				still = false
+			end
 			if work ~= nil then
 				local seen = (origin * group.pivot):PointToObjectSpace(world.position_of(work))
 				if seen.X * seen.X + seen.Z * seen.Z > 1e-4 then
@@ -316,21 +354,31 @@ local function animate(dressing: Dressing, origin: CFrame, finished: boolean, dt
 				end
 				group.fired = fired
 			end
-			local target = if os.clock() < group.open_until then group.def.open or 0 else 0
+			local open = os.clock() < group.open_until
+			if open then
+				still = false
+			end
+			local target = if open then group.def.open or 0 else 0
 			group.angle = approach(group.angle, target, HATCH_RATE * dt)
 		end
+		if group.angle ~= before then
+			still = false
+		end
 	end
+	return still
 end
 
 -- Puts every piece where its group's pivot and angle say, relative to the art's origin. A piece is only moved when
--- its angle or the origin has changed.
-local function place(dressing: Dressing, origin: CFrame)
+-- its angle or the origin has changed. Returns whether any was.
+local function place(dressing: Dressing, origin: CFrame): boolean
 	local moved = dressing.origin == nil or dressing.origin ~= origin
+	local placed_any = moved
 	dressing.origin = origin
 	for _, group in dressing.groups do
 		if moved == false and group.placed == group.angle then
 			continue
 		end
+		placed_any = true
 		group.placed = group.angle
 		local frame = origin * group.pivot * art_build.turn_of_group(group.def, group.angle)
 		group.frame = frame
@@ -338,6 +386,7 @@ local function place(dressing: Dressing, origin: CFrame)
 			piece.part.CFrame = frame * piece.source.offset
 		end
 	end
+	return placed_any
 end
 
 -- The art `def_name` is drawn in when it wears `skin`: its own, unless the skin swaps it for another that there is.
@@ -375,7 +424,7 @@ local function glow(dressing: Dressing, finished: boolean, dt: number)
 		return
 	end
 	local model = dressing.model
-	local showing = finished and entity_attrs.flag(model, "carried") ~= true
+	local showing = finished and dressing.carried == false
 	for _, charged in dressing.charged do
 		local frame = charged.group.frame
 		local at = (frame * charged.muzzle).Position
@@ -384,47 +433,86 @@ local function glow(dressing: Dressing, finished: boolean, dt: number)
 	end
 end
 
+-- Frames drawn so far, which spreads out the frames art at rest looks at its pivot on (RESTING_PIVOT_FRAMES).
+local frame_count = 0
+
 local function step(dt: number)
+	frame_count += 1
 	for _, model in world.all() do
-		local def_name = entity_attrs.def_name(model)
 		local id = world.id_of(model)
-		if def_name == nil or id == nil then
+		if id == nil then
 			continue
 		end
-		local skin_name = entity_attrs.text(model, "skin")
-		local skin = skins.get(skin_name)
 		local dressing = dressings[id]
-		-- a new skin can mean other art altogether, which is dressed afresh
-		if dressing ~= nil and dressing.skin ~= skin then
-			if dressing.art_name ~= art_for(def_name, skin) then
-				undress(dressing)
-				dressing = nil
-			else
-				dressing.skin = skin
-				dressing.paint_key = nil
+		if dressing ~= nil and dressing.resting then
+			if (frame_count + id) % RESTING_PIVOT_FRAMES ~= 0 or model:GetPivot() == dressing.pivot then
+				continue
 			end
+			dressing.resting = false
 		end
-		if dressing == nil then
-			local art_name = art_for(def_name, skin)
-			if art.has(art_name) == false then
+		if dressing == nil or dressing.stale then
+			local def_name = entity_attrs.def_name(model)
+			if def_name == nil then
 				continue
 			end
-			local template = art_models.template(art_name)
-			if template == nil then
-				continue
+			local skin_name = entity_attrs.text(model, "skin")
+			local skin = skins.get(skin_name)
+			-- a new skin can mean other art altogether, which is dressed afresh
+			if dressing ~= nil and dressing.skin ~= skin then
+				if dressing.art_name ~= art_for(def_name, skin) then
+					undress(dressing)
+					dressing = nil
+				else
+					dressing.skin = skin
+					dressing.paint_key = nil
+				end
 			end
-			dress(model, id, def_name, art_name, skin, template)
-			dressing = dressings[id]
+			if dressing == nil then
+				local art_name = art_for(def_name, skin)
+				if art.has(art_name) == false then
+					continue
+				end
+				local template = art_models.template(art_name)
+				if template == nil then
+					continue
+				end
+				dress(model, id, def_name, art_name, skin, template)
+				dressing = dressings[id]
+			end
+			local read = dressing :: Dressing
+			read.stale = false
+			paint(read)
+			-- a blueprint or a wreck is not the thing itself yet, or any more
+			read.finished = entity_attrs.state(model) ~= "blueprint" and world.is_remains(model) == false
+			read.carried = entity_attrs.flag(model, "carried") == true
+			read.still_kind = entity_attrs.kind(model) ~= "unit"
 		end
 		local ready = dressing :: Dressing
-		paint(ready)
-		-- a blueprint or a wreck is not the thing itself yet, or any more
-		local finished = entity_attrs.state(model) ~= "blueprint" and world.is_remains(model) == false
-		local origin = model:GetPivot() * CFrame.new(0, -ready.half_height, 0)
-		animate(ready, origin, finished, dt)
-		place(ready, origin)
-		attach(ready, finished, dt)
-		glow(ready, finished, dt)
+		local pivot = model:GetPivot()
+		local origin = pivot * CFrame.new(0, -ready.half_height, 0)
+		local still = animate(ready, origin, ready.finished, dt)
+		local moved = place(ready, origin)
+		attach(ready, ready.finished, dt)
+		glow(ready, ready.finished, dt)
+		ready.pivot = pivot
+		ready.resting = ready.still_kind
+			and still
+			and moved == false
+			and #ready.charged == 0
+			and ready.skin.donut == nil
+	end
+end
+
+-- One of an entity's attributes has changed (the world's `subscribe_changed`): its art wakes, whatever it was, and
+-- reads what it is drawn as again if that is what changed.
+local function changed(id: EntityId, attribute: string)
+	local dressing = dressings[id]
+	if dressing == nil then
+		return
+	end
+	dressing.resting = false
+	if READ_ATTRIBUTES[attribute] == true then
+		dressing.stale = true
 	end
 end
 
@@ -475,9 +563,10 @@ end
 
 local function init()
 	world.subscribe_removed(forget)
+	world.subscribe_changed(changed)
 	-- just before the frame is drawn, after any replicated update has landed and right after interpolation has
 	-- pivoted the models past it, so the art is placed where each model is seen, never at a raw update
-	RunService:BindToRenderStep("art", Enum.RenderPriority.First.Value + 1, step)
+	RunService:BindToRenderStep("art", Enum.RenderPriority.First.Value + 1, frame_profile.wrap("art", step))
 end
 
 return table.freeze({

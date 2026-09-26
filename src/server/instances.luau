@@ -70,6 +70,10 @@ local reclaimables_synced: { [EntityId]: number } = {}
 -- Where each model was last pivoted to, so a building or a unit standing still is not handed the
 -- same PivotTo it already has every single sync.
 local transforms: { [EntityId]: { position: Vector3, facing: number } } = {}
+-- Every attribute value written to each model, as it was written (`set_attribute`). Nothing else writes them, so this is
+-- what the model holds, and comparing against it here costs a table lookup where reading the model back costs a call
+-- into the engine, a few dozen of them for every entity every sync.
+local written: { [Model]: { [string]: any } } = {}
 local container: Folder? = nil
 
 local function get_container(): Folder
@@ -252,7 +256,13 @@ end
 -- Attributes replicate on every write, so only write when the value has actually moved. Numbers
 -- are rounded first so a health bar creeping by a hundredth does not cost a replication.
 local function set_attribute(model: Model, name: entity_attrs.Name, value: any)
-	if model:GetAttribute(name) ~= value then
+	local values = written[model]
+	if values == nil then
+		values = {}
+		written[model] = values
+	end
+	if values[name] ~= value then
+		values[name] = value
 		model:SetAttribute(name, value)
 	end
 end
@@ -416,6 +426,7 @@ local function destroy(id: EntityId)
 			originals[descendant] = nil
 		end
 	end
+	written[model] = nil
 	model:Destroy()
 	models[id] = nil
 	appearance_keys[id] = nil

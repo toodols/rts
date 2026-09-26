@@ -198,8 +198,10 @@ local function from_instance(instance: Instance?): Model?
 	return nil
 end
 
+-- An entity's model keeps its id for as long as it is there, so a tracked one's is looked up rather than read off it
+-- again: this is called for every model every frame.
 local function id_of(model: Model): EntityId?
-	return entity_attrs.id(model)
+	return id_of_model[model] or entity_attrs.id(model)
 end
 
 -- The def `model` is of, or nil for one that names none. A wreck names the def of what it was.

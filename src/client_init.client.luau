@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local game_phase = require(ReplicatedStorage.Shared.game_phase)
 local starts = require(ReplicatedStorage.Shared.starts)
 
+local frame_profile_mod = require(ReplicatedStorage.Client.frame_profile)
 local world_mod = require(ReplicatedStorage.Client.world)
 local building_walls_mod = require(ReplicatedStorage.Client.building_walls)
 local interpolation_mod = require(ReplicatedStorage.Client.interpolation)
@@ -64,6 +65,7 @@ if #not_built > 0 then
 	)
 end
 
+frame_profile_mod.init()
 world_mod.init()
 building_walls_mod.init()
 interpolation_mod.init()

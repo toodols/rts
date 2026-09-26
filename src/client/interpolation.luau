@@ -22,7 +22,10 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
 
+local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
+
 local world = require(ReplicatedStorage.Client.world)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 type State = {
 	from: CFrame,
@@ -32,6 +35,11 @@ type State = {
 	duration: number,
 	-- the gap between updates lately, a running average
 	gap: number,
+	-- whether it is something other than a unit, which the server almost never moves, and has come to rest where it
+	-- was last put: such a model's pivot is only read one frame in STILL_CHECK_FRAMES, on a frame of its own (`slot`)
+	still_kind: boolean,
+	settled: boolean,
+	slot: number,
 }
 
 local states: { [Instance]: State } = {}
@@ -53,11 +61,17 @@ local MAX_GAP = 0.25
 -- Each step is played a little slower than the gaps have been, so that one landing a frame late
 -- finds the model still moving toward the last, not stopped on it.
 local SLACK = 1.15
+-- How many frames apart the pivot of something at rest that is not a unit is read, to see if it has been moved: a wreck
+-- set back down on ground blown out from under it, which is drawn moving that many frames late at most.
+local STILL_CHECK_FRAMES = 16
 
 -- When the last frame was drawn. A step that lands is played from then, not from now: it has been
 -- on its way for that frame already, and starting it from nothing would hold the model still for the
 -- frame it lands in, one frame in every update.
 local last_frame_at: number? = nil
+-- frames drawn so far, and the slot the next model tracked is given
+local frame_count = 0
+local next_slot = 0
 
 local function close_enough(a: CFrame, b: CFrame): boolean
 	return (a.Position - b.Position).Magnitude < SAME_EPSILON and (a.LookVector - b.LookVector).Magnitude < SAME_EPSILON
@@ -72,10 +86,18 @@ local function step(_dt: number)
 	local now = os.clock()
 	local previous = last_frame_at or now
 	last_frame_at = now
+	frame_count += 1
 	for _, model in world.all() do
-		local actual = model:GetPivot()
 		local state = states[model]
+		if state ~= nil and state.settled and state.still_kind then
+			if (frame_count + state.slot) % STILL_CHECK_FRAMES ~= 0 then
+				continue
+			end
+			state.still_kind = entity_attrs.kind(model) ~= "unit"
+		end
+		local actual = model:GetPivot()
 		if state == nil then
+			next_slot += 1
 			states[model] = {
 				from = actual,
 				to = actual,
@@ -83,6 +105,9 @@ local function step(_dt: number)
 				started_at = now,
 				duration = MIN_DURATION,
 				gap = FIRST_GAP,
+				still_kind = entity_attrs.kind(model) ~= "unit",
+				settled = true,
+				slot = next_slot,
 			}
 			continue
 		end
@@ -106,13 +131,18 @@ local function step(_dt: number)
 			model:PivotTo(rendered)
 		end
 		state.rendered = rendered
+		state.settled = alpha >= 1
 	end
 end
 
 local function init()
 	world.subscribe_removed(forget)
 	-- first of everything bound to render, see art.luau
-	RunService:BindToRenderStep("interpolation", Enum.RenderPriority.First.Value, step)
+	RunService:BindToRenderStep(
+		"interpolation",
+		Enum.RenderPriority.First.Value,
+		frame_profile.wrap("interpolation", step)
+	)
 end
 
 return table.freeze({

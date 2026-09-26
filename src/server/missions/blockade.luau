@@ -1,7 +1,7 @@
 --!strict
 -- Blockade, the sixth mission, on the channel again (shared/map_designs/channel.luau), just after Channel Crossing. The
--- enemy's island outpost, line and base are wrecks now, where they stood (mission_forces.CHANNEL_ENEMY), for the player
--- to reclaim or raise. The player holds the west shore with a harbour base (mission_forces.BLOCKADE_BASE), which goes
+-- enemy's Agitators and the rest of its defences are wrecks now, where they stood (mission_forces.CHANNEL_ENEMY), for
+-- the player to reclaim or raise. The player holds the west shore with a harbour base (mission_forces.BLOCKADE_BASE), which goes
 -- down beside their commander once the commander has (`on_commander_down`), and so starts the mission's clock. Played
 -- together, the one team has it all.
 --

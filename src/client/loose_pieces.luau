@@ -9,8 +9,11 @@
 -- way. Every piece is whole until `fade_at` and then fades out over `fade_time`, and is gone at `lifetime` whatever
 -- has happened.
 
+local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
 local Workspace = game:GetService "Workspace"
+
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 -- What a falling piece does as it comes down on the ground: bounces, keeping `keep_up` of its speed off the ground and
 -- `keep_along` of its speed along it and of its tumbling, until it comes down slower than `settle` and stays where it
@@ -145,7 +148,7 @@ local function step(dt: number)
 end
 
 local function init()
-	RunService.PreRender:Connect(step)
+	RunService.PreRender:Connect(frame_profile.wrap("loose_pieces", step))
 end
 
 return table.freeze({

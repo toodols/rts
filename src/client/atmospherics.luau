@@ -29,6 +29,7 @@ local rts_camera = require(ReplicatedStorage.Client.camera)
 local wind = require(ReplicatedStorage.Client.wind)
 local world_fx = require(ReplicatedStorage.Client.world_fx)
 local weather_looks = require(ReplicatedStorage.Client.weather_looks)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 -- what a map asks for (not the Atmosphere instance, which is Roblox's haze)
 type Settings = atmosphere.Atmosphere
@@ -483,7 +484,11 @@ local function weather(given: Settings)
 		end
 		running_key = key
 		running_look = look
-		RunService:BindToRenderStep(RENDER_STEP, Enum.RenderPriority.Camera.Value + 1, carry)
+		RunService:BindToRenderStep(
+			RENDER_STEP,
+			Enum.RenderPriority.Camera.Value + 1,
+			frame_profile.wrap("atmospherics", carry)
+		)
 	else
 		for _, each in running do
 			each.amount = if look ~= nil and table.find(look.layers, each.layer) ~= nil

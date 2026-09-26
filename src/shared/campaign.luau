@@ -130,12 +130,12 @@ local MISSIONS: { Mission } = {
 	{
 		id = "channel",
 		label = "Channel Crossing",
-		description = "The enemy has fortified the far side of the channel and builds no ships. Cross it and kill their commander before time runs out.",
+		description = "Enemy Agitators hold the channel. Destroy them, land Garpikes and kill the enemy commander before time runs out.",
 		preset = "channel",
 		unlocks = { "urchin", "coral", "herring", "slingshot", "agitator" },
-		-- bomber raids, a Coral past each end of the line, an Agitator, and less time (server/missions/channel.luau)
+		-- an Air Lab whose bombers raid the player, two Urchins off the shore, and less time (server/missions/channel.luau)
 		hard_mode = true,
-		hard_mode_description = "With enemy bombers",
+		hard_mode_description = "With an enemy Air Lab",
 		hard_mode_unlocks = { "oppressor" },
 		coop = 2,
 		coop_kind = "allied",

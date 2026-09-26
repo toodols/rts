@@ -21,6 +21,7 @@ local charged_beam = require(ReplicatedStorage.Client.charged_beam)
 local world_fx = require(ReplicatedStorage.Client.world_fx)
 local sounds = require(ReplicatedStorage.ClientShared.sounds)
 local palette = require(ReplicatedStorage.ClientShared.palette)
+local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 
 local weapon_fired: RemoteEvent = ReplicatedStorage.Shared.WeaponFired
 
@@ -806,7 +807,7 @@ local function on_lightning(event: shot_events.LightningFired)
 end
 
 local function init()
-	RunService.Heartbeat:Connect(fly_projectiles)
+	RunService.Heartbeat:Connect(frame_profile.wrap("projectiles", fly_projectiles))
 	weapon_fired.OnClientEvent:Connect(function(event: shot_events.Event)
 		if event.kind == "projectile" then
 			on_launched(event)
