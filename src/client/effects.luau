@@ -711,9 +711,9 @@ local function explosion_sound(at: Vector3, radius: number)
 	end
 end
 
--- The sound of `weapon` firing, from `at` (its kind's `sound`).
+-- The sound of `weapon` firing, from `at`.
 local function firing_sound(weapon: types.Weapon, at: Vector3)
-	local sound = weapon_kinds.get(weapon.kind).sound
+	local sound = weapon_kinds.sound_of(weapon)
 	sounds.play_at(sound.name, at, 1, sound.pitch)
 end
 
