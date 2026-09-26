@@ -212,6 +212,20 @@
     "module": "src/shared/art/air_lab.luau",
     "pending": []
   },
+  "angler": {
+    "blender": "5.2.0 LTS",
+    "digest": "7d183e7bf78c741a",
+    "hashes": [
+      "e3c29ce903c160cb",
+      "50745fe7275a9b73",
+      "879b80e13a0b8d8f",
+      "24cf30b53076d407",
+      "08a3e53710e3cdfb"
+    ],
+    "inputs": "f648fa722dbc6351",
+    "module": "src/shared/art/angler.luau",
+    "pending": []
+  },
   "apocalypse": {
     "blender": "5.2.0 LTS",
     "digest": "d415c0e07441a8f0",
@@ -238,6 +252,64 @@
     ],
     "inputs": "e3d65d51ca10e4d0",
     "module": "src/shared/art/arbiter.luau",
+    "pending": []
+  },
+  "argonaut": {
+    "blender": "5.2.0 LTS",
+    "digest": "045fd043bb40af29",
+    "hashes": [
+      "725b006c4d4ebe04",
+      "d35de526954fe3e0",
+      "7fed1798ba6356b5",
+      "963de1c10f0966b4",
+      "f039074bedad093c",
+      "97535cb4295c4c31",
+      "3c32f53d442ba91d"
+    ],
+    "inputs": "d9b4a84a51e16038",
+    "module": "src/shared/art/argonaut.luau",
+    "pending": []
+  },
+  "arrow_storm": {
+    "blender": "5.2.0 LTS",
+    "digest": "3fd060e0b4871e1e",
+    "hashes": [
+      "41d5b0ee58d9a36b",
+      "99b7aae69312e498",
+      "4d6b2571b6a2a9e1",
+      "23680a30243fa035",
+      "6f5a4b4e86651b91"
+    ],
+    "inputs": "5c3e45a191a68f4c",
+    "module": "src/shared/art/arrow_storm.luau",
+    "pending": []
+  },
+  "banshee": {
+    "blender": "5.2.0 LTS",
+    "digest": "3688051e073b36f9",
+    "hashes": [
+      "40ffe18e9cbec8e1",
+      "22187a1d308cf75b",
+      "b22685482edfb0be",
+      "d8f095268f14ea6a",
+      "18e87b28c1279e2f"
+    ],
+    "inputs": "cfbc4777bfb027ce",
+    "module": "src/shared/art/banshee.luau",
+    "pending": []
+  },
+  "bat": {
+    "blender": "5.2.0 LTS",
+    "digest": "fc3449c006cb1b3e",
+    "hashes": [
+      "a7d25fc2e0f4cb09",
+      "e0be420b2ef8ee0b",
+      "46ad0be4520f88b7",
+      "3740355a9f25dcc6",
+      "37b9640a6029ddc7"
+    ],
+    "inputs": "e196eb0fd627564d",
+    "module": "src/shared/art/bat.luau",
     "pending": []
   },
   "behemoth": {
@@ -277,6 +349,21 @@
     ],
     "inputs": "bde4b9c8b6b11c1b",
     "module": "src/shared/art/birdeater.luau",
+    "pending": []
+  },
+  "black_hydra": {
+    "blender": "5.2.0 LTS",
+    "digest": "b1d9d02996259704",
+    "hashes": [
+      "bd1a0bfbf7a8088f",
+      "4effe9759e0c9243",
+      "ae062eec93c0995e",
+      "658395c466aa3b1b",
+      "b1b885139d24c013",
+      "b1b885139d24c013"
+    ],
+    "inputs": "1973bfbf6fd54f9e",
+    "module": "src/shared/art/black_hydra.luau",
     "pending": []
   },
   "bot_lab": {
@@ -430,6 +517,22 @@
     "module": "src/shared/art/construction_hovercraft.luau",
     "pending": []
   },
+  "construction_seaplane": {
+    "blender": "5.2.0 LTS",
+    "digest": "ce3477f4648b4dae",
+    "hashes": [
+      "e8e60465c281155b",
+      "e3f6ede7f631e80d",
+      "39cf438427e88ea8",
+      "5a45a3b4766b771b",
+      "0f4d135a7ab3f8eb",
+      "cca8de275c6b1503",
+      "7d009fe24963c246"
+    ],
+    "inputs": "7bfedde81a6cffaf",
+    "module": "src/shared/art/construction_seaplane.luau",
+    "pending": []
+  },
   "construction_ship": {
     "blender": "5.2.0 LTS",
     "digest": "817fcaebaad03fa7",
@@ -472,6 +575,61 @@
     ],
     "inputs": "dfe44db9cc1a07ae",
     "module": "src/shared/art/construction_vehicle.luau",
+    "pending": []
+  },
+  "coral": {
+    "blender": "5.2.0 LTS",
+    "digest": "dcdf52c57b7c782f",
+    "hashes": [
+      "2f2590673394332b",
+      "5894ddf07105e722",
+      "a76ca91336605e7a",
+      "acda6639c97c88f4"
+    ],
+    "inputs": "1f0dda6fc4423050",
+    "module": "src/shared/art/coral.luau",
+    "pending": []
+  },
+  "cutlass": {
+    "blender": "5.2.0 LTS",
+    "digest": "f45dbbcf25ffd808",
+    "hashes": [
+      "7c6255edbe801eab",
+      "ff60de967d7ab32f",
+      "8a2151ddfe968dfc",
+      "6f3932d25a49f2ec",
+      "a45a920a54c69f00"
+    ],
+    "inputs": "b4861297954951ae",
+    "module": "src/shared/art/cutlass.luau",
+    "pending": []
+  },
+  "dam_buster": {
+    "blender": "5.2.0 LTS",
+    "digest": "6455442dfc6227ef",
+    "hashes": [
+      "d5f71654bd4daf4f",
+      "1e929710b6016dcd",
+      "47af6fbd00b6be3c",
+      "950bcbb41075303b",
+      "0e26bdafb8999534"
+    ],
+    "inputs": "2ba029e4951ef9fb",
+    "module": "src/shared/art/dam_buster.luau",
+    "pending": []
+  },
+  "despot": {
+    "blender": "5.2.0 LTS",
+    "digest": "eb463e611266e8ba",
+    "hashes": [
+      "b91b597ae6a2985a",
+      "e275730e9d3be7b4",
+      "4e361b71252cd956",
+      "4012cf346addd07d",
+      "95d89ad44ee2bfdd"
+    ],
+    "inputs": "2946cab9d6b14efb",
+    "module": "src/shared/art/despot.luau",
     "pending": []
   },
   "drone": {
@@ -594,6 +752,20 @@
     ],
     "inputs": "5db352627495e3d1",
     "module": "src/shared/art/fusion_reactor.luau",
+    "pending": []
+  },
+  "garpike": {
+    "blender": "5.2.0 LTS",
+    "digest": "7912f4f91e39780b",
+    "hashes": [
+      "98eeae1023fb06cd",
+      "0a5ad5f36ef9bfc4",
+      "d9ddb8b8e65e2dd8",
+      "9529bdaca4c2c4ec",
+      "3563abe2f600d2ac"
+    ],
+    "inputs": "3537243287cc3305",
+    "module": "src/shared/art/garpike.luau",
     "pending": []
   },
   "geothermal_powerplant": {
@@ -869,6 +1041,17 @@
     "module": "src/shared/ui_art/icon_emp.luau",
     "pending": []
   },
+  "icon_energy": {
+    "blender": "5.2.0 LTS",
+    "digest": "3e756eaa6d31f6a2",
+    "hashes": [
+      "5416248364c0a473",
+      "140601d2193dc661"
+    ],
+    "inputs": "cdff31376642b73c",
+    "module": "src/shared/ui_art/icon_energy.luau",
+    "pending": []
+  },
   "icon_fight": {
     "blender": "5.2.0 LTS",
     "digest": "f20977e339c76c19",
@@ -968,6 +1151,17 @@
     "module": "src/shared/ui_art/icon_machine_gun.luau",
     "pending": []
   },
+  "icon_metal": {
+    "blender": "5.2.0 LTS",
+    "digest": "d305a997b1fe569f",
+    "hashes": [
+      "e8b67c579ffa08b0",
+      "3c9777a492ac298a"
+    ],
+    "inputs": "ea6da65b87371e27",
+    "module": "src/shared/ui_art/icon_metal.luau",
+    "pending": []
+  },
   "icon_missile": {
     "blender": "5.2.0 LTS",
     "digest": "4acf59216a5adc5f",
@@ -1021,6 +1215,17 @@
     ],
     "inputs": "7b48406478353738",
     "module": "src/shared/ui_art/icon_repair.luau",
+    "pending": []
+  },
+  "icon_resurrect": {
+    "blender": "5.2.0 LTS",
+    "digest": "5063f3107297a1a9",
+    "hashes": [
+      "47a6480877d6bb49",
+      "3f45fb400963cf83"
+    ],
+    "inputs": "470c4084cd3df4df",
+    "module": "src/shared/ui_art/icon_resurrect.luau",
     "pending": []
   },
   "icon_rocket": {
@@ -1113,6 +1318,21 @@
     "module": "src/shared/art/juggernaut.luau",
     "pending": []
   },
+  "kraken": {
+    "blender": "5.2.0 LTS",
+    "digest": "65a000d76e81b6e7",
+    "hashes": [
+      "d04924350c88bab8",
+      "16647ae557851394",
+      "2bcb39eeb1e6e69a",
+      "6e869d791485be27",
+      "8b0cd1b106d7227a",
+      "8b0cd1b106d7227a"
+    ],
+    "inputs": "26c54740ef3e54bc",
+    "module": "src/shared/art/kraken.luau",
+    "pending": []
+  },
   "lasher": {
     "blender": "5.2.0 LTS",
     "digest": "96311380025b998b",
@@ -1158,6 +1378,22 @@
     "module": "src/shared/art/mantis.luau",
     "pending": []
   },
+  "messenger": {
+    "blender": "5.2.0 LTS",
+    "digest": "e860fd9a93755aa4",
+    "hashes": [
+      "91b22e122fd62b85",
+      "45478cba13a1078e",
+      "a4b12d34ec7351f3",
+      "e6b542b8c36eda91",
+      "2089bcf51c82f3c4",
+      "8bd4dde68dcaf685",
+      "5739be6b80f00b29"
+    ],
+    "inputs": "2e69c6042cad43d6",
+    "module": "src/shared/art/messenger.luau",
+    "pending": []
+  },
   "metal_extractor": {
     "blender": "5.2.0 LTS",
     "digest": "8dc5cd5e4cdf0b65",
@@ -1183,6 +1419,20 @@
     "module": "src/shared/art/metal_storage.luau",
     "pending": []
   },
+  "monsoon": {
+    "blender": "5.2.0 LTS",
+    "digest": "66deba91f7ba8596",
+    "hashes": [
+      "4201c9c58809c2e0",
+      "130d471b7f3447b3",
+      "c3e1702e70350526",
+      "987ef6c43cc4423a",
+      "ae67a1a8eff698fa"
+    ],
+    "inputs": "0cf2cfc57831eb91",
+    "module": "src/shared/art/monsoon.luau",
+    "pending": []
+  },
   "negotiator": {
     "blender": "5.2.0 LTS",
     "digest": "d6d59fac430f7b4d",
@@ -1198,6 +1448,21 @@
     ],
     "inputs": "ceae652722ed504c",
     "module": "src/shared/art/negotiator.luau",
+    "pending": []
+  },
+  "oppressor": {
+    "blender": "5.2.0 LTS",
+    "digest": "1ce62514c4c99ba1",
+    "hashes": [
+      "dc6f4ac047617a23",
+      "7825043bc3c2e0d1",
+      "b625243bc7c769d2",
+      "967feea899a71324",
+      "48861f8a88a1c8cd",
+      "2c861c2a2d24740f"
+    ],
+    "inputs": "23c6234b27206a2c",
+    "module": "src/shared/art/oppressor.luau",
     "pending": []
   },
   "orca": {
@@ -1292,6 +1557,20 @@
     ],
     "inputs": "c4e77c59ebff8ccd",
     "module": "src/shared/art/pounder.luau",
+    "pending": []
+  },
+  "predator": {
+    "blender": "5.2.0 LTS",
+    "digest": "bc08a85c291676dc",
+    "hashes": [
+      "46cb09ed3c35bfb3",
+      "06409a009ada9c51",
+      "04fa2f3eaf665cd5",
+      "0826ee85d6e3188c",
+      "9a6cd050a3aa0f45"
+    ],
+    "inputs": "deeb2cb911282053",
+    "module": "src/shared/art/predator.luau",
     "pending": []
   },
   "prevailer": {
@@ -1482,6 +1761,20 @@
     "module": "src/shared/art/sea_dragon.luau",
     "pending": []
   },
+  "seaplane_platform": {
+    "blender": "5.2.0 LTS",
+    "digest": "d270f2fa8bf5adb3",
+    "hashes": [
+      "8e5902bec41c9ca1",
+      "9ff8f9de71fb834c",
+      "3433ee6ed6fb16a2",
+      "d7d3dc7e2cdf939e",
+      "91c452504cbdf61c"
+    ],
+    "inputs": "9b6761272db3e13b",
+    "module": "src/shared/art/seaplane_platform.luau",
+    "pending": []
+  },
   "sharpshooter": {
     "blender": "5.2.0 LTS",
     "digest": "127c3e572f6ae192",
@@ -1532,6 +1825,20 @@
     ],
     "inputs": "1bebb06c94fbce66",
     "module": "src/shared/reclaimable_art/shrub.luau",
+    "pending": []
+  },
+  "slingshot": {
+    "blender": "5.2.0 LTS",
+    "digest": "5f2bc4189b5c77ab",
+    "hashes": [
+      "c7c72c4762c2dc2a",
+      "0d5da6f85e319424",
+      "52eca9c756ceb5b4",
+      "192d0e7999cfaa2e",
+      "b6f8f963e6068781"
+    ],
+    "inputs": "205d601316e5e71a",
+    "module": "src/shared/art/slingshot.luau",
     "pending": []
   },
   "solar_collector": {
@@ -1843,6 +2150,19 @@
     ],
     "inputs": "ec5fa0b7471efb05",
     "module": "src/shared/art/twin_guard.luau",
+    "pending": []
+  },
+  "urchin": {
+    "blender": "5.2.0 LTS",
+    "digest": "e2b85fa345a8dec9",
+    "hashes": [
+      "2c401fde5ddd7178",
+      "6cb79f1080659299",
+      "b6a83684b058102b",
+      "a44c3d4add1e0098"
+    ],
+    "inputs": "a268dfd23596001c",
+    "module": "src/shared/art/urchin.luau",
     "pending": []
   },
   "valiant": {

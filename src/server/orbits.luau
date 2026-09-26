@@ -14,6 +14,7 @@ local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local rng = require(script.Parent.rng)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityDef = types.EntityDef
@@ -182,6 +183,14 @@ local function station_point(
 	held.radius = math.clamp(held.radius, inner, outer)
 	return target.position + offset_of(held.angle, held.radius)
 end
+
+snapshot.keep("orbits", function()
+	return { stations = stations, round = round, tick_count = tick_count }
+end, function(saved)
+	stations = saved.stations
+	round = saved.round
+	tick_count = saved.tick_count
+end)
 
 return table.freeze({
 	ORBIT_INNER = ORBIT_INNER,

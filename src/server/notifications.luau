@@ -32,6 +32,7 @@ local remotes = require(ServerScriptService.ServerShared.remotes)
 local state = require(script.Parent.state)
 local players = require(script.Parent.players)
 local alliances = require(script.Parent.alliances)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type TeamId = types.TeamId
@@ -193,6 +194,22 @@ local function init()
 	end)
 	remotes.listen(metal_requested, { args = { decode.number }, rate = REQUEST_RATE }, on_request_metal)
 end
+
+snapshot.keep("notifications", function()
+	return {
+		now = now,
+		next_air_scan = next_air_scan,
+		base_hurt_at = base_hurt_at,
+		commander_hurt_at = commander_hurt_at,
+		air_told = air_told,
+	}
+end, function(saved)
+	now = saved.now
+	next_air_scan = saved.next_air_scan
+	base_hurt_at = saved.base_hurt_at
+	commander_hurt_at = saved.commander_hurt_at
+	air_told = saved.air_told
+end)
 
 return table.freeze({
 	init = init,

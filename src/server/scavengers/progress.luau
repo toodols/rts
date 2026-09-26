@@ -19,6 +19,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local state = require(ServerScriptService.Server.state)
 
 local settings = require(script.Parent.settings)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 
@@ -108,6 +109,20 @@ local function reset()
 	began_at = state.now()
 	progress_offset = 0
 end
+
+snapshot.keep("scavenger_progress", function()
+	return {
+		began_at = began_at,
+		progress_offset = progress_offset,
+		game_length = game_length,
+		health_multiplier = health_multiplier,
+	}
+end, function(saved)
+	began_at = saved.began_at
+	progress_offset = saved.progress_offset
+	game_length = saved.game_length
+	health_multiplier = saved.health_multiplier
+end)
 
 return table.freeze({
 	now = now,

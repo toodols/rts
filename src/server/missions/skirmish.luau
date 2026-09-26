@@ -15,6 +15,7 @@ local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 local ai = require(ServerScriptService.Server.ai)
 
 local kit = require(script.Parent.kit)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type TeamId = types.TeamId
 type Profile = ai_profiles.Profile
@@ -60,6 +61,12 @@ local handler: kit.Handler = {
 	end_mode = "commanders",
 	enemy_end_mode = "commanders",
 }
+
+snapshot.keep("mission_skirmish", function()
+	return { waiting = waiting }
+end, function(saved)
+	waiting = saved.waiting
+end)
 
 return table.freeze({
 	handler = table.freeze(handler),

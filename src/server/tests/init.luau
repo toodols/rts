@@ -30,6 +30,7 @@ local harness = require(script.harness)
 local ai = require(script.ai)
 local aircraft = require(script.aircraft)
 local campaign = require(script.campaign)
+local channel = require(script.channel)
 local construction = require(script.construction)
 local economy = require(script.economy)
 local maps = require(script.maps)
@@ -39,6 +40,7 @@ local naval = require(script.naval)
 local performance = require(script.performance)
 local piloting = require(script.piloting)
 local scavengers = require(script.scavengers)
+local snapshots = require(script.snapshots)
 local transport = require(script.transport)
 local weapons = require(script.weapons)
 
@@ -54,6 +56,7 @@ local AREAS: { { [string]: Test } } = {
 	ai,
 	aircraft,
 	campaign,
+	channel,
 	construction,
 	economy,
 	maps,
@@ -63,6 +66,7 @@ local AREAS: { { [string]: Test } } = {
 	performance,
 	piloting,
 	scavengers,
+	snapshots,
 	transport,
 	weapons,
 }

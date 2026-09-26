@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
 local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
+local snapshot = require(script.Parent.snapshot)
 
 type EntityId = types.EntityId
 
@@ -96,6 +97,12 @@ local function publish(entity: types.Entity, _def: types.EntityDef, write: entit
 	write("stalled", if flow ~= nil then flow.stall else nil)
 	write("flow_sources", entity_attrs.encode_flow_sources(shown_sources(entity.id)))
 end
+
+snapshot.keep("flows", function()
+	return { flows = flows }
+end, function(saved)
+	flows = saved.flows
+end)
 
 return table.freeze({
 	get = get,

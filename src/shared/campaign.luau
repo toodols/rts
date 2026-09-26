@@ -114,9 +114,9 @@ local MISSIONS: { Mission } = {
 	{
 		id = "prairie",
 		label = "Prairie Skirmish",
-		description = "A real game on open grassland against a computer opponent. Kill its commander.",
+		description = "A real game on open grassland against an ai enemy. Kill its commander to win! Fast moving vehicles may now be your best choice.",
 		preset = "prairie",
-		unlocks = { "tidal_generator", "shipyard", "supporter", "riptide", "construction_ship" },
+		unlocks = { "tidal_generator", "shipyard", "supporter", "riptide", "construction_ship", "garpike" },
 		-- the enemy plays as BARb does, with the fight predictor
 		hard_mode = true,
 		hard_mode_description = "This time with a smarter enemy",
@@ -125,6 +125,34 @@ local MISSIONS: { Mission } = {
 		coop = 2,
 		coop_kind = "allied",
 		ai_profile = "passive",
+		hud = "full",
+	},
+	{
+		id = "channel",
+		label = "Channel Crossing",
+		description = "The enemy has fortified the far side of the channel and builds no ships. Cross it and kill their commander before time runs out.",
+		preset = "channel",
+		unlocks = { "urchin", "coral", "herring", "slingshot", "agitator" },
+		-- bomber raids, a Coral past each end of the line, an Agitator, and less time (server/missions/channel.luau)
+		hard_mode = true,
+		hard_mode_description = "With enemy bombers",
+		hard_mode_unlocks = { "oppressor" },
+		coop = 2,
+		coop_kind = "allied",
+		hud = "full",
+	},
+	{
+		id = "blockade",
+		label = "Blockade",
+		description = "Enemy fleets are sailing through the channel. Don't let too many get past.",
+		preset = "channel",
+		unlocks = { "orca", "hovercraft_platform", "construction_hovercraft", "goon" },
+		-- twelve waves rather than seven, with cruisers (server/missions/blockade.luau)
+		hard_mode = true,
+		hard_mode_description = "More waves, with cruisers",
+		hard_mode_unlocks = { "halberd", "birdeater" },
+		coop = 2,
+		coop_kind = "shared",
 		hud = "full",
 	},
 }

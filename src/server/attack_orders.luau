@@ -12,6 +12,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
 local sight = require(script.Parent.sight)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -80,6 +81,13 @@ local function forget(entity_id: EntityId)
 	ordered[entity_id] = nil
 	launched[entity_id] = nil
 end
+
+snapshot.keep("attack_orders", function()
+	return { ordered = ordered, launched = launched }
+end, function(saved)
+	ordered = saved.ordered
+	launched = saved.launched
+end)
 
 return table.freeze({
 	forget = forget,

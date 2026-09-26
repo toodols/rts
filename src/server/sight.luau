@@ -105,17 +105,17 @@ local function verdict(shooter: Entity, aim: Aim, origin: Vector3, path: { Vecto
 	return "clear"
 end
 
--- What a shot at `aim` from `origin` actually strikes: whatever is first on the line to it, a solid thing or else a
--- wreck, and failing both what it was aimed at, if it was aimed at something.
+-- What a shot at `aim` from `origin` actually strikes: whatever is first on the line to it, a solid thing or else
+-- remains (a wreck, a rock, a tree), and failing both what it was aimed at, if it was aimed at something.
 local function first_hit(shooter: Entity, aim: Aim, origin: Vector3): Entity?
 	local to, ignored = line_to(shooter, aim)
 	local blocker = spatial.first_blocker(origin, to, shooter.id, ignored)
 	if blocker ~= nil then
 		return blocker
 	end
-	local wreck = spatial.first_wreck(origin, to, shooter.id, ignored)
-	if wreck ~= nil then
-		return wreck
+	local remains = spatial.first_remains(origin, to, shooter.id, ignored)
+	if remains ~= nil then
+		return remains
 	end
 	return target_of(aim)
 end

@@ -2,7 +2,7 @@
 -- The modes the cursor can be put in to give an order with the next click, as data: one entry per mode, each saying
 -- which key starts it, who among the selection can take part, and what a click, a dragged line or a dragged circle
 -- sends (as order kinds, shared/order_kinds.luau). Everything that handles a mode reads it from here: the keys and
--- clicks (command_input.luau), what the cursor lights, the command panel's rows and the hint under the cursor.
+-- clicks (command_input.luau), what the cursor lights, the command panel's rows and the badge on the cursor.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -52,8 +52,9 @@ export type ModeInfo = {
 	active_only: boolean,
 	-- whether something of `def` can take part
 	can: (def: EntityDef) -> boolean,
-	-- what the cursor lights things in while it is on, if not the usual colour
-	color: Color3?,
+	-- its colour: what the cursor lights things in while it is on, its badge by the cursor and the outlines of those
+	-- selected who take part
+	color: Color3,
 	-- its icon in the command panel (Shared.ui_art), if it has one
 	icon: string?,
 }
@@ -103,6 +104,7 @@ local MODES: { ModeInfo } = table.freeze({
 		launch = false,
 		active_only = false,
 		can = can_go,
+		color = order_colors.of "fight",
 		icon = "icon_fight",
 	} :: ModeInfo),
 	table.freeze({
@@ -142,6 +144,7 @@ local MODES: { ModeInfo } = table.freeze({
 		active_only = false,
 		can = works "resurrect",
 		color = order_colors.of "resurrect",
+		icon = "icon_resurrect",
 	} :: ModeInfo),
 	table.freeze({
 		mode = "load",
@@ -152,6 +155,7 @@ local MODES: { ModeInfo } = table.freeze({
 		launch = false,
 		active_only = false,
 		can = carries,
+		color = order_colors.of "load",
 	} :: ModeInfo),
 	table.freeze({
 		mode = "unload",
@@ -163,6 +167,7 @@ local MODES: { ModeInfo } = table.freeze({
 		launch = false,
 		active_only = false,
 		can = carries,
+		color = order_colors.of "unload",
 	} :: ModeInfo),
 	table.freeze({
 		mode = "guard",
@@ -175,6 +180,7 @@ local MODES: { ModeInfo } = table.freeze({
 		can = function(_: EntityDef): boolean
 			return true
 		end,
+		color = order_colors.of "guard",
 		icon = "icon_guard",
 	} :: ModeInfo),
 	table.freeze({
@@ -188,6 +194,7 @@ local MODES: { ModeInfo } = table.freeze({
 		can = function(def: EntityDef): boolean
 			return def.manual_weapon ~= nil
 		end,
+		color = order_colors.of "dgun",
 		icon = "icon_disintegrator",
 	} :: ModeInfo),
 	table.freeze({
@@ -202,6 +209,7 @@ local MODES: { ModeInfo } = table.freeze({
 		can = function(def: EntityDef): boolean
 			return unit_defs.order_range(def, true) ~= nil
 		end,
+		color = order_colors.of "attack",
 		icon = "icon_missile",
 	} :: ModeInfo),
 })
@@ -227,23 +235,8 @@ local function for_key(key: string): { ModeInfo }
 	return found
 end
 
--- What the hint under the cursor says while `info`'s mode is on: its name and key, what a drag in it does, what shift
--- does (keeps the mode for another click; a manual weapon's shots queue), and how to leave it.
-local function hint_of(info: ModeInfo): string
-	local parts = { `{string.upper(info.label)} ({info.key})` }
-	if info.area ~= nil then
-		table.insert(parts, "drag for an area")
-	elseif info.line ~= nil then
-		table.insert(parts, "drag to spread")
-	end
-	table.insert(parts, if info.click == "manual" then "shift queues" else "shift keeps")
-	table.insert(parts, "right click cancels")
-	return table.concat(parts, " · ")
-end
-
 return table.freeze({
 	all = MODES,
-	hint_of = hint_of,
 	get = get,
 	for_key = for_key,
 	can_go = can_go,

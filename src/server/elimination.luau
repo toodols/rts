@@ -40,6 +40,9 @@ export type Evaluator = {
 	look: (sides: { Side }) -> ({ boolean }, Standing),
 	-- Forgets what was on the field, for a game that starts over.
 	reset: () -> (),
+	-- What it remembers, to be kept with the rest of the game (server/snapshot), and it put back to what was kept.
+	kept: () -> any,
+	put_back: (saved: any) -> (),
 }
 
 -- Whether `entity` is something that keeps a side in by `end_mode`.
@@ -116,9 +119,19 @@ local function new(): Evaluator
 		table.clear(fielded)
 	end
 
+	local function kept(): any
+		return fielded
+	end
+
+	local function put_back(saved: any)
+		fielded = saved
+	end
+
 	return table.freeze({
 		look = look,
 		reset = reset,
+		kept = kept,
+		put_back = put_back,
 	})
 end
 

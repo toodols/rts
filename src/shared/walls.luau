@@ -104,8 +104,22 @@ local function blocked_at(x: number, z: number): boolean
 	return buffer.readu8(counts, cz * width + cx) > 0
 end
 
+-- Every wall as it stands, and the generation of the map they were marked on, for what keeps the game (server/snapshot);
+-- and every wall put back as they were kept, on a map of the same size.
+export type Kept = { counts: buffer, generation: number }
+local function kept(): Kept
+	return { counts = counts, generation = generation }
+end
+local function put_back(saved: Kept)
+	assert(buffer.len(saved.counts) == width * depth, "walls kept on a map of another size")
+	counts = saved.counts
+	generation = saved.generation
+end
+
 return table.freeze({
 	reset = reset,
+	kept = kept,
+	put_back = put_back,
 	cells_of = cells_of,
 	add = add,
 	remove = remove,

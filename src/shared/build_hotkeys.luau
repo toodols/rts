@@ -62,14 +62,16 @@ local CATEGORIES: { Category } = table.freeze({
 	}),
 	category("Combat", "X", {
 		{ key = "Z", defs = { "scorpion", "guard" } },
-		{ key = "X", defs = { "pulsar", "twin_guard" } },
+		-- the floating ones where BAR's commander has them, beside the land ones it cannot build
+		{ key = "X", defs = { "pulsar", "twin_guard", "urchin" } },
 		{ key = "C", defs = { "warden", "persecutor" } },
 		{ key = "W", defs = { "agitator", "calamity" } },
 		{ key = "D", defs = { "eradicator", "prevailer" } },
 		{ key = "A", defs = { "thistle" } },
-		{ key = "S", defs = { "screamer" } },
+		{ key = "S", defs = { "screamer", "slingshot" } },
 		{ key = "V", defs = { "catalyst" } },
 		{ key = "E", defs = { "apocalypse" } },
+		{ key = "R", defs = { "coral" } },
 	}),
 	category("Utility", "C", {
 		{ key = "Z", defs = { "wall" } },
@@ -84,6 +86,7 @@ local CATEGORIES: { Category } = table.freeze({
 		{ key = "V", defs = { "shipyard" } },
 		{ key = "C", defs = { "air_lab", "advanced_construction_turret" } },
 		{ key = "Q", defs = { "hovercraft_platform" } },
+		{ key = "W", defs = { "seaplane_platform" } },
 	}),
 })
 

@@ -14,6 +14,7 @@ local instances = require(script.instances)
 local warp = require(script.warp)
 local profiler = require(script.profiler)
 local pregame = require(script.pregame)
+local roblox_teams = require(script.roblox_teams)
 local sharing = require(script.sharing)
 local missions = require(script.missions)
 local simulation = require(script.simulation)
@@ -83,6 +84,8 @@ end
 local function on_heartbeat(delta: number)
 	-- nothing steps until every player is ready and the countdown is out
 	pregame.tick()
+	-- Roblox's teams follow the game's, for team chat, before the game has begun and while it is paused too
+	roblox_teams.sync()
 	-- and once it is over it keeps going, for anyone who would rather play on than look at the end screen (see
 	-- client/ui/victory_screen.luau)
 	if game_phase.has_begun() == false or switches.is_on "paused" then

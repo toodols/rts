@@ -23,9 +23,9 @@
 -- A building picked from the build menu, or by its key (shared/build_hotkeys.luau), is placed by a left click, or with
 -- shift dragged out into a line, and with alt as well a grid; [ and ] turn it, and a right click puts it down.
 --
--- G stops everything selected, ctrl+B sets it to destroy itself, Q selects everything on screen of the same kind, Tab
--- selects your commanders in turn, T opens and closes the player list, P pilots a unit (pilot.luau), and Escape
--- closes the player list and ends whatever the cursor was doing.
+-- G stops everything selected, ctrl+B sets it to destroy itself, K switches its shields, Q selects everything on screen of
+-- the same kind, Tab selects your commanders in turn, T opens and closes the player list, P pilots a unit (pilot.luau),
+-- and Escape closes the player list and ends whatever the cursor was doing.
 --
 -- A spectator commands nothing: the left button selects, to look at what it selects, and Q, T and Escape do what they
 -- do, and nothing else is heard.
@@ -60,6 +60,7 @@ local picking = require(ReplicatedStorage.Client.picking)
 local placing = require(ReplicatedStorage.Client.placing)
 local drag_trace = require(ReplicatedStorage.Client.drag_trace)
 local hover = require(ReplicatedStorage.Client.hover)
+local mode_aim = require(ReplicatedStorage.Client.mode_aim)
 
 type State = command_state.State
 type ModeInfo = order_modes.ModeInfo
@@ -266,6 +267,7 @@ local KEYS: { [Enum.KeyCode]: () -> () } = table.freeze({
 	end,
 	[Enum.KeyCode.Tab] = picking.cycle_commander,
 	[Enum.KeyCode.P] = pilot.take_selected,
+	[Enum.KeyCode.K] = commands.toggle_shield,
 })
 
 -- The keys a spectator has: those that select, or open and close the player list.
@@ -360,7 +362,9 @@ local function on_render()
 	local placing_at = if state.kind == "placing" then placing.preview(state.def_name, state.from) else nil
 	hover.render(state, placing_at)
 	if state.kind == "mode" then
-		preview_mode(order_modes.get(state.mode), state.drag)
+		local info = order_modes.get(state.mode)
+		mode_aim.render(info, state.drag)
+		preview_mode(info, state.drag)
 	elseif state.kind == "ordering" then
 		drag_trace.preview(#selected.movers(), "move", true)
 	elseif state.kind == "selecting" then
@@ -379,6 +383,9 @@ local function on_state_changed(now: State, before: State)
 	local still_same_mode = now.kind == "mode" and before.kind == "mode" and now.mode == before.mode
 	if before.kind == "mode" and order_modes.get(before.mode).click == "manual" and still_same_mode == false then
 		markers.hide_blast()
+	end
+	if before.kind == "mode" and now.kind ~= "mode" then
+		mode_aim.clear()
 	end
 	if before.kind == "placing" and before.from ~= nil and (now.kind ~= "placing" or now.from == nil) then
 		build_mode.clear_preview()
@@ -429,6 +436,7 @@ local function on_covered(now: boolean)
 	if now then
 		command_state.to_idle()
 		hover.clear()
+		mode_aim.clear()
 	end
 end
 

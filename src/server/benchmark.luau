@@ -62,8 +62,8 @@ local running = false
 
 -- Whether the arena's whole footprint, corner at (x, z), is dry enough to spawn land units on: a coarse sample of the
 -- corner, the far inward corner of the footprint, and its centre. A map preset can just as easily put ocean in the
--- corner this used to assume was always safe, and a land unit (whose footing's max_depth is 0, most of them) spawned in
--- water it cannot tolerate drowns within moments of existing - exactly what happened to the "idle" scenario's grunts.
+-- corner this used to assume was always safe, and a land unit (which wades no deeper than 20 elmos, most of them) spawned
+-- in water it cannot tolerate drowns within moments of existing - exactly what happened to the "idle" scenario's grunts.
 local function arena_is_dry(x: number, z: number): boolean
 	for _, sample in
 		{

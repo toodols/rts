@@ -13,15 +13,20 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local SoundService = game:GetService "SoundService"
 local Workspace = game:GetService "Workspace"
 
-local sound_ids = require(ReplicatedStorage.ClientShared.sound_ids)
+-- a sound's uploaded asset id; one made but not uploaded yet has none
+local sound_ids: { [string]: string? } = require(ReplicatedStorage.ClientShared.sound_ids) :: any
 
 export type SoundName =
 	"laser"
+	| "heat_ray"
+	| "pulsar"
 	| "cannon"
 	| "explosion_small"
 	| "explosion_large"
 	| "dgun"
 	| "anti_air"
+	| "torpedo"
+	| "torpedo_hit"
 	| "click"
 	| "notify"
 
@@ -37,15 +42,56 @@ type Kind = {
 	-- it is cut off at `far`. At the camera's usual height the ground in the middle of the view is about 80 away.
 	near: number?,
 	far: number?,
+	-- what is played in its place while it has not been uploaded (has no id in sound_ids)
+	stand_in: SoundName?,
 }
 
 local KINDS: { [SoundName]: Kind } = {
 	laser = { volume = 0.49, gap = 0.035, most = 6, pitch_spread = 0.08, near = 30, far = 500 },
+	-- heavier than the laser, and louder: a heat ray is a much bigger gun
+	heat_ray = {
+		volume = 1.26,
+		gap = 0.04,
+		most = 5,
+		pitch_spread = 0.07,
+		near = 35,
+		far = 650,
+		stand_in = "laser",
+	},
+	-- the biggest beam there is, heard across the battlefield
+	pulsar = {
+		volume = 1.78,
+		gap = 0.15,
+		most = 3,
+		pitch_spread = 0.04,
+		near = 60,
+		far = 1200,
+		stand_in = "laser",
+	},
 	cannon = { volume = 1.43, gap = 0.04, most = 6, pitch_spread = 0.1, near = 30, far = 600 },
 	explosion_small = { volume = 2.73, gap = 0.05, most = 5, pitch_spread = 0.12, near = 40, far = 800 },
 	explosion_large = { volume = 2.32, gap = 0.12, most = 3, pitch_spread = 0.08, near = 60, far = 1400 },
 	dgun = { volume = 1.6, gap = 0.1, most = 3, pitch_spread = 0.05, near = 40, far = 900 },
 	anti_air = { volume = 1.4, gap = 0.04, most = 6, pitch_spread = 0.06, near = 30, far = 600 },
+	-- a torpedo's launch and a blast under water (a torpedo's or a depth charge's), both muffled by the water
+	torpedo = {
+		volume = 1.23,
+		gap = 0.04,
+		most = 6,
+		pitch_spread = 0.08,
+		near = 30,
+		far = 600,
+		stand_in = "cannon",
+	},
+	torpedo_hit = {
+		volume = 3,
+		gap = 0.05,
+		most = 5,
+		pitch_spread = 0.1,
+		near = 40,
+		far = 800,
+		stand_in = "explosion_small",
+	},
 	click = { volume = 0.66, gap = 0.03, most = 2, pitch_spread = 0 },
 	-- loud enough to be heard over a battle, since a ping is a call for attention
 	notify = { volume = 1.2, gap = 0.08, most = 2, pitch_spread = 0 },
@@ -70,10 +116,13 @@ local function all_voices(): { [SoundName]: { Voice } }
 	local sounds: { Instance } = {}
 	for name, kind in KINDS do
 		made[name] = {}
+		if sound_ids[name] == nil then
+			continue
+		end
 		for _ = 1, kind.most do
 			local sound = Instance.new "Sound"
 			sound.Name = name
-			sound.SoundId = sound_ids[name]
+			sound.SoundId = sound_ids[name] :: string
 			sound.SoundGroup = group
 			local anchor: Attachment? = nil
 			if kind.near ~= nil and kind.far ~= nil then
@@ -132,6 +181,13 @@ end
 -- Plays a sound from a point in the world. `volume_scale` and `pitch` shape one play of it (a nuke is a big
 -- explosion played slow and loud). Anything too far from the camera to be heard is not played at all.
 local function play_at(name: SoundName, at: Vector3, volume_scale: number?, pitch: number?)
+	if sound_ids[name] == nil then
+		local stand_in = KINDS[name].stand_in
+		if stand_in == nil then
+			return
+		end
+		name = stand_in
+	end
 	local camera = Workspace.CurrentCamera
 	if camera == nil then
 		return

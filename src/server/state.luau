@@ -10,6 +10,7 @@ local teams = require(ReplicatedStorage.Shared.teams)
 local skins = require(ReplicatedStorage.Shared.skins)
 
 local economy_settings = require(script.Parent.economy_settings)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -501,6 +502,40 @@ local function reap()
 		drop_hold(id)
 	end
 end
+
+-- The world is kept whole: every entity, the ones in holds among them, every team, and the clock. Nothing is waiting
+-- to join it between steps, and each index is filled again from what is back.
+snapshot.keep("state", function()
+	assert(stepping == false and next(spawning) == nil, "the world is only kept between steps")
+	return {
+		entities = entities,
+		holds = holds,
+		carriers = carriers,
+		teams = team_records,
+		next_entity_id = next_entity_id,
+		membership = membership,
+		elapsed = elapsed,
+	}
+end, function(saved)
+	assert(stepping == false, "the world is only put back between steps")
+	entities = saved.entities
+	holds = saved.holds
+	carriers = saved.carriers
+	team_records = saved.teams
+	next_entity_id = saved.next_entity_id
+	membership = saved.membership
+	elapsed = saved.elapsed
+	spawning = {}
+	carried_list = nil
+	for _, index in indexes do
+		table.clear(index.members)
+		for id, entity in entities do
+			if index.has(entity.def) then
+				index.members[id] = entity
+			end
+		end
+	end
+end)
 
 return table.freeze({
 	RECLAIMABLE_BUILDPOWER_FRACTION = RECLAIMABLE_BUILDPOWER_FRACTION,

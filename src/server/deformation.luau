@@ -30,6 +30,9 @@ local state = require(script.Parent.state)
 local outbox = require(script.Parent.outbox)
 local placement = require(script.Parent.placement)
 local spatial = require(script.Parent.spatial)
+local snapshot = require(script.Parent.snapshot)
+local passability = require(ReplicatedStorage.Shared.passability)
+local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 
 type Entity = types.Entity
 
@@ -159,6 +162,39 @@ end
 local function discard_pending()
 	table.clear(pending)
 end
+
+-- The ground is kept as the edits made to it, on the map it was generated as, which a game can only be put back onto.
+-- Once it is back, with the walls on it (obstacles.luau), what can be walked is worked out again all over, and what
+-- moved is drawn and sent as any crater is.
+local restored_changes: { number } = {}
+snapshot.keep("ground", function()
+	local map = map_state.get()
+	return {
+		preset = if map ~= nil then map.preset else nil,
+		seed = if map ~= nil then map.seed else nil,
+		edits = heightmap.kept_edits(),
+		pending = pending,
+	}
+end, function(saved)
+	local map = map_state.get()
+	assert(
+		map ~= nil and map.preset == saved.preset and map.seed == saved.seed,
+		`a game kept on {saved.preset} ({saved.seed}) can only be put back on that map`
+	)
+	restored_changes = heightmap.put_back_edits(saved.edits)
+	pending = saved.pending
+end)
+snapshot.rebuild("ground", function()
+	local cells_x, cells_z = heightmap.cells()
+	passability.refresh(0, 0, cells_x - 1, cells_z - 1)
+	pathfinder.reset()
+	local changes = restored_changes
+	restored_changes = {}
+	if #changes > 0 then
+		local first_x, first_z, last_x, last_z = ground.edited_cells(changes)
+		outbox.ground_edited(changes, first_x, first_z, last_x, last_z)
+	end
+end)
 
 return table.freeze({
 	init = init,

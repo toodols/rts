@@ -700,9 +700,14 @@ local function fly_projectiles(real_delta: number)
 	end
 end
 
--- The sound of an explosion drawn `radius` across at `at`.
-local function explosion_sound(at: Vector3, radius: number)
-	if radius >= LARGE_EXPLOSION_RADIUS then
+-- The sound of an explosion drawn `radius` across at `at`: under water (a torpedo's or a depth charge's), a muffled boom
+-- of any size.
+local function explosion_sound(at: Vector3, radius: number, underwater: boolean?)
+	if underwater == true then
+		local loudness =
+			math.clamp(radius / EXPLOSION_REFERENCE_RADIUS, SMALL_EXPLOSION_QUIETEST, SMALL_EXPLOSION_LOUDEST)
+		sounds.play_at("torpedo_hit", at, loudness)
+	elseif radius >= LARGE_EXPLOSION_RADIUS then
 		sounds.play_at("explosion_large", at)
 	else
 		local loudness =
@@ -711,21 +716,24 @@ local function explosion_sound(at: Vector3, radius: number)
 	end
 end
 
--- The sound of `weapon` firing, from `at` (its kind's `sound`).
+-- The sound of `weapon` firing, from `at`.
 local function firing_sound(weapon: types.Weapon, at: Vector3)
-	local sound = weapon_kinds.get(weapon.kind).sound
+	local sound = weapon_kinds.sound_of(weapon)
 	sounds.play_at(sound.name, at, 1, sound.pitch)
 end
 
--- A projectile was launched: it is drawn flying, and heard leaving.
+-- A projectile was launched: it is drawn flying, and heard leaving, unless it is one of the shots a shell split into,
+-- which leave nothing to be heard.
 local function on_launched(event: shot_events.Launched)
-	local weapon = shot_events.weapon_of(event)
+	local weapon = shot_events.weapon_of(event, event.split)
 	local delivery = weapon.delivery
 	if delivery.kind == "beam" then
 		return
 	end
 	launch_projectile(event, weapon, delivery)
-	firing_sound(weapon, event.from)
+	if event.split ~= true then
+		firing_sound(weapon, event.from)
+	end
 end
 
 -- A projectile went off. A piercing shot going off inside what it is going through flies on, and is not heard for
@@ -735,6 +743,8 @@ local function on_impact(event: shot_events.Impact)
 		draw_explosion(event.at, event.radius * 2)
 		return
 	end
+	local flying = projectiles[event.id]
+	local underwater = flying ~= nil and flying.delivery.kind == "torpedo"
 	local look = remove_projectile(event.id)
 	if event.how == "airburst" then
 		draw_airburst(event.at, event.radius)
@@ -747,7 +757,7 @@ local function on_impact(event: shot_events.Impact)
 		explosion_sound(event.at, event.radius)
 	else
 		draw_explosion(event.at, event.radius * 2)
-		explosion_sound(event.at, event.radius * 2)
+		explosion_sound(event.at, event.radius * 2, underwater)
 	end
 end
 

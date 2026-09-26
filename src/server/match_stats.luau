@@ -14,6 +14,7 @@ local match_report = require(ReplicatedStorage.Shared.match_report)
 
 local state = require(script.Parent.state)
 local players = require(script.Parent.players)
+local snapshot = require(script.Parent.snapshot)
 
 type TeamId = types.TeamId
 
@@ -107,6 +108,12 @@ local function init()
 		end
 	end)
 end
+
+snapshot.keep("match_stats", function()
+	return { tallies = tallies }
+end, function(saved)
+	tallies = saved.tallies
+end)
 
 return table.freeze({
 	dealt = dealt,

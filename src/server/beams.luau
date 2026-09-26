@@ -20,7 +20,9 @@ local sight = require(script.Parent.sight)
 local spatial = require(script.Parent.spatial)
 local damage = require(script.Parent.damage)
 local muzzles = require(script.Parent.muzzles)
+local shields = require(script.Parent.shields)
 local shot_feed = require(script.Parent.shot_feed)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -41,6 +43,15 @@ type Burning = {
 }
 local burning: { Burning } = {}
 
+-- `amount` of `attacker`'s `weapon`'s harm comes to `struck`, as `damage.hit` has it, less what a shield round `struck`
+-- that blocks everything takes of it, unless `attacker` is inside that shield too.
+local function strike(attacker: Entity, struck: Entity, amount: number, weapon: Weapon, direct: boolean)
+	local left = shields.shelter(struck, amount, attacker.team, shields.covering(attacker.position))
+	if left > 0 then
+		damage.hit(struck, left, weapon, attacker.id, attacker.team, direct)
+	end
+end
+
 -- How many ticks `beam` burns for, and so how many slices its damage comes in: at least one, for a beam that is up for
 -- less than a tick, or has no time at all.
 local function slices_of(beam: types.Beam): number
@@ -53,7 +64,7 @@ local function burn(attacker: Entity, weapon: Weapon, index: number, beam: types
 	local slices = slices_of(beam)
 	local slice = weapon.damage / slices
 	if struck ~= nil then
-		damage.hit(struck, slice, weapon, attacker.id, attacker.team, true)
+		strike(attacker, struck, slice, weapon, true)
 	end
 	if slices > 1 then
 		local target = sight.target_of(aim)
@@ -129,7 +140,7 @@ local function spark(
 	for index = 1, math.min(lightning.forks, #near) do
 		local other = near[index]
 		table.insert(ends, other.position)
-		damage.hit(other, weapon.damage * lightning.fork_damage, weapon, attacker.id, attacker.team, false)
+		strike(attacker, other, weapon.damage * lightning.fork_damage, weapon, false)
 	end
 	return ends
 end
@@ -208,7 +219,7 @@ local function tick()
 			end
 		end
 		if shooter ~= nil and struck ~= nil then
-			damage.hit(struck, beam.slice, beam.weapon, shooter.id, shooter.team, true)
+			strike(shooter, struck, beam.slice, beam.weapon, true)
 		end
 		beam.slices_left -= 1
 		if lit == false or beam.slices_left <= 0 then
@@ -219,6 +230,12 @@ local function tick()
 		end
 	end
 end
+
+snapshot.keep("beams", function()
+	return { burning = burning }
+end, function(saved)
+	burning = saved.burning
+end)
 
 return table.freeze({
 	fire = fire,

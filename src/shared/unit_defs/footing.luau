@@ -30,11 +30,17 @@ local LAND = footing(nil, "ground", 0, 0, 0)
 -- aircraft, which lands wherever it is.
 local ANYWHERE = footing(nil, "ground", math.huge, 0, 0)
 
--- A unit that moves by movement class `class`. `max_depth` is for a unit whose own file lets it into deeper water than
--- its class does.
-local function moves(class: MoveClassName, max_depth: number?): Footing
+-- A building that stands on the ground, dry or under water no deeper than `max_depth`, its own file's
+-- `maxwaterdepth`, which is what holds a building in BAR.
+local function shallows(max_depth: number): Footing
+	return footing(nil, "ground", max_depth, 0, 0)
+end
+
+-- A unit that moves by movement class `class`, into water as deep as its class goes. A unit's own file's
+-- `maxwaterdepth` is not used: BAR's engine holds a unit that moves by its class's alone.
+local function moves(class: MoveClassName): Footing
 	local move = move_classes.get(class)
-	return footing(class, move.water, max_depth or move.max_water_depth or math.huge, 0, 0)
+	return footing(class, move.water, move.max_water_depth or math.huge, 0, 0)
 end
 
 -- A ship of movement class `class`, which needs water at least `min_depth` deep, from its own file (BAR's
@@ -53,6 +59,7 @@ end
 return table.freeze({
 	LAND = LAND,
 	ANYWHERE = ANYWHERE,
+	shallows = shallows,
 	moves = moves,
 	ship = ship,
 	afloat = afloat,

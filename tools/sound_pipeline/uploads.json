@@ -24,6 +24,10 @@
       "id": "124363757202063",
       "sha256": "70eb293c54c682b3eafab0bc0625153b8d4470f415ec18bad05b194ee76fd8d4"
     },
+    "heat_ray": {
+      "id": "111952315112669",
+      "sha256": "f8ed78fda4b12aeb3db5e740a83815c213fa6d6ff8a7c0df0d834da5e47c1f83"
+    },
     "laser": {
       "id": "109742071750414",
       "sha256": "c7c18a8a1f44fe1f5a8466c61d9b007eb4ae76353e91fb91d48e51d312c67452"
@@ -31,6 +35,10 @@
     "notify": {
       "id": "124115317599599",
       "sha256": "cd4c12321076f2ff5921642f8cee97a6c77eacada3089c51aa4ff29cdbe0040a"
+    },
+    "pulsar": {
+      "id": "95119478653746",
+      "sha256": "2e69cd632b442c66ff1188f33a432a7fa43c45ad27c63164302688864b734d66"
     }
   }
 }

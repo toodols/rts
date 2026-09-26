@@ -27,6 +27,7 @@ local roster = require(script.Parent.roster)
 local units = require(script.Parent.units)
 local sites = require(script.Parent.sites)
 local boss = require(script.Parent.boss)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -434,6 +435,20 @@ local function reset()
 	table.clear(beacons)
 	next_reroll_at = 0
 end
+
+snapshot.keep("scavenger_beacons", function()
+	return {
+		opened = opened,
+		next_beacon_at = next_beacon_at,
+		beacons = beacons,
+		next_reroll_at = next_reroll_at,
+	}
+end, function(saved)
+	opened = saved.opened
+	next_beacon_at = saved.next_beacon_at
+	beacons = saved.beacons
+	next_reroll_at = saved.next_reroll_at
+end)
 
 return table.freeze({
 	open_once = open_once,

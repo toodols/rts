@@ -38,33 +38,31 @@
 	z-index: 110;
 }
 
-// The hint for a reclaim, repair or disintegrator mode: the same plate as the placement hint, but lit, so
-// it reads as something the cursor is doing rather than a tip.
-.mode-hint {
-	color: var(--Accent);
-	outline: 1px solid var(--Accent);
+// The badge of the mode that is on, riding just off the cursor's tip. The position is the cursor's and comes from
+// the component.
+.mode-cursor {
+	position: absolute;
+	width: auto;
+	height: auto;
+	background-color: transparent;
+	pointer-events: none;
+	z-index: 110;
 }
 
-// Attacking is red, the same red as danger.
-.mode-hint.attack {
-	color: var(--Danger);
-	outline: 1px solid var(--Danger);
+// A mode's icon, lit in its colour by the component.
+.mode-cursor-icon {
+	width: 28px;
+	height: 28px;
+	background-color: transparent;
 }
 
-// Fighting is orange: an attack that is also on the move.
-.mode-hint.fight {
-	color: var(--Fight);
-	outline: 1px solid var(--Fight);
-}
-
-// Repairing is yellow, the same yellow as energy.
-.mode-hint.repair {
-	color: var(--Energy);
-	outline: 1px solid var(--Energy);
-}
-
-// Resurrecting is purple.
-.mode-hint.resurrect {
-	color: var(--Resurrect);
-	outline: 1px solid var(--Resurrect);
+// A mode with no icon is named instead, in its colour, which comes from the component.
+.mode-cursor-label {
+	width: auto;
+	height: auto;
+	padding: space(1) space(2);
+	background-color: veil($void, 0.82);
+	font-family: RobotoMono;
+	font-size: 12px;
+	white-space: nowrap;
 }

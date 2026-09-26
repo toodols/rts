@@ -21,6 +21,12 @@ export type Description = {
 local DESCRIPTIONS: { [string]: Description } = {
 	-- Builders
 
+	commander = {
+		tips = {
+			"Shift keeps a command on for another click.",
+			"Drag Attack, Reclaim, Repair or Resurrect for an area.",
+		},
+	},
 	construction_bot = {
 		tips = { "Shift-click queues several buildings." },
 	},
@@ -121,6 +127,12 @@ local DESCRIPTIONS: { [string]: Description } = {
 		text = "Only torpedoes can hit it.",
 	},
 	sea_dragon = {
+		text = "Only torpedoes can hit it.",
+	},
+	predator = {
+		text = "Only torpedoes can hit it.",
+	},
+	kraken = {
 		text = "Only torpedoes can hit it.",
 	},
 

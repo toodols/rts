@@ -18,6 +18,7 @@ local deaths = require(ServerScriptService.Server.deaths)
 
 local progress = require(script.Parent.progress)
 local sites = require(script.Parent.sites)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -93,6 +94,13 @@ local function reset()
 	came = false
 	fallen = nil
 end
+
+snapshot.keep("scavenger_boss", function()
+	return { came = came, fallen = fallen }
+end, function(saved)
+	came = saved.came
+	fallen = saved.fallen
+end)
 
 return table.freeze({
 	summon = summon,

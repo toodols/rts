@@ -7,8 +7,8 @@ local TERRAIN_BASE_HEIGHT = 4
 local TERRAIN_FLOOR_HEIGHT = -48
 
 -- The sea. Ground below this height is under water, as deep as the ground is far under it. Whether a
--- thing may stand there is up to its def: land units cannot, amphibious ones like the commander can, and
--- ships need it.
+-- thing may stand there is up to its def: land units wade only into the shallows, amphibious ones like the
+-- commander go anywhere, and ships need it.
 local WATER_LEVEL = 0
 -- Ground counts as dry land, for a start, a vent or scenery to be put on, only this far above the water.
 local DRY_GROUND_MARGIN = 0.5

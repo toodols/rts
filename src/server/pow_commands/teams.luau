@@ -9,7 +9,6 @@ local ServerScriptService = game:GetService "ServerScriptService"
 
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local pow_types = require(ReplicatedStorage.Shared.pow_types)
-local skin_defs = require(ReplicatedStorage.Shared.skins)
 local teams = require(ReplicatedStorage.Shared.teams)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
@@ -49,7 +48,7 @@ end
 return function(extras: pow_types.Extras)
 	local commands = extras.commands
 
-	commands.ally = {
+	commands.team_ally = {
 		description = "Allies two teams. It is transitive: their allies become allies of each other too. Allies do "
 			.. "not shoot each other.",
 		permissions = { "admin" },
@@ -77,7 +76,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.unally = {
+	commands.team_unally = {
 		description = "Takes a team out of whatever alliance it is in. The teams it leaves stay allied with each other.",
 		permissions = { "admin" },
 		overloads = {
@@ -102,7 +101,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.list_teams = {
+	commands.team_list = {
 		description = "Lists every team: its number, name, who plays it, its allies and what it has in the bank.",
 		permissions = { "admin" },
 		overloads = {
@@ -117,7 +116,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.team_stats = {
+	commands.team_info = {
 		description = "Shows a team's bank, income, forces and what it has done this game: your own team, or the one "
 			.. "given.",
 		permissions = { "admin" },
@@ -162,7 +161,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.newteam = {
+	commands.team_new = {
 		description = "Makes a new team with the given name and puts a commander down for it, as if a player had joined.",
 		permissions = { "admin" },
 		overloads = {
@@ -187,12 +186,11 @@ return function(extras: pow_types.Extras)
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = { { name = "Team", type = "number" } } },
-			{ returns = "nil", args = { { name = "Player", type = "player" }, { name = "Team", type = "number" } } },
+			{ returns = "nil", args = { { name = "Team", type = "number" }, { name = "Player", type = "player" } } },
 		},
 		server_run = function(context: Context)
-			local joining = context.args[2] ~= nil
-			local target: Player = if joining then context.args[1] else context.executor
-			local team_id: number = if joining then context.args[2] else context.args[1]
+			local team_id: number = context.args[1]
+			local target = target_player(context, 2)
 			local ok, why = team_moves.join(target, team_id)
 			local team = state.get_team(team_id)
 			context:log({
@@ -217,11 +215,11 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.skin = {
+	commands.team_skin = {
 		description = "Puts a team in a skin, and everything it has with it: your own team, or the one given. "
 			.. "Every skin is open to this command, the developer-only golden one too. It lasts until someone on the "
-			.. "team equips a skin, and is not saved: to change what a player wears for good, use equip. With no "
-			.. "arguments it says which skin your team wears and which there are.",
+			.. "team equips a skin, and is not saved: to change what a player wears for good, skin_equip. With no "
+			.. "arguments it says which skin your team wears.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -236,13 +234,7 @@ return function(extras: pow_types.Extras)
 			end
 			local skin_name = context.args[1]
 			if skin_name == nil then
-				context:log({
-					type = "info",
-					value = `Team {team_id} wears {skins.of_team(team_id) or "nothing"}; the skins are {table.concat(
-						skin_defs.names(),
-						", "
-					)}`,
-				})
+				context:log({ type = "info", value = `Team {team_id} wears {skins.of_team(team_id) or "nothing"}` })
 				return
 			end
 			local ok = skins.set_team(team_id, skin_name)
@@ -253,7 +245,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.give = {
+	commands.spawn = {
 		description = "Spawns a finished unit or building for a team at (X, Z) right now, for testing. It still needs "
 			.. "room to stand.",
 		permissions = { "admin" },
@@ -261,7 +253,7 @@ return function(extras: pow_types.Extras)
 			{
 				returns = "nil",
 				args = {
-					{ name = "DefName", type = "unit" },
+					{ name = "Def", type = "unit" },
 					{ name = "Team", type = "number" },
 					{ name = "X", type = "number" },
 					{ name = "Z", type = "number" },
@@ -286,7 +278,7 @@ return function(extras: pow_types.Extras)
 			context:log({
 				type = if entity ~= nil then "info" else "error",
 				value = if entity ~= nil
-					then `Gave team {team_id} a {def_name} at ({x}, {z})`
+					then `Spawned a {def_name} for team {team_id} at ({x}, {z})`
 					else `No room for a {def_name} near ({x}, {z})`,
 			})
 		end,

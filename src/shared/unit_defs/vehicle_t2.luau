@@ -82,7 +82,7 @@ local defs: { [string]: EntityDef } = {
 	-- bar: legvcarry
 	mantis = {
 		name = "mantis",
-		footing = footing.moves("HTANK4", studs(12)),
+		footing = footing.moves "HTANK4",
 		display_name = "Mantis",
 		subtitle = "Drone carrier",
 		kind = "unit",

@@ -631,7 +631,8 @@ local function Live(props: { view: EntityView, def: types.EntityDef, features: H
 		else view.health / math.max(1, view.max_health)
 
 	local gauges = {
-		Shield = if view.shield ~= nil
+		-- a full shield is not worth a row
+		Shield = if view.shield ~= nil and view.shield.value < view.shield.most
 			then React.createElement(GaugeRow, {
 				label = "SHIELD",
 				gauge = view.shield,

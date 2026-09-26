@@ -57,9 +57,7 @@ local function fire(shooter: Entity, aim: Vector3): Result
 	local middle = shooter.position + direction * (weapon.range / 2)
 	local extent = math.sqrt((weapon.range / 2) ^ 2 + weapon.radius ^ 2)
 	spatial.each_collider_near(middle.X, middle.Z, extent, function(other: Entity, reach: number)
-		-- it sweeps the ground, so an aircraft that is up in the air is over it, and so is what hangs from a transport;
-		-- a reclaimable is not harmed by it, as it is by nothing (`damage_immunity`), and is not among the colliders at
-		-- all
+		-- it sweeps the ground, so an aircraft that is up in the air is over it, and so is what hangs from a transport
 		if
 			other.id == shooter.id
 			or air.is_airborne(other)

@@ -11,8 +11,9 @@
 -- (server/projectiles.luau); a lightning gun's sparks jump to friend and foe alike. Whether what is struck is harmed is
 -- decided here, the same for all of them.
 --
--- What is immune (`EntityDef.damage_immunity`: a reclaimable, or what only a disintegrator can harm) takes nothing from
--- either. Without ally griefing, an ally's weapon does nothing (`alliances.may_harm`).
+-- What is immune (`EntityDef.damage_immunity`: what only a disintegrator can harm) takes nothing from either. Remains
+-- are not: a wreck, a rock or a tree is worn down by what strikes it and is gone when its health runs out, as BAR's
+-- features are. Without ally griefing, an ally's weapon does nothing (`alliances.may_harm`).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 

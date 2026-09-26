@@ -6,7 +6,8 @@ Run via Blender itself (bpy only exists inside Blender):
 
 By default it writes the game icon, marketing/icon.png (512x512, from a 1024 Cycles render kept as icon_large.png);
 `--shot poster` writes marketing/thumbnail.png (1920x1080) instead. `--out`, `--width`, `--height` override.
-`--probe [defs...]` prints each cast member (or each named def)'s size and exits, for placing them. `--samples` trades speed for noise.
+`--probe [defs...]` prints each cast member's (or each named def's) size and exits, for placing them.
+`--samples` trades speed for noise.
 """
 
 import argparse
@@ -32,8 +33,15 @@ FONT = Path("C:/Windows/Fonts/impact.ttf")
 BLUE = (86 / 255, 148 / 255, 224 / 255)
 RED = (214 / 255, 92 / 255, 84 / 255)
 TEAM_TINT = 0.45
-# the marketing art leans harder than the game, so the sides read apart at thumbnail size
-MARKETING_TINT = 0.75
+# the marketing art leans much harder than the game, so the sides read apart at thumbnail size: accents take a
+# saturated team colour (linear, where BLUE and RED above are sRGB and render pastel), and the grey hull steel leans
+# toward it too
+TEAM_PAINT = {"blue": (0.03, 0.13, 0.62), "red": (0.62, 0.035, 0.025)}
+ACCENT_TINT = 0.85
+HULL = "paint_66666e"  # the palette's hull grey, common to every unit
+HULL_TINT = 0.3
+# rims in the team's hue but bright enough to light an edge
+TEAM_RIM = {"blue": (0.3, 0.55, 1.0), "red": (1.0, 0.3, 0.2)}
 # the bolts' colours, purer than the team colours: a glow's hue is all there is to tell the two sides' fire apart
 BLUE_BOLT = (0.15, 0.5, 1.0)
 RED_BOLT = (1.0, 0.16, 0.08)
@@ -91,14 +99,19 @@ _team_materials = {}
 members = {BLUE: [], RED: []}
 
 
-def team_material(mat, team):
+def side(team):
+    return "blue" if team is BLUE else "red"
+
+
+def team_material(mat, team, amount):
     key = (mat.name, team)
     if key not in _team_materials:
         copy = mat.copy()
-        copy.name = f"{mat.name}_{'blue' if team is BLUE else 'red'}"
+        copy.name = f"{mat.name}_{side(team)}"
         bsdf = copy.node_tree.nodes.get("Principled BSDF")
         base = bsdf.inputs["Base Color"].default_value
-        tinted = tuple(base[i] + (team[i] - base[i]) * MARKETING_TINT for i in range(3))
+        paint = TEAM_PAINT[side(team)]
+        tinted = tuple(base[i] + (paint[i] - base[i]) * amount for i in range(3))
         bsdf.inputs["Base Color"].default_value = (*tinted, 1.0)
         if bsdf.inputs["Emission Strength"].default_value > 0:
             bsdf.inputs["Emission Color"].default_value = (*tinted, 1.0)
@@ -143,8 +156,12 @@ def spawn(def_name, team, location, facing, scale=1.0, tilt=(0.0, 0.0)):
     objects = generate(def_name)
     for obj in objects:
         for slot in obj.material_slots:
-            if team is not None and slot.material is not None and "accent" in slot.material.name:
-                slot.material = team_material(slot.material, team)
+            if team is None or slot.material is None:
+                continue
+            if "accent" in slot.material.name:
+                slot.material = team_material(slot.material, team, ACCENT_TINT)
+            elif slot.material.name == HULL:
+                slot.material = team_material(slot.material, team, HULL_TINT)
     root = bpy.data.objects.new(f"{def_name}_root", None)
     bpy.context.collection.objects.link(root)
     for obj in objects:
@@ -259,6 +276,38 @@ def blast(center, radius, glow=1.0):
     bpy.context.collection.objects.link(obj)
 
 
+def shockwave(center, radius):
+    """The blast's ring racing out along the ground: a flat glowing hoop, with dust kicked up along it."""
+    ring = flat_material("shock_ring", (1.0, 0.6, 0.2), emission=4.0)
+    ring.node_tree.nodes.get("Principled BSDF").inputs["Alpha"].default_value = 0.7
+    dust = flat_material("shock_dust", (0.35, 0.28, 0.22), emission=0.2, roughness=1.0)
+    cx, cy, cz = center
+    bpy.ops.mesh.primitive_torus_add(major_radius=radius, minor_radius=radius * 0.06, major_segments=20,
+                                     minor_segments=4, location=(cx, cy, cz))
+    obj = bpy.context.active_object
+    obj.scale.z = 0.35
+    obj.data.materials.append(ring)
+    for i in range(16):
+        a = i / 16 * math.tau + random.uniform(-0.1, 0.1)
+        r = radius * random.uniform(0.95, 1.1)
+        at = (cx + math.cos(a) * r, cy + math.sin(a) * r, cz + random.uniform(0, 0.4))
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=random.uniform(0.35, 0.7), location=at)
+        puff = bpy.context.active_object
+        puff.rotation_euler = [random.uniform(0, 6.28) for _ in range(3)]
+        puff.data.materials.append(dust)
+
+
+def sparks(center, spread, count):
+    """Glowing shrapnel flung out of a hit: short streaks, each stretched along the way it flies."""
+    hot = flat_material("spark", (1.0, 0.7, 0.25), emission=10.0)
+    c = mathutils.Vector(center)
+    for _ in range(count):
+        d = mathutils.Vector((random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-0.1, 1))).normalized()
+        at = c + d * spread * random.uniform(0.4, 1.0)
+        length = random.uniform(0.3, 0.8)
+        bar(at, at + d * length, random.uniform(0.05, 0.1), hot, "spark")
+
+
 def bar(start, end, width, mat, name):
     """A long thin box from start to end."""
     a, b = mathutils.Vector(start), mathutils.Vector(end)
@@ -282,43 +331,73 @@ def beam(start, end, color, width=0.35, name="beam"):
     return bar(start, end, width, shell, f"{name}_shell")
 
 
-def nano_beam(start, end):
-    """A constructor's green build stream, reaching into whatever it is building."""
-    return bar(start, end, 0.12, flat_material("nano", (0.3, 1.0, 0.35), emission=5.0), "nano")
+def smoke_material(i, value, alpha):
+    mat = flat_material(f"smoke_{i}", (value, value, value * 0.97), emission=0.25, roughness=1.0)
+    mat.node_tree.nodes.get("Principled BSDF").inputs["Alpha"].default_value = alpha
+    return mat
 
 
-def smoke_column(base, height, lean=(1.0, 0.4)):
-    """Black smoke rising off a wreck, thinning and greying as it climbs and leaning with the wind."""
-    shades = [flat_material(f"smoke_{i}", (v, v, v * 0.97), roughness=1.0)
-              for i, v in enumerate((0.04, 0.1, 0.2, 0.32))]
-    flame = flat_material("wreck_flame", (1.0, 0.45, 0.1), emission=6.0)
+def smoke_column(base, height, lean=(1.0, 0.4), width=1.0, black=False):
+    """Black smoke rising off a wreck: a narrow, dense, near-black root that billows out, greys and thins as it
+    climbs and leans with the wind. Many small overlapping puffs, flattened by a little glow of their own, so it
+    reads as one column and not a stack of rocks. `width` scales the puffs, for plumes seen from far off, and `black`
+    keeps them black all the way up, as a silhouette against the sky."""
+    if black:
+        greys = ((0.02, 1.0), (0.03, 1.0), (0.04, 0.95), (0.05, 0.9))
+    else:
+        greys = ((0.02, 1.0), (0.05, 0.95), (0.1, 0.8), (0.16, 0.6))
+    tag = "b" if black else ""
+    shades = [smoke_material(f"{i}{tag}", v, a) for i, (v, a) in enumerate(greys)]
     x, y, z = base
-    steps = max(4, int(height / 1.1))
+    steps = max(5, int(height / 0.8))
     for i in range(steps):
         t = i / (steps - 1)
-        r = 0.35 + 1.5 * t * t
-        loc = (x + lean[0] * t * height * 0.35 + random.uniform(-0.3, 0.3),
-               y + lean[1] * t * height * 0.35 + random.uniform(-0.3, 0.3), z + t * height)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r * random.uniform(0.8, 1.1), location=loc)
+        r = (0.4 + 1.2 * t) * width
+        cx = x + lean[0] * t * t * height * 0.5
+        cy = y + lean[1] * t * t * height * 0.5
+        for _ in range(3):
+            loc = (cx + random.uniform(-0.6, 0.6) * r, cy + random.uniform(-0.6, 0.6) * r, z + t * height)
+            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r * random.uniform(0.55, 0.8), location=loc)
+            obj = bpy.context.active_object
+            obj.rotation_euler = [random.uniform(0, 6.28) for _ in range(3)]
+            obj.data.materials.append(shades[min(3, int(t * 4))])
+
+
+def fire(at, size=1.0, glow=1.0):
+    """Flames licking off a wreck: a few glowing chunks and the orange light they throw on what is around them
+    (`glow` scales it)."""
+    hot = flat_material("fire_hot", (1.0, 0.75, 0.25), emission=8.0)
+    warm = flat_material("fire_warm", (1.0, 0.35, 0.06), emission=5.0)
+    x, y, z = at
+    for i in range(6):
+        loc = (x + random.uniform(-0.8, 0.8) * size, y + random.uniform(-0.8, 0.8) * size,
+               z + random.uniform(0, 0.9) * size)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=random.uniform(0.25, 0.5) * size, location=loc)
         obj = bpy.context.active_object
         obj.rotation_euler = [random.uniform(0, 6.28) for _ in range(3)]
-        obj.data.materials.append(shades[min(3, int(t * 4))])
-    for _ in range(3):
-        at = (x + random.uniform(-0.6, 0.6), y + random.uniform(-0.6, 0.6), z)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=random.uniform(0.35, 0.6), location=at)
-        bpy.context.active_object.data.materials.append(flame)
+        obj.scale.z = random.uniform(1.2, 1.8)
+        obj.data.materials.append(hot if i < 2 else warm)
+    light = bpy.data.lights.new("fire_light", type="POINT")
+    light.color = (1.0, 0.5, 0.15)
+    light.energy = 600 * size * size * glow
+    light.shadow_soft_size = size
+    obj = bpy.data.objects.new("fire_light", light)
+    obj.location = (x, y, z + size)
+    bpy.context.collection.objects.link(obj)
 
 
 def wreck(def_name, location, facing, smoke=6.0):
-    """A burnt-out unit: its own model, charred, knocked askew and half sunk, still smoking."""
-    char = flat_material("wreck_char", (0.045, 0.04, 0.035), roughness=0.85, metallic=0.3)
-    root, objects = spawn(def_name, None, location, facing, tilt=(random.uniform(-14, 14), random.uniform(-14, 14)))
+    """A burnt-out unit: its own model, scorched, knocked well askew and half sunk, burning and smoking."""
+    char = flat_material("wreck_char", (0.07, 0.06, 0.055), roughness=0.8, metallic=0.4)
+    tilt = tuple(random.choice((-1, 1)) * random.uniform(12, 22) for _ in range(2))
+    root, objects = spawn(def_name, None, location, facing, tilt=tilt)
     for obj in objects:
         for slot in obj.material_slots:
             slot.material = char
     root.location.z -= 0.35
+    fire((location[0], location[1], location[2] + 1.0))
     if smoke:
-        smoke_column((location[0], location[1], location[2] + 1.2), smoke)
+        smoke_column((location[0], location[1], location[2] + 2.0), smoke)
     return root
 
 
@@ -332,7 +411,7 @@ def team_rim(name, team, energy, rot):
             coll.objects.link(obj)
     data = bpy.data.lights.new(name, type="SUN")
     data.energy = energy
-    data.color = tuple(0.15 + 0.85 * c for c in team)
+    data.color = TEAM_RIM[side(team)]
     data.angle = math.radians(3)
     obj = bpy.data.objects.new(name, data)
     obj.rotation_euler = tuple(math.radians(a) for a in rot)
@@ -341,7 +420,11 @@ def team_rim(name, team, energy, rot):
     return obj
 
 
-def sky():
+DUSK = ((0.0, (1.0, 0.66, 0.34)), (0.1, (0.85, 0.40, 0.30)), (0.34, (0.09, 0.16, 0.36)))
+
+
+def sky(stops=DUSK):
+    """A gradient up the sky, from (height, colour) `stops`."""
     world = bpy.data.worlds.get("World") or bpy.data.worlds.new("World")
     bpy.context.scene.world = world
     world.use_nodes = True
@@ -365,10 +448,10 @@ def sky():
     links.new(mix.outputs[2], bg.inputs["Color"])
     links.new(bg.outputs["Background"], out.inputs["Surface"])
     els = ramp.color_ramp.elements
-    els[0].position, els[0].color = 0.0, (1.0, 0.66, 0.34, 1)
-    els[1].position, els[1].color = 0.34, (0.09, 0.16, 0.36, 1)
-    mid = els.new(0.1)
-    mid.color = (0.85, 0.40, 0.30, 1)
+    while len(els) < len(stops):
+        els.new(0.5)
+    for el, (at, color) in zip(els, stops):
+        el.position, el.color = at, (*color, 1)
     bg.inputs["Strength"].default_value = 1.0
 
 
@@ -446,7 +529,8 @@ def army(team, kinds, xs, ys, facing, spacing=4.5, skip=()):
 
 
 def base(team, x0, y0, flip):
-    """A corner of a team's base behind its army: a factory, mexes, power and a constructor raising a turret."""
+    """A corner of a team's base behind its army: a factory, mexes and power. (No constructors: at this distance
+    their arms read as stray yellow glitches.)"""
     s = -1 if flip else 1
     spawn("vehicle_lab" if flip else "bot_lab", team, (x0, y0 + 10, 0), 180 + 20 * s)
     spawn("metal_extractor", team, (x0 + 13 * s, y0 + 2, 0), 0)
@@ -454,11 +538,19 @@ def base(team, x0, y0, flip):
     spawn("solar_collector", team, (x0 - 14 * s, y0 + 6, 0), 0)
     spawn("wind_turbine", team, (x0 + 20 * s, y0 + 12, 0), 0)
     spawn("wind_turbine", team, (x0 - 20 * s, y0 + 16, 0), 0)
-    con = (x0 + 6 * s, y0 - 6, 0)
-    spawn("construction_vehicle" if flip else "construction_bot", team, con, -90 * s)
-    turret = (x0 + 11 * s, y0 - 8, 0)
-    spawn("guard", team, turret, 90 * s)
-    nano_beam((con[0], con[1], 2.4), (turret[0], turret[1], 3.0))
+    spawn("guard", team, (x0 + 11 * s, y0 - 8, 0), 90 * s)
+
+
+def placed(location, facing, offset):
+    """A point `offset` from a unit's origin, in its own frame, for one standing at `location` turned to `facing`:
+    where its gun is, so a bolt leaves the muzzle however the unit is turned."""
+    a = math.radians(facing)
+    x, y, z = offset
+    return (location[0] + x * math.cos(a) - y * math.sin(a), location[1] + x * math.sin(a) + y * math.cos(a),
+            location[2] + z)
+
+
+COMMANDER_GUN = (2.15, -0.45, 3.6)
 
 
 def stage():
@@ -472,8 +564,8 @@ def stage():
     cam_data.clip_end = 2000
     camera = bpy.data.objects.new("camera", cam_data)
     bpy.context.collection.objects.link(camera)
-    camera.location = (0, -38, 6.0)
-    target = mathutils.Vector((0, 6, 6.0))
+    camera.location = (0, -38, 8.5)
+    target = mathutils.Vector((0, 6, 5.0))
     camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
     bpy.context.scene.camera = camera
 
@@ -482,11 +574,14 @@ def stage():
     # where shells have landed: the ground between the armies is burnt and littered with wrecks
     wrecks = ((-13, 14, "tiger", 30), (5, -3, "sumo", -110), (15, 17, "brute", 160), (-5, -2, "grunt", 70),
               (-22, 32, "tiger", -20), (24, 34, "sumo", 200))
-    terrain(scorches=((0.5, 4, 5.0), *((x, y, 3.0) for x, y, _, _ in wrecks), (-3, 26, 4), (9, 34, 4)))
+    terrain(scorches=((0.5, 4, 5.0), *((x, y, 3.0) for x, y, _, _ in wrecks), (-3, 26, 4), (9, 34, 4),
+                      (6, -19, 3.5)))
     haze(0.0015, 15)
 
     # the heroes, up front: the blue commander at the left, a red juggernaut wading in from the right
-    spawn("commander", BLUE, (-7, -16, 0), 55)
+    # turned more toward the lens than at its target, so the hero shows its face
+    commander = ((-7, -16, 0), 38)
+    spawn("commander", BLUE, *commander)
     spawn("tiger", BLUE, (-15, -10, 0), 62)
     spawn("tiger", BLUE, (-20, -4, 0), 66)
     spawn("grunt", BLUE, (-11, -7, 0), 55)
@@ -507,6 +602,8 @@ def stage():
         spawn(name, None, (x, y, 0), random.uniform(0, 360))
     for x, y, kind, facing in wrecks:
         wreck(kind, (x, y, 0), facing, smoke=random.uniform(5, 9))
+    # and one burning near the lens, so the foreground is not bare grass (no smoke: it would veil the big blast)
+    wreck("tiger", (6, -19, 0), 120, smoke=0)
 
     # a dogfight in the open sky left of the title, clear of every head: blue fighters out, red bombers coming in
     spawn("valiant", BLUE, (-11, -12, 12), 75, tilt=(0, -22))
@@ -516,9 +613,11 @@ def stage():
 
     # the fight: one big hit in the middle and more going off down the line
     blast((0.5, 4, 1.6), 3.0)
+    shockwave((0.5, 4, 0.2), 6.0)
+    sparks((0.5, 4, 1.8), 8.0, 50)
     blast((-3, 26, 1.2), 1.8)
     blast((9, 34, 1.0), 1.6)
-    beam((-5.4, -14.5, 3.6), (0, 3, 2), BLUE_BOLT, width=0.3, name="commander_bolt")
+    beam(placed(*commander, COMMANDER_GUN), (0, 3, 2), BLUE_BOLT, width=0.3, name="commander_bolt")
     beam((-13.5, -8.5, 1.4), (-1, 5, 1.2), BLUE_BOLT, width=0.2)
     beam((-18, 12, 1.4), (-4, 25, 1.2), BLUE_BOLT, width=0.2)
     beam((11.6, -5.6, 7.4), (-3, -1, 1.8), RED_BOLT, width=0.35)
@@ -565,8 +664,9 @@ def icon_lights():
     mix.inputs[6].default_value = (0.16, 0.18, 0.24, 1)
 
 
-# at the top, over the sky, so the fight below keeps the frame: both lines the same letter height, reading as one name
-ICON_TITLE = ((TITLE_TOP, 0.21, 0.54), (TITLE_BOTTOM, 0.21, 0.36))
+# the icon looks up, so it sees little of the horizon: its sunset climbs higher, burning behind the robots so their
+# dark shapes stand out, into a deep blue overhead
+ICON_SKY = ((0.0, (1.0, 0.5, 0.18)), (0.2, (0.8, 0.24, 0.2)), (0.55, (0.04, 0.07, 0.24)))
 
 
 def icon_stage():
@@ -581,18 +681,18 @@ def icon_stage():
     cam_data.clip_end = 2000
     camera = bpy.data.objects.new("camera", cam_data)
     bpy.context.collection.objects.link(camera)
-    camera.location = (-0.5, -19.5, 1.0)
-    target = mathutils.Vector((1.0, 0, 10.5))
+    camera.location = (-0.5, -17.6, 1.2)
+    target = mathutils.Vector((0.8, 0, 7.8))
     camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
     bpy.context.scene.camera = camera
-    commander_at = mathutils.Vector((-3.6, -9.5, 0))
+    commander_at = mathutils.Vector((-2.3, -9.5, 0))
     cam_data.dof.use_dof = True
     cam_data.dof.focus_distance = (commander_at + mathutils.Vector((0, 0, 3)) - camera.location).length
     cam_data.dof.aperture_fstop = 3.2
 
-    sky()
+    sky(ICON_SKY)
     icon_lights()
-    haze(0.006, -6)
+    haze(0.003, -6)
     terrain(scorches=((-0.5, -5.5, 3.5), (-6, 4, 2.5)))
 
     spawn("commander", BLUE, tuple(commander_at), 40)
@@ -601,19 +701,35 @@ def icon_stage():
 
     spawn("juggernaut", RED, (4.2, -1.5, 0), -32)
     spawn("sumo", RED, (9, 3, 0), -60)
-    spawn("brute", RED, (11, 10, 0), -70)
     spawn("thor", RED, (15, 20, 0), -60)
     for name, x, y in (("tree", -16, 26), ("tree", -11, 34), ("tree", 20, 30)):
         spawn(name, None, (x, y, 0), random.uniform(0, 360))
-    wreck("tiger", (-5.5, 4, 0), 20, smoke=7)
 
-    blast((-0.2, -5.5, 1.0), 1.7, glow=0.6)
-    beam((-2.1, -9.3, 3.3), (-0.2, -5.5, 1.4), BLUE_BOLT, width=0.22, name="commander_bolt")
-    beam((2.3, -3.3, 7.6), (-0.2, -5.5, 1.4), RED_BOLT, width=0.26)
+    # annihilation: the field behind them is wrecks burning under black smoke against the sunset, with more going up
+    wreck("tiger", (-5.5, 4, 0), 20, smoke=11)
+    wreck("sumo", (11, 11, 0), -40, smoke=13)
+    wreck("brute", (-12, 13, 0), 70, smoke=10)
+    blast((-8, 14, 1.5), 1.8, glow=0.4)
+    blast((8, 18, 1.5), 2.0, glow=0.4)
+    # tall enough to climb out from behind the robots and up behind the title, black against the sunset
+    for x, y, height in ((-22, 30, 50), (-3, 36, 58), (22, 26, 50)):
+        fire((x, y, 0.5), size=1.5)
+        smoke_column((x, y, 1.5), height, lean=(0.8, 0.3), width=3.2, black=True)
+
+    # and the hit between the two: a fireball as big as a tank, shrapnel flying
+    blast((-0.2, -5.2, 1.3), 2.5, glow=0.3)
+    sparks((-0.2, -5.2, 1.6), 7.0, 30)
+    beam((-0.8, -9.3, 3.3), (-0.2, -5.2, 1.6), BLUE_BOLT, width=0.24, name="commander_bolt")
+    beam((2.3, -3.3, 7.6), (-0.2, -5.2, 1.6), RED_BOLT, width=0.28)
+
+    # the juggernaut has been hit too: its shoulder is burning and throwing sparks
+    fire((1.2, -3.2, 10.2), size=0.9, glow=0.15)
+    sparks((1.2, -3.2, 10.6), 2.5, 8)
 
     team_rim("blue_rim", BLUE, 8.0, (60, 0, 150))
     team_rim("red_rim", RED, 7.0, (60, 0, -145))
-    title(camera, ICON_TITLE)
+    # no title: on a discovery page the icon is a thumbnail among a hundred, where lettering is an unreadable smudge
+    # and Roblox prints the name under it anyway, so the whole square goes to the fight
     return camera
 
 
@@ -708,12 +824,12 @@ def render(args):
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     titles = [o for o in scene.objects if o.name.startswith("title_")]
     camera = scene.camera.data
-    if camera.dof.use_dof:
+    if camera.dof.use_dof and titles:
         # depth of field would blur the title a unit in front of the lens, so it gets its own sharp pass on top
         for obj in titles:
             obj.hide_render = True
     bpy.ops.render.render(write_still=True)
-    if camera.dof.use_dof:
+    if camera.dof.use_dof and titles:
         overlay_titles(scene, titles, args.out)
     print(f"wrote {args.out}")
     if args.small:

@@ -21,6 +21,7 @@ local army = require(script.Parent.army)
 local groups = require(script.Parent.groups)
 local sorties = require(script.Parent.sorties)
 local catalog = require(script.Parent.catalog)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type TeamId = types.TeamId
@@ -161,6 +162,12 @@ end
 local function forget(team_id: TeamId)
 	histories[team_id] = nil
 end
+
+snapshot.keep("ai_inspect", function()
+	return { histories = histories }
+end, function(saved)
+	histories = saved.histories
+end)
 
 return table.freeze({
 	init = init,

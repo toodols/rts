@@ -125,8 +125,13 @@ if game_phase.box_of(local_player) == nil then
 	end)
 end
 
--- the view follows this player to the start they choose, and to a campaign mission's if the game turns out to be one
-game_phase.start_changed(local_player, look_at_start)
+-- Choosing a start leaves the view where it is; a start the server gives this player once the game is under way (joining
+-- late, or moving to another team) is looked at, and so is a campaign mission's if the game turns out to be one.
+game_phase.start_changed(local_player, function()
+	if game_phase.has_begun() then
+		look_at_start()
+	end
+end)
 missions_mod.subscribe(function(mission: string?)
 	if mission ~= nil then
 		look_at_start()

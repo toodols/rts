@@ -1,6 +1,6 @@
 --!strict
 -- Tests of how units find their way and walk it: routes up onto the plateau, crowds, orders that walk to something,
--- units coming out of labs, and buildings as walls.
+-- units coming out of labs, buildings as walls, and wading through the shallows.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
@@ -9,6 +9,9 @@ local types = require(ReplicatedStorage.Shared.types)
 local tick_rate = require(ReplicatedStorage.Shared.tick_rate)
 local world_scale = require(ReplicatedStorage.Shared.world_scale)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+local ground = require(ReplicatedStorage.Shared.ground)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local move_classes = require(ReplicatedStorage.Shared.move_classes)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local surface = require(ReplicatedStorage.Shared.surface)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
@@ -494,12 +497,217 @@ local function building_walls(args: Args): Findings
 	}
 end
 
+-- The pit `wading` digs: a trench `PIT_LENGTH` studs long along z with a flat floor `PIT_FLOOR` studs wide, whose banks
+-- rise at `PIT_BANK` (rise over run, gentle enough for a tank) until they meet the ground, and the dry ground a unit
+-- crosses it from and to, `PIT_CROSSING` studs either side of its middle.
+local PIT_LENGTH = 80
+local PIT_FLOOR = 12
+local PIT_BANK = 0.25
+local PIT_CROSSING = 40
+-- How much deeper than its class allows a unit's route may take it, in elmos: none, but for rounding.
+local DEPTH_SLACK = 0.01
+-- How much faster than its class's slowing in the water allows a wader may go there, as a share of its top speed: what
+-- it has not yet shed of its speed on land by the time it is in deep water.
+local SPEED_SLACK = 0.05
+
+-- Wading, as BAR has it (shared/move_classes): a land unit goes into water as deep as its movement class's
+-- `maxwaterdepth`, and no deeper, slowed there by its `depthModParams`. A pit is dug into dry ground somewhere open to a
+-- tank all round, and filled by the sea: first a ford 15 elmos deep, which a Grunt (BOT2) and a Brute (TANK3), each
+-- allowed 20 elmos, must cross straight through, slowed in the deepest of it and unharmed, and which a Tick (SBOT2, 5
+-- elmos) must go round instead; then a pit 30 elmos deep, which the Grunt and the Brute must go round, never in water
+-- deeper than 20 elmos, and short of which a Grunt sent into its middle must stop, while a Trasher (ABOT3, amphibious)
+-- and a Goon (a hovercraft) go straight across. In the ford, a Brute standing in the water must still be shot at by a
+-- Grunt on the bank, and shoot back, and of the buildings only a Hardened Metal Storage (9999 elmos) may be put down in
+-- it, not a Fusion Reactor (1) nor a Solar Collector (none).
+local function wading(args: Args): Findings
+	local elmo = 1 / world_scale.ELMOS_PER_STUD
+	local tank = unit_defs.get "brute"
+	local reach_x = PIT_CROSSING + 8
+	local reach_z = PIT_LENGTH / 2 + PIT_CROSSING
+	-- somewhere dry, and open to a tank, all over the box the pit and the crossings take
+	local function suits(x: number, z: number): boolean
+		for dx = -reach_x, reach_x, world_scale.CELL_STUDS do
+			for dz = -reach_z, reach_z, world_scale.CELL_STUDS do
+				if
+					heightmap.in_bounds(x + dx, z + dz) == false
+					or heightmap.height_at(x + dx, z + dz) < ground_levels.WATER_LEVEL + 1
+					or pathfinder.open_at(tank, x + dx, z + dz) == false
+				then
+					return false
+				end
+			end
+		end
+		return true
+	end
+	local found = harness.find_spot(suits)
+	assert(found ~= nil, "no dry ground open to a tank big enough for the pit on this map")
+	local center = found :: Vector3
+
+	-- the heights the box's samples had before any pit, by sample index
+	local across = heightmap.samples_across()
+	local originals: { [number]: number } = {}
+	local first_x, first_z = heightmap.world_to_grid(center.X - reach_x, center.Z - reach_z)
+	local last_x, last_z = heightmap.world_to_grid(center.X + reach_x, center.Z + reach_z)
+	for cz = math.floor(first_z), math.ceil(last_z) do
+		for cx = math.floor(first_x), math.ceil(last_x) do
+			originals[cz * across + cx + 1] = heightmap.sample(cx, cz)
+		end
+	end
+	-- digs the pit `depth` studs deep into the ground as it was before any pit
+	local function dig(depth: number)
+		local changes: { number } = {}
+		for index, original in originals do
+			local x, z = heightmap.grid_to_world((index - 1) % across, (index - 1) // across)
+			local along = math.clamp(z - center.Z, -PIT_LENGTH / 2, PIT_LENGTH / 2)
+			local from_middle = Vector2.new(x - center.X, z - center.Z - along).Magnitude
+			local bottom = ground_levels.WATER_LEVEL - depth + math.max(0, from_middle - PIT_FLOOR / 2) * PIT_BANK
+			table.insert(changes, index)
+			table.insert(changes, math.min(original, bottom))
+		end
+		ground.apply_edits(changes)
+	end
+
+	local west = Vector3.new(center.X - PIT_CROSSING, 0, center.Z)
+	local east = Vector3.new(center.X + PIT_CROSSING, 0, center.Z)
+	-- `def_name` sent from the west bank to `to`: whether it got there, how deep the water it was in ever was, and how
+	-- deep its class lets it go (both in elmos), and how fast it went, as a share of its top speed, on dry ground and at
+	-- the deepest it was
+	local function cross(def_name: string, to: Vector3): Findings
+		local def = unit_defs.get(def_name)
+		local walker = unkillable(spawn_resting(def_name, OWN, west.X, west.Z))
+		advance(tick_rate.TICK_DELTA)
+		local destination = surface.position(def, to.X, to.Z)
+		local route, searched = pathfinder.route(def, walker.position, destination, 20000)
+		orders.issue(walker, route, false, false)
+		local started = now()
+		local deepest = 0
+		local fastest_dry = 0
+		local fastest_deepest = 0
+		local arrived = harness.until_idle(walker, args.seconds or 60, function()
+			local depth = heightmap.water_depth(walker.position.X, walker.position.Z)
+			local speed = geometry.flatten(walker.velocity).Magnitude / (def.max_speed :: number)
+			if depth <= 0 then
+				fastest_dry = math.max(fastest_dry, speed)
+			elseif depth > deepest then
+				fastest_deepest = speed
+			elseif depth == deepest then
+				fastest_deepest = math.max(fastest_deepest, speed)
+			end
+			deepest = math.max(deepest, depth)
+		end)
+		local offset = destination - walker.position
+		local class = move_classes.get(def.footing.class :: types.MoveClassName)
+		local findings: Findings = {
+			searched = searched,
+			arrived = arrived,
+			seconds = round(now() - started, 2),
+			left_to_go = round(geometry.flatten(offset).Magnitude, 1),
+			allowed = if def.footing.max_depth == math.huge then "any" else round(def.footing.max_depth / elmo, 2),
+			deepest = round(deepest / elmo, 2),
+			fastest_dry = round(fastest_dry, 3),
+			fastest_deepest = round(fastest_deepest, 3),
+			slowed_to = round(move_classes.speed_in_water(class, deepest), 3),
+			damage = round(damage_to(walker), 1),
+		}
+		deaths.destroy(walker, "removed")
+		advance(tick_rate.TICK_DELTA)
+		return findings
+	end
+
+	local ford_depth = 15 * elmo
+	dig(ford_depth)
+	local ford: Findings = {
+		depth = round(heightmap.water_depth(center.X, center.Z) / elmo, 2),
+		grunt = cross("grunt", east),
+		brute = cross("brute", east),
+		tick = cross("tick", east),
+	}
+	-- buildings in the middle of the ford, which only one whose own file lets it stand in water that deep may go on
+	local function placing(name: string): boolean | string
+		local at = placement.resolve_center(name, center.X, center.Z, 0, nil)
+		local placeable, problem = placement.can_place(name, at :: Vector3, 0, nil, OWN)
+		return if placeable then true else problem or "unplaceable"
+	end
+	ford.buildings = {
+		hardened_metal_storage = placing "hardened_metal_storage",
+		fusion_reactor = placing "fusion_reactor",
+		solar_collector = placing "solar_collector",
+	}
+	-- a Brute standing in the ford and a Grunt of the other side's on the bank, within reach of each other
+	local wader = unkillable(spawn_resting("brute", OWN, center.X + PIT_FLOOR / 2 - 1, center.Z))
+	local bank_x = center.X + PIT_FLOOR / 2 + ford_depth / PIT_BANK + 4
+	local shooter = unkillable(spawn_resting("grunt", ENEMY, bank_x, center.Z))
+	advance(args.fight_seconds or 10)
+	ford.fight = {
+		wader_depth = round(heightmap.water_depth(wader.position.X, wader.position.Z) / elmo, 2),
+		wader_in_water = unit_defs.in_water(wader.def, wader.position),
+		wader_submerged = unit_defs.submerged(wader.def, wader.position),
+		damage_to_wader = round(damage_to(wader), 1),
+		damage_from_wader = round(damage_to(shooter), 1),
+	}
+	clear_world()
+
+	dig(30 * elmo)
+	local pit: Findings = {
+		depth = round(heightmap.water_depth(center.X, center.Z) / elmo, 2),
+		grunt = cross("grunt", east),
+		brute = cross("brute", east),
+		grunt_into_middle = cross("grunt", Vector3.new(center.X, 0, center.Z)),
+		trasher = cross("trasher", east),
+		goon = cross("goon", east),
+	}
+	clear_world()
+
+	local function arrived(trip: Findings): boolean
+		return trip.arrived and trip.left_to_go < 2 and trip.damage == 0
+	end
+	local function within(trip: Findings): boolean
+		return trip.deepest <= trip.allowed + DEPTH_SLACK
+	end
+	local function waded(trip: Findings): boolean
+		return arrived(trip)
+			and within(trip)
+			and trip.deepest >= 0.9 * ford.depth
+			and trip.fastest_dry >= 0.95
+			and trip.fastest_deepest <= trip.slowed_to + SPEED_SLACK
+	end
+	local short = pit.grunt_into_middle
+	return {
+		center = { x = center.X, z = center.Z },
+		ford = ford,
+		pit = pit,
+		pass = waded(ford.grunt)
+			and waded(ford.brute)
+			and arrived(ford.tick)
+			and ford.buildings.hardened_metal_storage == true
+			and ford.buildings.fusion_reactor == "too_deep"
+			and ford.buildings.solar_collector == "no_water"
+			and within(ford.tick)
+			and ford.fight.wader_in_water
+			and ford.fight.wader_submerged == false
+			and ford.fight.damage_to_wader > 0
+			and ford.fight.damage_from_wader > 0
+			and arrived(pit.grunt)
+			and within(pit.grunt)
+			and arrived(pit.brute)
+			and within(pit.brute)
+			and short.left_to_go > 2
+			and within(short)
+			and short.damage == 0
+			and arrived(pit.trasher)
+			and pit.trasher.deepest >= 0.9 * pit.depth
+			and arrived(pit.goon)
+			and pit.goon.deepest >= 0.9 * pit.depth,
+	}
+end
+
 local TESTS: { [string]: Test } = {
 	move_route = { run = move_route },
 	walk_orders = { run = walk_orders },
 	lab_exit = { run = lab_exit },
 	lab_orders = { run = lab_orders },
 	building_walls = { run = building_walls },
+	wading = { run = wading },
 }
 
 return table.freeze(TESTS)

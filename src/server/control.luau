@@ -12,6 +12,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local pilots = require(script.Parent.pilots)
 local emp = require(script.Parent.emp)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -63,6 +64,12 @@ end
 local function forget(entity_id: EntityId)
 	docked[entity_id] = nil
 end
+
+snapshot.keep("control", function()
+	return { docked = docked }
+end, function(saved)
+	docked = saved.docked
+end)
 
 return table.freeze({
 	mode_of = mode_of,

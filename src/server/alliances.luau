@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
+local snapshot = require(script.Parent.snapshot)
 
 type TeamId = types.TeamId
 
@@ -88,6 +89,13 @@ end
 local function may_harm(attacker: TeamId, target: TeamId): boolean
 	return ally_griefing or attacker == target or are_allied(attacker, target) == false
 end
+
+snapshot.keep("alliances", function()
+	return { parent = parent, ally_griefing = ally_griefing }
+end, function(saved)
+	parent = saved.parent
+	ally_griefing = saved.ally_griefing
+end)
 
 return table.freeze({
 	ally = ally,

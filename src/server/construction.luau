@@ -22,6 +22,7 @@ local economy = require(script.Parent.economy)
 local deaths = require(script.Parent.deaths)
 local alliances = require(script.Parent.alliances)
 local work = require(script.Parent.work)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 
@@ -195,6 +196,12 @@ local function decay(delta: number)
 	end
 	table.clear(fed)
 end
+
+snapshot.keep("construction", function()
+	return { fed = fed }
+end, function(saved)
+	fed = saved.fed
+end)
 
 return table.freeze({
 	decay = decay,

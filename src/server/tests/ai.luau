@@ -287,7 +287,8 @@ local function ai_match(args: Args): Findings
 	}
 end
 
--- pow's ai_add, run through the command itself (harness.command): a player's commander at the
+-- pow's ai_add, and ai_control handing it a team with nothing yet, run through the commands themselves
+-- (harness.command): a player's commander at the
 -- first box's usual start, then each case in turn. Every case reports, for each team it put down, the team, where its
 -- commander stands, its allies and how far it is from the nearest other commander, and whatever it logged. An AI put
 -- down with no spot given has to stand spawning.MIN_START_SPACING from every other commander (less a little for the commander
@@ -296,6 +297,7 @@ end
 -- more than the map has room for, so it has to end in an error.
 local function ai_add_test(_args: Args): Findings
 	local ai_add = harness.command(ai_commands, "ai_add")
+	local ai_control = harness.command(ai_commands, "ai_control")
 
 	local function commanders(): { [TeamId]: Vector2 }
 		local found: { [TeamId]: Vector2 } = {}
@@ -323,41 +325,50 @@ local function ai_add_test(_args: Args): Findings
 
 	-- `expect`: "free" (MIN_START_SPACING clear), "box" (that and in box 2), "spot" (at 100, -100), "error" (nobody put
 	-- down) or "fill" (free, until an error)
-	local cases: { { label: string, args: { any }, want: number, expect: string, ally: boolean?, profile: string? } } =
+	-- `control`: run through ai_control rather than ai_add
+	type Case = {
+		label: string,
+		args: { any },
+		want: number,
+		expect: string,
+		ally: boolean?,
+		profile: string?,
+		control: boolean?,
+	}
+	local cases: { Case } = {
+		{ label = "default", args = {}, want = 1, expect = "free" },
+		{ label = "pair", args = { "Pair", 2 }, want = 2, expect = "free" },
+		{ label = "boxed", args = { "Boxed", 1, 2 }, want = 1, expect = "box" },
+		{ label = "spot", args = { "Spot", 1, 100, -100 }, want = 1, expect = "spot" },
 		{
-			{ label = "default", args = {}, want = 1, expect = "free" },
-			{ label = "pair", args = { "Pair", 2 }, want = 2, expect = "free" },
-			{ label = "boxed", args = { "Boxed", 1, 2 }, want = 1, expect = "box" },
-			{ label = "spot", args = { "Spot", 1, 100, -100 }, want = 1, expect = "spot" },
-			{
-				label = "friend",
-				args = { "Friend", 1, 0, "ally", player_team },
-				want = 1,
-				expect = "free",
-				ally = true,
-			},
-			{ label = "lined", args = { "Lined", 1, 0, "enemy", 0, "vehicle" }, want = 1, expect = "free" },
-			{
-				label = "profiled",
-				args = { "Profiled", 1, 0, "enemy", 0, "any", "raider" },
-				want = 1,
-				expect = "free",
-				profile = "raider",
-			},
-			{ label = "bad_profile", args = { "x", 1, 0, "enemy", 0, "any", "nobody" }, want = 0, expect = "error" },
-			{ label = "bad_team", args = { "x", 1, 0, "ally", 999 }, want = 0, expect = "error" },
-			{ label = "off_map", args = { "Off", 1, 9999, 9999 }, want = 0, expect = "error" },
-			{ label = "joined", args = { "J", 1, 0, "join", joined_team }, want = 1, expect = "free" },
-			{ label = "many", args = { "Many", 6 }, want = 6, expect = "free" },
-			{ label = "crowd", args = { "Crowd", 60 }, want = 60, expect = "fill" },
-		}
+			label = "friend",
+			args = { "Friend", 1, 0, "ally", player_team },
+			want = 1,
+			expect = "free",
+			ally = true,
+		},
+		{ label = "lined", args = { "Lined", 1, 0, "enemy", 0, "vehicle" }, want = 1, expect = "free" },
+		{
+			label = "profiled",
+			args = { "Profiled", 1, 0, "enemy", 0, "any", "raider" },
+			want = 1,
+			expect = "free",
+			profile = "raider",
+		},
+		{ label = "bad_profile", args = { "x", 1, 0, "enemy", 0, "any", "nobody" }, want = 0, expect = "error" },
+		{ label = "bad_team", args = { "x", 1, 0, "ally", 999 }, want = 0, expect = "error" },
+		{ label = "off_map", args = { "Off", 1, 9999, 9999 }, want = 0, expect = "error" },
+		{ label = "joined", args = { joined_team, true }, want = 1, expect = "free", control = true },
+		{ label = "many", args = { "Many", 6 }, want = 6, expect = "free" },
+		{ label = "crowd", args = { "Crowd", 60 }, want = 60, expect = "fill" },
+	}
 
 	local spacing = spawning.MIN_START_SPACING - 20
 	local results: { Findings } = {}
 	local pass = true
 	for _, case in cases do
 		local before = commanders()
-		local logs = ai_add(case.args, nil)
+		local logs = (if case.control then ai_control else ai_add)(case.args, nil)
 		local after = commanders()
 		local placed: { Findings } = {}
 		local errors: { string } = {}

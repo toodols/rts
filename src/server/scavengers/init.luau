@@ -101,7 +101,7 @@ local function spawn_chances(
 	return roster.spawn_chances(defense, progress.budget(), sea, beacons.enemy_air_exists())
 end
 
--- How the scavengers are set up this game, and where they have got to, for the `gameconfig` command.
+-- How the scavengers are set up this game, and where they have got to, for the `game_config` command.
 local function status(): {
 	enabled: boolean,
 	progress: number,

@@ -31,6 +31,7 @@ local build_rules = require(script.Parent.build_rules)
 local control = require(script.Parent.control)
 local deaths = require(script.Parent.deaths)
 local orders = require(script.Parent.orders)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -272,6 +273,14 @@ end
 local function publish(entity: Entity, _def: types.EntityDef, write: entity_attrs.Publish)
 	write("exit_blocked", blocked_for[entity.id] ~= nil)
 end
+
+snapshot.keep("production", function()
+	return { in_progress = in_progress, blocked_for = blocked_for, exit_points = exit_points }
+end, function(saved)
+	in_progress = saved.in_progress
+	blocked_for = saved.blocked_for
+	exit_points = saved.exit_points
+end)
 
 return table.freeze({
 	forget = forget,

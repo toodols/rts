@@ -20,6 +20,7 @@ local state = require(script.Parent.state)
 local outbox = require(script.Parent.outbox)
 local match_stats = require(script.Parent.match_stats)
 local credit = require(script.Parent.credit)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -209,6 +210,12 @@ end
 local function forget(id: EntityId)
 	recent_damage[id] = nil
 end
+
+snapshot.keep("deaths", function()
+	return { recent_damage = recent_damage }
+end, function(saved)
+	recent_damage = saved.recent_damage
+end)
 
 return table.freeze({
 	forget = forget,

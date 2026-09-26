@@ -16,6 +16,7 @@ local build_rules = require(ServerScriptService.Server.build_rules)
 local state = require(ServerScriptService.Server.state)
 
 local danger_field = require(script.Parent.danger_field)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 -- The clock every brain thinks by: the game's (state.now).
 local now = state.now
@@ -188,6 +189,23 @@ local THINK_INTERVAL = 1
 local JOBS: { Job } = { "wave", "group", "escort", "defend", "retreat", "assist", "expand", "flee", "salvage" }
 
 local brains: { [TeamId]: Brain } = {}
+-- Units of a team the AI plays that something else commands (a mission's raiders): no brain counts them or gives them
+-- orders (census.luau passes over them). Kept until the unit is gone.
+local left_alone: { [EntityId]: boolean } = {}
+
+-- The AI leaves the unit `unit_id` to whatever commands it, for as long as it lives.
+local function leave_alone(unit_id: EntityId)
+	left_alone[unit_id] = true
+end
+
+local function is_left_alone(unit_id: EntityId): boolean
+	return left_alone[unit_id] == true
+end
+
+-- `unit_id` is gone.
+local function forget(unit_id: EntityId)
+	left_alone[unit_id] = nil
+end
 
 local function get(team_id: TeamId): Brain?
 	return brains[team_id]
@@ -266,6 +284,13 @@ local function can_build(builder: Entity, def_name: string): boolean
 	return table.find(unit_defs.build_options(builder.def), def_name) ~= nil and may_build(builder.team, def_name)
 end
 
+snapshot.keep("ai_brains", function()
+	return { brains = brains, left_alone = left_alone }
+end, function(saved)
+	brains = saved.brains
+	left_alone = saved.left_alone
+end)
+
 return table.freeze({
 	THINK_INTERVAL = THINK_INTERVAL,
 	JOBS = JOBS,
@@ -277,4 +302,7 @@ return table.freeze({
 	tell_line = tell_line,
 	may_build = may_build,
 	can_build = can_build,
+	leave_alone = leave_alone,
+	is_left_alone = is_left_alone,
+	forget = forget,
 })

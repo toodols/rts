@@ -64,6 +64,7 @@ local squads = require(script.squads)
 local army = require(script.army)
 local inspect = require(script.inspect)
 local sorties = require(script.sorties)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -302,6 +303,29 @@ local function formation_for(
 	return squads.formation(units, goal, kind, spacing, 0, Vector3.new(1, 0, 0), {})
 end
 
+-- The unit `unit_id`, of a team the AI plays, is commanded by something else (a mission's raider): the AI never counts
+-- it or gives it orders.
+local function leave_alone(unit_id: EntityId)
+	brains.leave_alone(unit_id)
+end
+
+-- Something is gone, which the AI need not remember.
+local function forget(unit_id: EntityId)
+	brains.forget(unit_id)
+end
+
+snapshot.keep("ai", function()
+	return {
+		opponents_wanted = opponents_wanted,
+		opponent_orders = opponent_orders,
+		opponents_placed = opponents_placed,
+	}
+end, function(saved)
+	opponents_wanted = saved.opponents_wanted
+	opponent_orders = saved.opponent_orders
+	opponents_placed = saved.opponents_placed
+end)
+
 return table.freeze({
 	init = init,
 	tick = tick,
@@ -314,6 +338,8 @@ return table.freeze({
 	teams = teams,
 	spawn_opponent = spawn_opponent,
 	take_over = take_over,
+	leave_alone = leave_alone,
+	forget = forget,
 	restart_on_new_map = restart_on_new_map,
 	describe = inspect.describe,
 	report = inspect.report,

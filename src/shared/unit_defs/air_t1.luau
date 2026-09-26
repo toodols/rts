@@ -15,6 +15,9 @@ local MAP_GRAVITY = conversions.MAP_GRAVITY
 local run_out = conversions.run_out
 local projectile = conversions.projectile
 local altitude = conversions.altitude
+local accuracy = conversions.accuracy
+local shell_speed = conversions.shell_speed
+local shell_gravity = conversions.shell_gravity
 
 type EntityDef = types.EntityDef
 type Weapon = types.Weapon
@@ -182,6 +185,55 @@ local defs: { [string]: EntityDef } = {
 			},
 		} :: { Weapon },
 		color = palette.RUST,
+	},
+
+	-- a light gunship: it hovers over what it attacks and circles it (server/orbits.luau), spraying it with quick bursts
+	-- of plasma, and hits only what is on the ground and the water. Armada's, from units/ArmAircraft/armkam.lua.
+	-- bar: armkam
+	banshee = {
+		name = "banshee",
+		display_name = "Banshee",
+		subtitle = "Light gunship",
+		kind = "unit",
+		category = "aircraft",
+		tech_level = 1,
+		-- no collision volume of its own, so its 2 x 2 footprint, 32 elmos a side
+		collider = capsule(32, 32, 32),
+		metal_cost = 135,
+		energy_cost = 2300,
+		buildpower_cost = 5050,
+		health = 560,
+		acceleration = studs_per_second_squared(0.15),
+		max_speed = studs(184.8),
+		footing = footing.ANYWHERE,
+		-- `cruisealtitude` 70
+		air = { altitude = altitude(70), climb_speed = 10 }, -- not bar's: climb_speed
+		-- emg: a cannon, bursts of three strewn about their aim (`accuracy` 13 and `sprayangle` 1024). BAR's fires only
+		-- ahead (`tolerance` 5000); it fires whichever way here, as the other gunships do.
+		weapons = {
+			{
+				kind = "plasma_cannon",
+				damage = 9,
+				reload = 0.7,
+				burst_count = 3,
+				burst_interval = 0.1,
+				range = studs(350),
+				energy_per_shot = 0,
+				target_layer = "ground",
+				delivery = {
+					kind = "lobbed",
+					arc = "low",
+					projectile = projectile({
+						speed = shell_speed(studs(1000)),
+						gravity = shell_gravity(studs(MAP_GRAVITY)),
+						aoe_radius = aoe(40),
+						edge_effectiveness = 0.5,
+						inaccuracy = accuracy(13 + 1024),
+					}),
+				},
+			},
+		} :: { Weapon },
+		color = palette.OLIVE,
 	},
 
 	-- a light transport: it lifts light units only, which is every T1 ground unit and nothing heavier

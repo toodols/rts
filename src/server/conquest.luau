@@ -20,6 +20,7 @@ local state = require(script.Parent.state)
 local deaths = require(script.Parent.deaths)
 local match = require(script.Parent.match)
 local elimination = require(script.Parent.elimination)
+local snapshot = require(script.Parent.snapshot)
 
 type TeamId = types.TeamId
 type Entity = types.Entity
@@ -178,6 +179,22 @@ local function start_over()
 	table.clear(to_destroy)
 	check_timer = 0
 end
+
+snapshot.keep("conquest", function()
+	return {
+		evaluator = evaluator.kept(),
+		check_timer = check_timer,
+		sides = sides,
+		eliminated = eliminated,
+		to_destroy = to_destroy,
+	}
+end, function(saved)
+	evaluator.put_back(saved.evaluator)
+	check_timer = saved.check_timer
+	sides = saved.sides
+	eliminated = saved.eliminated
+	to_destroy = saved.to_destroy
+end)
 
 return table.freeze({
 	tick = tick,

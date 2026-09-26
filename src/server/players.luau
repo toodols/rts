@@ -10,6 +10,7 @@ local signal = require(ReplicatedStorage.Shared.signal)
 local seating = require(ReplicatedStorage.Shared.seating)
 
 local state = require(script.Parent.state)
+local snapshot = require(script.Parent.snapshot)
 
 type TeamId = types.TeamId
 
@@ -151,6 +152,13 @@ local function forget(player: Player)
 		name_team(team_id)
 	end
 end
+
+snapshot.keep("players", function()
+	return { next_team_id = next_team_id, freed = freed }
+end, function(saved)
+	next_team_id = saved.next_team_id
+	freed = saved.freed
+end)
 
 return table.freeze({
 	assign = assign,

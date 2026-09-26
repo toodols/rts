@@ -28,6 +28,7 @@ local placement = require(script.Parent.placement)
 local production = require(script.Parent.production)
 local build_rules = require(script.Parent.build_rules)
 local self_destruct = require(script.Parent.self_destruct)
+local shields = require(script.Parent.shields)
 local alliances = require(script.Parent.alliances)
 
 type Entity = types.Entity
@@ -187,6 +188,10 @@ local function issue(team: TeamId, sent: Sent)
 		-- anything of yours can destroy itself, a building too, and stopping it calls that off
 		if sent.kind == "self_destruct" then
 			self_destruct.toggle(entity)
+			continue
+		end
+		if sent.kind == "shield" then
+			shields.toggle(entity)
 			continue
 		end
 		if sent.kind == "stop" then

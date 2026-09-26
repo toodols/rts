@@ -41,6 +41,10 @@ export type Handler = {
 	on_commander_down: ((team_id: TeamId) -> ())?,
 	-- Whether its enemy having nothing left beats it yet; always, for a mission that does not say.
 	is_beaten: (() -> boolean)?,
+	-- Whether it has been lost other than by every one of the players' teams being out (its time run out, something
+	-- that had to stand gone): the line everyone sees under the result, or nil while it has not. Never, for a mission
+	-- that does not say.
+	lost: (() -> string?)?,
 	-- How many of its enemy's units are on their way onto the field, still to come down; none for a mission that does
 	-- not say.
 	arriving: (() -> number)?,

@@ -1,4 +1,4 @@
--- A team as the pow commands describe it (list_teams, team_stats, player_stats): a line of who plays it, its allies and
+-- A team as the pow commands describe it (team_list, team_info, player_info): a line of who plays it, its allies and
 -- its bank, and in full, its flow, what it has on the map and what it has done this game.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"

@@ -1,7 +1,8 @@
 --!strict
 -- What the campaign's missions put on the field, as their design has it: the overlook's enemy base (and what its hard
--- mode adds), and the counterattack's layout and waves (and its hard mode's). The server's missions put it down (server/missions); it is kept here, apart from
--- how they play it, so that what reads it (a test, a mission's guide) needs nothing of theirs.
+-- mode adds), the counterattack's layout and waves (and its hard mode's), Channel Crossing's enemy and timing, and
+-- Blockade's player base and waves. The server's missions put it down (server/missions); it is kept here, apart
+-- from how they play it, so that what reads it (a test, a mission's guide) needs nothing of theirs.
 
 -- One of the enemy's things. What is out in front stands `from_edge` studs east of wherever the cliff's edge is at its
 -- z (mission_map.brink_x), since the edge wanders: a guard reaches 39.5 studs and a thug at the edge about 55 from that
@@ -269,10 +270,226 @@ local COUNTERATTACK_HARD_WAVES: { Wave } = table.clone(COUNTERATTACK_WAVES)
 table.move(EXTRA_HARD_WAVES, 1, #EXTRA_HARD_WAVES, #COUNTERATTACK_HARD_WAVES + 1, COUNTERATTACK_HARD_WAVES)
 table.freeze(COUNTERATTACK_HARD_WAVES)
 
+-- Channel Crossing's enemy (server/missions/channel.luau), on the channel (shared/map_designs/channel.luau), in world
+-- (x, z). Floating defences stand on the channel's level floor, out past every shore's slope (nothing floats over a
+-- floor that falls away under it).
+--
+-- First an outpost on the island's west side, facing the player across the west strait: a guard each side and a Twin
+-- Guard between them on the shore, and an Urchin off each. The AI cannot reach it to rebuild it: it is the player's to
+-- take, and the island's metal with it.
+--
+-- Then the enemy's own shore. The east strait's line floats in its middle: an Urchin off each landing beach and two
+-- between, whose torpedoes find ships, submarines, a wading commander and a Garpike under the water alike, and a Coral
+-- between each pair. On the cliff top two Agitators, whose shells reach across the whole east strait (113 studs) and
+-- onto the island's east shore; a Warden between them; and a pair of guards over each beach. Behind it all, the base the
+-- enemy's AI builds on: a lab and power. Its commander goes down at its start, and an extractor on each of its metal
+-- spots.
+local CHANNEL_ENEMY: { Thing } = {
+	-- the island outpost
+	{ def_name = "guard", at = Vector2.new(-44, -50) },
+	{ def_name = "guard", at = Vector2.new(-44, 50) },
+	{ def_name = "twin_guard", at = Vector2.new(-48, 0) },
+	{ def_name = "urchin", at = Vector2.new(-92, -40) },
+	{ def_name = "urchin", at = Vector2.new(-92, 40) },
+	-- the east strait's line
+	{ def_name = "urchin", at = Vector2.new(128, -100) },
+	{ def_name = "urchin", at = Vector2.new(128, -34) },
+	{ def_name = "urchin", at = Vector2.new(128, 34) },
+	{ def_name = "urchin", at = Vector2.new(128, 100) },
+	{ def_name = "coral", at = Vector2.new(128, -68) },
+	{ def_name = "coral", at = Vector2.new(128, 0) },
+	{ def_name = "coral", at = Vector2.new(128, 68) },
+	-- the shore
+	{ def_name = "agitator", at = Vector2.new(186, -44) },
+	{ def_name = "agitator", at = Vector2.new(186, 44) },
+	{ def_name = "warden", at = Vector2.new(184, 0) },
+	{ def_name = "guard", at = Vector2.new(192, -90) },
+	{ def_name = "guard", at = Vector2.new(192, -110) },
+	{ def_name = "guard", at = Vector2.new(192, 90) },
+	{ def_name = "guard", at = Vector2.new(192, 110) },
+	-- the base
+	{ def_name = "bot_lab", at = Vector2.new(236, -24) },
+	{ def_name = "energy_storage", at = Vector2.new(250, 30) },
+	{ def_name = "solar_collector", at = Vector2.new(296, -12) },
+	{ def_name = "solar_collector", at = Vector2.new(296, 4) },
+	{ def_name = "solar_collector", at = Vector2.new(304, -12) },
+	{ def_name = "solar_collector", at = Vector2.new(304, 4) },
+}
+
+-- What Channel Crossing's enemy has besides in its hard mode: a Coral past each end of the east strait's line, and
+-- another Agitator over each beach.
+local CHANNEL_HARD_ENEMY: { Thing } = {
+	{ def_name = "coral", at = Vector2.new(128, -140) },
+	{ def_name = "coral", at = Vector2.new(128, 140) },
+	{ def_name = "agitator", at = Vector2.new(206, -130) },
+	{ def_name = "agitator", at = Vector2.new(206, 130) },
+}
+
+local CHANNEL_LAYOUT = table.freeze({
+	-- how long the player has to kill the enemy's commander, in seconds, from their own going down; less in the hard
+	-- mode
+	time_limit = 22 * 60,
+	hard_time_limit = 18 * 60,
+	-- the hard mode's bomber raids: the first this long in, then one every raid_gap seconds, each of raid_bombers
+	-- Whirlwinds and one more every raid_growth raids, up to raid_most; they come in over the east edge
+	first_raid = 240,
+	raid_gap = 110,
+	raid_bombers = 2,
+	raid_growth = 2,
+	raid_most = 6,
+	raid_arrivals = table.freeze({ Vector2.new(312, -60), Vector2.new(312, 60) }),
+})
+
+-- Blockade's player base (server/missions/blockade.luau), put down beside their commander on the channel's west shore,
+-- in world (x, z): a shipyard in the middle of the harbour's level water (the map's "harbor" point), tidal generators
+-- round it and an Urchin each side of its mouth; a lab, power and a guard each side of the harbour on the shore; and a
+-- small fleet, a construction ship among it, in the harbour. An extractor goes on each of their metal spots on land as
+-- well.
+local BLOCKADE_BASE: { Thing } = {
+	{ def_name = "shipyard", at = Vector2.new(-181, 70) },
+	{ def_name = "tidal_generator", at = Vector2.new(-174, 60) },
+	{ def_name = "tidal_generator", at = Vector2.new(-174, 80) },
+	{ def_name = "tidal_generator", at = Vector2.new(-186, 82) },
+	{ def_name = "urchin", at = Vector2.new(-172, 52) },
+	{ def_name = "urchin", at = Vector2.new(-172, 88) },
+	{ def_name = "guard", at = Vector2.new(-206, 50) },
+	{ def_name = "guard", at = Vector2.new(-206, 92) },
+	{ def_name = "bot_lab", at = Vector2.new(-236, -12) },
+	{ def_name = "solar_collector", at = Vector2.new(-290, -16) },
+	{ def_name = "solar_collector", at = Vector2.new(-290, -4) },
+	{ def_name = "solar_collector", at = Vector2.new(-290, 8) },
+	{ def_name = "solar_collector", at = Vector2.new(-282, 20) },
+	{ def_name = "construction_ship", at = Vector2.new(-178, 64) },
+	{ def_name = "riptide", at = Vector2.new(-176, 72) },
+	{ def_name = "riptide", at = Vector2.new(-176, 66) },
+	{ def_name = "supporter", at = Vector2.new(-172, 70) },
+	{ def_name = "supporter", at = Vector2.new(-172, 64) },
+	{ def_name = "supporter", at = Vector2.new(-172, 76) },
+}
+
+local BLOCKADE_LAYOUT = table.freeze({
+	-- how long the player has to prepare before the first wave, in seconds
+	prep_seconds = 240,
+	-- how many of the enemy's ships may get through before the mission is lost: the one that makes it this many loses
+	escape_limit = 10,
+})
+
+-- Blockade's waves: fleets that sail in at the channel's north end, half down each strait, and on out at its south end,
+-- firing at whatever they pass but stopping for nothing. Ships only: the tier one fleet, with Oppressors and submarines
+-- once the player has had time for Agitators and Urchins. Its hard mode goes on past the seventh with cruisers.
+local BLOCKADE_WAVES: { Wave } = {
+	{ at = 0, units = { { def_name = "supporter", count = 4 } } },
+	{
+		at = 70,
+		units = { { def_name = "riptide", count = 2 }, { def_name = "supporter", count = 4 } },
+	},
+	{
+		at = 140,
+		units = {
+			{ def_name = "riptide", count = 3 },
+			{ def_name = "herring", count = 2 },
+			{ def_name = "supporter", count = 3 },
+		},
+	},
+	{
+		at = 220,
+		units = {
+			{ def_name = "oppressor", count = 1 },
+			{ def_name = "riptide", count = 3 },
+			{ def_name = "argonaut", count = 2 },
+		},
+	},
+	{
+		at = 300,
+		units = {
+			{ def_name = "orca", count = 2 },
+			{ def_name = "riptide", count = 4 },
+			{ def_name = "herring", count = 2 },
+		},
+	},
+	{
+		at = 380,
+		units = {
+			{ def_name = "oppressor", count = 2 },
+			{ def_name = "argonaut", count = 3 },
+			{ def_name = "riptide", count = 3 },
+		},
+	},
+	{
+		at = 460,
+		units = {
+			{ def_name = "oppressor", count = 3 },
+			{ def_name = "orca", count = 2 },
+			{ def_name = "riptide", count = 4 },
+			{ def_name = "herring", count = 3 },
+		},
+	},
+}
+table.freeze(BLOCKADE_WAVES)
+
+local EXTRA_BLOCKADE_HARD_WAVES: { Wave } = {
+	{
+		at = 540,
+		units = {
+			{ def_name = "buccaneer", count = 1 },
+			{ def_name = "oppressor", count = 2 },
+			{ def_name = "orca", count = 2 },
+			{ def_name = "riptide", count = 4 },
+		},
+	},
+	{
+		at = 620,
+		units = {
+			{ def_name = "buccaneer", count = 2 },
+			{ def_name = "orca", count = 3 },
+			{ def_name = "herring", count = 3 },
+			{ def_name = "argonaut", count = 3 },
+		},
+	},
+	{
+		at = 700,
+		units = {
+			{ def_name = "buccaneer", count = 2 },
+			{ def_name = "oppressor", count = 3 },
+			{ def_name = "orca", count = 3 },
+			{ def_name = "riptide", count = 5 },
+		},
+	},
+	{
+		at = 780,
+		units = {
+			{ def_name = "buccaneer", count = 3 },
+			{ def_name = "oppressor", count = 2 },
+			{ def_name = "orca", count = 4 },
+			{ def_name = "herring", count = 4 },
+		},
+	},
+	{
+		at = 860,
+		units = {
+			{ def_name = "buccaneer", count = 4 },
+			{ def_name = "oppressor", count = 4 },
+			{ def_name = "orca", count = 4 },
+			{ def_name = "riptide", count = 6 },
+			{ def_name = "argonaut", count = 3 },
+		},
+	},
+}
+local BLOCKADE_HARD_WAVES: { Wave } = table.clone(BLOCKADE_WAVES)
+table.move(EXTRA_BLOCKADE_HARD_WAVES, 1, #EXTRA_BLOCKADE_HARD_WAVES, #BLOCKADE_HARD_WAVES + 1, BLOCKADE_HARD_WAVES)
+table.freeze(BLOCKADE_HARD_WAVES)
+
 return table.freeze({
 	OVERLOOK_ENEMY = OVERLOOK_ENEMY,
 	OVERLOOK_HARD_ENEMY = OVERLOOK_HARD_ENEMY,
 	COUNTERATTACK_LAYOUT = COUNTERATTACK_LAYOUT,
 	COUNTERATTACK_WAVES = COUNTERATTACK_WAVES,
 	COUNTERATTACK_HARD_WAVES = COUNTERATTACK_HARD_WAVES,
+	CHANNEL_ENEMY = CHANNEL_ENEMY,
+	CHANNEL_HARD_ENEMY = CHANNEL_HARD_ENEMY,
+	CHANNEL_LAYOUT = CHANNEL_LAYOUT,
+	BLOCKADE_BASE = BLOCKADE_BASE,
+	BLOCKADE_LAYOUT = BLOCKADE_LAYOUT,
+	BLOCKADE_WAVES = BLOCKADE_WAVES,
+	BLOCKADE_HARD_WAVES = BLOCKADE_HARD_WAVES,
 })

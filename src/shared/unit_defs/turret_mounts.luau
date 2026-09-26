@@ -21,11 +21,23 @@ local mounts: { [string]: { [number]: TurretMount } } = {
 	arbiter = {
 		[1] = { pivot = Vector3.new(0, 1.3084, 0.0978), muzzle = Vector3.new(-0.2989, 0.6844, 1.0272) },
 	},
+	argonaut = {
+		[1] = { pivot = Vector3.new(0, 0.7712, 1.2168), muzzle = Vector3.new(-0.3422, 0.374, 0.5288) },
+	},
+	arrow_storm = {
+		[1] = { pivot = Vector3.new(0, 0.8469, 1.6818), muzzle = Vector3.new(-0.4087, 0.6574, 0.3251) },
+		[2] = { pivot = Vector3.new(0, 0.7568, -2.0182), muzzle = Vector3.new(-0.227, 0.8783, 0.6507) },
+	},
 	behemoth = {
 		[1] = { pivot = Vector3.new(0, 5.3501, -0.3095), muzzle = Vector3.new(-0.2657, 1.5326, 4.4004) },
 	},
 	birdeater = {
 		[1] = { pivot = Vector3.new(0, 0.66, 0.3), muzzle = Vector3.new(-0.2086, 0.8934, 0.568) },
+	},
+	black_hydra = {
+		[1] = { pivot = Vector3.new(0, 1.9081, 3.2127), muzzle = Vector3.new(-0.6848, 0.3296, 4.1427) },
+		[2] = { pivot = Vector3.new(0, 2.7814, -3.8891), muzzle = Vector3.new(-0.1278, 0.2555, 1.7755) },
+		[4] = { pivot = Vector3.new(0, 1.7512, -6.7636), muzzle = Vector3.new(-0.1278, 0.2555, 1.7755) },
 	},
 	brute = {
 		[1] = { pivot = Vector3.new(0, 1.3548, -0.1983), muzzle = Vector3.new(-0.2297, 0.1408, 1.6397) },
@@ -41,11 +53,21 @@ local mounts: { [string]: { [number]: TurretMount } } = {
 		[1] = { pivot = Vector3.new(-1.0264, 2.3328, 0), muzzle = Vector3.new(0, 0, 1.3636) },
 		[2] = { pivot = Vector3.new(1.0264, 2.3328, 0), muzzle = Vector3.new(0, 0, 1.3636) },
 	},
+	coral = {
+		[1] = { pivot = Vector3.new(0, 3.8, 0), muzzle = Vector3.new(0, 0.975, 4.732) },
+	},
+	despot = {
+		[1] = { pivot = Vector3.new(0, 1.4546, 2.96), muzzle = Vector3.new(-0.8065, 0.3602, 3.2964) },
+		[4] = { pivot = Vector3.new(0, 1.3341, -4.44), muzzle = Vector3.new(-0.1271, 0.2168, 1.6145) },
+	},
 	eradicator = {
 		[1] = { pivot = Vector3.new(0, 1.6, 0), muzzle = Vector3.new(-2.15, 0, 2.55) },
 	},
 	fatboy = {
 		[1] = { pivot = Vector3.new(0, 1.8182, 0), muzzle = Vector3.new(0.4673, 2.8121, 2.7273) },
+	},
+	garpike = {
+		[1] = { pivot = Vector3.new(0, 1.0876, -0.4406), muzzle = Vector3.new(-0.085, 0.1359, 2.014) },
 	},
 	goon = {
 		[1] = { pivot = Vector3.new(0, 0.6431, -0.0517), muzzle = Vector3.new(0, 0.1263, 1.2707) },
@@ -82,8 +104,14 @@ local mounts: { [string]: { [number]: TurretMount } } = {
 	mammoth = {
 		[1] = { pivot = Vector3.new(0, 2.5, 0.1003), muzzle = Vector3.new(0.2301, 0.6591, 2.627) },
 	},
+	messenger = {
+		[2] = { pivot = Vector3.new(0, 0.9297, -3.2136), muzzle = Vector3.new(-0.3099, 0.508, 0.2858) },
+	},
 	negotiator = {
 		[1] = { pivot = Vector3.new(0, 1.1724, -0.334), muzzle = Vector3.new(0, 1.6245, 1.0041) },
+	},
+	oppressor = {
+		[1] = { pivot = Vector3.new(0, 1.1859, 1.914), muzzle = Vector3.new(-0.2965, 0.1523, 1.5614) },
 	},
 	persecutor = {
 		[1] = { pivot = Vector3.new(0, 3, 0), muzzle = Vector3.new(-0.85, 5.1569, 7.6654) },
@@ -120,6 +148,9 @@ local mounts: { [string]: { [number]: TurretMount } } = {
 	},
 	shiva = {
 		[1] = { pivot = Vector3.new(0, 3.4286, 0), muzzle = Vector3.new(1.3745, 0.7481, 2.7727) },
+	},
+	slingshot = {
+		[1] = { pivot = Vector3.new(0, 3.4, 0), muzzle = Vector3.new(-0.53, 1.3665, 0.9706) },
 	},
 	starlight = {
 		[1] = { pivot = Vector3.new(0, 2.4508, 0.0267), muzzle = Vector3.new(0, 0.346, 1.7727) },

@@ -33,7 +33,7 @@ local CommandPanel = command_panel.CommandPanel
 local SelectionBox = selection_box.SelectionBox
 local PlacementHint = cursor_hints.PlacementHint
 local PlacementProblem = cursor_hints.PlacementProblem
-local ModeHint = cursor_hints.ModeHint
+local ModeCursor = cursor_hints.ModeCursor
 
 local player = Players.LocalPlayer
 
@@ -66,7 +66,7 @@ local function Main()
 		SelectionBox = React.createElement(SelectionBox),
 		PlacementHint = React.createElement(PlacementHint),
 		PlacementProblem = React.createElement(PlacementProblem),
-		ModeHint = React.createElement(ModeHint),
+		ModeCursor = React.createElement(ModeCursor),
 		PlayerList = React.createElement(player_list.PlayerList),
 		Notifications = React.createElement(notifications.Notifications),
 		LobbyPanel = React.createElement(lobby_panel.LobbyPanel),

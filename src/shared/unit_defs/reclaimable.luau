@@ -13,15 +13,17 @@ type EntityDef = types.EntityDef
 -- The reclaimables: rocks and trees lying about the map, belonging to nobody, there to be reclaimed for the metal or
 -- energy in them (see `types.EntityKind`). Their `metal_cost` and `energy_cost` are what reclaiming one pays out, and
 -- their `buildpower_cost` is the buildpower that takes, BAR's `reclaimTime`, which when a feature does not give one
--- the engine makes (metal + energy) * 6 (FeatureDefHandler.cpp). Nothing harms one (`damage_immunity`), so it has no
--- health.
+-- the engine makes (metal + energy) * 6 (FeatureDefHandler.cpp). Its `health` is BAR's `damage`: weapons wear one down
+-- as they do a wreck (a hitscan shot or a blast strikes it, a shell flies through), and when it runs out the rock or
+-- tree is simply gone, with what was left in it, since none of these has a `featuredead` to leave. No EMP stuns one.
 --
 -- On a BAR map every one holds what that feature holds in BAR, which the map says (`Preset.reclaimables`), and these are
 -- only what it is drawn as: a rock for anything with metal in it, a tree for energy, and a shrub for a little energy,
 -- like BAR's ferns and mushrooms. Laid out from the seed, they hold what they say here.
 --
--- The rocks are three of BAR's features/rocks30.lua, whose rock number i holds 9 + i metal on a footprint of
--- floor(i / 8) + 1 squares of 16 elmos, 16 elmos high. The tree is features/enginetrees_override.lua's.
+-- The rocks are three of BAR's features/rocks30.lua, whose rock number i holds 9 + i metal and has 100 + 50 i health
+-- (`damage`) on a footprint of floor(i / 8) + 1 squares of 16 elmos, 16 elmos high. The tree is
+-- features/enginetrees_override.lua's.
 
 local function rock(name: string, number: number): EntityDef
 	local metal = 9 + number
@@ -37,7 +39,8 @@ local function rock(name: string, number: number): EntityDef
 		metal_cost = metal,
 		energy_cost = 0,
 		buildpower_cost = metal * 6,
-		damage_immunity = "all",
+		health = 100 + 50 * number,
+		emp_resistance = 1,
 		-- every rock is the same art, stretched to its own collider, so that the thousands on a map are all one mesh
 		feature = { art = "rock", shadowless = true, ground = "any" },
 		color = Color3.fromRGB(112, 106, 98),
@@ -63,13 +66,16 @@ local defs: { [string]: EntityDef } = {
 		metal_cost = 0,
 		energy_cost = 250,
 		buildpower_cost = 1500,
-		damage_immunity = "all",
+		health = 250,
+		emp_resistance = 1,
 		feature = { art = "tree", ground = "soil" },
 		color = Color3.fromRGB(70, 104, 52),
 	},
 
 	-- a fern or a clump of mushrooms, as BAR's maps strew them, which hold 50 energy
 	-- bar: none (a map feature)
+	-- divergence from bar: BAR has no file of its own for these (each map brings its own), so its health is derived, not
+	-- copied: the tree's 250 health for its 250 energy, one health for each energy, gives 50
 	shrub = {
 		name = "shrub",
 		display_name = "Shrub",
@@ -81,7 +87,8 @@ local defs: { [string]: EntityDef } = {
 		metal_cost = 0,
 		energy_cost = 50,
 		buildpower_cost = 300,
-		damage_immunity = "all",
+		health = 50,
+		emp_resistance = 1,
 		feature = { art = "shrub", shadowless = true, ground = "any" },
 		color = Color3.fromRGB(88, 120, 56),
 	},

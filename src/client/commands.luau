@@ -229,18 +229,52 @@ local function spot_under_cursor(): Vector3?
 	return if point ~= nil then drag_trace.waypoint_ground(point.X, point.Z) else nil
 end
 
--- An "attack" click: the enemy under the cursor, judged from the first attacker's side, or a wreck, is attacked, and
--- anything else means the spot on the ground under it, which is shot at until told otherwise.
-local function click_attack(info: ModeInfo, entries: { Entry }, queueing: Queueing): boolean
-	local ids = selected.ids_of(entries)
+-- What a click in the mode `info` by `entries` would land on: an entity, or else a spot on the ground, or neither when
+-- the click would do nothing.
+-- - "attack": the enemy under the cursor, judged from the first attacker's side, or a wreck, and anything else means
+--   the spot on the ground under it;
+-- - "spot" and "manual": the ground under the cursor, whatever is on it;
+-- - "entity": what is under the cursor, but not what the order may not be aimed at (an enemy, for a guard), nor the one
+--   thing that would be given it.
+local function aim(info: ModeInfo, entries: { Entry }): (Model?, Vector3?)
+	if #entries == 0 then
+		return nil, nil
+	end
 	local target = cursor.entity()
+	if target ~= nil and world.id_of(target) == nil then
+		target = nil
+	end
+	if info.click == "attack" then
+		if target ~= nil and world.is_attackable(target, entries[1].model) then
+			return target, nil
+		end
+		return nil, spot_under_cursor()
+	elseif info.click == "entity" then
+		if
+			target ~= nil
+			and order_kinds.get(info.order).friendly_only
+			and world.is_guardable(target, entries[1].model) == false
+		then
+			return nil, nil
+		end
+		if target ~= nil and #entries == 1 and entries[1].model == target then
+			return nil, nil
+		end
+		return target, nil
+	end
+	return nil, spot_under_cursor()
+end
+
+-- An "attack" click: the enemy aimed at is attacked, or else the spot on the ground, which is shot at until told
+-- otherwise.
+local function click_attack(info: ModeInfo, entries: { Entry }, queueing: Queueing): boolean
+	local target, spot = aim(info, entries)
 	local target_id = if target ~= nil then world.id_of(target) else nil
-	if target ~= nil and target_id ~= nil and world.is_attackable(target, entries[1].model) then
+	local ids = selected.ids_of(entries)
+	if target_id ~= nil then
 		orders.send(info.order, ids, { aim = "entity", id = target_id }, queueing, info.launch)
 		return true
-	end
-	local spot = spot_under_cursor()
-	if spot == nil then
+	elseif spot == nil then
 		return false
 	end
 	markers.flash_points({ spot }, ORDER_MARKER_SECONDS, "attack_ground")
@@ -250,7 +284,7 @@ end
 
 -- A "spot" or "manual" click: the mode's order to the ground under the cursor, whatever is on it.
 local function click_spot(info: ModeInfo, entries: { Entry }, queueing: Queueing): boolean
-	local spot = spot_under_cursor()
+	local _, spot = aim(info, entries)
 	if spot == nil then
 		return false
 	end
@@ -259,17 +293,9 @@ local function click_spot(info: ModeInfo, entries: { Entry }, queueing: Queueing
 	return true
 end
 
--- An "entity" click: the mode's order at what is under the cursor, given by everyone who can but that thing itself.
--- What the order may not be aimed at (an enemy, for a guard) is as good as nothing there.
+-- An "entity" click: the mode's order at what is aimed at, given by everyone who can but that thing itself.
 local function click_entity(info: ModeInfo, entries: { Entry }, queueing: Queueing): boolean
-	local target = cursor.entity()
-	if
-		target ~= nil
-		and order_kinds.get(info.order).friendly_only
-		and world.is_guardable(target, entries[1].model) == false
-	then
-		target = nil
-	end
+	local target = aim(info, entries)
 	local target_id = if target ~= nil then world.id_of(target) else nil
 	if target_id == nil then
 		return false
@@ -279,9 +305,6 @@ local function click_entity(info: ModeInfo, entries: { Entry }, queueing: Queuei
 		if entry.id ~= target_id then
 			table.insert(ids, entry.id)
 		end
-	end
-	if #ids == 0 then
-		return false
 	end
 	orders.send(info.order, ids, { aim = "entity", id = target_id }, queueing)
 	return true
@@ -315,7 +338,13 @@ local function self_destruct()
 	orders.send("self_destruct", selection.get(), { aim = "none" }, orders.NOW)
 end
 
+-- K: every switched shield in the selection (a commander's) goes up, or down if it is up.
+local function toggle_shield()
+	orders.send("shield", selection.get(), { aim = "none" }, orders.NOW)
+end
+
 return table.freeze({
+	aim = aim,
 	right_click = right_click,
 	move_along = move_along,
 	mode_click = mode_click,
@@ -323,4 +352,5 @@ return table.freeze({
 	mode_area = mode_area,
 	stop = stop,
 	self_destruct = self_destruct,
+	toggle_shield = toggle_shield,
 })

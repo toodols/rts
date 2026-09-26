@@ -12,7 +12,7 @@ local pow_types = require(ReplicatedStorage.Shared.pow_types)
 local selection = require(ReplicatedStorage.Client.selection)
 
 -- The commands that act on what is selected.
-local ON_SELECTION = { "donut_pop", "donut_flyoff", "donut_float", "donut_regen" }
+local ON_SELECTION = { "donut_pop", "donut_fly", "donut_float", "donut_regen" }
 
 local function with_selection(context: any)
 	context.data.selected = selection.get()

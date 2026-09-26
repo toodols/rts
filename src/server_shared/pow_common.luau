@@ -58,41 +58,51 @@ local function outcome_line(done: string, outcome: string, why: string?): (strin
 	return "info", if outcome == "saved" then `{done} (saved)` else `{done} ({why or "not saved"})`
 end
 
-local function developer(): Command
+-- Logs the developers' list, `ids`, as developer_list hands it back, or `err`, why it could not be reached.
+local function log_developers(context: Context, ids: { number }?, err: string?)
+	if ids == nil then
+		context:log({ type = "error", value = `Could not reach the developer list: {err}` })
+		return
+	end
+	local names: { string } = {}
+	for _, id in ids do
+		table.insert(names, tostring(id))
+	end
+	context:log({
+		type = "info",
+		value = if #names > 0
+			then `Developers: {table.concat(names, ", ")} (and the game's owner)`
+			else "No developers listed (only the game's owner is one)",
+	})
+end
+
+local function developer_list_command(): Command
 	return {
-		description = "Adds a user to the game's developers, who alone may give lobby players a resource bonus, and "
-			.. "may use this command bar, or takes them off it. The list is the same in every place. With no "
-			.. "arguments it says who is on it.",
+		description = "Lists the game's developers, who alone may give lobby players a resource bonus and use this "
+			.. "command bar. The list is the same in every place.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
+		},
+		server_run = function(context: Context)
+			log_developers(context, developer_list.read())
+		end,
+	}
+end
+
+local function developer_set(): Command
+	return {
+		description = "Adds a user to the game's developers, or with Listed false takes them off. The list is the "
+			.. "same in every place.",
+		permissions = { "admin" },
+		overloads = {
 			{
 				returns = "nil",
-				args = { { name = "UserId", type = "number" }, { name = "Developer", type = "boolean" } },
+				args = { { name = "UserId", type = "number" }, { name = "Listed", type = "boolean" } },
 			},
 		},
 		server_run = function(context: Context)
-			local user_id, listed = context.args[1], context.args[2]
-			local ids, err
-			if user_id == nil then
-				ids, err = developer_list.read()
-			else
-				ids, err = developer_list.set(user_id, listed)
-			end
-			if ids == nil then
-				context:log({ type = "error", value = `Could not reach the developer list: {err}` })
-				return
-			end
-			local names: { string } = {}
-			for _, id in ids do
-				table.insert(names, tostring(id))
-			end
-			context:log({
-				type = "info",
-				value = if #names > 0
-					then `Developers: {table.concat(names, ", ")} (and the game's owner)`
-					else "No developers listed (only the game's owner is one)",
-			})
+			log_developers(context, developer_list.set(context.args[1], context.args[2]))
 		end,
 	}
 end
@@ -147,7 +157,7 @@ local function skin_list(place: Place): Command
 	}
 end
 
-local function equip(): Command
+local function skin_equip(): Command
 	return {
 		description = "Equips a skin for you, or for the player given, as the lobby's Skins tab does: it is saved, and "
 			.. "worn in their games from then on, and at once in this one. Unlike the tab it may equip anything, "
@@ -172,7 +182,7 @@ local function equip(): Command
 	}
 end
 
-local function complete_mission(): Command
+local function mission_complete(): Command
 	return {
 		description = "Finishes a campaign mission for you, or for the player given, as winning it would: it is marked "
 			.. "done and what it unlocks is theirs, and that is saved.",
@@ -194,7 +204,7 @@ local function complete_mission(): Command
 	}
 end
 
-local function reset_data(): Command
+local function player_reset(): Command
 	return {
 		description = "Wipes what is saved for you, or for the player given, as though they had never played: no "
 			.. "missions done, the starting unlocks, and the default skin. That is saved.",
@@ -218,7 +228,7 @@ local function reset_data(): Command
 end
 
 -- Read-only readouts, for debugging. Each logs once, everything newline-joined, so that it copies in one go.
-local function unlocks(): Command
+local function unlock_list(): Command
 	return {
 		description = "Shows your campaign progress, or the player given's: each mission and whether it is done, what "
 			.. "it unlocks, every def they have unlocked and every one still locked, and whether their progress was "
@@ -251,7 +261,7 @@ local function unlocks(): Command
 	}
 end
 
-local function player_stats(place: Place): Command
+local function player_info(place: Place): Command
 	return {
 		description = "Shows everything about you, or the player given: user id, developer or not, skin, campaign "
 			.. "progress, and what they are doing here.",
@@ -275,7 +285,7 @@ local function player_stats(place: Place): Command
 					.. ` | developer: {if developers.is_developer(target) then "yes" else "no"}`
 					.. ` | skin equipped: {skin_session.equipped_by(target)}`,
 				`  campaign: {done} / {#campaign.MISSIONS} missions done, {#unlocked} lockable defs unlocked`
-					.. ` ({if is_saved(target) then "saved" else "not saved"}; /unlocks for the list)`,
+					.. ` ({if is_saved(target) then "saved" else "not saved"}; unlock_list for the list)`,
 			}
 			for _, line in place.player_lines(target) do
 				table.insert(lines, line)
@@ -287,13 +297,14 @@ end
 
 -- Registers every command here into pow's `commands`, `place` saying what only it knows.
 local function register(commands: { [string]: Command }, place: Place)
-	commands.developer = developer()
-	commands.skins = skin_list(place)
-	commands.equip = equip()
-	commands.complete_mission = complete_mission()
-	commands.reset_data = reset_data()
-	commands.unlocks = unlocks()
-	commands.player_stats = player_stats(place)
+	commands.developer_list = developer_list_command()
+	commands.developer_set = developer_set()
+	commands.skin_list = skin_list(place)
+	commands.skin_equip = skin_equip()
+	commands.mission_complete = mission_complete()
+	commands.player_info = player_info(place)
+	commands.player_reset = player_reset()
+	commands.unlock_list = unlock_list()
 end
 
 return table.freeze({

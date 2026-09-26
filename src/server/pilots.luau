@@ -10,6 +10,7 @@ local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 local piloting = require(ReplicatedStorage.Shared.piloting)
 
 local state = require(script.Parent.state)
+local snapshot = require(script.Parent.snapshot)
 
 type EntityId = types.EntityId
 type Entity = types.Entity
@@ -154,6 +155,12 @@ local function publish(entity: Entity, def: types.EntityDef, write: entity_attrs
 		end
 	end
 end
+
+snapshot.keep("pilots", function()
+	return { pilots = pilots }
+end, function(saved)
+	pilots = saved.pilots
+end)
 
 return table.freeze({
 	new = new,

@@ -127,6 +127,7 @@ export type ProjectileSpec = {
 	inaccuracy: number?,
 	turn_rate: number?,
 	fuse: number?,
+	burst_at_aim: boolean?,
 	line_thickness: number?,
 	look: types.ProjectileLook?,
 }
@@ -144,6 +145,7 @@ local function projectile(spec: ProjectileSpec): types.ProjectileParams
 		inaccuracy = spec.inaccuracy,
 		turn_rate = spec.turn_rate,
 		fuse = spec.fuse,
+		burst_at_aim = spec.burst_at_aim,
 		line_thickness = spec.line_thickness,
 		look = spec.look,
 	}

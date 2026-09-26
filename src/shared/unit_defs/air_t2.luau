@@ -36,8 +36,8 @@ local LASER_BOLT: types.ProjectileLook = {
 local BOLT_SPENT_DRAG = 0.02
 
 -- The second tier of aircraft, the ones the Advanced Air Lab makes, in BAR's numbers from its unit files:
--- units/CorAircraft/T2/coraca.lua (Advanced Construction Aircraft), corvamp.lua (Nighthawk) and corhurc.lua
--- (Hailstorm), units/ArmAircraft/T2/armliche.lua (Liche) and armstil.lua (Stiletto), and
+-- units/CorAircraft/T2/coraca.lua (Advanced Construction Aircraft), corvamp.lua (Nighthawk), corhurc.lua
+-- (Hailstorm) and cortitan.lua (Angler), units/ArmAircraft/T2/armliche.lua (Liche) and armstil.lua (Stiletto), and
 -- units/Legion/Air/T2 Air/legfort.lua (Tyrannus) and legstronghold.lua (Stronghold).
 --
 -- A unit file with no collision volume of its own gets a collider the size of its footprint, as the heavy drone does.
@@ -323,6 +323,60 @@ local defs: { [string]: EntityDef } = {
 			},
 		} :: { Weapon },
 		color = Color3.fromRGB(120, 108, 150),
+	},
+
+	-- cortitan: the torpedo bomber. It comes in on a pass and drops a heavy homing torpedo, which falls into the water
+	-- and runs for what it was dropped on: ships and submarines, and nothing out of the water. BAR's hits what is on land
+	-- too, for a fifth of its damage (`land_damage_mult` 0.2); a torpedo here is aimed at nothing out of the water.
+	-- bar: cortitan
+	angler = {
+		name = "angler",
+		display_name = "Angler",
+		subtitle = "Torpedo bomber",
+		kind = "unit",
+		category = "aircraft",
+		tech_level = 2,
+		-- no collision volume of its own, so its 4 x 4 footprint, 64 elmos a side
+		collider = capsule(64, 64, 64),
+		metal_cost = 410,
+		energy_cost = 8200,
+		buildpower_cost = 18000,
+		health = 1960,
+		acceleration = studs_per_second_squared(0.1325),
+		max_speed = studs(279),
+		footing = footing.ANYWHERE,
+		-- `cruisealtitude` 90 and `turnradius` 64; `maxelevator` 0.00972 and `maxrudder` 0.00522, a circle of about
+		-- 26 studs. BAR has no climb rate; this is the Hailstorm's.
+		air = {
+			altitude = altitude(90),
+			climb_speed = 11, -- not bar's
+			bombing_runs = true,
+			wings = { turn_rate = 0.99, run_out = run_out(64, 279) }, -- derived: turn_rate
+		},
+		-- heavy_torpedo
+		weapons = {
+			{
+				kind = "torpedo",
+				damage = 1200,
+				reload = 8,
+				range = studs(400),
+				energy_per_shot = 0,
+				delivery = {
+					kind = "torpedo",
+					guidance = "homes",
+					projectile = projectile({
+						speed = studs(35),
+						acceleration = studs(35),
+						thrust_time = (160 - 35) / 35,
+						-- `mygravity` 0.1, which it falls under from the plane to the water
+						gravity = studs_per_second_squared(0.1),
+						aoe_radius = aoe(150),
+						edge_effectiveness = 0.15,
+					}),
+				},
+			},
+		} :: { Weapon },
+		color = Color3.fromRGB(70, 128, 150),
 	},
 
 	-- legfort: the flying fortress, a huge, slow gunship. It hovers, and like any gunship it keeps circling what it

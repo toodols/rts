@@ -62,6 +62,8 @@ local defs: { [string]: EntityDef } = {
 				"wall",
 				"thistle",
 				"hovercraft_platform",
+				"urchin",
+				"slingshot",
 			},
 		},
 		acceleration = studs_per_second_squared(0.18),
@@ -89,6 +91,17 @@ local defs: { [string]: EntityDef } = {
 			reload = 0.9,
 			energy_per_shot = 500,
 			radius = studs(36),
+		},
+		-- divergence from bar: in place of cloaking, a shield switched on and off (K) that stops every weapon, paid
+		-- for while it is up, and regrown while it is off
+		shield = {
+			radius = studs(110),
+			power = 3000,
+			regen = 20,
+			regen_energy = 0,
+			starting_power = 3000,
+			blocks = "all",
+			upkeep = { moving = 1000, standing = 100 },
 		},
 		-- armcom's own income and storage; a team with no commander has neither
 		metal_income = 2,
@@ -388,7 +401,9 @@ local defs: { [string]: EntityDef } = {
 		color = palette.OLIVE,
 	},
 
-	-- armwar: a bot with a pair of short-range lasers, one on each side, that aim on their own
+	-- armwar: a bot with a short-range laser on each arm, that aim on their own. BAR's armwar has one armwar_laser,
+	-- whose script fires it from each arm in turn; here each arm is a weapon of its own.
+	-- derived: each arm's reload is twice armwar_laser's 0.3 seconds, so the two together fire as often as BAR's one
 	-- bar: armwar
 	centurion = {
 		name = "centurion",
@@ -411,7 +426,7 @@ local defs: { [string]: EntityDef } = {
 			{
 				kind = "laser",
 				damage = 55,
-				reload = 0.3,
+				reload = 0.3 * 2,
 				range = studs(325),
 				turret = { turn_rate = math.rad(240) },
 				energy_per_shot = 0,
@@ -423,7 +438,7 @@ local defs: { [string]: EntityDef } = {
 			{
 				kind = "laser",
 				damage = 55,
-				reload = 0.3,
+				reload = 0.3 * 2,
 				range = studs(325),
 				turret = { turn_rate = math.rad(240) },
 				energy_per_shot = 0,

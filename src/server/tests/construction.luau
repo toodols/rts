@@ -141,7 +141,8 @@ end
 -- a spot the bot can stand on with a site for a Solar Collector, or `args.building`, within its reach that it cannot
 -- go straight to and that a search finds a way to. How many waypoints the way to the site itself has, how many were
 -- sent ahead of the build (none: it builds from where it stands), whether the blueprint went down, and how far the bot
--- went from where it started (nowhere).
+-- went from where it started (nowhere). Played on koth unless another `preset` is given: the usual map's only such
+-- sites were across shallow water, which a bot now wades.
 local function build_in_reach(args: Args): Findings
 	local building = args.building or "solar_collector"
 	local unit = args.unit or "construction_bot"
@@ -486,25 +487,38 @@ local function reclaimables(args: Args): Findings
 	local tree = reclaim_one(lay("tree", 5, 0))
 	local rock = reclaim_one(lay("large_rock", -6, 0))
 
-	-- nothing but reclaiming it takes it away
+	-- it cannot be raised or ordered attacked, but damage wears it away as it does a wreck, leaving nothing and
+	-- crediting nobody (BAR's rocks have `damage` health and no `featuredead`)
 	local target = lay("rock", 20, 0)
 	local rezzer = spawn("graverobber", OWN, 16, 4)
-	-- off to the side, so that its disintegrator, fired at the rock, passes nothing else
+	-- off to the side, so that its disintegrator, fired at a rock, passes nothing else
 	local commander = spawn("commander", OWN, 20, -16)
 	advance(tick_rate.TICK_DELTA)
 	local raisable = resurrection.can_resurrect(rezzer, target)
 	local attackable = targeting.is_valid_forced_target(commander, target)
-	damage.apply(target, 1e6)
-	local survived_damage = target.alive
+	local rock_health = target.max_health
+	damage.apply(target, 1e6, commander.id)
+	advance(tick_rate.TICK_DELTA)
+	local destroyed_by_damage = target.alive == false
+	local credited = commander.kills > 0 or commander.damage_dealt > 0
+	local left_behind = 0
+	for _, entity in state.all() do
+		if entity.alive and geometry.distance_2d(entity.position, target.position) < 2 then
+			left_behind += 1
+		end
+	end
+	local swept = lay("rock", 20, 0)
 	commander.manual_reload_remaining = 0
 	local dgun: any = nil
 	with_switch(NOCOST, true, function()
-		dgun = manual_weapons.fire(commander, target.position)
+		dgun = manual_weapons.fire(commander, swept.position)
 	end)
 	advance(tick_rate.TICK_DELTA)
-	local survived_dgun = target.alive
-	local site = placement.resolve_center("solar_collector", target.position.X, target.position.Z, 0, nil)
-		or target.position
+	local destroyed_by_dgun = swept.alive == false
+	-- still in the way of anyone else building on it, though its own side's builder clears it off as it comes
+	local standing = lay("rock", 20, 0)
+	local site = placement.resolve_center("solar_collector", standing.position.X, standing.position.Z, 0, nil)
+		or standing.position
 	local blocks_others = placement.can_place("solar_collector", site, 0, nil, nil) == false
 	local cleared_by_builder = placement.can_place("solar_collector", site, 0, nil, OWN)
 
@@ -531,9 +545,12 @@ local function reclaimables(args: Args): Findings
 		large_rock = rock,
 		raisable = raisable,
 		attackable = attackable,
-		survived_damage = survived_damage,
+		rock_health = rock_health,
+		destroyed_by_damage = destroyed_by_damage,
+		credited = credited,
+		left_behind = left_behind,
 		dgun = dgun,
-		survived_dgun = survived_dgun,
+		destroyed_by_dgun = destroyed_by_dgun,
 		blocks_others = blocks_others,
 		cleared_by_builder = cleared_by_builder,
 		area_reclaim_left = left,
@@ -543,11 +560,66 @@ local function reclaimables(args: Args): Findings
 			and rock.ok
 			and raisable == false
 			and attackable == false
-			and survived_damage
-			and survived_dgun
+			and rock_health == 700
+			and destroyed_by_damage
+			and credited == false
+			and left_behind == 0
+			and destroyed_by_dgun
 			and blocks_others
 			and cleared_by_builder
 			and left == 0,
+	}
+end
+
+-- Rocks and trees take damage as BAR's features do (unit_defs/reclaimable.luau): a blast burns a tree away, a grunt's
+-- beam at an enemy behind a tree strikes the tree first, a Thug's plasma shell flies through a tree on its way to the
+-- enemy past it, and nothing shoots at a rock or a tree of its own accord.
+local function reclaimables_harmed(_args: Args): Findings
+	clear_world()
+	harness.ensure_team(OWN)
+	harness.ensure_team(ENEMY)
+
+	-- a blast: the tree is gone, with nothing left where it stood
+	local blasted = lay("tree", 0, 0)
+	local tree_health = blasted.max_health
+	damage.blast(blasted.position, 4, nil, function(other: Entity, force: number)
+		damage.apply(other, 1000 * force)
+	end)
+	advance(tick_rate.TICK_DELTA)
+	local blast_destroyed = blasted.alive == false
+
+	-- a beam: the tree between the grunt and the enemy takes the shots
+	unkillable(harness.spawn_resting("grunt", OWN, 40, 0))
+	local shielded = unkillable(harness.spawn_resting("grunt", ENEMY, 56, 0))
+	local screen = lay("tree", 48, 0)
+	advance(4)
+	local beam_hit = screen.alive == false or screen.health < screen.max_health
+	local shielded_hurt = harness.damage_to(shielded)
+
+	-- a shell: it flies over and through the tree, which only the blast where it lands could reach, and that is far off
+	local thug = unkillable(spawn("thug", OWN, -60, 0))
+	local shelled = unkillable(spawn("grunt", ENEMY, -30, 0))
+	local passed = lay("tree", -45, 0)
+	advance(6)
+	local shell_passed = passed.alive and passed.health == passed.max_health
+	local shelled_hurt = harness.damage_to(shelled)
+
+	-- nothing picks a rock or a tree to shoot at
+	local idle = unkillable(spawn("grunt", OWN, 120, 0))
+	local rock = lay("rock", 124, 0)
+	local tree = lay("tree", 118, 4)
+	advance(3)
+	local left_alone = rock.health == rock.max_health and tree.health == tree.max_health and idle.damage_dealt == 0
+
+	return {
+		tree_health = tree_health,
+		blast_destroyed = blast_destroyed,
+		beam_hit = beam_hit,
+		shielded_hurt = shielded_hurt,
+		shell_passed = shell_passed,
+		shelled_hurt = shelled_hurt,
+		left_alone = left_alone,
+		pass = tree_health == 250 and blast_destroyed and beam_hit and shell_passed and shelled_hurt > 0 and left_alone,
 	}
 end
 
@@ -1003,11 +1075,12 @@ local TESTS: { [string]: Test } = {
 	order_path_codec = { run = order_path_codec },
 	build_hotkeys = { run = build_hotkeys_data },
 	build_route = { run = build_route },
-	build_in_reach = { run = build_in_reach },
+	build_in_reach = { run = build_in_reach, defaults = { preset = "koth" } },
 	build_reach_edge = { run = build_reach_edge },
 	builder_blocked = { run = builder_blocked },
 	mex_queue_snap = { run = mex_queue_snap },
 	reclaimables = { run = reclaimables, defaults = { scenery = true } },
+	reclaimables_harmed = { run = reclaimables_harmed },
 	reclaim_income = { run = reclaim_income },
 	geothermal = { run = geothermal, defaults = { preset = "koth" } },
 	rez_repair = { run = rez_repair },

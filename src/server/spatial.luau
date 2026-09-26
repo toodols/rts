@@ -26,6 +26,7 @@ local geometry = require(ReplicatedStorage.Shared.geometry)
 local state = require(script.Parent.state)
 local flat_grid = require(script.Parent.flat_grid)
 local alliances = require(script.Parent.alliances)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -73,21 +74,19 @@ local function new_layer(cell: number, side: number, widest: number): Layer
 	}
 end
 
--- Solid things on the ground and in the water, small and large; wrecks, which a shell flies through and a hitscan shot
--- or a blast can still strike; and aircraft, which as in BAR have no collider, so a shot passes through any but the
--- one it is aimed at and only a blast reaches the rest. What hangs from a transport is up with the aircraft, and is
--- treated as they are. A reclaimable is struck by nothing and hurt by no blast, so it is in none of them, but in a
--- layer of its own for what looks for something to reclaim.
+-- Solid things on the ground and in the water, small and large; remains, wrecks and reclaimables (rocks and trees),
+-- which a shell flies through and a hitscan shot or a blast can still strike, as BAR's features are; and aircraft,
+-- which as in BAR have no collider, so a shot passes through any but the one it is aimed at and only a blast reaches
+-- the rest. What hangs from a transport is up with the aircraft, and is treated as they are.
 local small = new_layer(8, 256, SMALL_RADIUS)
 local large = new_layer(24, 64, widest_collider)
-local wrecks = new_layer(24, 64, widest_collider)
+local remains = new_layer(24, 64, widest_collider)
 local aircraft = new_layer(24, 64, widest_collider)
-local reclaimables = new_layer(24, 64, widest_collider)
-local LAYERS = table.freeze({ small = small, large = large, wrecks = wrecks, aircraft = aircraft })
+local LAYERS = table.freeze({ small = small, large = large, remains = remains, aircraft = aircraft })
 -- the colliders, in the order a blast looks through them
-local IN_ORDER: { Layer } = { small, large, wrecks, aircraft }
+local IN_ORDER: { Layer } = { small, large, remains, aircraft }
 -- everything, for a search by position alone
-local EVERYTHING: { Layer } = { small, large, wrecks, aircraft, reclaimables }
+local EVERYTHING: { Layer } = IN_ORDER
 
 local function layer_add(layer: Layer, entity: Entity, blocks: boolean)
 	local def = entity.def
@@ -119,10 +118,8 @@ local function fill_colliders()
 		if entity.alive == false then
 			continue
 		end
-		if entity.kind == "reclaimable" then
-			layer_add(reclaimables, entity, false)
-		elseif entity.kind == "wreck" then
-			layer_add(wrecks, entity, false)
+		if unit_defs.is_remains(entity.def) then
+			layer_add(remains, entity, false)
 		elseif unit_defs.is_air(entity.def) then
 			layer_add(aircraft, entity, false)
 		else
@@ -259,9 +256,10 @@ local function first_blocker(from: Vector3, to: Vector3, ignored_a: EntityId, ig
 	return bigger or nearest
 end
 
--- The first wreck the line from `from` to `to` touches, other than the two `ignored`, if any.
-local function first_wreck(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
-	local _, nearest = nearest_on_segment(colliders().wrecks, from, to, ignored_a, ignored_b, math.huge, false)
+-- The first remains, a wreck or a reclaimable, the line from `from` to `to` touches, other than the two `ignored`, if
+-- any.
+local function first_remains(from: Vector3, to: Vector3, ignored_a: EntityId, ignored_b: EntityId): Entity?
+	local _, nearest = nearest_on_segment(colliders().remains, from, to, ignored_a, ignored_b, math.huge, false)
 	return nearest
 end
 
@@ -709,6 +707,17 @@ local function begin_tick()
 	fill_targets()
 end
 
+-- The targets are filled at the top of a tick, and what comes before it in the step (the AI, the scavengers) looks
+-- through them as the last tick left them, so they are kept. Every other index is filled again when next asked.
+snapshot.keep("spatial", function()
+	return { target_grid = target_grid, present_roots = present_roots, present_root_count = present_root_count }
+end, function(saved)
+	target_grid = saved.target_grid
+	present_roots = saved.present_roots
+	present_root_count = saved.present_root_count
+	invalidate()
+end)
+
 return table.freeze({
 	SMALL_RADIUS = SMALL_RADIUS,
 	begin_tick = begin_tick,
@@ -716,7 +725,7 @@ return table.freeze({
 	colliders = colliders,
 	each_in = each_in,
 	first_blocker = first_blocker,
-	first_wreck = first_wreck,
+	first_remains = first_remains,
 	each_collider_near = each_collider_near,
 	each_near = each_near,
 	any_enemy_of = any_enemy_of,

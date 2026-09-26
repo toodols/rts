@@ -35,6 +35,7 @@ local targeting = require(script.Parent.targeting)
 local attack_orders = require(script.Parent.attack_orders)
 local manual_weapons = require(script.Parent.manual_weapons)
 local sight = require(script.Parent.sight)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -449,6 +450,14 @@ local function forget(entity_id: EntityId)
 	starved_at[entity_id] = nil
 	shots[entity_id] = nil
 end
+
+snapshot.keep("weapons", function()
+	return { burst_aims = burst_aims, starved_at = starved_at, shots = shots }
+end, function(saved)
+	burst_aims = saved.burst_aims
+	starved_at = saved.starved_at
+	shots = saved.shots
+end)
 
 return table.freeze({
 	damage_per_second = damage_per_second,

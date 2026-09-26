@@ -192,6 +192,56 @@ local function edited_heights(): { number }
 	return changes
 end
 
+-- Every edited sample, as a flat list of sample index, the height it was generated with and its height now, by index;
+-- and the lowest and highest heights the ground has had. What keeps the game (server/snapshot) keeps the ground as this.
+export type KeptEdits = { edits: { number }, lowest: number, highest: number }
+local function kept_edits(): KeptEdits
+	local indices = {}
+	for index in originals do
+		table.insert(indices, index)
+	end
+	table.sort(indices)
+	local edits = {}
+	for _, index in indices do
+		table.insert(edits, index)
+		table.insert(edits, originals[index])
+		table.insert(edits, heights[index])
+	end
+	return { edits = edits, lowest = lowest_height, highest = highest_height }
+end
+
+-- Puts the ground back as `kept_edits` found it: every sample edited now as it was generated, then every sample edited
+-- in `saved` at its height there. Returns the samples that may have moved, as a flat list of sample index and height
+-- now, by index, as `deform` does.
+local function put_back_edits(saved: KeptEdits): { number }
+	local moved: { [number]: boolean } = {}
+	for index, original in originals do
+		heights[index] = original
+		moved[index] = true
+	end
+	originals = {}
+	local edits = saved.edits
+	for at = 1, #edits - 2, 3 do
+		local index = edits[at]
+		originals[index] = edits[at + 1]
+		heights[index] = edits[at + 2]
+		moved[index] = true
+	end
+	lowest_height = saved.lowest
+	highest_height = saved.highest
+	local indices = {}
+	for index in moved do
+		table.insert(indices, index)
+	end
+	table.sort(indices)
+	local changes = {}
+	for _, index in indices do
+		table.insert(changes, index)
+		table.insert(changes, heights[index])
+	end
+	return changes
+end
+
 -- Presses a crater into the ground: a bowl `depth` studs deep at its centre, rising smoothly to the level
 -- of the ground at `radius`, with the ground it pushed aside heaped up in a low rim around it. The samples
 -- `is_protected` says are not to be touched keep their heights. Ground can be dug as far down as
@@ -307,6 +357,8 @@ return table.freeze({
 	deform = deform,
 	apply_heights = apply_heights,
 	edited_heights = edited_heights,
+	kept_edits = kept_edits,
+	put_back_edits = put_back_edits,
 	sample_index = sample_index,
 	cells = cells,
 	samples_across = samples_across,

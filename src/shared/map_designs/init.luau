@@ -23,6 +23,7 @@
 -- last_stand: a walled fortress with three ramps for each side, on open ground the scavengers spread over.
 -- pinwheel: four arms spiralling out from a hub between four lakes, for a free for all of up to eight.
 -- prairie: wide, gently rolling grassland with its metal spread thin over it, for vehicles, and for two to eight.
+-- channel: the campaign's fifth and sixth missions, two shores with a deep channel between them, crossed only by sea.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -45,6 +46,7 @@ local gale = require(script.gale)
 local last_stand = require(script.last_stand)
 local pinwheel = require(script.pinwheel)
 local prairie = require(script.prairie)
+local channel = require(script.channel)
 
 type Preset = map_types.Preset
 
@@ -66,6 +68,7 @@ local ALL: { Preset } = {
 	last_stand,
 	pinwheel,
 	prairie,
+	channel,
 }
 
 return table.freeze({

@@ -13,6 +13,7 @@ local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
 local state = require(script.Parent.state)
 local deaths = require(script.Parent.deaths)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -74,6 +75,12 @@ local function publish(entity: Entity, _def: types.EntityDef, write: entity_attr
 	local left = counting[entity.id]
 	write("self_destruct", if left ~= nil then math.ceil(left) else nil)
 end
+
+snapshot.keep("self_destruct", function()
+	return { counting = counting }
+end, function(saved)
+	counting = saved.counting
+end)
 
 return table.freeze({
 	seconds_left = seconds_left,

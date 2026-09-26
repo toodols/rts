@@ -18,7 +18,8 @@
 -- can be beaten (`is_beaten`); the game then ends in victory for every other team (game_phase.set_ended), and each
 -- player on a winning team has the mission marked complete, saved and its unlocks published
 -- (server_shared/campaign_session.luau), which `completed` tells of once it has been for every one of them. It is lost
--- when every one of the players' teams is out: the enemy wins. Neither is looked at before the enemy is on the field,
+-- when every one of the players' teams is out, or when the handler says it has been some other way (`lost`): the enemy
+-- wins. Neither is looked at before the enemy is on the field,
 -- or once the mission has ended. The end screen then offers to go back to the lobby or on to the next mission
 -- (campaign_exit.luau), which `changed` tells of how the mission stands.
 --
@@ -57,6 +58,9 @@ local tutorial = require(script.tutorial)
 local overlook = require(script.overlook)
 local counterattack = require(script.counterattack)
 local skirmish = require(script.skirmish)
+local channel = require(script.channel)
+local blockade = require(script.blockade)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type EntityId = types.EntityId
 type TeamId = types.TeamId
@@ -77,6 +81,8 @@ local HANDLERS: { [string]: Handler } = table.freeze({
 	overlook = overlook.handler,
 	counterattack = counterattack.handler,
 	prairie = skirmish.handler,
+	channel = channel.handler,
+	blockade = blockade.handler,
 })
 for _, mission in campaign.MISSIONS do
 	assert(HANDLERS[mission.id] ~= nil, `the mission "{mission.id}" has no handler`)
@@ -277,6 +283,11 @@ local function tick(delta: number)
 		win()
 		return
 	end
+	local lost_by = if playing.lost ~= nil then playing.lost() else nil
+	if lost_by ~= nil then
+		finish("lost", { enemy_id }, lost_by)
+		return
+	end
 	if #teams_here == 0 then
 		return
 	end
@@ -369,6 +380,32 @@ local function forget(id: EntityId)
 		playing.forget(id)
 	end
 end
+
+snapshot.keep("missions", function()
+	return {
+		evaluator = evaluator.kept(),
+		current = current,
+		current_hard = current_hard,
+		enemy_team = enemy_team,
+		check_timer = check_timer,
+		enemy_left = enemy_left,
+		commanded = commanded,
+		outcome = outcome,
+		winning = winning,
+		completions = completions,
+	}
+end, function(saved)
+	evaluator.put_back(saved.evaluator)
+	current = saved.current
+	current_hard = saved.current_hard
+	enemy_team = saved.enemy_team
+	check_timer = saved.check_timer
+	enemy_left = saved.enemy_left
+	commanded = saved.commanded
+	outcome = saved.outcome
+	winning = saved.winning
+	completions = saved.completions
+end)
 
 return table.freeze({
 	setup = setup,

@@ -16,6 +16,7 @@ local types = require(ReplicatedStorage.Shared.types)
 local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
 local state = require(script.Parent.state)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -86,6 +87,12 @@ local function publish(entity: Entity, _def: types.EntityDef, write: entity_attr
 	local stun_left = seconds_left(entity)
 	write("stun", if stun_left ~= nil then math.max(1, math.ceil(stun_left)) else nil)
 end
+
+snapshot.keep("emp", function()
+	return { charged = charged }
+end, function(saved)
+	charged = saved.charged
+end)
 
 return table.freeze({
 	seconds_left = seconds_left,

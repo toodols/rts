@@ -23,6 +23,7 @@ local muzzles = require(script.Parent.muzzles)
 local attack_orders = require(script.Parent.attack_orders)
 local projectiles = require(script.Parent.projectiles)
 local interceptors = require(script.Parent.interceptors)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -431,6 +432,12 @@ end
 local function begin_tick()
 	table.clear(picks)
 end
+
+snapshot.keep("targeting", function()
+	return { picks = picks }
+end, function(saved)
+	picks = saved.picks
+end)
 
 return table.freeze({
 	STEALTH_DETECTION_RANGE = STEALTH_DETECTION_RANGE,

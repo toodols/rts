@@ -7,6 +7,8 @@ return table.freeze({
 	dgun = "rbxassetid://82247042644798",
 	explosion_large = "rbxassetid://77674252738624",
 	explosion_small = "rbxassetid://124363757202063",
+	heat_ray = "rbxassetid://111952315112669",
 	laser = "rbxassetid://109742071750414",
 	notify = "rbxassetid://124115317599599",
+	pulsar = "rbxassetid://95119478653746",
 })

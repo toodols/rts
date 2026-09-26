@@ -209,7 +209,8 @@ local defs: { [string]: EntityDef } = {
 	-- bar: corcan
 	sumo = {
 		name = "sumo",
-		footing = footing.moves "HBOT4",
+		-- corcan.lua's movementclass
+		footing = footing.moves "BOT2",
 		display_name = "Sumo",
 		subtitle = "Armored assault bot",
 		kind = "unit",

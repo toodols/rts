@@ -68,7 +68,7 @@ return function(extras: pow_types.Extras)
 	local commands = extras.commands
 	pow_common.register(commands, LOBBY)
 
-	commands.lobbies = {
+	commands.lobby_list = {
 		description = "Lists the lobbies on this server: each one's settings, whether it can start, and who is in it "
 			.. "on which side.",
 		permissions = { "admin" },

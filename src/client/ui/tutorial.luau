@@ -9,8 +9,9 @@
 -- a short demonstration on a loop, as do the counterattack's resurrect cards: the Resurrect command being clicked, and
 -- a circle dragged over wrecks, which rise.
 --
--- A mission with waves has them in a box of their own above the step (ui/wave_block.luau), and once its steps are
--- done, its objective under that; a guide that ends in a card of its own (its `finish`) shows that instead.
+-- A mission with waves has them in a box of their own above the step (ui/wave_block.luau), as one with a time limit
+-- has the time left, and once its steps are done, its objective under that; a guide that ends in a card of its own (its
+-- `finish`) shows that instead. A mission played without a guide (a hard mode) still shows that box, and nothing else.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
@@ -668,13 +669,30 @@ local function Tutorial()
 	local ui_scale = use_viewport.use_ui_scale()
 	-- hooks, so called on every render, whether or not there is a step to take them from
 	local hint = use_store.use_store(tutorial.hint, tutorial.subscribe_hint)
-	-- nil outside a mission with waves
+	-- nil outside a mission with waves, or with a time limit
 	local waves = wave_block.use_waves()
-	if state.active == false then
-		return nil
-	end
+	local time_left = wave_block.use_time_left()
 	-- once the metal and energy bar is up, the cards sit below it rather than over it
 	local root_tag = if tutorial.shown "economy" then "tutorial below-resources" else "tutorial"
+	local wave_box = if waves ~= nil
+		then React.createElement(wave_block.WaveBox, { LayoutOrder = 0, waves = waves })
+		elseif time_left ~= nil then React.createElement(
+			wave_block.TimeBox,
+			{ LayoutOrder = 0, seconds = time_left }
+		)
+		else nil
+	-- a mission played with no guide (its hard mode) still shows its waves or its time
+	if state.active == false then
+		if wave_box == nil then
+			return nil
+		end
+		return React.createElement("Frame", {
+			[React.Tag] = "tutorial below-resources",
+		}, {
+			Scale = React.createElement("UIScale", { Scale = ui_scale }),
+			Waves = wave_box,
+		})
+	end
 
 	local steps = tutorial.steps()
 	local step = steps[state.step]
@@ -682,9 +700,6 @@ local function Tutorial()
 	local finish = if guide ~= nil then guide.finish else nil
 	local mission = campaign.get(state.mission or "")
 	local kicker = if mission ~= nil then string.upper(mission.label) else "GUIDE"
-	local wave_box = if waves ~= nil
-		then React.createElement(wave_block.WaveBox, { LayoutOrder = 0, waves = waves })
-		else nil
 	-- Past the last step of a guide that does not end in a card of its own, what is left is its objective, if it says;
 	-- otherwise there is nothing more to say: it has been won.
 	if step == nil and finish == nil then

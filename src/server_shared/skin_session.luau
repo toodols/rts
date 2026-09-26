@@ -72,7 +72,7 @@ local function may_equip(player: Player, skin_name: string): boolean
 end
 
 -- Equips the skin called `skin_name` for `player`, for every game they play from now on; `anyway` equips even a
--- developer's skin on someone who is not one, for pow's `equip`. Yields while it saves. Returns what became of it, and
+-- developer's skin on someone who is not one, for pow's `skin_equip`. Yields while it saves. Returns what became of it, and
 -- why it was not saved or not equipped.
 local function equip(player: Player, skin_name: string, anyway: boolean?): (Outcome, string?)
 	if skins.exists(skin_name) == false then

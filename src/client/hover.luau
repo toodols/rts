@@ -1,6 +1,6 @@
 --!strict
--- What the cursor is over, shown and told. Whatever a click would land on is lit, in the colour of the mode that is on
--- if it has one, and hovering something shows how far it can build and shoot as rings on the ground around it; what is
+-- What the cursor is over, shown and told. Whatever a click would land on is lit, in the colour of the mode that is on,
+-- and hovering something shows how far it can build and shoot as rings on the ground around it; what is
 -- being placed shows the rings it would have where it would go. Which entity the cursor is over is told to whoever
 -- subscribes (`subscribe`), for the HUD to say what it is; nothing about what a click does depends on that.
 
@@ -20,6 +20,7 @@ local build_mode = require(ReplicatedStorage.Client.build_mode)
 local command_state = require(ReplicatedStorage.Client.command_state)
 local order_modes = require(ReplicatedStorage.Client.order_modes)
 local selected = require(ReplicatedStorage.Client.selected)
+local commands = require(ReplicatedStorage.Client.commands)
 
 type EntityId = types.EntityId
 type EntityDef = types.EntityDef
@@ -62,24 +63,18 @@ local function show_ranges_of(def: EntityDef, at: Vector3, facing: number)
 	range_rings.show(ground, build_range, attack_range, def, muzzle, intercept_range, facing)
 end
 
--- What a click would land on in `state`, if anything is lit for it: nothing while a button is held, nor for a click
--- that lands on the ground whatever is under it, and only what may be aimed at for an order aimed only at friends.
+-- What a click would land on in `state`, if anything is lit for it: nothing while a button is held, and in a mode only
+-- the entity its click would be aimed at (`commands.aim`).
 local function lit(state: State): Model?
 	if state.kind == "selecting" or state.kind == "ordering" then
 		return nil
 	end
 	if state.kind == "mode" then
-		local info = order_modes.get(state.mode)
-		if state.drag ~= nil or info.click == "spot" then
+		if state.drag ~= nil then
 			return nil
 		end
-		local model = cursor.entity()
-		if model ~= nil and order_kinds.get(info.order).friendly_only then
-			local first = selected.for_mode(info)[1]
-			if first == nil or world.is_guardable(model, first.model) == false then
-				return nil
-			end
-		end
+		local info = order_modes.get(state.mode)
+		local model = commands.aim(info, selected.for_mode(info))
 		return model
 	end
 	return cursor.entity()
@@ -100,8 +95,8 @@ end
 -- or else of what is hovered.
 local function render(state: State, placing_at: Vector3?)
 	local model = lit(state)
-	local color = if state.kind == "mode" then order_modes.get(state.mode).color else nil
-	markers.show_hover(model, color or HOVER_COLOR)
+	local color = if state.kind == "mode" then order_modes.get(state.mode).color else HOVER_COLOR
+	markers.show_hover(model, color)
 
 	-- nothing is over while a box is dragged or an order aimed, when the cursor is busy with the selection rather than
 	-- looking at things

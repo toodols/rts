@@ -1,6 +1,6 @@
 --!strict
--- Tests of what weapons do: bombs, EMP, beams, turrets, arcs, stockpiled missiles and interceptors, self-destruct, and
--- who a shot may hurt; and what a new unit's weapons do, from its lab to a duel (the Janus and the Pounder).
+-- Tests of what weapons do: bombs, EMP, beams, turrets, arcs, stockpiled missiles and interceptors, self-destruct, the
+-- commander's shield, and who a shot may hurt; and what a new unit's weapons do, from its lab to a duel (the Janus and the Pounder).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
@@ -29,6 +29,8 @@ local emp = require(ServerScriptService.Server.emp)
 local alliances = require(ServerScriptService.Server.alliances)
 local placement = require(ServerScriptService.Server.placement)
 local self_destruct = require(ServerScriptService.Server.self_destruct)
+local shields = require(ServerScriptService.Server.shields)
+local flows = require(ServerScriptService.Server.flows)
 local production = require(ServerScriptService.Server.production)
 
 local harness = require(script.Parent.harness)
@@ -942,6 +944,79 @@ local function self_destruct_test(args: Args): Findings
 	return findings
 end
 
+-- The commander's switched shield (server/shields.luau), with nocost on: an enemy commander with it switched on under
+-- fire from a commander's laser and a Thug's shells for `args.seconds` (4) loses no health, and the shield power instead;
+-- it costs 100 energy a second standing and 1000 moving. Switched off, the same fire hurts it, and with the shooters
+-- gone its power grows back at 20 a second. With nocost off, and no energy, it will not stay on.
+local function upkeep_of(entity: Entity): number?
+	local flow = flows.get(entity.id)
+	if flow == nil then
+		return nil
+	end
+	for _, source in flow.sources do
+		if source.label == "Shield" then
+			return -source.energy
+		end
+	end
+	return nil
+end
+
+local function commander_shield(args: Args): Findings
+	local findings: Findings = {}
+	with_switch(NOCOST, true, function()
+		local commander = spawn_resting("commander", ENEMY, 0, 0)
+		advance(tick_rate.TICK_DELTA)
+		shields.toggle(commander)
+		advance(tick_rate.TICK_DELTA)
+		findings.up = shields.is_up(commander)
+		findings.standing_upkeep = upkeep_of(commander)
+
+		local laser = spawn_resting("commander", OWN, 20, 0)
+		local thug = spawn_resting("thug", OWN, -20, 0)
+		advance(tick_rate.TICK_DELTA)
+		orders.issue(laser, { { kind = "attack", target_id = commander.id } }, false, false)
+		orders.issue(thug, { { kind = "attack", target_id = commander.id } }, false, false)
+		local health = commander.health
+		advance(args.seconds or 4)
+		findings.shielded_health_lost = round(health - commander.health, 1)
+		findings.power_after_fire = round(shields.power_of(commander), 1)
+
+		orders.issue(commander, { { kind = "move", position = heightmap.ground_position(0, 40) } }, false, false)
+		advance(0.5)
+		findings.moving_upkeep = upkeep_of(commander)
+
+		shields.toggle(commander)
+		health = commander.health
+		advance(2)
+		findings.unshielded_health_lost = round(health - commander.health, 1)
+
+		damage.apply(laser, 1e9)
+		damage.apply(thug, 1e9)
+		advance(tick_rate.TICK_DELTA)
+		local before = shields.power_of(commander)
+		advance(5)
+		findings.regrown_in_5 = round(shields.power_of(commander) - before, 1)
+		findings.up_while_off = shields.is_up(commander)
+	end)
+
+	local broke = spawn_resting("commander", ENEMY, 200, 0)
+	advance(tick_rate.TICK_DELTA)
+	shields.toggle(broke)
+	advance(tick_rate.TICK_DELTA)
+	findings.up_without_energy = shields.is_up(broke)
+
+	findings.pass = findings.up == true
+		and findings.standing_upkeep == 100
+		and findings.moving_upkeep == 1000
+		and findings.shielded_health_lost == 0
+		and findings.power_after_fire < 3000
+		and findings.unshielded_health_lost > 0
+		and math.abs(findings.regrown_in_5 - 100) < 1
+		and findings.up_while_off == false
+		and findings.up_without_energy == false
+	return findings
+end
+
 -- An unkillable `args.veteran` (a Grunt by default) left to fight `args.count` (3) each of `args.victims` (Grunts and
 -- Ticks) set round it in a ring: what it has to show for it after `args.seconds` (40), against what BAR's rules say it
 -- should if it made every kill and dealt all the damage itself, 0.2 x the victim's power over its own per kill, which it
@@ -1551,6 +1626,7 @@ local TESTS: { [string]: Test } = {
 	nuke_manual = { run = nuke_manual },
 	anti_nuke = { run = anti_nuke },
 	self_destruct = { run = self_destruct_test },
+	commander_shield = { run = commander_shield },
 	experience = { run = experience },
 	ally_griefing = { run = ally_griefing },
 	drone_stockpile = { run = drone_stockpile },

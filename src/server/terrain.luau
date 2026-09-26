@@ -109,10 +109,35 @@ local function write_chunk(cell_x: number, cell_z: number, cells_x: number, cell
 	Workspace.Terrain:WriteVoxels(region, CELL_STUDS, materials, occupancies)
 end
 
+-- Where one of the water's parts sits along an axis, and how long it is there.
+type Segment = { centre: number, size: number }
+
+-- How a water span `span` studs across, centred on the map, is cut into parts along one axis:
+-- one part as wide as a part can be over the middle, then the rest on either side in as few equal pieces as fit. The
+-- seams between parts are where the eye catches them, so they all fall outside that middle part, and so outside the
+-- map itself, which is never as wide as a part can be; cutting the span into equal pieces instead ran a seam straight
+-- down the middle of the map whenever it took an even number.
+local function water_segments(span: number): { Segment }
+	local middle = math.min(span, MAX_PART_STUDS)
+	local segments: { Segment } = { { centre = 0, size = middle } }
+	local rest = (span - middle) / 2
+	if rest > 0 then
+		local pieces = math.ceil(rest / MAX_PART_STUDS)
+		local size = rest / pieces
+		for i = 1, pieces do
+			local centre = middle / 2 + (i - 0.5) * size
+			table.insert(segments, { centre = centre, size = size })
+			table.insert(segments, { centre = -centre, size = size })
+		end
+	end
+	return segments
+end
+
 -- The sea the map sits in: a flat block of water whose top is the sea level, everywhere, so the water is never terrain.
--- It is a few parts side by side where one cannot reach far enough, since a part is at most MAX_PART_STUDS across,
--- and rebuilt from scratch, so that re-rendering the map cannot leave any of the last one's behind. Raycasts pass
--- straight through it, so clicking past the shore still finds nothing rather than ordering a unit out to sea.
+-- It is a few parts side by side where one cannot reach far enough, since a part is at most MAX_PART_STUDS across
+-- (see `water_segments` for where the seams go), and rebuilt from scratch, so that re-rendering the map cannot leave
+-- any of the last one's behind. Raycasts pass straight through it, so clicking past the shore still finds nothing
+-- rather than ordering a unit out to sea.
 local function render_water(theme: Theme)
 	local previous = Workspace:FindFirstChild "Water"
 	if previous ~= nil then
@@ -122,15 +147,11 @@ local function render_water(theme: Theme)
 	folder.Name = "Water"
 
 	local half_x, half_z = heightmap.half_extents()
-	local span_x = half_x * 2 * WATER_SPAN_FACTOR
-	local span_z = half_z * 2 * WATER_SPAN_FACTOR
-	local tiles_x = math.ceil(span_x / MAX_PART_STUDS)
-	local tiles_z = math.ceil(span_z / MAX_PART_STUDS)
-	local tile_x = span_x / tiles_x
-	local tile_z = span_z / tiles_z
+	local along_x = water_segments(half_x * 2 * WATER_SPAN_FACTOR)
+	local along_z = water_segments(half_z * 2 * WATER_SPAN_FACTOR)
 
-	for ix = 1, tiles_x do
-		for iz = 1, tiles_z do
+	for _, x in along_x do
+		for _, z in along_z do
 			local water = Instance.new "Part"
 			water.Name = "Water"
 			water.Anchored = true
@@ -139,13 +160,9 @@ local function render_water(theme: Theme)
 			water.CanQuery = false
 			water.CanTouch = false
 			water.CastShadow = false
-			water.Size = Vector3.new(tile_x, WATER_THICKNESS, tile_z)
+			water.Size = Vector3.new(x.size, WATER_THICKNESS, z.size)
 			-- hung below the surface height so that the face you see is exactly WATER_HEIGHT
-			water.CFrame = CFrame.new(
-				-span_x / 2 + (ix - 0.5) * tile_x,
-				WATER_HEIGHT - WATER_THICKNESS / 2,
-				-span_z / 2 + (iz - 0.5) * tile_z
-			)
+			water.CFrame = CFrame.new(x.centre, WATER_HEIGHT - WATER_THICKNESS / 2, z.centre)
 			water.Material = Enum.Material.Water
 			water.Color = theme.water_color
 			water.Transparency = WATER_TRANSPARENCY

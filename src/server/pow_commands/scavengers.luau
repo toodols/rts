@@ -17,8 +17,9 @@ type Context = pow_builders.Context
 return function(extras: pow_types.Extras)
 	local commands = extras.commands
 
-	commands.scavprogress = {
-		description = "Sets how far the scavengers' game has got, from 0 to 1. Their difficulty follows it, and it goes on rising from there.",
+	commands.scav_progress = {
+		description = "Sets how far the scavengers' game has got, from 0 to 1. Their difficulty follows it, and it goes "
+			.. "on rising from there.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = { { name = "Progress", type = "number" } } },
@@ -35,8 +36,9 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.scavdifficulty = {
-		description = "Sets the scavengers' difficulty, the number on their readout, by setting the progress that gives it. It goes on rising from there.",
+	commands.scav_difficulty = {
+		description = "Sets the scavengers' difficulty, the number on their readout, by setting the progress that gives "
+			.. "it. It goes on rising from there.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = { { name = "Difficulty", type = "number" } } },
@@ -53,7 +55,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.scavchances = {
+	commands.scav_chances = {
 		description = "Shows what a scavenger beacon would make of its units and its defences at the current "
 			.. "difficulty, and the chance of each. A land beacon's unless Sea is given.",
 		permissions = { "admin" },
@@ -63,7 +65,6 @@ return function(extras: pow_types.Extras)
 		},
 		server_run = function(context: Context)
 			local sea = context.args[1] == true
-			-- one log call, as /profile does, so the whole table copies in one go
 			local lines = {
 				`{if sea then "Sea" else "Land"} beacon at difficulty {string.format("%.0f", scavengers.budget())}`,
 			}
@@ -83,37 +84,27 @@ return function(extras: pow_types.Extras)
 					)
 				end
 			end
-			context:log({ type = "info", value = table.concat(lines, "\n") })
+			pow_builders.readout(context, lines)
 		end,
 	}
 
-	commands.beacon = {
-		description = "Puts a scavenger beacon down now, at a random place away from the players.",
+	commands.scav_beacon = {
+		description = "Puts a scavenger beacon down now: at a random place away from the players, or at (X, Z), even "
+			.. "next to players, as long as there is ground or water to stand on.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
-		},
-		server_run = function(context: Context)
-			local placed = scavengers.summon_beacon()
-			context:log({
-				type = if placed then "info" else "error",
-				value = if placed then "A beacon has appeared" else "There was no room for a beacon",
-			})
-		end,
-	}
-
-	commands.force_beacon = {
-		description = "Puts a scavenger beacon down at (X, Z) right now, even next to players, for testing. "
-			.. "It still needs valid ground or water to stand on.",
-		permissions = { "admin" },
-		overloads = {
 			{ returns = "nil", args = { { name = "X", type = "number" }, { name = "Z", type = "number" } } },
 		},
 		server_run = function(context: Context)
-			local placed = scavengers.force_beacon(context.args[1], context.args[2])
+			local x, z = context.args[1], context.args[2]
+			local placed = if x ~= nil then scavengers.force_beacon(x, z) else scavengers.summon_beacon()
 			context:log({
 				type = if placed then "info" else "error",
-				value = if placed then "A beacon has appeared" else "Nowhere to stand there",
+				value = if placed
+					then "A beacon has appeared"
+					elseif x ~= nil then "Nowhere to stand there"
+					else "There was no room for a beacon",
 			})
 		end,
 	}

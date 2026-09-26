@@ -24,7 +24,7 @@
 --   at again then too;
 -- - "carried": everyone who voted is told they are being sent on, and going on to the next mission waits until
 --   finishing this one has been saved for all of them, as going to the lobby does;
--- - "sending": the mission is loaded here, for everyone, as the load_mission command does (maps.load): no teleport, so
+-- - "sending": the mission is loaded here, for everyone, as the mission_load command does (maps.load): no teleport, so
 --   it works in Studio too. What the mission just won unlocks is the players' at once (server/unlocks.luau), so the
 --   next is played with it. Once it begins there is no vote again until it has ended; if it cannot be loaded,
 --   everyone is told why and the vote is open again, nobody agreeing.

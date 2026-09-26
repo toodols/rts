@@ -13,7 +13,8 @@
 --   down on the ground, where it goes off one last time.
 -- `sound`: what it is heard firing as (ClientShared.sounds), played at `pitch` (1 without it): a missile's launch is the
 --   cannon's pitched up into more of a whoosh, and a lightning bolt, which has no sound of its own yet, the laser's
---   pitched down into a crack.
+--   pitched down into a crack. A laser whose beam is charged, a tachyon accelerator (the Pulsar's and the Starlight's),
+--   is heard as the pulsar instead (`sound_of`).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -22,7 +23,7 @@ local types = require(ReplicatedStorage.Shared.types)
 type WeaponKind = types.WeaponKind
 
 -- The sounds a weapon is heard firing as.
-export type FiringSound = "laser" | "cannon" | "anti_air"
+export type FiringSound = "laser" | "heat_ray" | "pulsar" | "cannon" | "anti_air" | "torpedo"
 
 export type Info = {
 	name: string,
@@ -40,14 +41,17 @@ export type Info = {
 local NON_AA_AIR_DAMAGE_FRACTION = 0.15
 
 local LASER = table.freeze({ name = "laser" :: FiringSound })
+local HEAT_RAY = table.freeze({ name = "heat_ray" :: FiringSound })
+local PULSAR = table.freeze({ name = "pulsar" :: FiringSound })
 local CRACK = table.freeze({ name = "laser" :: FiringSound, pitch = 0.55 })
 local CANNON = table.freeze({ name = "cannon" :: FiringSound })
 local WHOOSH = table.freeze({ name = "cannon" :: FiringSound, pitch = 1.5 })
 local ANTI_AIR = table.freeze({ name = "anti_air" :: FiringSound })
+local TORPEDO = table.freeze({ name = "torpedo" :: FiringSound })
 
 local KINDS: { [WeaponKind]: Info } = {
 	laser = { name = "LASER", slot = "LSR", icon = "icon_laser", sound = LASER },
-	heat_ray = { name = "HEAT RAY", slot = "HRY", icon = "icon_heat_ray", sound = LASER },
+	heat_ray = { name = "HEAT RAY", slot = "HRY", icon = "icon_heat_ray", sound = HEAT_RAY },
 	emp_laser = { name = "EMP LASER", slot = "EMP", icon = "icon_emp", sound = LASER },
 	lightning = { name = "LIGHTNING GUN", slot = "LTN", icon = "icon_lightning", sound = CRACK },
 	sniper = { name = "SNIPER RIFLE", slot = "SNP", icon = "icon_sniper", sound = LASER },
@@ -70,7 +74,7 @@ local KINDS: { [WeaponKind]: Info } = {
 	emp_missile = { name = "EMP MISSILE", slot = "EMP", icon = "icon_emp", sound = WHOOSH },
 	nuke = { name = "NUCLEAR MISSILE", slot = "NUK", icon = "icon_nuke", nuclear = true, sound = WHOOSH },
 	anti_nuke = { name = "ANTI-NUKE", slot = "ABM", icon = "icon_anti_nuke", anti_nuke = true, sound = CANNON },
-	torpedo = { name = "TORPEDO", slot = "TRP", icon = "icon_torpedo", sound = CANNON },
+	torpedo = { name = "TORPEDO", slot = "TRP", icon = "icon_torpedo", sound = TORPEDO },
 	depth_charge = { name = "DEPTH CHARGES", slot = "DPC", icon = "icon_depth_charge", sound = CANNON },
 	bombs = { name = "BOMBS", slot = "BMB", icon = "icon_bombs", sound = CANNON },
 	emp_bombs = { name = "EMP BOMBS", slot = "EMP", icon = "icon_emp", sound = CANNON },
@@ -86,7 +90,17 @@ local function get(kind: WeaponKind): Info
 	return info
 end
 
+-- What `weapon` is heard firing as.
+local function sound_of(weapon: types.Weapon): { name: FiringSound, pitch: number? }
+	local delivery = weapon.delivery
+	if weapon.kind == "laser" and delivery.kind == "beam" and delivery.charged == true then
+		return PULSAR
+	end
+	return get(weapon.kind).sound
+end
+
 return table.freeze({
 	NON_AA_AIR_DAMAGE_FRACTION = NON_AA_AIR_DAMAGE_FRACTION,
 	get = get,
+	sound_of = sound_of,
 })

@@ -18,6 +18,9 @@ export type Waves = {
 	wave_in: number?,
 	-- how many of the enemy's things are left standing
 	left: number,
+	-- for a mission lost once enough of the enemy get through: how many have, and how many it takes
+	escaped: number?,
+	escape_limit: number?,
 }
 
 -- What the HUD shows of a mission, as its handler has it (server/missions/kit.luau): each part only for a mission that
@@ -26,6 +29,8 @@ export type Hud = {
 	-- the x the enemy zone begins at: whatever is east of it is inside
 	zone_x: number?,
 	waves: Waves?,
+	-- whole seconds left before a mission with a time limit is lost
+	time_left: number?,
 }
 
 -- What a vote is on: going on to the next mission, or trying this one again.
@@ -79,11 +84,14 @@ local HUD = replicated.world(
 				waves = waves.waves,
 				wave_in = if typeof(waves.wave_in) == "number" then waves.wave_in else nil,
 				left = if typeof(waves.left) == "number" then waves.left else 0,
+				escaped = if typeof(waves.escaped) == "number" then waves.escaped else nil,
+				escape_limit = if typeof(waves.escape_limit) == "number" then waves.escape_limit else nil,
 			}
 		end
 		return {
 			zone_x = if typeof(decoded.zone_x) == "number" then decoded.zone_x else nil,
 			waves = read_waves,
+			time_left = if typeof(decoded.time_left) == "number" then decoded.time_left else nil,
 		}
 	end)
 )
@@ -168,6 +176,19 @@ local function waves(): Waves?
 	return if shown ~= nil then shown.waves else nil
 end
 
+-- Whole seconds left before the mission being played is lost, for one with a time limit.
+local function time_left(): number?
+	local shown = hud()
+	return if shown ~= nil then shown.time_left else nil
+end
+
+-- Calls `listener` with the seconds left whenever what the HUD shows changes, until the returned function is called.
+local function subscribe_time_left(listener: (seconds: number?) -> ()): () -> ()
+	return HUD.changed(function()
+		listener(time_left())
+	end)
+end
+
 -- Calls `listener` with where the enemy zone begins whenever that changes, until the returned function is called.
 local function subscribe_zone(listener: (x: number?) -> ()): () -> ()
 	local last = zone_x()
@@ -212,6 +233,8 @@ return table.freeze({
 	waves = waves,
 	subscribe_zone = subscribe_zone,
 	subscribe_waves = subscribe_waves,
+	time_left = time_left,
+	subscribe_time_left = subscribe_time_left,
 	vote = vote,
 	subscribe_vote = subscribe_vote,
 })

@@ -22,6 +22,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local state = require(script.Parent.state)
 local damage = require(script.Parent.damage)
+local snapshot = require(script.Parent.snapshot)
 
 type DonutSettings = skins.DonutSettings
 type Entity = types.Entity
@@ -235,6 +236,13 @@ local function init()
 		hits[entity.id] = true
 	end)
 end
+
+snapshot.keep("donuts", function()
+	return { donuts = donuts, hits = hits }
+end, function(saved)
+	donuts = saved.donuts
+	hits = saved.hits
+end)
 
 return table.freeze({
 	init = init,

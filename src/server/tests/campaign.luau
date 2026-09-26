@@ -148,7 +148,7 @@ local function set_up_mission(mission_id: string): TeamId
 	return mission_state.enemy_team() :: TeamId
 end
 
--- Loads the counterattack as the load_mission command would (maps.load with a mission) and puts the player's commander
+-- Loads the counterattack as the mission_load command would (maps.load with a mission) and puts the player's commander
 -- down as a player's arriving would, which puts their base down beside it. Returns the mission's enemy team.
 local function start_counterattack(): TeamId
 	local loaded, err = maps.load({ mission = "counterattack" })
@@ -598,7 +598,7 @@ local function overlook(args: Args): Findings
 	}
 end
 
--- The counterattack (server/missions/counterattack.luau, on the overlook's map), loaded as the load_mission command
+-- The counterattack (server/missions/counterattack.luau, on the overlook's map), loaded as the mission_load command
 -- would, with `args.prep` seconds to prepare (5) and the gaps between its waves `args.pace` times as long as they are
 -- (0.3), and the player's commander put down as a player's arriving would. First the setup, once the commander's base
 -- has gone down beside it: the player's things by def (`own`: the commander, 4 extractors all on metal spots, 6 solar
@@ -1186,7 +1186,7 @@ local function counterattack_balance(args: Args): Findings
 	}
 end
 
--- The load_mission command's work (maps.load with a mission): the tutorial loaded, the game then ended as though it had been
+-- The mission_load command's work (maps.load with a mission): the tutorial loaded, the game then ended as though it had been
 -- won, and the overlook loaded over it. The overlook should be what is played (`mission`), with its enemy's 8 guards
 -- and no grunts (it has none, so any would be the tutorial's enemy's) and nothing left of the tutorial's boulder, its enemy playing as the tutorial's did (no empty
 -- team left behind), and the game playing again with no winners. A mission there is not should be refused.
@@ -1451,7 +1451,7 @@ local function commander_at_first_start(): Entity
 	return commander
 end
 
--- Prairie Skirmish (server/missions/skirmish.luau, on the prairie map), loaded as the load_mission command would, with
+-- Prairie Skirmish (server/missions/skirmish.luau, on the prairie map), loaded as the mission_load command would, with
 -- the player's commander put down at the first start box's usual start, as a player choosing there would. Before
 -- anything steps the enemy should have nothing on the field (`enemy_before`, 0); a second later the AI should play it
 -- (`is_ai`) by the mission's profile (`profile`, "passive"), with one commander (`enemy_commanders`) far from the
@@ -1520,7 +1520,7 @@ local function prairie_skirmish(args: Args): Findings
 	}
 end
 
--- The campaign's hard modes (campaign.Mission's `hard_mode`), each loaded as `load_mission <id> true` would. Keys: the
+-- The campaign's hard modes (campaign.Mission's `hard_mode`), each loaded as `mission_load <id> true` would. Keys: the
 -- overlook's hard mode should be named "overlook_hard" and parse back (`keys`), the tutorial should have none, and each
 -- hard mission a mode of its own (`modes`). The overlook in hard mode should be played hard (missions.hard) with one
 -- agitator in the enemy's base (`overlook_hard_agitators`, 1), which should shell a thug at the cliff's edge, out of

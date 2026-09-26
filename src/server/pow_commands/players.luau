@@ -20,7 +20,8 @@ local team_readout = require(script.Parent.team_readout)
 local GAME: pow_common.Place = table.freeze({
 	player_lines = function(player: Player): { string }
 		local team_id = players.team_of(player)
-		return (if team_id ~= nil then team_readout.full(team_id) else nil) or { "  not on a team" }
+		local team = if team_id ~= nil then team_readout.summary(team_id) else nil
+		return { if team ~= nil then `  {team} (team_info for more)` else "  not on a team" }
 	end,
 	skin_note = function(name: string): string?
 		local wearing: { string } = {}

@@ -102,7 +102,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 22000,
 		buildpower_cost = 59000,
 		health = 4300,
-		footing = footing.LAND,
+		-- corfus.lua's maxwaterdepth
+		footing = footing.shallows(studs(1)),
 		energy_storage = 2500,
 		energy_income = 850,
 		color = palette.GOLD,
@@ -204,7 +205,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 7700,
 		buildpower_cost = 14900,
 		health = 2800,
-		footing = footing.LAND,
+		-- cormoho.lua's maxwaterdepth
+		footing = footing.shallows(studs(20)),
 		metal_income = 7,
 		spot = "metal",
 		upgrades = { "metal_extractor" },
@@ -227,7 +229,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 13000,
 		buildpower_cost = 12900,
 		health = 2050,
-		footing = footing.LAND,
+		-- corgeo.lua's maxwaterdepth
+		footing = footing.shallows(studs(5)),
 		energy_income = 300,
 		energy_storage = 1000,
 		spot = "geo",
@@ -251,7 +254,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 27000,
 		buildpower_cost = 48000,
 		health = 4150,
-		footing = footing.LAND,
+		-- corageo.lua's maxwaterdepth
+		footing = footing.shallows(studs(5)),
 		energy_income = 1250,
 		energy_storage = 12000,
 		spot = "geo",
@@ -354,7 +358,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 11000,
 		buildpower_cost = 20400,
 		health = 12700,
-		footing = footing.LAND,
+		-- coruwadves.lua's maxwaterdepth: on dry land or the sea floor
+		footing = footing.shallows(studs(9999)),
 		energy_storage = 40000,
 		death_explosion = { radius = studs(480), damage = 2650 },
 		color = palette.GOLD,
@@ -373,7 +378,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 11000,
 		buildpower_cost = 20500,
 		health = 11200,
-		footing = footing.LAND,
+		-- coruwadvms.lua's maxwaterdepth: on dry land or the sea floor
+		footing = footing.shallows(studs(9999)),
 		metal_storage = 10000,
 		color = palette.SILVER,
 	},

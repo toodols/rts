@@ -15,6 +15,8 @@ local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local passability = require(ReplicatedStorage.Shared.passability)
 
 local orders = require(ServerScriptService.Server.orders)
+local placement = require(ServerScriptService.Server.placement)
+local state = require(ServerScriptService.Server.state)
 
 local harness = require(script.Parent.harness)
 
@@ -48,6 +50,8 @@ local CONTINENTS_MAP = { preset = "continents" }
 local LAUNCH_SURFACE_SLACK = 10
 local LAUNCH_MIN_CLIMB = 100
 local LAUNCH_LANDING_SLACK = 10
+-- A flak shell should go off within this many studs of the aircraft it was fired at, where it was aimed.
+local FLAK_NEAR_SLACK = 10
 
 -- A match of `seconds` of a `shooter_def` at `shooter_at` against a `target_def` at `target_at` that it cannot kill,
 -- each resting where it is, the shooter turned `turned` radians off facing the target and the target facing the way
@@ -110,7 +114,9 @@ end
 -- torpedo should be aimed at a submarine or at anything else wholly under the water, a torpedo at nothing that is not
 -- in the water, and nothing but a torpedo should be fired from under the water. A Buccaneer's depth charges and an
 -- Orca's torpedoes should hurt what they are fired at, whether a ship, a submarine or a commander on the sea floor;
--- a Riptide, which has no torpedoes, should not fire at a submarine or a commander on the sea floor at all.
+-- a Riptide, which has no torpedoes, should not fire at a submarine or a commander on the sea floor at all. An
+-- Argonaut's deck torpedoes should hurt both a submarine and a ship, and never be fired at a hovercraft, which is
+-- never in the water, nor at a commander on land.
 -- Dry land with deep open water 30 studs off it, one way or another, and which way that is; nil if the map has none.
 local function shore_by_deep_water(): (Vector3?, Vector3)
 	local shore_offset = Vector3.zero
@@ -149,9 +155,13 @@ local function naval(args: Args): Findings
 		orca_at_commander_on_sea_floor = duel("orca", "commander", sea, sea + off),
 		riptide_at_commander_on_sea_floor = duel("riptide", "commander", sea, sea + off),
 		commander_on_sea_floor_at_riptide = duel("commander", "riptide", sea, sea + off),
+		argonaut_at_orca = duel("argonaut", "orca", sea, sea + off),
+		argonaut_at_riptide = duel("argonaut", "riptide", sea, sea + off),
+		argonaut_at_goon = duel("argonaut", "goon", sea, sea + off),
 	}
 	if shore ~= nil then
 		findings.orca_at_commander_on_land = duel("orca", "commander", shore, shore + shore_offset)
+		findings.argonaut_at_commander_on_land = duel("argonaut", "commander", shore, shore + shore_offset)
 	end
 	local all_kept = true
 	for _, found in findings do
@@ -165,6 +175,10 @@ local function naval(args: Args): Findings
 		and findings.riptide_at_orca.shots == 0
 		and findings.orca_at_commander_on_sea_floor.damage_to_target > 0
 		and findings.riptide_at_commander_on_sea_floor.shots == 0
+		and findings.argonaut_at_orca.damage_to_target > 0
+		and findings.argonaut_at_riptide.damage_to_target > 0
+		and findings.argonaut_at_goon.shots == 0
+		and (findings.argonaut_at_commander_on_land == nil or findings.argonaut_at_commander_on_land.shots == 0)
 	return findings
 end
 
@@ -437,12 +451,403 @@ local function ship_off_land(args: Args): Findings
 	return findings
 end
 
+-- The floating defences, each out in deep water, each match `args.seconds` (15 by default) long, played with nocost on,
+-- as the Coral's laser spends energy. The Urchin's torpedoes should hurt a ship and a submarine; the Coral's laser a
+-- ship but, having no torpedo, never be fired at a submarine; the Slingshot fire at nothing on the water, and at a
+-- Whirlwind bombing a tidal generator beside it. Each should be placeable on the deep water, and not on dry land.
+local function sea_defences(args: Args): Findings
+	local seconds = args.seconds or 15
+	local sea = harness.open_sea()
+	local shore = shore_by_deep_water()
+	local off = Vector3.new(30, 0, 0)
+	local findings: Findings = {}
+	with_switch(NOCOST, true, function()
+		findings = {
+			urchin_at_riptide = water_duel("urchin", "riptide", sea, sea + off, seconds),
+			urchin_at_orca = water_duel("urchin", "orca", sea, sea + off, seconds),
+			coral_at_riptide = water_duel("coral", "riptide", sea, sea + off, seconds),
+			coral_at_orca = water_duel("coral", "orca", sea, sea + off, seconds),
+			slingshot_at_riptide = water_duel("slingshot", "riptide", sea, sea + off, seconds),
+		}
+	end)
+
+	local slingshot = unkillable(spawn_resting("slingshot", OWN, sea.X, sea.Z))
+	local bait = unkillable(spawn_resting("tidal_generator", OWN, sea.X + 20, sea.Z))
+	local bomber = unkillable(spawn("whirlwind", ENEMY, sea.X - 250, sea.Z + 40))
+	advance(tick_rate.TICK_DELTA)
+	orders.issue(bomber, { { kind = "attack", target_id = bait.id } }, false, false)
+	local seen: { [number]: boolean } = {}
+	local shots = 0
+	advance(seconds * 2, function()
+		for _, projectile in in_flight() do
+			if projectile.owner_id == slingshot.id and seen[projectile.id] == nil then
+				seen[projectile.id] = true
+				shots += 1
+			end
+		end
+	end)
+	findings.slingshot_at_whirlwind = { shots = shots, damage_to_target = round(damage_to(bomber), 0) }
+	clear_world()
+
+	local placeable: { [string]: { sea: boolean, land: boolean? } } = {}
+	local all_placeable = true
+	-- whether `def_name` may be put down on the grid at (x, z)
+	local function can_place_at(def_name: string, x: number, z: number): boolean
+		local center = placement.resolve_center(def_name, x, z, 0, nil)
+		return center ~= nil and placement.can_place(def_name, center, 0, nil, OWN)
+	end
+	for _, def_name in { "urchin", "coral", "slingshot" } do
+		local on_sea = can_place_at(def_name, sea.X, sea.Z)
+		local on_land = if shore ~= nil then can_place_at(def_name, shore.X, shore.Z) else nil
+		placeable[def_name] = { sea = on_sea, land = on_land }
+		all_placeable = all_placeable and on_sea and on_land ~= true
+	end
+	findings.placeable = placeable
+
+	local all_kept = true
+	for _, found in findings do
+		if typeof(found) == "table" and found.keeps_to_the_water == false then
+			all_kept = false
+		end
+	end
+	findings.pass = all_kept
+		and all_placeable
+		and findings.urchin_at_riptide.damage_to_target > 0
+		and findings.urchin_at_orca.damage_to_target > 0
+		and findings.coral_at_riptide.damage_to_target > 0
+		and findings.coral_at_orca.shots == 0
+		and findings.slingshot_at_riptide.shots == 0
+		and findings.slingshot_at_whirlwind.shots > 0
+	return findings
+end
+
+-- A `shooter_def` on an attack order against an unkillable `target_def` 30 studs off, both resting beside `at`, for
+-- `seconds`: how much damage the target took, and how many shots the shooter let go and how many of them were torpedoes.
+local function air_strike(shooter_def: string, target_def: string, at: Vector3, seconds: number): Findings
+	local target = unkillable(spawn_resting(target_def, ENEMY, at.X, at.Z))
+	local shooter = unkillable(spawn_resting(shooter_def, OWN, at.X + 30, at.Z))
+	advance(tick_rate.TICK_DELTA)
+	orders.issue(shooter, { { kind = "attack", target_id = target.id } }, false, false)
+	local seen: { [number]: boolean } = {}
+	local shots, torpedoes = 0, 0
+	advance(seconds, function()
+		for _, projectile in in_flight() do
+			if projectile.owner_id == shooter.id and seen[projectile.id] == nil then
+				seen[projectile.id] = true
+				shots += 1
+				if projectile.delivery.kind == "torpedo" then
+					torpedoes += 1
+				end
+			end
+		end
+	end)
+	local findings: Findings = {
+		damage_to_target = round(damage_to(target), 0),
+		shots = shots,
+		torpedoes = torpedoes,
+	}
+	clear_world()
+	return findings
+end
+
+-- The seaplanes, out on open sea. The Seaplane Platform may be placed there and not on dry land; a Construction Ship
+-- builds one (nocost on), which then makes each of the seaplanes. Then each armed one is set on something it cannot
+-- kill for `args.seconds` (20 by default): the Cutlass, the Dam Buster and the Monsoon on a Supporter, whose hull the
+-- Monsoon's torpedoes have to reach from the air, the Banshee on one too, and the Bat on a Hercules. Every one of them
+-- should hurt its target.
+local function seaplanes(args: Args): Findings
+	local seconds = args.seconds or 20
+	local sea = harness.open_sea()
+	local land = harness.find_spot(function(x: number, z: number): boolean
+		return heightmap.water_depth(x, z) <= 0 and heightmap.water_depth(x + 12, z + 12) <= 0
+	end)
+	local findings: Findings = {}
+	local site = placement.resolve_center("seaplane_platform", sea.X, sea.Z, 0, nil) or sea
+	findings.placeable_at_sea = placement.can_place("seaplane_platform", site, 0, nil, OWN)
+	if land ~= nil then
+		local dry = placement.resolve_center("seaplane_platform", land.X, land.Z, 0, nil) or land
+		findings.placeable_on_land = placement.can_place("seaplane_platform", dry, 0, nil, OWN)
+	end
+
+	local made: { [string]: boolean } = {}
+	local platform: Entity? = nil
+	with_switch(NOCOST, true, function()
+		local builder = spawn_resting("construction_ship", OWN, site.X + 20, site.Z)
+		advance(tick_rate.TICK_DELTA)
+		orders.issue(
+			builder,
+			{ { kind = "build", position = site, target_id = nil, def_name = "seaplane_platform", facing = 0 } },
+			false,
+			false
+		)
+		advance(30, function()
+			if platform ~= nil then
+				return
+			end
+			for _, entity in state.all() do
+				if entity.def_name == "seaplane_platform" and entity.state == "active" then
+					platform = entity
+				end
+			end
+		end)
+		local factory = platform
+		if factory ~= nil then
+			for _, name in unit_defs.build_options(factory.def) do
+				table.insert(factory.queue, name)
+			end
+			advance(30, function()
+				for _, entity in state.all() do
+					if entity.team == OWN and entity.def.category == "aircraft" and entity.state == "active" then
+						made[entity.def_name] = true
+					end
+				end
+			end)
+		end
+	end)
+	findings.platform_built = platform ~= nil
+	local all_made = true
+	for _, name in unit_defs.build_options(unit_defs.get "seaplane_platform") do
+		all_made = all_made and made[name] == true
+	end
+	findings.made_every_seaplane = all_made
+	clear_world()
+
+	local strikes: { [string]: Findings } = {
+		cutlass = air_strike("cutlass", "supporter", sea, seconds),
+		dam_buster = air_strike("dam_buster", "supporter", sea, seconds),
+		monsoon = air_strike("monsoon", "supporter", sea, seconds),
+		banshee = air_strike("banshee", "supporter", sea, seconds),
+		bat = air_strike("bat", "hercules", sea, seconds),
+	}
+	local all_hurt = true
+	for name, strike in strikes do
+		findings[name] = strike
+		all_hurt = all_hurt and strike.damage_to_target > 0
+	end
+	findings.pass = findings.placeable_at_sea == true
+		and findings.placeable_on_land ~= true
+		and findings.platform_built
+		and findings.made_every_seaplane
+		and strikes.monsoon.torpedoes > 0
+		and all_hurt
+	return findings
+end
+
+-- An Angler on an attack order against a Supporter out on open sea, for `args.seconds` (30 by default): it should make
+-- its passes, drop its torpedoes into the water from the air, and hurt the ship with them.
+local function angler(args: Args): Findings
+	local strike = air_strike("angler", "supporter", harness.open_sea(), args.seconds or 30)
+	strike.pass = strike.torpedoes > 0 and strike.damage_to_target > 0
+	return strike
+end
+
+-- The matches of `t2_ships`.
+local function t2_ship_matches(args: Args): Findings
+	local seconds = args.seconds or 20
+	local distance = args.distance or 110
+	local sea = harness.find_spot(function(x: number, z: number): boolean
+		return harness.deep_all_round(x, z, 4, 30) and harness.deep_all_round(x + distance, z, 4, 30)
+	end)
+	assert(sea ~= nil, `no open sea {distance} studs across on this map`)
+	local at = sea :: Vector3
+	local near = at + Vector3.new(40, 0, 0)
+	-- inside the Predator's reach, which is shorter than the rest's
+	local nearer = at + Vector3.new(30, 0, 0)
+	local far = at + Vector3.new(distance, 0, 0)
+
+	local findings: Findings = {
+		despot = water_duel("despot", "buccaneer", near, at, seconds),
+		black_hydra = water_duel("black_hydra", "buccaneer", near, at, seconds),
+		predator = water_duel("predator", "orca", nearer, at, seconds),
+		kraken = water_duel("kraken", "orca", near, at, seconds),
+	}
+
+	-- the Messenger: its rockets, and where each split
+	local target = unkillable(spawn_resting("buccaneer", ENEMY, far.X, far.Z))
+	local messenger = unkillable(spawn_resting("messenger", OWN, at.X, at.Z))
+	messenger.facing = math.pi / 2
+	local rockets, split_shots = 0, 0
+	local lowest_split = math.huge
+	local hurt_before_split = false
+	local seen: { [number]: boolean } = {}
+	advance(seconds, function()
+		for _, projectile in in_flight() do
+			if projectile.owner_id == messenger.id and seen[projectile.id] == nil then
+				seen[projectile.id] = true
+				if projectile.fired.split == true then
+					split_shots += 1
+					lowest_split = math.min(lowest_split, projectile.flight.position.Y - ground_levels.WATER_LEVEL)
+				else
+					rockets += 1
+					hurt_before_split = hurt_before_split or (split_shots == 0 and damage_to(target) > 0)
+				end
+			end
+		end
+	end)
+	findings.messenger = {
+		damage_to_target = round(damage_to(target), 0),
+		rockets = rockets,
+		split_shots = split_shots,
+		lowest_split = round(lowest_split, 1),
+		hurt_before_split = hurt_before_split,
+	}
+	clear_world()
+
+	-- the Arrow Storm: where each flak shell was last seen, against where the aircraft was then, for those that have
+	-- gone off
+	local plane = unkillable(spawn_resting("hercules", ENEMY, near.X, near.Z))
+	local ship = unkillable(spawn_resting("arrow_storm", OWN, at.X, at.Z))
+	orders.issue(plane, { { kind = "move", position = at - Vector3.new(200, 0, 0) } }, false, false)
+	local last: { [number]: { shell: Vector3, plane: Vector3 } } = {}
+	local flak = 0
+	advance(seconds, function()
+		for _, projectile in in_flight() do
+			if projectile.owner_id == ship.id and projectile.weapon.kind == "flak" then
+				if last[projectile.id] == nil then
+					flak += 1
+				end
+				last[projectile.id] = { shell = projectile.flight.position, plane = plane.position }
+			end
+		end
+	end)
+	for _, projectile in in_flight() do
+		if last[projectile.id] ~= nil then
+			last[projectile.id] = nil
+			flak -= 1
+		end
+	end
+	local near_the_plane = 0
+	local farthest = 0
+	for _, seen_last in last do
+		local off = (seen_last.shell - seen_last.plane).Magnitude
+		farthest = math.max(farthest, off)
+		if off <= FLAK_NEAR_SLACK then
+			near_the_plane += 1
+		end
+	end
+	findings.arrow_storm = {
+		damage_to_target = round(damage_to(plane), 0),
+		flak_shells = flak,
+		went_off_near_the_plane = near_the_plane,
+		farthest_off = round(farthest, 1),
+	}
+	clear_world()
+
+	local all_hurt = true
+	for _, name in { "despot", "black_hydra", "predator", "kraken" } do
+		local duel = findings[name]
+		all_hurt = all_hurt and duel.damage_to_target > 0 and duel.keeps_to_the_water
+	end
+	local m = findings.messenger
+	local a = findings.arrow_storm
+	findings.pass = all_hurt
+		and m.damage_to_target > 0
+		and m.rockets > 0
+		and m.split_shots >= 8 * (m.rockets - 1)
+		and m.split_shots <= 8 * m.rockets
+		and m.lowest_split > 20
+		and m.hurt_before_split == false
+		and a.damage_to_target > 0
+		and a.flak_shells > 0
+		and a.went_off_near_the_plane == a.flak_shells
+	return findings
+end
+
+-- Cortex's second-tier warships (unit_defs/ship_t2.luau), out on open sea, each for `args.seconds` (20 by default)
+-- against something it cannot kill, with nocost on so that the lasers have the energy to fire: the Despot and the
+-- Black Hydra on a Buccaneer, the Predator and the Kraken on an Orca, the Messenger on a Buccaneer at `args.distance`
+-- (110 studs by default, well out past the others' reach), and the Arrow Storm on a Hercules flying over it. Each
+-- should hurt its target, keeping to what can be fired where. Every Messenger rocket should split, high in the air,
+-- into its eight shots, and none do harm before it has split. Every Arrow Storm flak shell should go off near the
+-- aircraft it was fired at.
+local function t2_ships(args: Args): Findings
+	local findings: Findings = {}
+	with_switch(NOCOST, true, function()
+		findings = t2_ship_matches(args)
+	end)
+	return findings
+end
+
+-- Torpedoes and depth charges at what is deep under the water, played on the channel, whose straits are far deeper
+-- than a torpedo's own running depth, with nocost on for the lasers' energy. Out in the deepest water on the map, an
+-- Orca's torpedoes, an Argonaut's deck torpedoes, a Buccaneer's depth charges and an Urchin's torpedoes are each fired
+-- for `args.seconds` (15 by default) at a Garpike and at a commander resting on the floor 30 studs off, and then at a
+-- Garpike driving along the floor past them 20 studs off, which has them diving the whole depth in a short run. Each
+-- should hurt what it is fired at, keeping to what can be fired where, and hardly a shot at the passing Garpike should
+-- run on over its top: one in ten at most, a shot led at where it was going before a blast cratered the floor under it.
+local function deep_torpedoes(args: Args): Findings
+	local seconds = args.seconds or 15
+	local deep = harness.find_spot(function(x: number, z: number): boolean
+		return harness.deep_all_round(x, z, 10, 40)
+	end)
+	assert(deep ~= nil, "no deep water on this map")
+	local findings: Findings = {
+		deep = { x = deep.X, z = deep.Z, depth = round(heightmap.water_depth(deep.X, deep.Z), 1) },
+	}
+	local hurt_all = true
+	local shooters = { "orca", "argonaut", "buccaneer", "urchin" }
+	with_switch(NOCOST, true, function()
+		for _, target_def in { "garpike", "commander" } do
+			for _, shooter_def in shooters do
+				local found = water_duel(shooter_def, target_def, deep, deep + Vector3.new(30, 0, 0), seconds)
+				findings[`{shooter_def}_at_{target_def}`] = found
+				hurt_all = hurt_all and found.keeps_to_the_water and found.damage_to_target > 0
+			end
+		end
+		for _, shooter_def in shooters do
+			local garpike = unkillable(spawn_resting("garpike", ENEMY, deep.X, deep.Z - 35))
+			local shooter = unkillable(spawn_resting(shooter_def, OWN, deep.X + 20, deep.Z))
+			-- facing where the Garpike sets off from, as an Orca, which fires only ahead of it, has to
+			shooter.facing = math.atan2(-20, -35)
+			orders.issue(garpike, { { kind = "move", position = deep + Vector3.new(0, 0, 35) } }, false, false)
+			-- for each of the shooter's shots, the nearest it came to the Garpike along the level, and how far above the
+			-- Garpike's top it was there; the few fired to miss on purpose (`Shot.aim_offset`) are left out
+			local nearest: { [number]: { distance: number, above: number } } = {}
+			advance(seconds, function()
+				local top = garpike.position.Y + unit_defs.collider_height(garpike.def) / 2
+				for _, projectile in in_flight() do
+					if projectile.owner_id == shooter.id and projectile.flight.shot.aim_offset == nil then
+						local at = projectile.flight.position
+						local distance = geometry.distance_2d(at, garpike.position)
+						local seen = nearest[projectile.id]
+						if seen == nil or distance < seen.distance then
+							nearest[projectile.id] = { distance = distance, above = at.Y - top }
+						end
+					end
+				end
+			end)
+			-- the shots that ran on over the Garpike's top, too shallow to strike it
+			local shots, over = 0, 0
+			for _, seen in nearest do
+				shots += 1
+				if seen.distance < unit_defs.collider_radius(garpike.def) and seen.above > 0 then
+					over += 1
+				end
+			end
+			findings[`{shooter_def}_at_passing_garpike`] = {
+				shots = shots,
+				ran_over = over,
+				damage_to_target = round(damage_to(garpike), 0),
+			}
+			hurt_all = hurt_all and shots > 0 and over * 10 <= shots
+			clear_world()
+		end
+	end)
+	findings.pass = hurt_all
+	return findings
+end
+
 local TESTS: { [string]: Test } = {
 	naval = { run = naval, defaults = SEA_MAP },
+	sea_defences = { run = sea_defences, defaults = SEA_MAP },
 	naval_arcs = { run = naval_arcs, defaults = SEA_MAP },
 	hovercraft = { run = hovercraft, defaults = SEA_MAP },
 	sea_dragon = { run = sea_dragon, defaults = CONTINENTS_MAP },
 	ship_off_land = { run = ship_off_land, defaults = SEA_MAP },
+	seaplanes = { run = seaplanes, defaults = SEA_MAP },
+	angler = { run = angler, defaults = SEA_MAP },
+	t2_ships = { run = t2_ships, defaults = SEA_MAP },
+	deep_torpedoes = { run = deep_torpedoes, defaults = { preset = "channel" } },
 }
 
 return table.freeze(TESTS)

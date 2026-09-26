@@ -288,6 +288,10 @@ local function take(brain: Brain): Census
 			end
 			continue
 		end
+		-- something else commands it (brains.leave_alone)
+		if brains.is_left_alone(entity.id) then
+			continue
+		end
 
 		bump(census.counts, entity.def_name)
 		if entity.state == "blueprint" then

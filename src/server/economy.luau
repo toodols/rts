@@ -27,6 +27,7 @@ local state = require(script.Parent.state)
 local wind = require(script.Parent.wind)
 local flows = require(script.Parent.flows)
 local match_stats = require(script.Parent.match_stats)
+local snapshot = require(script.Parent.snapshot)
 
 type Team = types.Team
 type TeamId = types.TeamId
@@ -394,6 +395,24 @@ local function transfer(from: TeamId, to: TeamId, resource: "metal" | "energy", 
 	record_spent(from, 0, banked)
 	return banked
 end
+
+snapshot.keep("economy", function()
+	return {
+		conversion = conversion,
+		converters = converters,
+		ledgers = ledgers,
+		bonus_scales = bonus_scales,
+		unlimited = unlimited,
+		drains = drains,
+	}
+end, function(saved)
+	conversion = saved.conversion
+	converters = saved.converters
+	ledgers = saved.ledgers
+	bonus_scales = saved.bonus_scales
+	unlimited = saved.unlimited
+	drains = saved.drains
+end)
 
 return table.freeze({
 	accrue = accrue,

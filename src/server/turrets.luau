@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
 local geometry = require(ReplicatedStorage.Shared.geometry)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -66,6 +67,12 @@ end
 local function forget(id: EntityId)
 	idle_for[id] = nil
 end
+
+snapshot.keep("turrets", function()
+	return { idle_for = idle_for }
+end, function(saved)
+	idle_for = saved.idle_for
+end)
 
 return table.freeze({
 	forget = forget,

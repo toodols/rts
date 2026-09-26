@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local types = require(ReplicatedStorage.Shared.types)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 local surface = require(ReplicatedStorage.Shared.surface)
+local snapshot = require(script.Parent.snapshot)
 
 type Order = types.Order
 type OrderKind = types.OrderKind
@@ -89,6 +90,12 @@ local function waypoints(
 ): { Vector3 }?
 	return pathfinder.waypoints_to(def, from, to, reach, asker.max_expansions, permit(asker, part))
 end
+
+snapshot.keep("paths", function()
+	return { spent = spent }
+end, function(saved)
+	spent = saved.spent
+end)
 
 return table.freeze({
 	begin_step = begin_step,

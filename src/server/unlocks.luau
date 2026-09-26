@@ -18,6 +18,7 @@ local campaign = require(ReplicatedStorage.Shared.campaign)
 local campaign_session = require(ServerScriptService.ServerShared.campaign_session)
 
 local players = require(script.Parent.players)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type TeamId = types.TeamId
 type Set = { [string]: boolean }
@@ -80,6 +81,13 @@ local function init()
 	players.on_team_changed(track)
 	campaign_session.on_published(track)
 end
+
+snapshot.keep("unlocks", function()
+	return { unlocked_by = unlocked_by, allowed = allowed }
+end, function(saved)
+	unlocked_by = saved.unlocked_by
+	allowed = saved.allowed
+end)
 
 return table.freeze({
 	init = init,

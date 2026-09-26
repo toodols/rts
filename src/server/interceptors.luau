@@ -15,6 +15,7 @@ local projectile_mod = require(ReplicatedStorage.Shared.projectile)
 
 local projectiles = require(script.Parent.projectiles)
 local alliances = require(script.Parent.alliances)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type Projectile = projectiles.Projectile
@@ -162,6 +163,12 @@ end
 local function clear()
 	table.clear(interceptors)
 end
+
+snapshot.keep("interceptors", function()
+	return { interceptors = interceptors }
+end, function(saved)
+	interceptors = saved.interceptors
+end)
 
 return table.freeze({
 	in_flight = in_flight,

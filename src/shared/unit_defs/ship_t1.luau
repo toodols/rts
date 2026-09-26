@@ -46,11 +46,15 @@ local defs: { [string]: EntityDef } = {
 			options = {
 				"shipyard",
 				"advanced_shipyard",
+				"seaplane_platform",
 				"bot_lab",
 				"vehicle_lab",
 				"air_lab",
 				"metal_extractor",
 				"tidal_generator",
+				"urchin",
+				"coral",
+				"slingshot",
 			},
 		},
 		acceleration = studs_per_second_squared(0.03567),
@@ -148,6 +152,75 @@ local defs: { [string]: EntityDef } = {
 		color = palette.STEEL_BLUE,
 	},
 
+	-- corroy (units/CorShips/corroy.lua), Cortex's Oppressor: the destroyer. A heavy plasma cannon on a turret for
+	-- what is on the water and the land (onlytargetcategory SURFACE, so its 45 against aircraft never applies), whose
+	-- shell falls under gravity along the low arc, as the Riptide's does, and a depth charge launcher for what is in
+	-- the water. The cannon's turret turns at 60 degrees a second (its script, scripts/Units/corroy.bos); the depth
+	-- charge has no turret there, and BAR lets it fire nearly all round (`maxangledif` 179), so it fires whichever way
+	-- its target is. The depth charge leaves at BAR's launch speed and gains its acceleration toward BAR's top speed,
+	-- homing (`tracks`) for BAR's `flighttime`. Everything here is BAR's.
+	-- bar: corroy
+	oppressor = {
+		name = "oppressor",
+		display_name = "Oppressor",
+		subtitle = "Destroyer",
+		kind = "unit",
+		category = "ships",
+		tech_level = 1,
+		-- 34 x 34 x 82 elmos
+		collider = capsule(34, 34, 82),
+		metal_cost = 960,
+		energy_cost = 7200,
+		buildpower_cost = 10600,
+		health = 3950,
+		acceleration = studs_per_second_squared(0.02757),
+		max_speed = studs(62.4),
+		footing = footing.ship("BOAT4", studs(12)),
+		weapons = {
+			-- plasma
+			{
+				kind = "plasma_cannon",
+				damage = 385,
+				reload = 2.5,
+				range = studs(710),
+				turret = { turn_rate = math.rad(60) },
+				energy_per_shot = 0,
+				target_layer = "ground",
+				delivery = {
+					kind = "lobbed",
+					arc = "low",
+					projectile = projectile({
+						speed = shell_speed(studs(320)),
+						gravity = shell_gravity(studs(MAP_GRAVITY)),
+						aoe_radius = aoe(64),
+						edge_effectiveness = 0.15,
+					}),
+				},
+			},
+			-- depthcharge
+			{
+				kind = "depth_charge",
+				damage = 225,
+				reload = 1.9,
+				range = studs(400),
+				energy_per_shot = 0,
+				delivery = {
+					kind = "torpedo",
+					guidance = "homes",
+					guidance_time = 3,
+					projectile = projectile({
+						speed = studs(120),
+						acceleration = studs(20),
+						thrust_time = (140 - 120) / 20,
+						aoe_radius = aoe(24),
+						edge_effectiveness = 0.9,
+					}),
+				},
+			},
+		} :: { Weapon },
+		color = palette.STEEL_BLUE,
+	},
+
 	-- legnavydestro, Legion's Syracusia: a destroyer with an orange heat ray, which needs energy to fire, and a drone
 	-- carrier. BAR gives it two drones; this game gives it one, to keep the count of things down, and makes up for it
 	-- by making that one drone tougher and harder hitting than either of BAR's. The heat ray's area of effect is left
@@ -195,6 +268,58 @@ local defs: { [string]: EntityDef } = {
 			engage_range = studs(1000),
 			repair_per_second = 30,
 		},
+		color = palette.COPPER,
+	},
+
+	-- legnavyfrigate (units/Legion/Ships/legnavyfrigate.lua), Legion's Argonaut: a frigate with a deck torpedo
+	-- launcher, which fires at what is on or under the water. BAR gives it the launcher twice, as
+	-- `leg_torpedo_launcher` aimed at what is level with or above it and `leg_alt_torpedo_launcher` at what is below it
+	-- (their `maindir`s point opposite ways and their `maxangledif`s meet), so only one of them can ever be turned on
+	-- any one target; this game does not aim by height, and has it as the one launcher. Its torpedo is
+	-- `leg_torpedo_launcher`'s: it leaves at BAR's launch speed and gains its acceleration toward BAR's top speed,
+	-- homing (`tracks`) for BAR's `flighttime`. BAR's missile `turnrate` is left out, as the other torpedoes' are.
+	-- Everything else here is BAR's.
+	-- bar: legnavyfrigate
+	argonaut = {
+		name = "argonaut",
+		display_name = "Argonaut",
+		subtitle = "Torpedo frigate",
+		kind = "unit",
+		category = "ships",
+		tech_level = 1,
+		-- 36 x 26 x 58 elmos
+		collider = capsule(36, 26, 58),
+		metal_cost = 370,
+		energy_cost = 3700,
+		buildpower_cost = 4800,
+		health = 2600,
+		acceleration = studs_per_second_squared(0.03),
+		max_speed = studs(72),
+		footing = footing.ship("BOAT4", studs(6)),
+		weapons = {
+			-- leg_torpedo_launcher
+			{
+				kind = "torpedo",
+				damage = 140,
+				reload = 1.3,
+				range = studs(460),
+				-- its script's (scripts/Units/legnavyfrigate.bos): one turret, which both of BAR's launchers aim
+				turret = { turn_rate = math.rad(120) },
+				energy_per_shot = 0,
+				delivery = {
+					kind = "torpedo",
+					guidance = "homes",
+					guidance_time = 3,
+					projectile = projectile({
+						speed = studs(200),
+						acceleration = studs(2),
+						thrust_time = (250 - 200) / 2,
+						aoe_radius = aoe(16),
+						edge_effectiveness = 0.25,
+					}),
+				},
+			},
+		} :: { Weapon },
 		color = palette.COPPER,
 	},
 
@@ -308,7 +433,8 @@ local defs: { [string]: EntityDef } = {
 
 	-- corcrus, Cortex's Buccaneer: a cruiser, and what there is to hunt submarines with. It has a heavy laser for
 	-- what is on the water and the land, and depth charges, which BAR makes the same weapon as a torpedo, that home on
-	-- what is in the water under or beside it. BAR's lighter deck laser is left out. Everything else here is BAR's.
+	-- what is in the water under or beside it, and BAR's lighter, quicker deck laser, which fires at aircraft too. It is
+	-- BAR's second tier, built at the Advanced Shipyard. Everything else here is BAR's.
 	-- bar: corcrus
 	buccaneer = {
 		name = "buccaneer",
@@ -316,7 +442,7 @@ local defs: { [string]: EntityDef } = {
 		subtitle = "Cruiser",
 		kind = "unit",
 		category = "ships",
-		tech_level = 1,
+		tech_level = 2,
 		-- 34 x 34 x 115 elmos
 		collider = capsule(34, 34, 115),
 		metal_cost = 1000,
@@ -339,6 +465,20 @@ local defs: { [string]: EntityDef } = {
 					kind = "beam",
 					time = 0.15,
 					thickness = 0.4,
+				},
+			},
+			-- adv_decklaser
+			{
+				kind = "laser",
+				damage = 75,
+				reload = 0.333,
+				range = studs(430),
+				turret = { turn_rate = math.rad(110) },
+				energy_per_shot = 15,
+				delivery = {
+					kind = "beam",
+					time = 0.15,
+					color = Color3.new(1, 0, 0),
 				},
 			},
 			{

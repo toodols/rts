@@ -40,6 +40,7 @@ local self_destruct = require(script.Parent.self_destruct)
 local emp = require(script.Parent.emp)
 local stockpiles = require(script.Parent.stockpiles)
 local work = require(script.Parent.work)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -273,10 +274,10 @@ local function order_position(order: types.Order): Vector3?
 	return target.position
 end
 
--- The bubble round a plasma deflector: a translucent ball the size of its shield, which fades out as the shield's
--- power runs down and is gone altogether while it is down or the building is not finished.
+-- The bubble round a shield: a translucent ball the size of it, which fades out as the shield's power runs down and is
+-- gone altogether while it has none, or is not up (unfinished, or switched off).
 local BUBBLE_COLOR = Color3.fromRGB(120, 200, 255)
-local function apply_shield_bubble(entity: Entity, model: Model, shield: types.Shield, held: number)
+local function apply_shield_bubble(entity: Entity, model: Model, shield: types.Shield, held: number, up: boolean)
 	local bubble = model:FindFirstChild "Shield"
 	if bubble == nil then
 		local part = Instance.new "Part"
@@ -299,7 +300,7 @@ local function apply_shield_bubble(entity: Entity, model: Model, shield: types.S
 	-- the model's own colouring passes over every part, this one too, so it is put back
 	ball.Color = BUBBLE_COLOR
 	ball.Material = Enum.Material.ForceField
-	if entity.state ~= "active" or held <= 0 then
+	if up == false or held <= 0 then
 		ball.Transparency = 1
 	else
 		ball.Transparency = 0.6 + 0.35 * (1 - math.clamp(held / shield.power, 0, 1))
@@ -398,9 +399,9 @@ local function apply_attributes(entity: Entity, model: Model)
 	end
 	writing = nil
 
-	-- a plasma deflector's bubble, drawn as its power has it
+	-- a shield's bubble, drawn as its power has it
 	if def.shield ~= nil then
-		apply_shield_bubble(entity, model, def.shield, shields.power_of(entity))
+		apply_shield_bubble(entity, model, def.shield, shields.power_of(entity), shields.is_up(entity))
 	end
 end
 
@@ -483,6 +484,26 @@ local function sync()
 		sync_entity(cargo, true)
 	end
 end
+
+-- A game put back (server/snapshot) may have an id belong to something other than what its model was built for: that
+-- model goes, and the next sync builds the right one. Models whose entity is gone go at the next sync, as ever.
+snapshot.rebuild("instances", function()
+	local stale: { EntityId } = {}
+	for id, model in models do
+		local entity = state.get(id, true)
+		if
+			entity == nil
+			or model:GetAttribute "def_name" ~= entity.def_name
+			or model:GetAttribute "kind" ~= entity.kind
+			or model:GetAttribute "skin" ~= entity.skin
+		then
+			table.insert(stale, id)
+		end
+	end
+	for _, id in stale do
+		destroy(id)
+	end
+end)
 
 local function get_model(id: EntityId): Model?
 	return models[id]

@@ -31,6 +31,7 @@ local build_rules = require(script.Parent.build_rules)
 local orbits = require(script.Parent.orbits)
 local control = require(script.Parent.control)
 local sight = require(script.Parent.sight)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type Order = types.Order
@@ -1013,6 +1014,14 @@ local function forget(id: types.EntityId)
 	build_waits[id] = nil
 	looked_in_vain[id] = nil
 end
+
+snapshot.keep("orders", function()
+	return { tick_delta = tick_delta, looked_in_vain = looked_in_vain, build_waits = build_waits }
+end, function(saved)
+	tick_delta = saved.tick_delta
+	looked_in_vain = saved.looked_in_vain
+	build_waits = saved.build_waits
+end)
 
 return table.freeze({
 	forget = forget,

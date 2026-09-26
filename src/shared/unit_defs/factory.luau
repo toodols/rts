@@ -94,6 +94,7 @@ local defs: { [string]: EntityDef } = {
 				"brute",
 				"janus",
 				"pounder",
+				"garpike",
 			},
 		},
 		footing = footing.LAND,
@@ -190,15 +191,23 @@ local defs: { [string]: EntityDef } = {
 		health = 4300,
 		builder = {
 			buildpower = 150,
-			options = { "construction_ship", "supporter", "riptide", "syracusia", "herring", "orca", "buccaneer" },
+			options = {
+				"construction_ship",
+				"supporter",
+				"riptide",
+				"oppressor",
+				"syracusia",
+				"argonaut",
+				"herring",
+				"orca",
+			},
 		},
 		footing = footing.afloat(studs(5)),
 		color = palette.GUNMETAL,
 	},
 
 	-- corasy, Cortex's Advanced Shipyard: the shipyard for the second tier, which the Construction Ship builds. Its
-	-- numbers are BAR's. BAR's makes the second tier of ships, which this game does not have yet, so for now it makes
-	-- the Shipyard's.
+	-- numbers are BAR's. It makes what there is of BAR's second tier of ships, in BAR's order.
 	-- bar: corasy
 	advanced_shipyard = {
 		name = "advanced_shipyard",
@@ -216,10 +225,41 @@ local defs: { [string]: EntityDef } = {
 			buildpower = 600,
 			options = {
 				"construction_ship",
+				"buccaneer",
+				"predator",
+				"kraken",
+				"arrow_storm",
+				"despot",
+				"messenger",
+				"black_hydra",
 				"sea_dragon",
 			},
 		},
 		metal_storage = 200,
+		energy_storage = 200,
+		footing = footing.afloat(studs(30)),
+		color = palette.GUNMETAL,
+	},
+
+	-- corplat: the lab for seaplanes, which floats on water deep enough for it. Only the Construction Ship and the
+	-- Construction Hovercraft build it.
+	-- bar: corplat
+	seaplane_platform = {
+		name = "seaplane_platform",
+		display_name = "Seaplane Platform",
+		subtitle = "Seaplane factory",
+		kind = "building",
+		category = "factories",
+		-- no collision volume of its own; its wreck's is 117.5 x 41.25 x 112.5 elmos, in whole grid cells
+		collider = { shape = "box", width = cells(3), height = cells(1), length = cells(3) },
+		metal_cost = 1400,
+		energy_cost = 5500,
+		buildpower_cost = 11800,
+		health = 2200,
+		builder = {
+			buildpower = 300,
+			options = { "construction_seaplane", "cutlass", "dam_buster", "monsoon", "bat" },
+		},
 		energy_storage = 200,
 		footing = footing.afloat(studs(30)),
 		color = palette.GUNMETAL,
@@ -239,7 +279,7 @@ local defs: { [string]: EntityDef } = {
 		health = 2150,
 		builder = {
 			buildpower = 150,
-			options = { "construction_aircraft", "valiant", "whirlwind", "hercules", "hephaestus" },
+			options = { "construction_aircraft", "valiant", "whirlwind", "banshee", "hercules", "hephaestus" },
 		},
 		footing = footing.LAND,
 		color = palette.GUNMETAL,
@@ -268,6 +308,7 @@ local defs: { [string]: EntityDef } = {
 				"hailstorm",
 				"stiletto",
 				"liche",
+				"angler",
 				"tyrannus",
 				"stronghold",
 			},

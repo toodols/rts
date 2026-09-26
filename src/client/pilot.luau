@@ -47,6 +47,7 @@ local team_state = require(ReplicatedStorage.Client.team_state)
 local modifiers = require(ReplicatedStorage.Client.modifiers)
 local input_router = require(ReplicatedStorage.Client.input_router)
 local pilot_army = require(ReplicatedStorage.Client.pilot_army)
+local orders = require(ReplicatedStorage.Client.orders)
 
 type EntityId = types.EntityId
 type EntityDef = types.EntityDef
@@ -460,6 +461,8 @@ local function on_key(now: Session, model: Model, key: Enum.KeyCode)
 		cargo(now, model, key == Enum.KeyCode.J)
 	elseif key == Enum.KeyCode.G then
 		call_mount(now, model)
+	elseif key == Enum.KeyCode.K then
+		orders.send("shield", { now.id }, { aim = "none" }, orders.NOW)
 	elseif WEAPON_KEYS[key] ~= nil then
 		choose_weapon(now, model, WEAPON_KEYS[key])
 	end

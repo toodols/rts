@@ -16,6 +16,8 @@ local kit = require(script.kit)
 local tutorial = require(script.tutorial)
 local overlook = require(script.overlook)
 local counterattack = require(script.counterattack)
+local channel = require(script.channel)
+local blockade = require(script.blockade)
 
 type Mission = campaign.Mission
 
@@ -31,6 +33,8 @@ local GUIDES: { [string]: Guide } = table.freeze({
 	tutorial = tutorial,
 	overlook = overlook,
 	counterattack = counterattack,
+	channel = channel,
+	blockade = blockade,
 })
 
 -- The id of the mission being played, if one is.

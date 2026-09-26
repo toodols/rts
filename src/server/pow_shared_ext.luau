@@ -20,9 +20,8 @@ return function(extras: pow_types.Extras)
 	end
 	-- One of map_presets' maps, by name.
 	extras.types.map = pow_types.named("map", "A map, by name", map_names)
-	-- Whose side an AI that ai_add puts down is on: a team of its own, a new team allied with the team given, or the
-	-- team given itself.
-	extras.types.ai_side = pow_types.named("ai_side", "enemy, ally or join", { "enemy", "ally", "join" })
+	-- Whose side an AI that ai_add puts down is on: a team of its own, or a new team allied with the team given.
+	extras.types.ai_side = pow_types.named("ai_side", "enemy or ally", { "enemy", "ally" })
 	-- Which labs an AI builds its army from; "any" leaves it to the AI's profile, or to the AI.
 	extras.types.ai_line = pow_types.named("ai_line", "bot, vehicle or any labs", { "bot", "vehicle", "any" })
 	-- One of shared/ai_profiles' profiles, by name: how an AI plays.

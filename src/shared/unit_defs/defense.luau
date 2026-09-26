@@ -538,7 +538,8 @@ local defs: { [string]: EntityDef } = {
 		energy_cost = 38000,
 		buildpower_cost = 36000,
 		health = 8600,
-		footing = footing.LAND,
+		-- legrampart.lua's maxwaterdepth
+		footing = footing.shallows(studs(5)),
 		energy_income = 600,
 		energy_storage = 4000,
 		spot = "geo",
@@ -660,6 +661,7 @@ local defs: { [string]: EntityDef } = {
 			regen = 130,
 			regen_energy = 562.5,
 			starting_power = 2090,
+			blocks = "plasma",
 		},
 		color = palette.SKY,
 	},
@@ -723,6 +725,123 @@ local defs: { [string]: EntityDef } = {
 						thrust_time = 2.3,
 						aoe_radius = missile_aoe(48),
 						line_thickness = 0.4,
+					}),
+				},
+			},
+		} :: { Weapon },
+		color = palette.BRICK,
+	},
+
+	-- The defences that float, which a construction ship builds.
+
+	-- cortl, Cortex's Urchin: a torpedo launcher moored offshore. It fires at what is in the water and nothing else, as
+	-- the Orca's torpedoes do; its torpedo leaves at BAR's launch speed and gains its acceleration until it is at BAR's
+	-- top speed. BAR gives it no collision volume of its own, so its collider is its footprint, as tall as its wreck.
+	-- bar: cortl
+	urchin = {
+		name = "urchin",
+		display_name = "Urchin",
+		subtitle = "Torpedo launcher",
+		kind = "building",
+		category = "defences",
+		collider = { shape = "box", width = cells(1), height = studs(19), length = cells(1) },
+		metal_cost = 170,
+		energy_cost = 1800,
+		buildpower_cost = 3750,
+		health = 1440,
+		footing = footing.afloat(studs(12)),
+		weapons = {
+			{
+				kind = "torpedo",
+				damage = 280,
+				reload = 1.5,
+				range = studs(500),
+				energy_per_shot = 0,
+				delivery = {
+					kind = "torpedo",
+					guidance = "leads",
+					projectile = projectile({
+						speed = studs(230),
+						acceleration = studs(50),
+						thrust_time = (280 - 230) / 50,
+						aoe_radius = aoe(16),
+						edge_effectiveness = 0.55,
+					}),
+				},
+			},
+		} :: { Weapon },
+		color = palette.BRICK,
+	},
+
+	-- corfhlt, Cortex's Coral: the Warden afloat. Its laser is BAR's own for it, a little weaker and quicker than the
+	-- Warden's and reaching a little further, on a broader, tougher hull that costs more energy.
+	-- bar: corfhlt
+	coral = {
+		name = "coral",
+		display_name = "Coral",
+		subtitle = "Floating heavy laser tower",
+		kind = "building",
+		category = "defences",
+		-- 73 x 67 x 73 elmos
+		collider = { shape = "box", width = cells(2), height = studs(67), length = cells(2) },
+		metal_cost = 480,
+		energy_cost = 6200,
+		buildpower_cost = 11400,
+		health = 4350,
+		footing = footing.afloat(studs(5)),
+		weapons = {
+			{
+				kind = "laser",
+				damage = 231,
+				reload = 1,
+				range = studs(630),
+				energy_per_shot = 45,
+				delivery = {
+					kind = "beam",
+					time = 0.225,
+					thickness = 0.45,
+				},
+				-- the Warden's turret
+				turret = { turn_rate = math.rad(120) },
+			},
+		} :: { Weapon },
+		color = palette.BRICK,
+	},
+
+	-- corfrt, Cortex's Slingshot: the Thistle afloat, with the Thistle's missile, cost and health.
+	-- bar: corfrt
+	slingshot = {
+		name = "slingshot",
+		display_name = "Slingshot",
+		subtitle = "Floating anti air tower",
+		kind = "building",
+		category = "defences",
+		-- 40 x 64 x 40 elmos
+		collider = { shape = "box", width = cells(1), height = studs(64), length = cells(1) },
+		metal_cost = 80,
+		energy_cost = 850,
+		buildpower_cost = 1750,
+		health = 335,
+		footing = footing.afloat(studs(2)),
+		weapons = {
+			{
+				kind = "aa_missiles",
+				damage = 115,
+				reload = 1.7,
+				range = studs(765),
+				energy_per_shot = 0,
+				-- the Thistle's turret
+				turret = { turn_rate = math.rad(200) },
+				target_layer = "air",
+				delivery = {
+					kind = "straight",
+					guidance = "homes",
+					projectile = projectile({
+						speed = studs(400),
+						acceleration = studs(150),
+						thrust_time = 1.9,
+						aoe_radius = missile_aoe(48),
+						line_thickness = 0.3,
 					}),
 				},
 			},

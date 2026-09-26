@@ -427,6 +427,56 @@ local defs: { [string]: EntityDef } = {
 		} :: { Weapon },
 		color = palette.RUST,
 	},
+
+	-- corgarp, Cortex's Garpike, from units/CorVehicles/corgarp.lua: a light amphibious tank. Its movement class is BAR's
+	-- ATANK3, so it drives along the sea floor as it does on land, at any depth, and comes up out of the water wherever
+	-- the shore lets it. Its gun is a Cannon, BAR's arm_pincer_gauss, whose shell falls under the map's gravity; as
+	-- nothing but a torpedo is fired from under the water (shot_rules), it fights only once it is out of it. Its turret
+	-- turns at BAR's `turretspeedy`, 130 degrees a second. Only at what is not a submarine (onlytargetcategory NOTSUB);
+	-- its 25 against aircraft is not modelled. Its `paralyzemultiplier` is 0.2. Its collision volume is a box 30 wide, 23
+	-- high and 36 long. Everything else here is BAR's.
+	-- bar: corgarp
+	garpike = {
+		name = "garpike",
+		footing = footing.moves "ATANK3",
+		weight_class = "light",
+		display_name = "Garpike",
+		subtitle = "Light amphibious tank",
+		kind = "unit",
+		category = "vehicles",
+		tech_level = 1,
+		-- 30 x 23 x 36 elmos
+		collider = capsule(30, 23, 36),
+		metal_cost = 220,
+		energy_cost = 2600,
+		buildpower_cost = 3100,
+		health = 1420,
+		acceleration = studs_per_second_squared(0.03226),
+		max_speed = studs(58.5),
+		-- corgarp's `paralyzemultiplier` 0.2
+		emp_resistance = 0.8,
+		weapons = {
+			{
+				kind = "plasma_cannon",
+				damage = 116,
+				reload = 1.5,
+				range = studs(305),
+				turret = { turn_rate = math.rad(130) },
+				energy_per_shot = 0,
+				delivery = {
+					kind = "lobbed",
+					arc = "low",
+					projectile = projectile({
+						speed = shell_speed(studs(450)),
+						gravity = shell_gravity(studs(MAP_GRAVITY)),
+						aoe_radius = aoe(8),
+						edge_effectiveness = 0.15,
+					}),
+				},
+			},
+		} :: { Weapon },
+		color = palette.STEEL_BLUE,
+	},
 }
 
 return table.freeze(defs)

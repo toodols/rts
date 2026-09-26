@@ -16,12 +16,14 @@ local surface = require(ReplicatedStorage.Shared.surface)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
+local move_classes = require(ReplicatedStorage.Shared.move_classes)
 
 local state = require(script.Parent.state)
 local air = require(script.Parent.air)
 local spatial = require(script.Parent.spatial)
 local control = require(script.Parent.control)
 local pilots = require(script.Parent.pilots)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -349,6 +351,13 @@ end
 -- ship left on dry land, or a unit just made inside its factory, may move freely to get out. Returns where it goes.
 local function keep_to_standable(entity: Entity, def: types.EntityDef, next_position: Vector3): Vector3
 	local here = entity.position
+	-- what is up in the air flies over whatever is under it, cliffs and all, and a plane on wings cannot stop to be
+	-- held up anyway: only what is on the ground is kept to ground it can stand on
+	local aircraft = def.air
+	if aircraft ~= nil and (aircraft.wings ~= nil or air.is_airborne(entity)) then
+		held_since[entity.id] = nil
+		return next_position
+	end
 	local standable = pathfinder.open_at
 	if standable(def, next_position.X, next_position.Z) or standable(def, here.X, here.Z) == false then
 		held_since[entity.id] = nil
@@ -401,6 +410,12 @@ end
 local function move(entity: Entity, delta: number)
 	local def = entity.def
 	local max_speed = def.max_speed :: number
+	-- a land unit wading through the shallows is slowed by the water, as its movement class says
+	local class = move_classes.of(def.footing.class)
+	if class ~= nil and class.depth_mod ~= nil then
+		local position = entity.position
+		max_speed *= move_classes.speed_in_water(class, heightmap.water_depth(position.X, position.Z))
+	end
 	local acceleration = def.acceleration :: number
 
 	-- a unit that has just been hit answers slower, but still answers
@@ -534,6 +549,30 @@ local function forget(entity_id: EntityId)
 	edge_slides[entity_id] = nil
 	held_since[entity_id] = nil
 end
+
+snapshot.keep("movement", function()
+	return {
+		goals = goals,
+		stepped_goals = stepped_goals,
+		hovers = hovers,
+		idle_for = idle_for,
+		impulse_remaining = impulse_remaining,
+		exiting = exiting,
+		edge_slides = edge_slides,
+		held_since = held_since,
+		clock = clock,
+	}
+end, function(saved)
+	goals = saved.goals
+	stepped_goals = saved.stepped_goals
+	hovers = saved.hovers
+	idle_for = saved.idle_for
+	impulse_remaining = saved.impulse_remaining
+	exiting = saved.exiting
+	edge_slides = saved.edge_slides
+	held_since = saved.held_since
+	clock = saved.clock
+end)
 
 return table.freeze({
 	ARRIVAL_RADIUS = ARRIVAL_RADIUS,

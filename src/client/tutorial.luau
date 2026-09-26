@@ -307,7 +307,7 @@ local function map_built(mission_id: string): boolean
 end
 
 -- Starts guiding the player from the first step when this game becomes a mission that guides, or begins it again (the
--- server's load_mission), once its map is built, and stops when it stops being one. Its hard mode does not guide.
+-- server's mission_load), once its map is built, and stops when it stops being one. Its hard mode does not guide.
 local function follow_mission(current: string?)
 	-- where the view was on the map before is nothing to go back to
 	missions.forget_view()

@@ -27,9 +27,19 @@ local rng = require(script.Parent.rng)
 local damage = require(script.Parent.damage)
 local sight = require(script.Parent.sight)
 local shot_feed = require(script.Parent.shot_feed)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
+
+-- The weapon a shot is from, as the clients know it (shot_events.Fired), and whether it is one of the shots that
+-- weapon's shell split into (`types.Split`).
+type Source = {
+	def_name: string,
+	skin: string?,
+	weapon: number,
+	split: boolean?,
+}
 
 -- What a nuclear missile has for interceptors (server/interceptors.luau): where it will come down, which is what an
 -- anti-nuke's coverage is about; the interceptor sent after it, so that no other is spent on it (`claim_nuke`); and that
@@ -49,8 +59,9 @@ export type Projectile = {
 	owner_id: EntityId,
 	team: types.TeamId,
 	flight: projectile_mod.Flight,
-	-- the weapon that fired it, whose harm it lands (`damage.hit`)
+	-- the weapon that fired it, whose harm it lands (`damage.hit`), and which one that is, as the clients know it
 	weapon: types.Weapon,
+	fired: Source,
 	-- how it flies, its weapon's
 	delivery: types.ProjectileDelivery,
 	-- whether it has come out of its launcher's collider yet; until it has, the launcher cannot be struck
@@ -82,6 +93,13 @@ local GUIDANCE_MARGIN = 2.5
 local MISS_CLEARANCE = 1.5
 -- How big the burst is where a shield swallows a shell.
 local SHIELD_BURST_RADIUS = 3
+-- How big the puff is where a shell splits (`types.Split`), which harms nothing.
+local SPLIT_BURST_RADIUS = 2
+-- How hard a split shell's shots are pushed apart, as fractions of its speed: BAR's split effect adds, to each of the
+-- three parts of the shell's velocity, up to 100/880 of its speed across and 100/440 of it up or down, in steps of a
+-- hundredth.
+local SPLIT_SPREAD_ACROSS = 1 / 880
+local SPLIT_SPREAD_UP = 1 / 440
 -- The projectile's own thickness.
 local PROJECTILE_RADIUS = 0.3
 -- How far under the surface a ship's hull reaches, for a torpedo: a ship rests on the water with nothing of its
@@ -163,7 +181,8 @@ local function aim_lobbed(
 	if params.inaccuracy ~= nil then
 		direction = strayed(direction, params.inaccuracy)
 	end
-	return { direction = direction, shot = { speed = speed }, inherited = nil }
+	local fuse = if params.burst_at_aim == true then flight_time else nil
+	return { direction = direction, shot = { speed = speed, fuse = fuse }, inherited = nil }
 end
 
 -- A bomb goes down from wherever it is let go, whatever it was aimed at, and on at the speed it was going, pushed
@@ -259,14 +278,13 @@ local function launch_point(owner: Entity, origin: Vector3, late: number): Vecto
 	return origin - owner.velocity * late
 end
 
--- Puts a shot of weapon `index` of `owner`'s, `weapon`, in the air from `origin` as `release` says, toward `aim`,
--- `late` seconds into its flight already, and tells the clients, who fly it the same from the same (shot_events): they
--- know its weapon by its owner's def and skin, and steer it onto the entity `homing_target_id` or the projectile
--- `homing_projectile_id` as this one is. Its id and its flight, for whoever keeps it.
-local function release_shot(
-	owner: Entity,
+-- Puts a shot of `weapon`, which is `fired`, in the air from `origin` as `release` says, toward `aim`, `late` seconds
+-- into its flight already, and tells the clients, who fly it the same from the same (shot_events): they know its
+-- weapon by `fired`, and steer it onto the entity `homing_target_id` or the projectile `homing_projectile_id` as this
+-- one is. Its id and its flight, for whoever keeps it.
+local function send_shot(
+	fired: Source,
 	weapon: types.Weapon,
-	index: number,
 	origin: Vector3,
 	release: Release,
 	aim: Vector3,
@@ -284,9 +302,10 @@ local function release_shot(
 	shot_feed.send({
 		kind = "projectile",
 		id = id,
-		def_name = owner.def_name,
-		skin = owner.skin,
-		weapon = index,
+		def_name = fired.def_name,
+		skin = fired.skin,
+		weapon = fired.weapon,
+		split = fired.split,
 		from = origin,
 		direction = release.direction.Unit,
 		shot = release.shot,
@@ -297,6 +316,22 @@ local function release_shot(
 		homing_projectile_id = homing_projectile_id,
 	})
 	return id, flight
+end
+
+-- The same for a shot of weapon `index` of `owner`'s, `weapon`.
+local function release_shot(
+	owner: Entity,
+	weapon: types.Weapon,
+	index: number,
+	origin: Vector3,
+	release: Release,
+	aim: Vector3,
+	late: number,
+	homing_target_id: EntityId?,
+	homing_projectile_id: number?
+): (number, projectile_mod.Flight)
+	local fired: Source = { def_name = owner.def_name, skin = owner.skin, weapon = index }
+	return send_shot(fired, weapon, origin, release, aim, late, homing_target_id, homing_projectile_id)
 end
 
 -- Fires a shot of weapon `index` of `owner`'s, `weapon`, whose delivery launches a projectile, from `origin` at `aim`,
@@ -337,7 +372,8 @@ local function launch(
 	end
 
 	local homing_entity_id = if homing and target ~= nil then target.id else nil
-	local id, flight = release_shot(owner, weapon, index, origin, release, at, late, homing_entity_id, nil)
+	local fired: Source = { def_name = owner.def_name, skin = owner.skin, weapon = index }
+	local id, flight = send_shot(fired, weapon, origin, release, at, late, homing_entity_id, nil)
 	local projectile: Projectile = {
 		id = id,
 		flying = true,
@@ -345,6 +381,7 @@ local function launch(
 		team = owner.team,
 		flight = flight,
 		weapon = weapon,
+		fired = fired,
 		delivery = delivery,
 		clear_of_owner = false,
 		exempt = shields.covering(origin),
@@ -449,9 +486,13 @@ local function struck_by(projectile: Projectile): Entity?
 	return found
 end
 
--- `amount` of `projectile`'s harm comes to `target`, which it struck `direct`ly or caught in its blast.
+-- `amount` of `projectile`'s harm comes to `target`, which it struck `direct`ly or caught in its blast, less what a
+-- shield round `target` that blocks everything takes of it.
 local function strike(projectile: Projectile, target: Entity, amount: number, direct: boolean)
-	damage.hit(target, amount, projectile.weapon, projectile.owner_id, projectile.team, direct)
+	local left = shields.shelter(target, amount, projectile.team, projectile.exempt)
+	if left > 0 then
+		damage.hit(target, left, projectile.weapon, projectile.owner_id, projectile.team, direct)
+	end
 end
 
 -- The rocket goes off at `at`. What it struck takes the whole damage; everything else within the blast
@@ -493,6 +534,54 @@ end
 -- drawn going off in the air (`airburst`).
 local function burst_harmlessly(id: number, at: Vector3, radius: number, how: shot_events.ImpactHow)
 	shot_feed.send({ kind = "impact", id = id, at = at, radius = radius, how = how })
+end
+
+-- Bursts `shell`, whose weapon splits (`types.Split`), into its shots where it is now, `late` seconds before the end of
+-- the tick: each flies on from there with the shell's velocity and a random push of its own, as BAR's split effect
+-- has it. The shell itself goes off harmlessly. The shots, to join the list once this tick's walk through it is done.
+local function split_shell(shell: Projectile, split: types.Split, late: number): { Projectile }
+	local flight = shell.flight
+	local at = flight.position
+	burst_harmlessly(shell.id, at, SPLIT_BURST_RADIUS, "burst")
+
+	local weapon = split.weapon
+	local delivery = weapon.delivery
+	assert(delivery.kind ~= "beam", "a shell splits into projectiles")
+	local kind = weapon_kinds.get(weapon.kind)
+	local fired: Source =
+		{ def_name = shell.fired.def_name, skin = shell.fired.skin, weapon = shell.fired.weapon, split = true }
+	local speed = flight.velocity.Magnitude
+	local random = rng.stream "projectiles"
+	local shots: { Projectile } = {}
+	for _ = 1, split.count do
+		local push = Vector3.new(
+			random:NextInteger(-100, 100) * SPLIT_SPREAD_ACROSS,
+			random:NextInteger(-100, 100) * SPLIT_SPREAD_UP,
+			random:NextInteger(-100, 100) * SPLIT_SPREAD_ACROSS
+		)
+		local velocity = flight.velocity + push * speed
+		local release: Release = { direction = velocity.Unit, shot = { speed = velocity.Magnitude }, inherited = nil }
+		local id, shot_flight = send_shot(fired, weapon, at, release, at, late, nil, nil)
+		table.insert(shots, {
+			id = id,
+			flying = true,
+			owner_id = shell.owner_id,
+			team = shell.team,
+			flight = shot_flight,
+			weapon = weapon,
+			fired = fired,
+			delivery = delivery,
+			clear_of_owner = true,
+			exempt = shell.exempt,
+			nuke = nil,
+			homing_entity_id = nil,
+			target_id = nil,
+			pierces = kind.pierces == true,
+			pierce_wait = 0,
+			is_plasma = kind.plasma == true,
+		})
+	end
+	return shots
 end
 
 -- Every nuclear missile in the air, in the order they were launched, for interceptors to choose from. Read only.
@@ -547,6 +636,8 @@ end
 
 -- Flies every rocket forward one tick.
 local function tick(delta: number)
+	-- the shots of shells that split this tick, which are already as far along as they are to be at its end
+	local split_shots: { Projectile } = {}
 	local index = 1
 	while index <= #projectiles do
 		local projectile = projectiles[index]
@@ -561,7 +652,7 @@ local function tick(delta: number)
 		local steps, sub_delta = substeps(projectile.flight, delta)
 
 		local finished = false
-		for _ = 1, steps do
+		for step = 1, steps do
 			-- a homing missile, such as an AA missile, steers toward the entity it was fired at for as long as that entity
 			-- is still alive
 			if projectile.homing_entity_id ~= nil then
@@ -582,7 +673,7 @@ local function tick(delta: number)
 			projectile_mod.step(projectile.flight, projectile.delivery, sub_delta)
 			local at = projectile.flight.position
 
-			-- a plasma shell that runs into an enemy shield goes off on it, and does no harm
+			-- a plasma shell that runs into an enemy plasma deflector goes off on it, and does no harm
 			if
 				projectile.is_plasma
 				and shields.absorb(at, projectile.weapon.damage, projectile.team, projectile.exempt)
@@ -624,8 +715,9 @@ local function tick(delta: number)
 				finished = true
 				break
 			end
-			-- a shell with a fuse goes off where it is once its time is up, in the air or not (ProjectileParams.fuse)
-			local fuse = projectile.delivery.projectile.fuse
+			-- a shell with a fuse goes off where it is once its time is up, in the air or not: its weapon's
+			-- (ProjectileParams.fuse), or its own, for one that bursts where it was aimed (`burst_at_aim`)
+			local fuse = projectile.flight.shot.fuse or projectile.delivery.projectile.fuse
 			if fuse ~= nil and projectile.flight.age >= fuse then
 				detonate(projectile, at, nil, false)
 				finished = true
@@ -636,6 +728,15 @@ local function tick(delta: number)
 				finished = true
 				break
 			end
+			-- a shell that splits does so once it starts to come down
+			local split = projectile.weapon.split
+			if split ~= nil and projectile.flight.velocity.Y < 0 then
+				for _, shot in split_shell(projectile, split, (steps - step) * sub_delta) do
+					table.insert(split_shots, shot)
+				end
+				finished = true
+				break
+			end
 		end
 
 		if finished then
@@ -643,6 +744,9 @@ local function tick(delta: number)
 		else
 			index += 1
 		end
+	end
+	for _, shot in split_shots do
+		table.insert(projectiles, shot)
 	end
 end
 
@@ -660,6 +764,14 @@ local function clear()
 	table.clear(projectiles)
 	table.clear(nuke_list)
 end
+
+snapshot.keep("projectiles", function()
+	return { projectiles = projectiles, nuke_list = nuke_list, next_projectile_id = next_projectile_id }
+end, function(saved)
+	projectiles = saved.projectiles
+	nuke_list = saved.nuke_list
+	next_projectile_id = saved.next_projectile_id
+end)
 
 return table.freeze({
 	substeps = substeps,

@@ -3,8 +3,8 @@
 -- server checks every order a player sends against this (server/commands.luau), and the client reads the same.
 --
 -- A player's command is one of these kinds (`Command`): an order that goes into a unit's queue (types.OrderKind), or
--- one of the two that act at once instead, `stop` (drop every order, and call off a self-destruct) and `self_destruct`
--- (start its countdown, or call it off).
+-- one of those that act at once instead, `stop` (drop every order, and call off a self-destruct), `self_destruct`
+-- (start its countdown, or call it off) and `shield` (switch a switched shield on or off).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -14,7 +14,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 type EntityDef = types.EntityDef
 type OrderKind = types.OrderKind
 
-export type Command = OrderKind | "stop" | "self_destruct"
+export type Command = OrderKind | "stop" | "self_destruct" | "shield"
 
 -- What an order is aimed at, as a player gives it:
 -- - "entity": something on the field, by id (`target_id`), which has to be there;
@@ -110,6 +110,7 @@ local KINDS: { [Command]: Kind } = {
 	area_attack = kind({ aim = "area" }),
 	stop = kind({ aim = "none" }),
 	self_destruct = kind({ aim = "none" }),
+	shield = kind({ aim = "none", lab_ok = false }),
 }
 table.freeze(KINDS)
 

@@ -71,7 +71,7 @@ return function(extras: pow_types.Extras)
 	commands.warp = {
 		description = "Runs the next Ticks ticks of the simulation as fast as it can, every step right after "
 			.. "the last with no real-time pacing between them, instead of the usual one tick per (roughly) "
-			.. "1/20th of a second, then goes back to normal. Replaces any warp already running; /unwarp "
+			.. "1/20th of a second, then goes back to normal. Replaces any warp already running; warp_stop "
 			.. "stops it early. With no argument it says how many ticks are left.",
 		permissions = { "admin" },
 		overloads = {
@@ -104,8 +104,8 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.unwarp = {
-		description = "Stops a /warp early, going back to one tick per (roughly) 1/20th of a second.",
+	commands.warp_stop = {
+		description = "Stops a warp early, going back to one tick per (roughly) 1/20th of a second.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },

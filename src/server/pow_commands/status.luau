@@ -54,7 +54,8 @@ return function(extras: pow_types.Extras)
 	local commands = extras.commands
 
 	commands.profile = {
-		description = "Shows where each simulation step's time has gone since the last /profile reset, heaviest first.",
+		description = "Shows where each simulation step's time has gone since the last profile_reset, heaviest first, "
+			.. "and how many entities there are of each kind.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -107,7 +108,7 @@ return function(extras: pow_types.Extras)
 	}
 
 	commands.profile_reset = {
-		description = "Clears the /profile counters and starts a fresh window.",
+		description = "Clears the profile counters and starts a fresh window.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -180,9 +181,10 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.gameconfig = {
-		description = "Shows how this game is set up: the match (mode, map, seed, ally griefing), the scavengers' "
-			.. "progress, difficulty, pace, health multiplier and spawn rate, and the simulation's rate and switches.",
+	commands.game_config = {
+		description = "Shows how this game is set up: the match (mode, ally griefing, how it ends), the scavengers' "
+			.. "progress, difficulty, pace, health multiplier and spawn rate, and the simulation's rate. The map, "
+			.. "seed and switches are game_status's.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -190,15 +192,10 @@ return function(extras: pow_types.Extras)
 		server_run = function(context: Context)
 			local current = match.get()
 			local mode = if current ~= nil then game_modes.get(current.mode) else nil
-			local map = map_state.get()
 			local scav = scavengers.status()
 			local rate = scavengers.SETTINGS.SPAWN_RATE
-			local on = switches_on()
 			local lines = {
-				`match: {if mode ~= nil then mode.label else "none"} | map: {if map ~= nil then map.preset else "none"} | seed: {if map
-						~= nil
-					then tostring(map.seed)
-					else "-"}`
+				`match: {if mode ~= nil then mode.label else "none"}`
 					.. ` | ally griefing: {if current ~= nil and current.ally_griefing then "on" else "off"}`
 					.. ` | ends: {if current ~= nil then current.end_mode else "-"}`,
 				`scavengers: {if scav.enabled then "on" else "off"} | progress {string.format("%.3f", scav.progress)}`
@@ -215,8 +212,7 @@ return function(extras: pow_types.Extras)
 					then ` (next in {math.floor(scav.next_beacon_in)} s)`
 					else ""} | units {scav.units}/{scavengers.SETTINGS.UNIT_CEILING} | reroll credit`
 					.. ` {math.floor(scavengers.reroll_credit())}`,
-				`sim: {tick_rate.TICK_RATE} ticks/s | rate x{one_decimal(game_phase.sim_rate())}`
-					.. ` | on: {list_or(on, "nothing")}`,
+				`sim: {tick_rate.TICK_RATE} ticks/s | rate x{one_decimal(game_phase.sim_rate())}`,
 			}
 			context:log({ type = "info", value = table.concat(lines, "\n") })
 		end,

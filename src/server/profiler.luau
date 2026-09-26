@@ -21,7 +21,7 @@ local reset_at = os.clock()
 
 -- Live entity counts, by kind ("unit", "building", "wreck") and by def name, alongside what each
 -- count was at the last reset, so a growing one stands out as a positive delta rather than needing
--- two /profile runs compared by eye.
+-- two profile runs compared by eye.
 local by_kind: { [string]: number } = {}
 local by_kind_at_reset: { [string]: number } = {}
 local by_def: { [string]: number } = {}

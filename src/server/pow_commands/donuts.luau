@@ -69,7 +69,7 @@ return function(extras: pow_types.Extras)
 		return donuts.force_off(entity, "pop")
 	end, "Popped")
 
-	commands.donut_flyoff = donut_command(
+	commands.donut_fly = donut_command(
 		"Throws donuts off as a fast aircraft does, on anything, not only aircraft.",
 		function(entity: Entity): boolean
 			return donuts.force_off(entity, "fly")

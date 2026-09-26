@@ -1,6 +1,7 @@
 -- Getting the game started (see shared/game_phase.luau), and starting it over on a new map. While it is waiting nothing steps: each player's client
 -- says when it has loaded, and each player chooses where to start by clicking in their team's start box (`starts`),
--- which puts them on the nearest ground there that a team can start on. With every player loaded and a start chosen
+-- which puts them where they clicked, or if their commander cannot stand there, on the nearest ground there that a team
+-- can start on. With every player loaded and a start chosen
 -- it counts down, and when the countdown is out every team's commander is put where its player chose and the game is
 -- playing. Someone arriving, or leaving the rest all ready, is taken account of whenever it happens; during the
 -- countdown, anyone not ready sends it back to waiting. A player arriving once the game is playing starts in their box
@@ -173,7 +174,8 @@ local function evaluate(leaving: Player?)
 	end
 end
 
--- A click in the player's own box starts them at the ground nearest it there that a team can start on.
+-- A click in the player's own box starts them right there, if their commander can stand there, or else at the ground
+-- nearest it there that a team can start on.
 local function on_choose(player: Player, position: Vector3)
 	if game_phase.has_begun() then
 		return
@@ -185,7 +187,9 @@ local function on_choose(player: Player, position: Vector3)
 	if index == nil or starts.in_box(index, position.X, position.Z) == false then
 		return
 	end
-	local spot = starts.nearest_start(index, position.X, position.Z)
+	local spot = if spawning.can_start_at(position.X, position.Z)
+		then Vector2.new(position.X, position.Z)
+		else starts.nearest_start(index, position.X, position.Z)
 	if spot == nil then
 		return
 	end

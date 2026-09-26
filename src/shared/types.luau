@@ -97,6 +97,10 @@ export type ProjectileParams = {
 	-- how many seconds after it is fired a shell goes off where it is, in the air or not, if it has not struck anything
 	-- first: BAR's `burnblow` on a shell with a `flighttime`, which Spring lets burst when its flight time runs out
 	fuse: number?,
+	-- a shell that goes off where it was aimed, in the air or not, once it has flown as long as it takes to get there:
+	-- BAR's `burnblow` on a cannon's shell with no `flighttime`, which Spring gives just long enough to reach its
+	-- target. What a flak cannon's shell does, bursting among the aircraft it is fired at.
+	burst_at_aim: boolean?,
 	-- drawn as a purple neon line this many studs thick, the way BAR draws its anti-air missiles, instead of as a
 	-- casing; a heavier anti-air weapon's is thicker. Only how it looks.
 	line_thickness: number?,
@@ -294,6 +298,17 @@ export type Weapon = {
 	-- instead of its health (server/emp.luau), and it stuns for no longer than this many seconds (BAR's
 	-- `paralyzetime`). Nil for a weapon that does real damage.
 	paralyze_time: number?,
+	-- a shell that splits in the air (`Split`), as BAR's `split` special effect has it; nil for one that stays whole
+	split: Split?,
+}
+
+-- What a shell that splits does (BAR's `speceffect = "split"`, luarules/gadgets/unit_custom_weapons_behaviours.lua):
+-- once it starts to come down, it bursts, harmlessly, into `count` shots of `weapon`, each flying on from where it
+-- burst with the shell's velocity and a random push of its own, which rain down around what it was fired at. Only
+-- `weapon`'s kind, damage and delivery matter: it is never fired on its own.
+export type Split = {
+	count: number,
+	weapon: Weapon,
 }
 
 -- What a lightning gun's sparks do, as BAR's lightning splash gadget has them (unit_lightning_splash_dmg.lua): where
@@ -365,15 +380,19 @@ export type Wings = {
 	run_out: number,
 }
 
--- A plasma deflector's shield: a sphere of `radius` studs round the building that stops enemy plasma shells, each
--- costing it the shell's damage in `power`. It starts with `starting_power`, and grows back `regen` a second for
--- `regen_energy` energy a second, when the energy is there.
+-- A shield (server/shields.luau): a sphere of `radius` studs round what carries it that stops enemy shots, plasma shells
+-- only for a plasma deflector's (`blocks` "plasma"), or every weapon's (`blocks` "all"), each costing it the shot's
+-- damage in `power`. It starts with `starting_power`, and grows back `regen` a second for `regen_energy` energy a
+-- second, when the energy is there. One with an `upkeep` is switched on and off, costs that much energy a second
+-- while it is up, and grows back only while it is off.
 export type Shield = {
 	radius: number,
 	power: number,
 	regen: number,
 	regen_energy: number,
 	starting_power: number,
+	blocks: "plasma" | "all",
+	upkeep: { moving: number, standing: number }?,
 }
 
 -- What a carrier keeps: up to `count` drones of `drone` out at once, parked on it or flying (BAR's maxunits). While
@@ -443,6 +462,7 @@ export type MoveClassName =
 	| "BOAT3"
 	| "BOAT4"
 	| "BOAT5"
+	| "BOAT9"
 	| "UBOAT4"
 
 -- How something meets the water. "ground": it stands on the ground, under water no deeper than its footing allows.
@@ -451,14 +471,26 @@ export type MoveClassName =
 -- the water, so no torpedo is aimed at it.
 export type WaterMode = "ground" | "float" | "hover"
 
+-- How a movement class slows in the water, BAR's `depthModParams`, in elmos as BAR has them: in water at least
+-- `min_depth` deep (`minHeight`) it goes 1 / (`quadratic` * depth² + `linear` * depth + `constant`) as fast, that
+-- divisor held to at most `max_scale` (`maxScale`). See move_classes.speed_in_water.
+export type DepthMod = {
+	min_depth: number,
+	constant: number,
+	linear: number,
+	quadratic: number,
+	max_scale: number,
+}
+
 -- A movement class: the steepest ground it can stand on, in degrees (BAR's `maxslope`; nil for one held to no slope,
--- a ship's), how it meets the water, the deepest water it goes into (nil for no limit), and whether it runs on tracks
--- or wheels, and so is drawn as a car rather than a bot.
+-- a ship's), how it meets the water, the deepest water it goes into (nil for no limit), whether it runs on tracks
+-- or wheels, and so is drawn as a car rather than a bot, and how it slows in the water (nil for not at all).
 export type MoveClass = {
 	max_slope: number?,
 	water: WaterMode,
 	max_water_depth: number?,
 	vehicle: boolean,
+	depth_mod: DepthMod?,
 }
 
 -- Where something can be and how it rests there, what placement, movement, drowning and the pathfinder all read.
@@ -502,7 +534,7 @@ export type Role = "commander" | "drone" | "boss" | "beacon"
 export type SpotKind = "metal" | "geo"
 
 -- What harms it: nothing but a manual weapon, no weapon, blast or death explosion, hurts the one; nothing at all, the
--- manual weapon included, hurts the other, a reclaimable.
+-- manual weapon included, hurts the other.
 export type DamageImmunity = "all_but_manual_weapon" | "all"
 
 -- How a reclaimable is drawn and where a generated map lays it. `art` is its art in Shared.reclaimable_art, stretched
@@ -523,8 +555,9 @@ export type EntityDef = {
 	subtitle: string?,
 	kind: EntityKind,
 	category: Category,
-	-- the tech level of what makes it, for a unit, 1 for the first labs, 2 for the advanced ones and 3 for the gantry;
-	-- nil for buildings and scenery, which are not filed by one
+	-- the tech level of what makes it, for a unit, 1 for the first labs, 2 for the advanced ones and 3 for the gantry,
+	-- and 1.5, between the two, for the Seaplane Platform, as BAR has it; nil for buildings and scenery, which are not
+	-- filed by one
 	tech_level: number?,
 	role: Role?,
 	collider: Collider,

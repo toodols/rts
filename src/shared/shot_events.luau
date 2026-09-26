@@ -33,6 +33,8 @@ export type Launched = {
 	def_name: string,
 	skin: string?,
 	weapon: number,
+	-- one of the shots that weapon's shell split into (`types.Split`), rather than the shell itself
+	split: boolean?,
 	from: Vector3,
 	direction: Vector3,
 	shot: projectile.Shot,
@@ -76,11 +78,15 @@ export type Event = Launched | Impact | Blast | BeamFired | LightningFired | Swe
 
 export type Kind = "projectile" | "impact" | "blast" | "beam" | "lightning" | "sweep"
 
--- The weapon that fired `fired`.
-local function weapon_of(fired: Fired): types.Weapon
+-- The weapon that fired `fired`, or with `split`, the one its shell splits into (`types.Split`).
+local function weapon_of(fired: Fired, split: boolean?): types.Weapon
 	local weapons = unit_defs.skinned(fired.def_name, fired.skin).weapons
 	local weapon = if weapons ~= nil then weapons[fired.weapon] else nil
 	assert(weapon ~= nil, `"{fired.def_name}" has no weapon {fired.weapon}`)
+	if split == true then
+		assert(weapon.split ~= nil, `"{fired.def_name}"'s weapon {fired.weapon} does not split`)
+		return weapon.split.weapon
+	end
 	return weapon
 end
 

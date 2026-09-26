@@ -22,6 +22,7 @@ local spatial = require(script.Parent.spatial)
 local alliances = require(script.Parent.alliances)
 local deaths = require(script.Parent.deaths)
 local orders = require(script.Parent.orders)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -171,6 +172,12 @@ local function forget(carrier_id: EntityId)
 		end
 	end
 end
+
+snapshot.keep("drones", function()
+	return { carriers = carriers }
+end, function(saved)
+	carriers = saved.carriers
+end)
 
 return table.freeze({
 	forget = forget,

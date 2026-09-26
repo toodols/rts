@@ -38,6 +38,7 @@ local paths = require(ServerScriptService.Server.paths)
 local settings = require(script.Parent.settings)
 local progress = require(script.Parent.progress)
 local roster = require(script.Parent.roster)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type EntityDef = types.EntityDef
@@ -649,6 +650,14 @@ local function reset()
 	credit_left = 0
 	next_aim_at = 0
 end
+
+snapshot.keep("scavenger_units", function()
+	return { brains = brains, credit_left = credit_left, next_aim_at = next_aim_at }
+end, function(saved)
+	brains = saved.brains
+	credit_left = saved.credit_left
+	next_aim_at = saved.next_aim_at
+end)
 
 return table.freeze({
 	count = count,

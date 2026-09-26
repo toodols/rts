@@ -17,7 +17,9 @@ local bot_t1 = require(script.bot_t1)
 local vehicle_t1 = require(script.vehicle_t1)
 local air_t1 = require(script.air_t1)
 local air_t2 = require(script.air_t2)
+local seaplane = require(script.seaplane)
 local ship_t1 = require(script.ship_t1)
+local ship_t2 = require(script.ship_t2)
 local hover_t1 = require(script.hover_t1)
 local bot_t2 = require(script.bot_t2)
 local t3 = require(script.t3)
@@ -56,7 +58,9 @@ local GROUPS: { [string]: { [string]: EntityDef } } = {
 	vehicle_t1 = vehicle_t1,
 	air_t1 = air_t1,
 	air_t2 = air_t2,
+	seaplane = seaplane,
 	ship_t1 = ship_t1,
+	ship_t2 = ship_t2,
 	hover_t1 = hover_t1,
 	bot_t2 = bot_t2,
 	t3 = t3,
@@ -200,6 +204,37 @@ local function wreck_of(def_name: string): EntityDef
 		}
 		found = deep_freeze(wreck)
 		wrecks[def_name] = found
+	end
+	return found
+end
+
+-- A def made so far, as it is asked for again: by name alone, by skin and name, or as a wreck.
+export type Made = { kind: "def" | "skinned" | "wreck", name: string, skin: string?, def: EntityDef }
+
+-- Every def made so far, in an order that is the same wherever the same defs were made: every def, then those a
+-- skin boosted, then the wrecks, each by name. What keeps a def as a reference rather than a copy (server/snapshot)
+-- finds its tables through this, and asks for each again the way `kind` says.
+local function made(): { Made }
+	local found: { Made } = {}
+	local function sorted_names(of: { [string]: any }): { string }
+		local names = {}
+		for name in of do
+			table.insert(names, name)
+		end
+		table.sort(names)
+		return names
+	end
+	for _, name in sorted_names(defs) do
+		table.insert(found, { kind = "def", name = name, def = defs[name] })
+	end
+	for _, skin_name in sorted_names(boosted) do
+		local by_def = boosted[skin_name]
+		for _, name in sorted_names(by_def) do
+			table.insert(found, { kind = "skinned", name = name, skin = skin_name, def = by_def[name] })
+		end
+	end
+	for _, name in sorted_names(wrecks) do
+		table.insert(found, { kind = "wreck", name = name, def = wrecks[name] })
 	end
 	return found
 end
@@ -671,6 +706,7 @@ return table.freeze({
 	skinned = skinned,
 	max_health = max_health,
 	wreck_of = wreck_of,
+	made = made,
 	is_commander = is_commander,
 	is_drone = is_drone,
 	is_remains_kind = is_remains_kind,

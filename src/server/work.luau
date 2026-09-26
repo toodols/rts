@@ -18,6 +18,7 @@ local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 local state = require(script.Parent.state)
 local economy = require(script.Parent.economy)
 local alliances = require(script.Parent.alliances)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -139,6 +140,20 @@ local function forget(id: EntityId)
 	jobs[id] = nil
 	previous_jobs[id] = nil
 end
+
+snapshot.keep("work", function()
+	return {
+		jobs = jobs,
+		jobs_on = jobs_on,
+		previous_jobs = previous_jobs,
+		previous_jobs_on = previous_jobs_on,
+	}
+end, function(saved)
+	jobs = saved.jobs
+	jobs_on = saved.jobs_on
+	previous_jobs = saved.previous_jobs
+	previous_jobs_on = saved.previous_jobs_on
+end)
 
 return table.freeze({
 	begin_tick = begin_tick,

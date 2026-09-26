@@ -10,7 +10,8 @@
 -- dives onto it, at one speed the whole way, turning onto each new heading over a moment.
 --
 -- So does a torpedo: it runs level under the water, at its target's depth but never nearer the surface than
--- TORPEDO_DEPTH or the sea floor than TORPEDO_CLEARANCE, and one let go above the water drops into it first.
+-- TORPEDO_DEPTH or the sea floor than TORPEDO_CLEARANCE, and one let go above the water drops into it first: under its
+-- gravity, one dropped from an aircraft, or else eased in at TORPEDO_DIVE_SPEED.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -25,8 +26,12 @@ type Arc = types.Arc
 
 local TORPEDO_DEPTH = 0.6
 local TORPEDO_CLEARANCE = 0.3
--- How fast a torpedo drops into the water or changes the depth it runs at, in studs a second.
+-- How fast a torpedo drops into the water or changes the depth it runs at, in studs a second, at the least.
 local TORPEDO_DIVE_SPEED = 8
+-- A torpedo makes its target's depth by the time it has run this share of the way still left to where it was aimed,
+-- diving faster than TORPEDO_DIVE_SPEED where it has to, so that it is down there before it arrives however deep that
+-- is (something on the floor of deep water, say) and however soon, even at something coming toward it.
+local TORPEDO_LEVEL_SHARE = 0.5
 -- A homing projectile aims this far along the way its target will have gone by the time it gets there, as a fraction
 -- of the whole way: BAR's MissileProjectile leads by 0.7. Leading at all is what stops it chasing the tail of something
 -- crossing in front of it and flying past; leading by less than all the way leaves it a little behind a target that
@@ -61,9 +66,11 @@ local HOMING_MISS_CHANCE = 0.1
 -- (nil for one guided as long as it flies), and where it steers for off its target's middle: nothing for most shots,
 -- and just clear of its collider for the few that are to miss (HOMING_MISS_CHANCE). A lofted one
 -- (`StraightDelivery.loft`) also has the height above its target it steers for at first, and the seconds over which
--- that sinks onto the target.
+-- that sinks onto the target. A shell that bursts where it was aimed (`ProjectileParams.burst_at_aim`) has the seconds
+-- it takes to get there, after which it goes off.
 export type Shot = {
 	speed: number,
+	fuse: number?,
 	guidance_time: number?,
 	aim_offset: Vector3?,
 	loft_height: number?,
@@ -84,6 +91,8 @@ export type Flight = {
 	ceiling: number?,
 	-- a torpedo's speed through the water, kept apart from its velocity, which also has its rise and fall in it
 	speed: number?,
+	-- how fast a torpedo let go in the air is falling, in studs a second, until it meets the water
+	fall: number?,
 	-- a homing projectile's: the nearest it has come to what it steers for, and whether it has flown past that and lost
 	-- its lock (see `home`)
 	nearest: number?,
@@ -272,6 +281,12 @@ local function home(
 	end
 	flight.nearest = math.min(nearest, distance)
 	local wanted = target_position + target_velocity * (distance / speed * HOMING_LEAD) - flight.position
+	-- a torpedo keeps to its own depth (`step_torpedo`), and makes for the one of where it steers for now, not of where
+	-- its target was when it was fired, which something driving along an uneven sea floor has long left (only a
+	-- torpedo's flight has a `speed`)
+	if flight.speed ~= nil then
+		flight.target = flight.position + wanted
+	end
 	if wanted.Magnitude < 1e-3 then
 		return
 	end
@@ -310,7 +325,9 @@ end
 
 -- Advances a torpedo by `delta` seconds, in place. It goes where its velocity points along the level, whatever
 -- turned it there (it homes by having its velocity turned, as a rocket does), at its own speed, and makes for the
--- depth of what it was aimed at, as far as the water lets it.
+-- depth of what it was aimed at, as far as the water lets it and soon enough to be at it when it gets there. One with
+-- a gravity that is still above the water falls under it, going on along the level as it does, as Spring's torpedoes
+-- do until they meet the water.
 local function step_torpedo(flight: Flight, params: ProjectileParams, delta: number)
 	flight.age += delta
 	local speed = flight.speed or params.speed
@@ -322,10 +339,23 @@ local function step_torpedo(flight: Flight, params: ProjectileParams, delta: num
 	local heading = if level.Magnitude > 1e-3 then level.Unit else Vector3.zAxis
 	local moved = flight.position + heading * speed * delta
 
+	if params.gravity > 0 and flight.position.Y > ground_levels.WATER_LEVEL then
+		local fall = (flight.fall or 0) + params.gravity * delta
+		flight.fall = fall
+		flight.position = moved - Vector3.yAxis * (fall * delta)
+		flight.velocity = heading * speed - Vector3.yAxis * fall
+		return
+	end
+
 	local top, bottom = torpedo_band(moved.X, moved.Z)
 	local aimed = if flight.target ~= nil then flight.target.Y else moved.Y
 	local wanted = math.clamp(aimed, bottom, top)
 	local most = TORPEDO_DIVE_SPEED * delta
+	if flight.target ~= nil then
+		local left = Vector2.new(flight.target.X - moved.X, flight.target.Z - moved.Z).Magnitude * TORPEDO_LEVEL_SHARE
+		local run = speed * delta
+		most = math.max(most, math.abs(wanted - moved.Y) * math.min(1, run / math.max(left, 1e-3)))
+	end
 	local rise = math.clamp(wanted - moved.Y, -most, most)
 	flight.position = moved + Vector3.yAxis * rise
 	flight.velocity = heading * speed + Vector3.yAxis * (rise / delta)

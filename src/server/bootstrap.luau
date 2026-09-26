@@ -75,6 +75,23 @@ local rng = require(script.Parent.rng)
 local team_updates = require(script.Parent.team_updates)
 local build_rules = require(script.Parent.build_rules)
 local unlocks = require(script.Parent.unlocks)
+local snapshot = require(script.Parent.snapshot)
+
+-- The switches are kept with the game (server/snapshot): godmode, nocost, a pause and the scavengers change how it plays.
+-- Each is turned as it was kept, if it is not already.
+snapshot.keep("switches", function()
+	local on: { [string]: boolean } = {}
+	for _, name: switches.Name in switches.NAMES do
+		on[name] = switches.is_on(name)
+	end
+	return on
+end, function(saved)
+	for _, name: switches.Name in switches.NAMES do
+		if switches.is_on(name) ~= (saved[name] == true) then
+			switches.set(name, saved[name] == true)
+		end
+	end
+end)
 
 type Session = session_config.Session
 type EntityId = number
@@ -110,6 +127,7 @@ local FORGETTERS: { (EntityId) -> () } = {
 	self_destruct.forget,
 	scavengers.forget,
 	missions.forget,
+	ai.forget,
 	donuts.forget,
 	-- its model goes
 	instances.destroy,

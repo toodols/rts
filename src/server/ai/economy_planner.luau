@@ -165,7 +165,7 @@ local function extractor_task(brain: Brain, census: Census, builder: Entity, max
 		if max_distance ~= nil and from_home > max_distance then
 			continue
 		end
-		if builder_def.footing.max_depth <= 0 and heightmap.water_depth(position.X, position.Z) > 0 then
+		if heightmap.water_depth(position.X, position.Z) > builder_def.footing.max_depth then
 			continue
 		end
 		if censuses.nearest_distance(taken, position) < siting.SAME_SPOT or siting.given_up(brain, position) then

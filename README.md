@@ -50,18 +50,48 @@ or in Studio (`StudioTestService:ExecuteRunModeAsync({ test = "<name>" })`). Hea
 and administration. Press `;` to open it, `help` lists commands. It is started the same way in
 both places by `src/server_shared/pow_setup.luau`, which lets the game's developers (`shared/developers.luau`) use it;
 the commands both places have are in `src/server_shared/pow_common.luau`, and this game's own in
-`src/server/pow_commands/`:
+`src/server/pow_commands/`.
+
+Every command is `subject_action` in snake_case, so typing a subject (`team_`, `ai_`, `scav_`…) lists its commands;
+the switches are named for what they switch. An argument in `[brackets]` may be left off: a missing `[player]` is
+you, a missing `[team]` your team, and a switch with no argument flips.
 
 | Command | Effect |
 | --- | --- |
-| `godmode` / `godmode true` / `godmode false` | toggle, enable or disable commanding every team; you can select and order any team's units and build with any team's builders |
-| `scavengers` / `scavengers true` / `scavengers false` | toggle, enable or disable the scavengers gamemode: whether beacons appear and make anything. What is already out there carries on |
-| `beacon` | put a scavenger beacon down now, wherever the rules would put one |
-| `skins` | list every skin: developers only or not, what it changes, who has it equipped and which teams wear it |
-| `equip` / `equip <skin>` / `equip <skin> <player>` | say what you have equipped, or equip a skin for yourself or a player, golden too; saved, as the lobby's Skins tab saves it. For debugging: players cannot change skins in a game |
-| `skin` / `skin <name>` / `skin <name> <team>` | say which skin your team wears, or put your team (or the one given) in a skin for now, without equipping or saving it |
-| `donut_pop` / `donut_flyoff` / `donut_float` / `donut_regen` (`<team>`) | pop donuts, throw them off, float them off to the water's surface, or put new ones on at once: on your selected units, or your team's with none selected, or the team given. Every player sees it |
-| `donut_status` (`<team>`) | how many units wear a donut, have it on, off, or are shaking it loose |
+| **Switches** | |
+| `godmode [enabled]` | every player may command every team's units and build with its builders |
+| `nocost [enabled]` | everything builds free and at once |
+| `pause [paused]` | stop the simulation stepping |
+| `scavengers [enabled]` | the scavengers gamemode: whether beacons appear and make anything. What is out already carries on |
+| `warp [ticks]` / `warp_stop` | run the next ticks as fast as possible (with none, say how many are left), or stop early |
+| **Game** | |
+| `game_status` / `game_config` | the phase, map, seed, mission, counts and what is on / how the match, scavengers and sim are set up |
+| `profile` / `profile_reset` / `benchmark` | where each step's time goes since the last reset / reset it / run the fixed performance scenarios |
+| `map_load <map> [seed]` | replace the map, every team starting over |
+| `map_wind [least most]` / `map_tidal [strength]` | set the wind or the tidal strength until the next map, or say what it is |
+| **Teams** | |
+| `team_list` / `team_info [team]` / `match_stats` | every team in a line / one in full / what each has done this game |
+| `team_new <name>` / `team_join <team> [player]` / `team_split [player]` | make a team with a commander / share a team / leave a shared one for a new one |
+| `team_ally <team1> <team2>` / `team_unally <team>` | ally two teams (and their allies) / take a team out of its alliance |
+| `team_skin [skin] [team]` | put a team in a skin for now, not saved; with none, say which it wears |
+| `spawn <def> <team> <x> <z>` | a finished unit or building for a team there |
+| **AI** | |
+| `ai_add [name count start\|x z side team line profile]` | add new AI teams, by default one enemy at the free start furthest from everyone; side `ally` allies them with the team given |
+| `ai_control <team> [enabled]` / `ai_profile <team> <profile>` / `ai_status` | hand an existing team to the AI (a commander too, if it has nothing) or take it back / change how it plays / how each is getting on |
+| **Scavengers** | |
+| `scav_progress <0-1>` / `scav_difficulty <n>` | set how far their game has got, or the difficulty that gives |
+| `scav_chances [sea]` | what a beacon would make at this difficulty, and how likely each is |
+| `scav_beacon [x z]` | put a beacon down now, where the rules would or at x z |
+| **Players and campaign** (both places) | |
+| `player_info [player]` / `player_reset [player]` | everything about a player / wipe what is saved for them |
+| `developer_list` / `developer_set <user id> <listed>` | who is a developer / add or remove one |
+| `skin_list` / `skin_equip [skin] [player]` | every skin and who wears it / equip one, golden too, saved as the lobby's Skins tab saves it |
+| `mission_load <mission> [hard]` / `mission_complete <mission> [player]` / `mission_timing [prep pace]` | play a mission here / finish one, saved / re-time the one playing (game only, but for `mission_complete`) |
+| `unlock_list [player]` / `unlock_def <def> [player]` / `unlock_all [player]` / `unlock_reset [player]` | campaign progress / unlock one or all, or go back to the starting unlocks, this session only (game only, but for `unlock_list`) |
+| `lobby_list` | the lobby only: every lobby on this server |
+| **Donuts** (the pool skin) | |
+| `donut_pop` / `donut_fly` / `donut_float` / `donut_regen` (`[team]`) | pop donuts, throw them off, float them off to the surface, or put new ones on at once: on your selected units, or your team's with none selected, or the team given. Every player sees it |
+| `donut_status [team]` | how many units wear a donut, have it on, off, or are shaking it loose |
 
 ## Skins
 
@@ -93,8 +123,8 @@ reads: a locked option is greyed, shows a lock where its key would be and LOCKED
 clicked or hotkeyed, and its tooltip says it is unlocked through the campaign. The server refuses it too
 (`server/unlocks.luau`): placing it, queueing it in a factory, and any build order for it already queued. Teams with
 no player, like the scavengers or a mission's enemy, are never restricted. In Studio, where DataStores cannot be read,
-a player has the starting unlocks; the `unlock <def|all>`, `unlock_all [player]`, `relock` and `complete_mission <id>` commands
-change them, and `reset_data [player]` wipes what is saved for a player.
+a player has the starting unlocks; the `unlock_def <def>`, `unlock_all`, `unlock_reset` and `mission_complete <id>` commands
+change them, and `player_reset [player]` wipes what is saved for a player.
 
 The lobby's Campaign screen lists the missions and every lockable thing, dimmed while locked, and starts a mission for
 the player alone, as a match of the mission's `campaign_<id>` mode on its own map (`lobby/server/mission_starts.luau`).
@@ -220,6 +250,18 @@ teleports a party into a reserved game server.
   (`shared/decode.luau`) and rate-limited before a handler sees it.
 - `tools/`: `check.py`, `lib/` (the engine stand-in), `headless_tests/`, `ai_arena/` (headless AI duels),
   `model_pipeline/` (every model, built in Blender and uploaded), `bar_maps/`, `sound_pipeline/` and `stylesheets.py`.
+
+### Snapshots
+
+`server/snapshot` keeps the whole game, between two steps, as a buffer (`capture`) and puts a game back to one
+(`restore`), on this server or a fresh one on the same map, after which it plays on bit for bit as the game it was taken
+from. Every module that keeps anything from one step to the next registers it with `snapshot.keep` (and what is only
+worked out from that with `snapshot.rebuild`); `snapshot/codec.luau` writes the graph, shared tables and all, with
+defs as references. The random streams are Luau PCG32 (`server/pcg32.luau`, Roblox's Random bit for bit) so that
+they can be kept mid-sequence. A game that has to stay in step with its copies is `take`n, which puts it back to its
+own snapshot at once, since a table's iteration order depends on its history and one built afresh can iterate
+differently. The `snapshot_roundtrip`, `snapshot_zoo` and `pcg32` tests check it in-process, and
+`tools/headless_tests/snapshot_check.luau` (`save`, then `load` in a fresh process, or `describe`) across processes.
 
 ### Economy and buildpower
 

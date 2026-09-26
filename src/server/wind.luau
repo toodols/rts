@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local environment = require(ReplicatedStorage.Shared.environment)
 
 local rng = require(script.Parent.rng)
+local snapshot = require(script.Parent.snapshot)
 
 -- How often the wind moves, in seconds, and the longest random delta it moves by.
 local WIND_INTERVAL = 5
@@ -76,6 +77,13 @@ end
 local function speed(): number
 	return current.Magnitude
 end
+
+snapshot.keep("wind", function()
+	return { current = current, timer = timer }
+end, function(saved)
+	current = saved.current
+	timer = saved.timer
+end)
 
 return table.freeze({
 	init = init,

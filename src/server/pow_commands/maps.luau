@@ -20,7 +20,7 @@ type Context = pow_builders.Context
 return function(extras: pow_types.Extras)
 	local commands = extras.commands
 
-	commands.load_map = {
+	commands.map_load = {
 		description = "Replaces the map: clears everything off it, resets every team's stockpile and gives each "
 			.. "player a new commander at their start. The seed is kept unless one is given. No campaign mission is "
 			.. "played on it.",
@@ -39,7 +39,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.load_mission = {
+	commands.mission_load = {
 		description = "Plays a campaign mission here, as though it had been started from the campaign screen: loads "
 			.. "its map, puts down what it starts with, and gives each player a new commander at its start. Whatever "
 			.. "was being played is cleared off, and a game that has ended starts again. Hard plays its hard mode.",
@@ -62,7 +62,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.wind = {
+	commands.map_wind = {
 		description = "Sets the least and most the wind blows until the next map is loaded, which sets its own. "
 			.. "With no arguments it says what they are.",
 		permissions = { "admin" },
@@ -89,7 +89,7 @@ return function(extras: pow_types.Extras)
 		end,
 	}
 
-	commands.tidal = {
+	commands.map_tidal = {
 		description = "Sets the tidal strength, the energy a tidal generator makes a second, until the next map is "
 			.. "loaded, which sets its own. With no argument it says what it is.",
 		permissions = { "admin" },

@@ -15,6 +15,7 @@ local walls = require(ReplicatedStorage.Shared.walls)
 local pathfinder = require(ReplicatedStorage.Shared.pathfinder)
 
 local state = require(script.Parent.state)
+local snapshot = require(script.Parent.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -54,6 +55,15 @@ end
 local function init()
 	state.on_created(add)
 end
+
+-- Every wall is kept, and the cells they mark; the pathfinder works the ground out again from them (deformation.luau
+-- rebuilds it, once the ground is back too).
+snapshot.keep("obstacles", function()
+	return { standing = standing, walls = walls.kept() }
+end, function(saved)
+	standing = saved.standing
+	walls.put_back(saved.walls)
+end)
 
 return table.freeze({
 	init = init,

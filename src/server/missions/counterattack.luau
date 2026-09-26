@@ -45,6 +45,7 @@ local spatial = require(ServerScriptService.Server.spatial)
 
 local kit = require(script.Parent.kit)
 local overlook = require(script.Parent.overlook)
+local snapshot = require(ServerScriptService.Server.snapshot)
 
 type Entity = types.Entity
 type EntityId = types.EntityId
@@ -495,6 +496,40 @@ local handler: kit.Handler = {
 	retime = retime,
 	forget = forget,
 }
+
+snapshot.keep("mission_counterattack", function()
+	return {
+		began_at = began_at,
+		prep_seconds = prep_seconds,
+		pace = pace,
+		waves = waves,
+		arrived = arrived,
+		enemy_team = enemy_team,
+		direct_timer = direct_timer,
+		zone_timer = zone_timer,
+		next_send = next_send,
+		warned = warned,
+		warned_at = warned_at,
+		furnished = furnished,
+		to_come = to_come,
+		routes = routes,
+	}
+end, function(saved)
+	began_at = saved.began_at
+	prep_seconds = saved.prep_seconds
+	pace = saved.pace
+	waves = saved.waves
+	arrived = saved.arrived
+	enemy_team = saved.enemy_team
+	direct_timer = saved.direct_timer
+	zone_timer = saved.zone_timer
+	next_send = saved.next_send
+	warned = saved.warned
+	warned_at = saved.warned_at
+	furnished = saved.furnished
+	to_come = saved.to_come
+	routes = saved.routes
+end)
 
 return table.freeze({
 	handler = table.freeze(handler),

@@ -15,6 +15,7 @@ local teams = require(ReplicatedStorage.Shared.teams)
 local state = require(script.Parent.state)
 local placement = require(script.Parent.placement)
 local players = require(script.Parent.players)
+local snapshot = require(script.Parent.snapshot)
 
 type TeamId = types.TeamId
 
@@ -90,12 +91,21 @@ local function owns_anything(team_id: TeamId): boolean
 	return false
 end
 
+-- The way a commander put down at (x, z) faces: back toward the middle of the map.
+local function start_facing(x: number, z: number): number
+	return math.atan2(-x, -z)
+end
+
 -- Returns whether the commander was placed.
 local function give_starting_force(team_id: TeamId): boolean
 	local origin = start_position(team_id)
-	-- face back toward the middle of the map
-	local facing = math.atan2(-origin.X, -origin.Z)
-	return spawn_near(STARTING_UNIT, team_id, origin, facing) ~= nil
+	return spawn_near(STARTING_UNIT, team_id, origin, start_facing(origin.X, origin.Z)) ~= nil
+end
+
+-- Whether a team's commander could be put down at exactly (x, z): ground it can stand on, with nothing in the way.
+local function can_start_at(x: number, z: number): boolean
+	local center = placement.ground_center(STARTING_UNIT, x, z)
+	return placement.can_place(STARTING_UNIT, center, start_facing(x, z), nil)
 end
 
 -- Everywhere someone is or is about to be: everything any team has on the map, and where each player on a team starts.
@@ -204,12 +214,19 @@ local function box_start(index: number): Vector2?
 	return if best ~= nil and distance >= MIN_START_SPACING then best else nil
 end
 
+snapshot.keep("spawning", function()
+	return { start_by_team = start_by_team }
+end, function(saved)
+	start_by_team = saved.start_by_team
+end)
+
 return table.freeze({
 	MIN_START_SPACING = MIN_START_SPACING,
 	free_start = free_start,
 	box_start = box_start,
 	set_start = set_start,
 	give_starting_force = give_starting_force,
+	can_start_at = can_start_at,
 	owns_anything = owns_anything,
 	spawn_near = spawn_near,
 	place = place,

@@ -279,6 +279,10 @@ local function def_rows(def: EntityDef): { Row }
 		add("Shield radius", studs(shield.radius))
 		add("Shield power", figure(shield.power))
 		add("Shield regen", `{figure(shield.regen)}/s for {figure(shield.regen_energy)} E/s`)
+		local upkeep = shield.upkeep
+		if upkeep ~= nil then
+			add("Shield upkeep", `{figure(upkeep.moving)} E/s moving, {figure(upkeep.standing)} E/s still`)
+		end
 	end
 	if def.autoheal ~= nil then
 		add("Self-repair", `{figure(def.autoheal)}/s`)

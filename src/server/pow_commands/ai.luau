@@ -39,7 +39,8 @@ return function(extras: pow_types.Extras)
 
 	commands.ai_add = {
 		description = "Adds AI players, by default one enemy at the free start furthest from everyone. Start: a box, 0 "
-			.. "for the furthest. Side: enemy, ally (of Team) or join (plays Team). Line: bot, vehicle or any. "
+			.. "for the furthest. Side: enemy, or ally (of Team). Line: bot, vehicle or any. To hand the AI a team "
+			.. "that is already there, ai_control. "
 			.. `Profile: how it plays ({PROFILE_NAMES}).`,
 		permissions = { "admin" },
 		overloads = {
@@ -97,8 +98,8 @@ return function(extras: pow_types.Extras)
 				context:log({ type = "error", value = "Count must be at least 1" })
 				return
 			end
-			if side ~= "enemy" and (teams.is_playable(team) == false or state.get_team(team) == nil) then
-				context:log({ type = "error", value = `There is no team {team} to {side}` })
+			if side == "ally" and (teams.is_playable(team) == false or state.get_team(team) == nil) then
+				context:log({ type = "error", value = `There is no team {team} to ally` })
 				return
 			end
 
@@ -119,31 +120,6 @@ return function(extras: pow_types.Extras)
 					if spot == nil
 						then `Nowhere on the map is {spawning.MIN_START_SPACING} studs from everyone; give a start or X Z`
 						else nil
-			end
-
-			-- joining plays a team that is already there, so there is only ever the one
-			if side == "join" then
-				local team_id = team
-				local spot: Vector2? = nil
-				if spawning.owns_anything(team_id) == false then
-					local reason
-					spot, reason = start()
-					if spot == nil then
-						context:log({ type = "error", value = reason })
-						return
-					end
-				end
-				local placed = ai.take_over(team_id, spot, profile)
-				if placed and line ~= nil then
-					ai.set_line(team_id, line :: any)
-				end
-				context:log({
-					type = if placed then "info" else "error",
-					value = if placed
-						then `Team {team_id} is played by the AI`
-						else "There was no room for the AI's commander",
-				})
-				return
 			end
 
 			-- every AI is put down before anything is said, so that a log that fails cannot leave the rest undone
@@ -178,7 +154,9 @@ return function(extras: pow_types.Extras)
 	}
 
 	commands.ai_control = {
-		description = "Hands a team to the AI, or takes it back. Without Enabled it flips whether the AI plays it.",
+		description = "Hands a team to the AI, or takes it back. A team with nothing on the map yet gets a commander at "
+			.. "the free start furthest from everyone. Without Enabled it flips whether the AI plays it; ai_profile "
+			.. "then says how it plays.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = { { name = "Team", type = "number" } } },
@@ -195,14 +173,17 @@ return function(extras: pow_types.Extras)
 			if enabled == nil then
 				enabled = ai.is_ai(team_id) == false
 			end
-			if enabled then
-				ai.add(team_id)
-			else
+			if enabled == false then
 				ai.remove(team_id)
+				context:log({ type = "info", value = `The AI lets team {team_id} go` })
+				return
 			end
+			local placed = ai.take_over(team_id, nil, ai.profile_of(team_id))
 			context:log({
-				type = "info",
-				value = if enabled then `Team {team_id} is played by the AI` else `The AI lets team {team_id} go`,
+				type = if placed then "info" else "error",
+				value = if placed
+					then `Team {team_id} is played by the AI`
+					else `Nowhere on the map is {spawning.MIN_START_SPACING} studs from everyone for its commander`,
 			})
 		end,
 	}
