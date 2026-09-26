@@ -309,5 +309,6 @@ end
 
 return table.freeze({
 	split_unlocks = split_unlocks,
+	outcome_line = outcome_line,
 	register = register,
 })

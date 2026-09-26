@@ -1,7 +1,6 @@
--- The pow commands of the campaign: unlocking what it keeps locked, or locking it again, for this session only, which
--- is never saved (see server_shared/campaign_session.luau), and re-timing the mission being played, for a mission
--- that can be (its handler's `retime`, server/missions/kit.luau). What finishing a mission does, which is saved, is
--- mission_complete (server_shared/pow_common.luau).
+-- The pow commands of the campaign: unlocking what it keeps locked, or locking it again, saved (see
+-- server_shared/campaign_session.luau), and re-timing the mission being played, for a mission that can be (its
+-- handler's `retime`, server/missions/kit.luau). Finishing a mission is mission_complete (server_shared/pow_common.luau).
 --
 -- pow calls its extension modules to let them register commands, so this one returns a function rather than the
 -- dictionary RULES.md asks of every other module.
@@ -31,8 +30,8 @@ return function(extras: pow_types.Extras)
 	local commands = extras.commands
 
 	commands.unlock_def = {
-		description = "Unlocks a def in the campaign for you, or for the player given, for this session only: it is "
-			.. "not saved. To unlock everything, unlock_all.",
+		description = "Unlocks a def in the campaign for you, or for the player given, saved. To unlock everything, "
+			.. "unlock_all.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = { { name = "Def", type = "unit" } } },
@@ -48,14 +47,14 @@ return function(extras: pow_types.Extras)
 				context:log({ type = "info", value = `{wanted} is never locked: nothing builds it` })
 				return
 			end
-			campaign_session.grant(player, { wanted }, false)
-			context:log({ type = "info", value = `Unlocked {wanted} for {player.Name}` })
+			local outcome, why = campaign_session.grant(player, { wanted }, true)
+			local kind, line = pow_common.outcome_line(`Unlocked {wanted} for {player.Name}`, outcome, why)
+			context:log({ type = kind, value = line })
 		end,
 	}
 
 	commands.unlock_all = {
-		description = "Unlocks everything in the campaign for you, or for the player given, for this session only: it "
-			.. "is not saved.",
+		description = "Unlocks everything in the campaign for you, or for the player given, saved.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -64,14 +63,16 @@ return function(extras: pow_types.Extras)
 		server_run = function(context: Context)
 			local target = pow_builders.target_player(context, 1)
 			local names = lockable_defs()
-			campaign_session.grant(target, names, false)
-			context:log({ type = "info", value = `Unlocked all {#names} buildable defs for {target.Name}` })
+			local outcome, why = campaign_session.grant(target, names, true)
+			local kind, line =
+				pow_common.outcome_line(`Unlocked all {#names} buildable defs for {target.Name}`, outcome, why)
+			context:log({ type = kind, value = line })
 		end,
 	}
 
 	commands.unlock_reset = {
-		description = "Takes you, or the player given, back to the campaign's starting unlocks, for this session only: "
-			.. "it is not saved.",
+		description = "Takes you, or the player given, back to the campaign's starting unlocks, the missions finished "
+			.. "staying finished, saved.",
 		permissions = { "admin" },
 		overloads = {
 			{ returns = "nil", args = {} },
@@ -79,11 +80,13 @@ return function(extras: pow_types.Extras)
 		},
 		server_run = function(context: Context)
 			local target = pow_builders.target_player(context, 1)
-			campaign_session.relock(target, false)
-			context:log({
-				type = "info",
-				value = `{target.Name} is back to the starting unlocks: {table.concat(campaign.STARTING_UNLOCKS, ", ")}`,
-			})
+			local outcome, why = campaign_session.relock(target, true)
+			local kind, line = pow_common.outcome_line(
+				`{target.Name} is back to the starting unlocks: {table.concat(campaign.STARTING_UNLOCKS, ", ")}`,
+				outcome,
+				why
+			)
+			context:log({ type = kind, value = line })
 		end,
 	}
 
