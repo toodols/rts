@@ -392,7 +392,7 @@ local function BuildMenu()
 			command_state.place(def_name)
 			return
 		end
-		orders.queue(builder.id, def_name, if modifiers.shift_held() then SHIFT_BATCH else 1)
+		orders.queue(builder.id, def_name, if modifiers.shift_held() then SHIFT_BATCH else 1, modifiers.alt_held())
 	end
 
 	-- A construction_bot's buildings are shown a category at a time, or they would fill the screen: the first page

@@ -179,9 +179,10 @@ local function place(def_name: string, builders: { EntityId }, centers: { Vector
 	end
 end
 
--- Adds `count` of `def_name` to the back of the queue of the lab `factory_id`.
-local function queue(factory_id: EntityId, def_name: string, count: number)
-	local sent: command_payloads.QueuedProduction = { factory_id = factory_id, def_name = def_name, count = count }
+-- Adds `count` of `def_name` to the back of the queue of the lab `factory_id`, or with `front` to the front of it.
+local function queue(factory_id: EntityId, def_name: string, count: number, front: boolean)
+	local sent: command_payloads.QueuedProduction =
+		{ factory_id = factory_id, def_name = def_name, count = count, front = front }
 	queue_production:FireServer(sent)
 end
 

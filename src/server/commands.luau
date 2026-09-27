@@ -263,8 +263,9 @@ local function on_queue_production(player: Player, sent: command_payloads.Queued
 		return
 	end
 	-- A factory's build orders always queue, whether or not shift was held.
+	local front = sent.front == true
 	for _ = 1, math.clamp(sent.count or 1, 1, MAX_QUEUE_COUNT) do
-		if production.enqueue(factory, sent.def_name) == false then
+		if production.enqueue(factory, sent.def_name, front) == false then
 			return
 		end
 	end

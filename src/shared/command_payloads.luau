@@ -40,11 +40,12 @@ export type PlacedBlueprint = {
 	front: boolean,
 }
 
--- Something added to a lab's queue, `count` times (QueueProduction).
+-- Something added to a lab's queue, `count` times (QueueProduction), at the back, or with `front` at the front.
 export type QueuedProduction = {
 	factory_id: EntityId,
 	def_name: string,
 	count: number?,
+	front: boolean?,
 }
 
 -- Something taken off a lab's queue, the one at `index`, or the last without it (CancelProduction).

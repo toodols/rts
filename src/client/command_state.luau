@@ -33,9 +33,10 @@ export type State =
 	| { kind: "selecting", from: Vector2, rect: Rect? }
 	-- the right button held from nothing: a click, or a line of moves once it has been dragged far enough
 	| { kind: "ordering", from: Vector3 }
-	| { kind: "mode", mode: Mode, drag: ModeDrag? }
-	-- `from` while shift held a line or grid of them is being dragged out from there
-	| { kind: "placing", def_name: string, from: Vector3? }
+	-- `kept` once shift has kept it on after an order, for another; letting go of shift then ends it
+	| { kind: "mode", mode: Mode, drag: ModeDrag?, kept: boolean? }
+	-- `from` while a line or grid of them is being dragged out from there
+	| { kind: "placing", def_name: string, from: Vector3?, kept: boolean? }
 
 local IDLE: State = { kind = "idle" }
 
@@ -137,25 +138,35 @@ end
 -- A button went down in the mode that is on, to drag out a line or a circle.
 local function drag_in_mode(drag: ModeDrag)
 	if state.kind == "mode" then
-		set({ kind = "mode", mode = state.mode, drag = drag })
+		set({ kind = "mode", mode = state.mode, drag = drag, kept = state.kept })
 	end
 end
 
--- Shift and the left button went down while placing: a line or grid of the building is dragged out from `from`.
+-- Shift or alt and the left button went down while placing: a line or grid of the building is dragged out from `from`.
 local function drag_placing(from: Vector3)
 	if state.kind == "placing" then
-		set({ kind = "placing", def_name = state.def_name, from = from })
+		set({ kind = "placing", def_name = state.def_name, from = from, kept = state.kept })
 	end
 end
 
 -- What was being clicked or dragged has been let go of, and whatever it did is done. A mode or a placement goes on
--- if `keep` (shift held, to give another), and ends otherwise; anything else ends.
+-- if `keep` (shift held, to give another), until shift is let go (`let_go_of_shift`), and ends otherwise; anything
+-- else ends.
 local function release(keep: boolean)
 	if keep and state.kind == "mode" then
-		set({ kind = "mode", mode = state.mode })
+		set({ kind = "mode", mode = state.mode, kept = true })
 	elseif keep and state.kind == "placing" then
-		set({ kind = "placing", def_name = state.def_name })
+		set({ kind = "placing", def_name = state.def_name, kept = true })
 	else
+		to_idle()
+	end
+end
+
+-- Shift is up: a mode or a placement it kept on ends, unless a drag of the next one is still to be let go of.
+local function let_go_of_shift()
+	if state.kind == "mode" and state.kept == true and state.drag == nil then
+		to_idle()
+	elseif state.kind == "placing" and state.kept == true and state.from == nil then
 		to_idle()
 	end
 end
@@ -186,6 +197,7 @@ return table.freeze({
 	drag_in_mode = drag_in_mode,
 	drag_placing = drag_placing,
 	release = release,
+	let_go_of_shift = let_go_of_shift,
 	subscribe = changed.subscribe,
 	subscribe_mode = mode_changed.subscribe,
 	subscribe_placing = placing_changed.subscribe,

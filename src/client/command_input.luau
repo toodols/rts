@@ -16,12 +16,13 @@
 -- Shift queues an order after what each unit is doing, and space puts it at the front instead.
 --
 -- A mode's key (order_modes.luau) puts the cursor in it: the next left click gives its order, a right click cancels
--- it, and shift keeps it on for another. In a mode that gives an order at a spot, the left button (and the right) can
+-- it, and shift keeps it on for another, until shift is let go. In a mode that gives an order at a spot, the left button (and the right) can
 -- instead be dragged out into a line, and the units spread along it; in one that gives an area order, the left button
 -- drags out a circle, and every unit that can do the job is sent to do it to whatever turns up inside.
 --
 -- A building picked from the build menu, or by its key (shared/build_hotkeys.luau), is placed by a left click, or with
--- shift dragged out into a line, and with alt as well a grid; [ and ] turn it, and a right click puts it down.
+-- shift dragged out into a line, and with alt a grid; shift keeps it in hand for another until shift is let go; [ and ]
+-- turn it, and a right click puts it down.
 --
 -- G stops everything selected, ctrl+B sets it to destroy itself, K switches its shields, Q selects everything on screen of
 -- the same kind, Tab selects your commanders in turn, T opens and closes the player list, P pilots a unit (pilot.luau),
@@ -111,7 +112,8 @@ local function on_left_down()
 			click_mode(info)
 		end
 	elseif state.kind == "placing" and state.from == nil then
-		if modifiers.shift_held() then
+		-- alt counts on its own, so that alt pressed before shift still makes a grid
+		if modifiers.shift_held() or modifiers.alt_held() then
 			-- shift starts a line, or with alt a grid, that the drag stretches and letting go places
 			local center = placing.under_cursor(state.def_name)
 			if center ~= nil then
@@ -358,6 +360,10 @@ end
 local function on_render()
 	if covered then
 		return
+	end
+	-- polled, since shift itself is taken by no layer and its letting go never comes here
+	if modifiers.shift_held() == false then
+		command_state.let_go_of_shift()
 	end
 	local state = command_state.get()
 	local placing_at = if state.kind == "placing" then placing.preview(state.def_name, state.from) else nil

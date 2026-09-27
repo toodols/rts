@@ -106,7 +106,8 @@ local function rally_order(factory: Entity, product: Entity, from: Vector3)
 	orders.push_move(product, surface.position(product.def, destination.X, destination.Z), false)
 end
 
-local function enqueue(factory: Entity, def_name: string): boolean
+-- Adds `def_name` to the back of `factory`'s queue, or with `front` to the front, and says whether it could.
+local function enqueue(factory: Entity, def_name: string, front: boolean?): boolean
 	if table.find(unit_defs.build_options(factory.def), def_name) == nil then
 		return false
 	end
@@ -114,7 +115,13 @@ local function enqueue(factory: Entity, def_name: string): boolean
 	if build_rules.allows(factory.team, def_name) == false then
 		return false
 	end
-	table.insert(factory.queue, def_name)
+	if front == true then
+		-- ahead of everything but the one under way, which keeps what has been put into it
+		local at = if in_progress[factory.id] ~= nil and #factory.queue > 0 then 2 else 1
+		table.insert(factory.queue, at, def_name)
+	else
+		table.insert(factory.queue, def_name)
+	end
 	return true
 end
 

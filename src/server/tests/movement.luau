@@ -416,6 +416,50 @@ local function lab_orders(args: Args): Findings
 	return result
 end
 
+-- Alt-queuing at a lab (`production.enqueue` with `front`): a Bot Lab, or `args.lab`, puts its first option under way
+-- with its second queued behind it, and then its third is put on the front. The third should come next, behind the
+-- one under way, which keeps its blueprint; and on the front of an idle lab's queue it should be first.
+local function lab_front(args: Args): Findings
+	local lab_name = args.lab or "bot_lab"
+	local result: Findings = {}
+	with_switch(NOCOST, true, function()
+		local lab = put_lab(lab_name, 0)
+		local options = unit_defs.build_options(lab.def)
+		local first, second, third = options[1], options[2], options[3]
+		production.enqueue(lab, first)
+		production.enqueue(lab, second)
+		local deadline = now() + 10
+		local building = newest_of(lab.team, first)
+		while building == nil and now() < deadline do
+			advance(tick_rate.TICK_DELTA)
+			building = newest_of(lab.team, first)
+		end
+		production.enqueue(lab, third, true)
+		local under_way = table.clone(lab.queue)
+		advance(tick_rate.TICK_DELTA)
+		local still_building = building ~= nil and building.alive and newest_of(lab.team, first) == building
+
+		local idle = put_lab(lab_name, 0)
+		production.enqueue(idle, first)
+		production.enqueue(idle, third, true)
+		local idle_queue = table.clone(idle.queue)
+
+		result = {
+			options = { first, second, third },
+			under_way = under_way,
+			still_building = still_building,
+			idle = idle_queue,
+			pass = under_way[1] == first
+				and under_way[2] == third
+				and under_way[3] == second
+				and still_building
+				and idle_queue[1] == third
+				and idle_queue[2] == first,
+		}
+	end)
+	return result
+end
+
 -- Buildings as walls (shared/walls.luau, server/obstacles.luau): an Advanced Fusion Reactor, or `args.building`, in the
 -- middle of open ground, and a Grunt, or `args.unit`, `args.distance` studs (40) to one side of it. Four walks, each
 -- for up to `args.seconds` (30): `routed` to the far side by a route as a player's move gets one (`pathfinder.route`);
@@ -706,6 +750,7 @@ local TESTS: { [string]: Test } = {
 	walk_orders = { run = walk_orders },
 	lab_exit = { run = lab_exit },
 	lab_orders = { run = lab_orders },
+	lab_front = { run = lab_front },
 	building_walls = { run = building_walls },
 	wading = { run = wading },
 }
