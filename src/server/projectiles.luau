@@ -4,7 +4,7 @@
 -- goes on by (a bomber's bombs fall through its own swarm), but its blast spares nobody but its shooter:
 -- a friend standing by what it strikes is caught in it. Anti-nuke interceptors are projectiles of their own kind, which
 -- strike nothing but the nuke they chase (server/interceptors.luau); what they need of a nuke is kept here, behind
--- `is_free_nuke`, `claim_nuke`, `free_nuke` and `catch_nuke`.
+-- `is_free_nuke`, `claim_nuke`, `free_nuke` and `catch_nuke`. Every nuke launched goes out through `on_nuke_launched`.
 --
 -- Clients are told about launches and impacts (shared/shot_events) and fly the same model themselves.
 
@@ -17,6 +17,7 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local projectile_mod = require(ReplicatedStorage.Shared.projectile)
 local weapon_kinds = require(ReplicatedStorage.Shared.weapon_kinds)
 local shot_events = require(ReplicatedStorage.Shared.shot_events)
+local signal = require(ReplicatedStorage.Shared.signal)
 
 local state = require(script.Parent.state)
 local deformation = require(script.Parent.deformation)
@@ -119,6 +120,8 @@ local projectiles: { Projectile } = {}
 -- The nuclear missiles among them, in the same order, for interceptors to look through (`nukes`).
 local nuke_list: { Projectile } = {}
 local next_projectile_id = 1
+-- every nuclear missile launched, with the team that launched it
+local nuke_launched = signal.new() :: signal.Signal<types.TeamId>
 
 -- A new projectile's id: one sequence for every kind, which the clients know them all by.
 local function new_id(): number
@@ -395,6 +398,7 @@ local function launch(
 	table.insert(projectiles, projectile)
 	if projectile.nuke ~= nil then
 		table.insert(nuke_list, projectile)
+		nuke_launched.fire(owner.team)
 	end
 end
 
@@ -783,6 +787,7 @@ return table.freeze({
 	in_flight = in_flight,
 	in_the_air = in_the_air,
 	nukes = nukes,
+	on_nuke_launched = nuke_launched.subscribe,
 	is_free_nuke = is_free_nuke,
 	claim_nuke = claim_nuke,
 	free_nuke = free_nuke,

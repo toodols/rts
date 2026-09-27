@@ -768,14 +768,16 @@ export type RosterEntry = {
 
 -- What a notice a player is sent is about (Notify, server/notifications.luau), which is what the toast says
 -- (client/ui/notifications.luau): an ally asks for metal or sent some, your base or commander is under attack, an enemy
--- has aircraft, and, in the third campaign mission (server/missions/counterattack.luau), a building put where the enemy
--- will land and a wave on its way.
+-- has aircraft or an atomic bomber, an enemy has launched a nuke, and, in the third campaign mission
+-- (server/missions/counterattack.luau), a building put where the enemy will land and a wave on its way.
 export type NoticeKind =
 	"metal_request"
 	| "metal_sent"
 	| "base_attacked"
 	| "commander_attacked"
 	| "air_detected"
+	| "atomic_bomber_detected"
+	| "nuke_launched"
 	| "enemy_zone"
 	| "wave"
 	| "final_wave"
@@ -787,6 +789,8 @@ export type PerNoticeKind<T> = {
 	base_attacked: T,
 	commander_attacked: T,
 	air_detected: T,
+	atomic_bomber_detected: T,
+	nuke_launched: T,
 	enemy_zone: T,
 	wave: T,
 	final_wave: T,
