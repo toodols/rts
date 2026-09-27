@@ -67,10 +67,12 @@ local HOMING_MISS_CHANCE = 0.1
 -- and just clear of its collider for the few that are to miss (HOMING_MISS_CHANCE). A lofted one
 -- (`StraightDelivery.loft`) also has the height above its target it steers for at first, and the seconds over which
 -- that sinks onto the target. A shell that bursts where it was aimed (`ProjectileParams.burst_at_aim`) has the seconds
--- it takes to get there, after which it goes off.
+-- it takes to get there, after which it goes off. A shot that never comes down on its own (`runs_level`) has the seconds
+-- it may fly, after which it is spent and gone, harming nothing.
 export type Shot = {
 	speed: number,
 	fuse: number?,
+	lifetime: number?,
 	guidance_time: number?,
 	aim_offset: Vector3?,
 	loft_height: number?,
@@ -453,10 +455,22 @@ local function max_age(delivery: ProjectileDelivery): number
 	return if delivery.kind == "missile" then MISSILE_MAX_AGE else MAX_AGE
 end
 
+-- Whether a shot of `delivery` goes on and on unless it strikes something: a torpedo, which runs level under the water,
+-- and a bolt with no gravity that does not home (one that homes falls once its guidance runs out). Anything else comes
+-- down on its own. Spring gives such a shot a time to live of what it takes to fly its weapon's range, and so does this
+-- (`Shot.lifetime`), so that it cannot be fired at the ground to strike something far past its reach.
+local function runs_level(delivery: ProjectileDelivery): boolean
+	if delivery.kind == "torpedo" then
+		return true
+	end
+	return delivery.kind == "straight" and delivery.guidance ~= "homes" and delivery.projectile.gravity <= 0
+end
+
 return table.freeze({
 	HOMING_MISS_CHANCE = HOMING_MISS_CHANCE,
 	launch = launch,
 	max_age = max_age,
+	runs_level = runs_level,
 	fall_time = fall_time,
 	trajectory = trajectory,
 	loft_path = loft_path,

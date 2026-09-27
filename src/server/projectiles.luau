@@ -89,6 +89,10 @@ local HIT_STEP = 0.5
 -- takes to fly its weapon's range: long enough to come round once for something that got past it, not long enough
 -- to chase it for ever.
 local GUIDANCE_MARGIN = 2.5
+-- A shot that never comes down on its own (`projectile.runs_level`) may fly this many times as long as it takes to fly
+-- its weapon's range, or as far as it was aimed if that is further: a little slack for a torpedo that turns after what
+-- it is homing on, and no more, so that it cannot be sent on to strike something far past its reach.
+local LIFETIME_MARGIN = 1.25
 -- How far clear of its target's collider a missile fired to miss (shared/projectile.luau's HOMING_MISS_CHANCE) passes.
 local MISS_CLEARANCE = 1.5
 -- How big the burst is where a shield swallows a shell.
@@ -368,6 +372,11 @@ local function launch(
 		homing = delivery.guidance == "homes"
 		if homing then
 			guide(release, weapon, delivery, origin, at, target)
+		end
+		if projectile_mod.runs_level(delivery) then
+			local reach = math.max(weapon.range, (at - origin).Magnitude)
+			local lifetime = projectile_mod.time_to_reach(reach, delivery.projectile) * LIFETIME_MARGIN
+			release.shot.lifetime = math.max(lifetime, delivery.guidance_time or 0)
 		end
 	end
 
@@ -720,6 +729,13 @@ local function tick(delta: number)
 			local fuse = projectile.flight.shot.fuse or projectile.delivery.projectile.fuse
 			if fuse ~= nil and projectile.flight.age >= fuse then
 				detonate(projectile, at, nil, false)
+				finished = true
+				break
+			end
+			-- one that would fly on for ever is spent once it has flown as far as its weapon reaches
+			local lifetime = projectile.flight.shot.lifetime
+			if lifetime ~= nil and projectile.flight.age >= lifetime then
+				burst_harmlessly(projectile.id, at, 0, "spent")
 				finished = true
 				break
 			end

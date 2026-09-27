@@ -692,7 +692,9 @@ local function fly_projectiles(real_delta: number)
 		-- a shell with a fuse is gone once it has burst (the server sends where, as an impact)
 		local fuse = projectile.delivery.projectile.fuse
 		-- anything else a little longer than the server flies it, so that the server's impact is what takes it down
-		local max_age = if fuse ~= nil then fuse else projectile_mod.max_age(projectile.delivery) + IMPACT_GRACE
+		local max_age = if fuse ~= nil
+			then fuse
+			else (projectile.flight.shot.lifetime or projectile_mod.max_age(projectile.delivery)) + IMPACT_GRACE
 		if projectile.flight.age > max_age or at.Y < heightmap.height_at(at.X, at.Z) - 2 then
 			remove_projectile(id)
 		else
@@ -747,7 +749,9 @@ local function on_impact(event: shot_events.Impact)
 	local flying = projectiles[event.id]
 	local underwater = flying ~= nil and flying.delivery.kind == "torpedo"
 	local look = remove_projectile(event.id)
-	if event.how == "airburst" then
+	if event.how == "spent" then
+		return
+	elseif event.how == "airburst" then
 		draw_airburst(event.at, event.radius)
 		explosion_sound(event.at, event.radius)
 	elseif look ~= nil and look.explosion == "nuclear" then

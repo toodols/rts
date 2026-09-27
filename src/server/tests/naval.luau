@@ -52,6 +52,9 @@ local LAUNCH_MIN_CLIMB = 100
 local LAUNCH_LANDING_SLACK = 10
 -- A flak shell should go off within this many studs of the aircraft it was fired at, where it was aimed.
 local FLAK_NEAR_SLACK = 10
+-- A torpedo fired at nothing should be gone before it is further than this many times its weapon's range from its
+-- launcher.
+local TORPEDO_REACH_SLACK = 1.4
 
 -- A match of `seconds` of a `shooter_def` at `shooter_at` against a `target_def` at `target_at` that it cannot kill,
 -- each resting where it is, the shooter turned `turned` radians off facing the target and the target facing the way
@@ -837,6 +840,54 @@ local function deep_torpedoes(args: Args): Findings
 	return findings
 end
 
+-- Torpedoes and depth charges fired at the open sea, where there is nothing to strike, must not run on and on and
+-- strike something far past their reach. Out in open deep water an Orca, an Argonaut, a Buccaneer and an Urchin are
+-- each told to attack the water halfway to the end of their torpedo's range, for `args.seconds` (12 by default): each
+-- should fire, and none of its shots should get further from it than TORPEDO_REACH_SLACK times that range.
+local function torpedo_reach(args: Args): Findings
+	local seconds = args.seconds or 12
+	local sea = harness.open_sea()
+	local findings: Findings = { sea = { x = sea.X, z = sea.Z } }
+	local all_held = true
+	for _, shooter_def in { "orca", "argonaut", "buccaneer", "urchin" } do
+		local shooter = unkillable(spawn_resting(shooter_def, OWN, sea.X, sea.Z))
+		shooter.facing = math.pi / 2
+		local range = 0
+		for _, weapon in shooter.def.weapons or {} do
+			if weapon.delivery.kind == "torpedo" then
+				range = math.max(range, weapon.range)
+			end
+		end
+		local aim_x = sea.X + range / 2
+		local aim = Vector3.new(aim_x, heightmap.height_at(aim_x, sea.Z), sea.Z)
+		orders.issue(shooter, { { kind = "attack_ground", position = aim } }, false, false)
+		local seen: { [number]: boolean } = {}
+		local shots, farthest, oldest = 0, 0, 0
+		advance(seconds, function()
+			for _, projectile in in_flight() do
+				if projectile.owner_id == shooter.id and projectile.delivery.kind == "torpedo" then
+					if seen[projectile.id] == nil then
+						seen[projectile.id] = true
+						shots += 1
+					end
+					farthest = math.max(farthest, geometry.distance_2d(projectile.flight.position, shooter.position))
+					oldest = math.max(oldest, projectile.flight.age)
+				end
+			end
+		end)
+		findings[shooter_def] = {
+			range = round(range, 1),
+			shots = shots,
+			farthest = round(farthest, 1),
+			longest_flight = round(oldest, 2),
+		}
+		all_held = all_held and shots > 0 and farthest <= range * TORPEDO_REACH_SLACK
+		clear_world()
+	end
+	findings.pass = all_held
+	return findings
+end
+
 local TESTS: { [string]: Test } = {
 	naval = { run = naval, defaults = SEA_MAP },
 	sea_defences = { run = sea_defences, defaults = SEA_MAP },
@@ -848,6 +899,7 @@ local TESTS: { [string]: Test } = {
 	angler = { run = angler, defaults = SEA_MAP },
 	t2_ships = { run = t2_ships, defaults = SEA_MAP },
 	deep_torpedoes = { run = deep_torpedoes, defaults = { preset = "channel" } },
+	torpedo_reach = { run = torpedo_reach, defaults = SEA_MAP },
 }
 
 return table.freeze(TESTS)
