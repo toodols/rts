@@ -10,9 +10,9 @@
 --
 -- The ratings are kept in the ratings store (server_shared/record_store.luau), one key a player, holding a Record for
 -- each ladder they have played on. Every player's is read before any is written, and if one cannot be the game is not
--- rated, so that a failed read is never saved over. Where records are not kept (record_store.enabled: Studio) every
--- player starts fresh and nothing is written, so a test sees what a game would do (`on_rated`) and the real ratings
--- are never touched.
+-- rated, so that a failed read is never saved over. Where records are not kept (record_store.enabled: a Studio test)
+-- every player starts fresh and nothing is written, so a test sees what a game would do (`on_rated`) and the real
+-- ratings are never touched.
 --
 -- A new map is a new game, rated afresh once it ends (`reset`).
 

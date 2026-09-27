@@ -12,12 +12,14 @@
 -- kept as they are (LEGACY_NAMES, and ratings' `user_` key, `legacy_player_key`), since renaming a store is losing what
 -- is in it.
 --
--- Nothing is read or written in Studio (`enabled`): a Studio session plays with a new player's records, the way a test
--- expects to, and the live data is never touched from it. A read or a write that fails is tried again a few times
--- before it is given up on; one that is given up on, or refused because stores are off, says why, and whoever asked
--- should then carry on without it and never save over what may be stored. A change is applied inside the store's own
--- update (`update`), to what is stored at that moment, so that what another server wrote meanwhile is kept, not
--- overwritten.
+-- Studio keeps stores of its own, every name with STUDIO_PREFIX, so the live data is never touched from it (it needs
+-- Game Settings' "Enable Studio Access to API Services"). A Studio test (test_request.luau) reads and writes nothing
+-- (`enabled`): it plays with a new player's records, the way it expects to.
+--
+-- A read or a write that fails is tried again a few times before it is given up on; one that is given up on, or
+-- refused because stores are off, says why, and whoever asked should then carry on without it and never save over what
+-- may be stored. A change is applied inside the store's own update (`update`), to what is stored at that moment, so
+-- that what another server wrote meanwhile is kept, not overwritten.
 --
 -- Only a server can use a DataStore, which is why this lives where only servers can see it.
 
@@ -58,11 +60,27 @@ export type Store<T> = {
 -- A read or a write is tried this many times, this far apart, before it is given up on.
 local ATTEMPTS = 3
 local RETRY_SECONDS = 1
-local DISABLED = "records are neither read nor written in Studio"
+local DISABLED = "records are neither read nor written in a Studio test"
+-- what every store's name starts with in Studio
+local STUDIO_PREFIX = "studio_"
 
--- Whether records are read and written here: on a live server, and never in Studio.
+-- Whether this is a Studio session started to run a test (test_request.luau).
+local function is_studio_test(): boolean
+	if RunService:IsStudio() == false then
+		return false
+	end
+	-- the service is only there in Studio, so it is not asked for until now
+	local ok, args = pcall(function(): any
+		return game:GetService("StudioTestService"):GetTestArgs()
+	end)
+	return ok and typeof(args) == "table" and typeof(args.test) == "string"
+end
+
+local studio_test = is_studio_test()
+
+-- Whether records are read and written here: everywhere but a Studio test.
 local function enabled(): boolean
-	return RunService:IsStudio() == false
+	return studio_test == false
 end
 
 -- The key a player's record is kept under.
@@ -94,6 +112,9 @@ end
 
 local function new<T>(spec: Spec<T>): Store<T>
 	local name = LEGACY_NAMES[spec.store] or `{spec.store}_v{STORES[spec.store]}`
+	if RunService:IsStudio() then
+		name = STUDIO_PREFIX .. name
+	end
 
 	-- asked for only when it is used: getting it throws where DataStores cannot be used
 	local function get_store(): DataStore

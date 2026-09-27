@@ -5,8 +5,8 @@
 -- As a player joins (`joined`) they are given a fresh record, which is published on them at once, so that nothing ever
 -- sees them without one, and what is stored for them is read without holding anything up, and published once it is.
 -- Until then nothing can be changed (`change` refuses it), so that nothing is saved over a record not yet read; if it
--- cannot be read at all, as in Studio, where records are not kept (record_store.enabled), they keep what they have for
--- the session, and a change is kept but never saved.
+-- cannot be read at all, as in a Studio test, where records are not kept (record_store.enabled), they keep what they
+-- have for the session, and a change is kept but never saved.
 
 local record_store = require(script.Parent.record_store)
 
@@ -91,7 +91,7 @@ local function new<T>(spec: Spec<T>): Session<T>
 				return
 			end
 			if stored == nil then
-				-- where records are not kept at all, as in Studio, that is how it should be
+				-- where records are not kept at all, as in a Studio test, that is how it should be
 				if record_store.enabled() then
 					warn(`could not read {player.Name}'s {spec.label}, so it is kept for this session only: {reason}`)
 				end
