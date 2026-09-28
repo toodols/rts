@@ -36,7 +36,7 @@ export type State =
 	-- `kept` once shift has kept it on after an order, for another; letting go of shift then ends it
 	| { kind: "mode", mode: Mode, drag: ModeDrag?, kept: boolean? }
 	-- `from` while a line or grid of them is being dragged out from there
-	| { kind: "placing", def_name: string, from: Vector3?, kept: boolean? }
+	| { kind: "placing", def_name: string, from: Vector3? }
 
 local IDLE: State = { kind = "idle" }
 
@@ -145,7 +145,7 @@ end
 -- Shift or alt and the left button went down while placing: a line or grid of the building is dragged out from `from`.
 local function drag_placing(from: Vector3)
 	if state.kind == "placing" then
-		set({ kind = "placing", def_name = state.def_name, from = from, kept = state.kept })
+		set({ kind = "placing", def_name = state.def_name, from = from })
 	end
 end
 
@@ -156,17 +156,18 @@ local function release(keep: boolean)
 	if keep and state.kind == "mode" then
 		set({ kind = "mode", mode = state.mode, kept = true })
 	elseif keep and state.kind == "placing" then
-		set({ kind = "placing", def_name = state.def_name, kept = true })
+		set({ kind = "placing", def_name = state.def_name })
 	else
 		to_idle()
 	end
 end
 
--- Shift is up: a mode or a placement it kept on ends, unless a drag of the next one is still to be let go of.
+-- Shift has just been let go: a building being placed is put down, however it was picked up, and a mode shift kept on
+-- ends. A line or grid still being dragged out, or a line in a mode, is left to its button coming up, which ends it.
 local function let_go_of_shift()
 	if state.kind == "mode" and state.kept == true and state.drag == nil then
 		to_idle()
-	elseif state.kind == "placing" and state.kept == true and state.from == nil then
+	elseif state.kind == "placing" and state.from == nil then
 		to_idle()
 	end
 end

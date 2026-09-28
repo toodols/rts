@@ -21,8 +21,8 @@
 -- drags out a circle, and every unit that can do the job is sent to do it to whatever turns up inside.
 --
 -- A building picked from the build menu, or by its key (shared/build_hotkeys.luau), is placed by a left click, or with
--- shift dragged out into a line, and with alt a grid; shift keeps it in hand for another until shift is let go; [ and ]
--- turn it, and a right click puts it down.
+-- shift dragged out into a line, and with alt a grid; shift keeps it in hand for another, and letting go of shift at any
+-- point puts it down, as do a right click and Escape; [ and ] turn it.
 --
 -- G stops everything selected, ctrl+B sets it to destroy itself, K switches its shields, Q selects everything on screen of
 -- the same kind, Tab selects your commanders in turn, T opens and closes the player list, P pilots a unit (pilot.luau),
@@ -72,6 +72,9 @@ local SELECTION_DRAG_THRESHOLD = 6
 
 -- Set while an exclusive layer (piloting) is over this one: nothing is commanded, hovered or drawn.
 local covered = false
+
+-- Whether shift was held last frame, to tell when it is let go.
+local shift_was_held = false
 
 -- Mouse ---------------------------------------------------------------------------------------------------------------
 
@@ -362,9 +365,11 @@ local function on_render()
 		return
 	end
 	-- polled, since shift itself is taken by no layer and its letting go never comes here
-	if modifiers.shift_held() == false then
+	local shift_now = modifiers.shift_held()
+	if shift_was_held and shift_now == false then
 		command_state.let_go_of_shift()
 	end
+	shift_was_held = shift_now
 	local state = command_state.get()
 	local placing_at = if state.kind == "placing" then placing.preview(state.def_name, state.from) else nil
 	hover.render(state, placing_at)
