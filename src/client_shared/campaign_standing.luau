@@ -15,6 +15,8 @@ local use_store = require(ReplicatedStorage.ClientShared.use_store)
 export type Standing = {
 	unlocks: { [string]: boolean },
 	completed: { [string]: boolean },
+	-- whether the server has published it yet: until then it reads as a new player's
+	known: boolean,
 }
 
 local player = Players.LocalPlayer
@@ -24,6 +26,7 @@ local function read(): Standing
 	return {
 		unlocks = campaign_progress.unlocks_of(player),
 		completed = campaign_progress.completed_of(player),
+		known = campaign_progress.is_published(player),
 	}
 end
 

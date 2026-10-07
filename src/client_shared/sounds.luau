@@ -75,7 +75,7 @@ local KINDS: { [SoundName]: Kind } = {
 	anti_air = { volume = 1.4, gap = 0.04, most = 6, pitch_spread = 0.06, near = 30, far = 600 },
 	-- a torpedo's launch and a blast under water (a torpedo's or a depth charge's), both muffled by the water
 	torpedo = {
-		volume = 1.23,
+		volume = 1.6,
 		gap = 0.04,
 		most = 6,
 		pitch_spread = 0.08,
@@ -84,7 +84,7 @@ local KINDS: { [SoundName]: Kind } = {
 		stand_in = "cannon",
 	},
 	torpedo_hit = {
-		volume = 3,
+		volume = 2.48,
 		gap = 0.05,
 		most = 5,
 		pitch_spread = 0.1,

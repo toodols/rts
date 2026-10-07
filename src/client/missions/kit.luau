@@ -29,7 +29,7 @@ type EntityDef = types.EntityDef
 export type PictureKind =
 	-- W, A, S and D, which flash red as they are pressed, since they do not pan
 	"wasd"
-	-- the arrow keys, lit as they are held
+	-- the keys that pan, lit as they are held: the arrow keys, or W, A, S and D when those are the keys
 	| "arrows"
 	-- the mouse, its middle button lit while it is held
 	| "middle_mouse"
@@ -51,6 +51,7 @@ export type Picture = { kind: PictureKind, def_name: string? }
 export type Card = {
 	-- what a step's `watch` calls it when it is done
 	id: string,
+	-- a key in it is named `{key:<action>}` (Shared.keybinds), and shown as the player's own
 	caption: string,
 	-- a way to do it ("check"), or a way not to ("cross"), which is never done
 	mark: "check" | "cross",
@@ -59,6 +60,8 @@ export type Card = {
 	-- Its progress is then the income itself, a number in text, which the card shows against the goal rather than as
 	-- a count.
 	rate: { resource: "metal" | "energy", goal: number }?,
+	-- whether it is shown now, for a card that is only true of some keybinds; always, without it
+	shown: (() -> boolean)?,
 }
 
 -- Something a guide keeps off the HUD until a step has taught what it is for: "economy" for the metal and energy bar

@@ -1,0 +1,4070 @@
+{
+ "bar_names": {
+  "advanced_air_lab": "coraap",
+  "advanced_bot_lab": "coralab",
+  "advanced_construction_aircraft": "coraca",
+  "advanced_construction_bot": "corack",
+  "advanced_construction_turret": "cornanotct2",
+  "advanced_construction_vehicle": "coracv",
+  "advanced_energy_converter": "cormmkr",
+  "advanced_fusion_reactor": "corafus",
+  "advanced_geothermal_powerplant": "corageo",
+  "advanced_metal_extractor": "cormoho",
+  "advanced_shipyard": "corasy",
+  "advanced_solar_collector": "coradvsol",
+  "advanced_vehicle_lab": "coravp",
+  "aggravator": "corstorm",
+  "agitator": "corpun",
+  "air_lab": "corap",
+  "angler": "cortitan",
+  "apocalypse": "corsilo",
+  "arbiter": "corhrk",
+  "argonaut": "legnavyfrigate",
+  "arrow_storm": "corarch",
+  "banshee": "armkam",
+  "bat": "corsfig",
+  "behemoth": "corjugg",
+  "birdeater": "corah",
+  "black_hydra": "corblackhy",
+  "bot_lab": "armlab",
+  "brute": "corraid",
+  "buccaneer": "corcrus",
+  "calamity": "corbuzz",
+  "catalyst": "cortron",
+  "centurion": "armwar",
+  "commander": "armcom",
+  "construction_aircraft": "corca",
+  "construction_bot": "armck",
+  "construction_hovercraft": "corch",
+  "construction_seaplane": "corcsa",
+  "construction_ship": "corcs",
+  "construction_turret": "armnanotc",
+  "construction_vehicle": "corcv",
+  "coral": "corfhlt",
+  "cutlass": "corcut",
+  "dam_buster": "corsb",
+  "despot": "corbats",
+  "drone": "legdrone",
+  "energy_converter": "cormakr",
+  "energy_storage": "armestor",
+  "epic_energy_converter": "cormmkrt3",
+  "epic_fusion_reactor": "corafust3",
+  "eradicator": "corerad",
+  "experimental_gantry": "corgant",
+  "fatboy": "armfboy",
+  "fusion_reactor": "corfus",
+  "garpike": "corgarp",
+  "geothermal_powerplant": "corgeo",
+  "goon": "corsh",
+  "graverobber": "cornecro",
+  "grunt": "corak",
+  "guard": "corllt",
+  "gunslinger": "armmav",
+  "hailstorm": "corhurc",
+  "halberd": "corhal",
+  "hardened_energy_storage": "coruwadves",
+  "hardened_metal_storage": "coruwadvms",
+  "heavy_drone": "legheavydrone",
+  "hephaestus": "corhvytrans",
+  "hercules": "corvalk",
+  "herring": "corpt",
+  "hovercraft_platform": "corhp",
+  "incisor": "corgator",
+  "janus": "armjanus",
+  "juggernaut": "corkorg",
+  "kraken": "corssub",
+  "lasher": "cormist",
+  "liche": "armliche",
+  "mammoth": "corsumo",
+  "mantis": "legvcarry",
+  "messenger": "cormship",
+  "metal_extractor": "armmex",
+  "metal_storage": "armmstor",
+  "monsoon": "corseap",
+  "negotiator": "corvroc",
+  "nighthawk": "corvamp",
+  "oppressor": "corroy",
+  "orca": "corsub",
+  "overseer": "corgate",
+  "persecutor": "cortoast",
+  "poison_arrow": "corparrow",
+  "pounder": "corlevlr",
+  "predator": "corshark",
+  "prevailer": "corfmd",
+  "pulsar": "armanni",
+  "quaker": "cormart",
+  "rampart": "legrampart",
+  "rascal": "corfav",
+  "recluse": "armsptk",
+  "riptide": "corpship",
+  "scorpion": "corvipe",
+  "screamer": "corscreamer",
+  "sea_dragon": "armseadragon",
+  "seaplane_platform": "corplat",
+  "sharpshooter": "armsnipe",
+  "shipyard": "corsy",
+  "shiva": "corshiva",
+  "slingshot": "corfrt",
+  "solar_collector": "armsolar",
+  "starlight": "armmanni",
+  "stiletto": "armstil",
+  "stronghold": "legstronghold",
+  "sumo": "corcan",
+  "supporter": "coresupp",
+  "syracusia": "legnavydestro",
+  "thistle": "corrl",
+  "thor": "armthor",
+  "thug": "corthud",
+  "tick": "armflea",
+  "tidal_generator": "armtide",
+  "tiger": "correap",
+  "trasher": "corcrash",
+  "twin_guard": "corhllt",
+  "tyrannus": "legfort",
+  "urchin": "cortl",
+  "valiant": "corveng",
+  "vanguard": "armvang",
+  "vehicle_lab": "corvp",
+  "wall": "armdrag",
+  "warden": "corhlt",
+  "whirlwind": "corshad",
+  "wind_turbine": "corwin",
+  "wolverine": "corwolv"
+ },
+ "build_chain": {
+  "advanced_bot_lab": {
+   "category": "factory",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "front": 200
+      },
+      "priority": "normal",
+      "unit": "scorpion"
+     }
+    ],
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "front": 150
+      },
+      "priority": "low",
+      "unit": "persecutor"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "advanced_fusion_reactor": {
+   "category": "energy",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": [
+       -180,
+       180
+      ],
+      "unit": "pulsar"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "advanced_shipyard": {
+   "category": "factory",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "front": 150
+      },
+      "priority": "high",
+      "unit": "coral"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "advanced_solar_collector": {
+   "category": "energy",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "condition": {
+       "chance": 0.12
+      },
+      "offset": {
+       "front": 100
+      },
+      "unit": "twin_guard"
+     }
+    ],
+    [
+     {
+      "category": "defence",
+      "condition": {
+       "chance": 0.12
+      },
+      "offset": {
+       "back": 100
+      },
+      "unit": "twin_guard"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "advanced_vehicle_lab": {
+   "category": "factory",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "back": 5
+      },
+      "priority": "now",
+      "unit": "guard"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "air_lab": {
+   "category": "factory",
+   "energy": null,
+   "hub": [],
+   "porc": false
+  },
+  "bot_lab": {
+   "category": "factory",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "back": 5
+      },
+      "priority": "now",
+      "unit": "guard"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "fusion_reactor": {
+   "category": "energy",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "front": 100
+      },
+      "unit": "construction_turret"
+     },
+     {
+      "category": "defence",
+      "condition": {
+       "chance": 0.2
+      },
+      "offset": [
+       200,
+       0
+      ],
+      "unit": "apocalypse"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "geothermal_powerplant": {
+   "category": "geo",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "front": 64
+      },
+      "unit": "twin_guard"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "metal_extractor": {
+   "category": "mex",
+   "energy": null,
+   "hub": [],
+   "porc": true
+  },
+  "shipyard": {
+   "category": "factory",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "front": 150
+      },
+      "priority": "high",
+      "unit": "coral"
+     }
+    ]
+   ],
+   "porc": false
+  },
+  "vehicle_lab": {
+   "category": "factory",
+   "energy": null,
+   "hub": [
+    [
+     {
+      "category": "defence",
+      "offset": {
+       "back": 5
+      },
+      "priority": "now",
+      "unit": "guard"
+     }
+    ]
+   ],
+   "porc": false
+  }
+ },
+ "commanders": {
+  "commander": {
+   "assist_fac": 3,
+   "bar": "armcom",
+   "hide": {
+    "air": true,
+    "task_rad": [
+     2000,
+     800.0
+    ],
+    "threat": 8,
+    "time": 420
+   }
+  }
+ },
+ "defence": {
+  "base_rad": [
+   800.0,
+   1400.0
+  ],
+  "comm_rad": [
+   800.0,
+   400.0
+  ],
+  "escort": [
+   3,
+   1,
+   540
+  ],
+  "infl_rad": 5
+ },
+ "economy": {
+  "assist": [
+   "construction_turret",
+   "construction_turret"
+  ],
+  "build_mod": 1000.0,
+  "buildpower": 1.2,
+  "cluster_range": 1500,
+  "cost_ratio": 0.04,
+  "em_ratio": 0.08,
+  "energy_land": [
+   {
+    "bar": "armsolar",
+    "cond": [
+     12,
+     14,
+     0,
+     0,
+     0.03
+    ],
+    "def": "solar_collector"
+   },
+   {
+    "bar": "armadvsol",
+    "cond": [
+     20,
+     30,
+     12,
+     220,
+     0.2
+    ],
+    "def": "advanced_solar_collector"
+   },
+   {
+    "bar": "armckfus",
+    "cond": [
+     1,
+     3,
+     50,
+     2000,
+     0.23
+    ],
+    "def": "fusion_reactor"
+   },
+   {
+    "bar": "corwin",
+    "cond": [
+     30,
+     60
+    ],
+    "def": "wind_turbine"
+   },
+   {
+    "bar": "corsolar",
+    "cond": [
+     9,
+     12,
+     0,
+     0,
+     0.06
+    ],
+    "def": "solar_collector"
+   },
+   {
+    "bar": "coradvsol",
+    "cond": [
+     20,
+     30,
+     12,
+     220,
+     0.22
+    ],
+    "def": "advanced_solar_collector"
+   },
+   {
+    "bar": "corfus",
+    "cond": [
+     4,
+     6,
+     50,
+     600,
+     2.06
+    ],
+    "def": "fusion_reactor"
+   },
+   {
+    "bar": "corafus",
+    "cond": [
+     50,
+     100,
+     60,
+     4000,
+     6.44
+    ],
+    "def": "advanced_fusion_reactor"
+   }
+  ],
+  "eps_step": 0.2,
+  "excess": -1.0,
+  "factor": [
+   [
+    6.0,
+    1
+   ],
+   [
+    20,
+    300
+   ],
+   [
+    30,
+    420
+   ],
+   [
+    60.0,
+    3600
+   ]
+  ],
+  "goal_exec": 50.0,
+  "mex_max": [
+   1.0,
+   false
+  ],
+  "mex_up": 4,
+  "min_income": 5,
+  "ms_pull": [
+   [
+    0.57,
+    0.0
+   ],
+   [
+    0.66,
+    0.34
+   ]
+  ],
+  "production": [
+   0.8,
+   0.8,
+   1.0,
+   0.8
+  ]
+ },
+ "factories": {
+  "advanced_air_lab": {
+   "bar": "coraap",
+   "caretaker": 3,
+   "importance": [
+    0.0,
+    2.0
+   ],
+   "require_energy": true
+  },
+  "advanced_bot_lab": {
+   "bar": "coralab",
+   "caretaker": 6,
+   "importance": [
+    0.0,
+    2.0
+   ],
+   "require_energy": true
+  },
+  "advanced_shipyard": {
+   "bar": "corasy",
+   "caretaker": 6,
+   "importance": [
+    0.0,
+    3.0
+   ],
+   "require_energy": true
+  },
+  "advanced_vehicle_lab": {
+   "bar": "coravp",
+   "caretaker": 6,
+   "importance": [
+    0.0,
+    2.0
+   ],
+   "require_energy": true
+  },
+  "air_lab": {
+   "bar": "corap",
+   "caretaker": 2,
+   "importance": [
+    1.0,
+    0.0
+   ],
+   "require_energy": true
+  },
+  "bot_lab": {
+   "bar": "armlab",
+   "caretaker": 8,
+   "importance": [
+    1.0,
+    0.0
+   ],
+   "require_energy": false
+  },
+  "experimental_gantry": {
+   "bar": "corgant",
+   "caretaker": 30,
+   "importance": [
+    0.0,
+    2.0
+   ],
+   "require_energy": true
+  },
+  "hovercraft_platform": {
+   "bar": "corhp",
+   "caretaker": 2,
+   "importance": [
+    0.0,
+    0.0
+   ],
+   "require_energy": false
+  },
+  "seaplane_platform": {
+   "bar": "corplat",
+   "caretaker": 2,
+   "importance": [
+    0.0,
+    1.0
+   ],
+   "require_energy": false
+  },
+  "shipyard": {
+   "bar": "corsy",
+   "caretaker": 3,
+   "importance": [
+    1.0,
+    0.0
+   ],
+   "require_energy": false
+  },
+  "vehicle_lab": {
+   "bar": "corvp",
+   "caretaker": 4,
+   "importance": [
+    1.0,
+    0.0
+   ],
+   "require_energy": false
+  }
+ },
+ "labs": {
+  "advanced_air_lab": {
+   "bar": "coraap",
+   "caretaker": 3,
+   "income_tier": [
+    50
+   ],
+   "require_energy": true,
+   "tiers": {
+    "air": [
+     {
+      "advanced_construction_aircraft": 0.1,
+      "hailstorm": 0.2,
+      "nighthawk": 0.6
+     },
+     {
+      "advanced_construction_aircraft": 0.1,
+      "hailstorm": 0.2,
+      "nighthawk": 0.6
+     }
+    ],
+    "land": [
+     {
+      "advanced_construction_aircraft": 0.1,
+      "hailstorm": 0.05,
+      "nighthawk": 0.2
+     },
+     {
+      "advanced_construction_aircraft": 0.1,
+      "hailstorm": 0.2,
+      "nighthawk": 0.2
+     }
+    ]
+   }
+  },
+  "advanced_bot_lab": {
+   "bar": "coralab",
+   "caretaker": 6,
+   "income_tier": [
+    30,
+    60
+   ],
+   "require_energy": true,
+   "tiers": {
+    "land": [
+     {
+      "advanced_construction_bot": 0.3
+     },
+     {
+      "advanced_construction_bot": 0.4,
+      "mammoth": 0.1,
+      "sumo": 0.25
+     },
+     {
+      "advanced_construction_bot": 0.4,
+      "arbiter": 0.05,
+      "mammoth": 0.2,
+      "sumo": 0.1
+     }
+    ],
+    "water": [
+     {
+      "advanced_construction_bot": 0.3,
+      "arbiter": 0.05,
+      "mammoth": 0.01,
+      "sumo": 0.05
+     },
+     {
+      "advanced_construction_bot": 0.3,
+      "arbiter": 0.1,
+      "mammoth": 0.05,
+      "sumo": 0.05
+     },
+     {
+      "advanced_construction_bot": 0.3,
+      "arbiter": 0.1,
+      "mammoth": 0.05,
+      "sumo": 0.05
+     }
+    ]
+   }
+  },
+  "advanced_shipyard": {
+   "bar": "corasy",
+   "caretaker": 6,
+   "income_tier": [
+    50,
+    100
+   ],
+   "require_energy": true,
+   "tiers": {
+    "land": [
+     {
+      "arrow_storm": 0.01,
+      "buccaneer": 0.4,
+      "despot": 0.2,
+      "messenger": 0.15,
+      "predator": 0.2
+     },
+     {
+      "arrow_storm": 0.01,
+      "black_hydra": 0.2,
+      "buccaneer": 0.3,
+      "despot": 0.2,
+      "kraken": 0.15,
+      "messenger": 0.2,
+      "predator": 0.1
+     },
+     {
+      "arrow_storm": 0.01,
+      "black_hydra": 1.0,
+      "buccaneer": 0.2,
+      "despot": 0.2,
+      "kraken": 0.15,
+      "messenger": 0.5,
+      "predator": 0.1
+     }
+    ]
+   }
+  },
+  "advanced_vehicle_lab": {
+   "bar": "coravp",
+   "caretaker": 6,
+   "income_tier": [
+    30,
+    60
+   ],
+   "require_energy": true,
+   "tiers": {
+    "air": [
+     {
+      "advanced_construction_vehicle": 0.3,
+      "negotiator": 0.03,
+      "quaker": 0.2,
+      "tiger": 0.4
+     },
+     {
+      "advanced_construction_vehicle": 0.4,
+      "negotiator": 0.03,
+      "quaker": 0.15,
+      "tiger": 0.4
+     },
+     {
+      "advanced_construction_vehicle": 0.3,
+      "negotiator": 0.03,
+      "tiger": 0.4
+     }
+    ],
+    "land": [
+     {
+      "advanced_construction_vehicle": 0.3,
+      "negotiator": 0.04,
+      "quaker": 0.2,
+      "tiger": 0.35
+     },
+     {
+      "advanced_construction_vehicle": 0.4,
+      "negotiator": 0.1,
+      "poison_arrow": 0.05,
+      "quaker": 0.1,
+      "tiger": 0.3
+     },
+     {
+      "advanced_construction_vehicle": 0.4,
+      "negotiator": 0.04,
+      "poison_arrow": 0.15,
+      "tiger": 0.25
+     }
+    ],
+    "water": [
+     {
+      "advanced_construction_vehicle": 0.2,
+      "quaker": 0.1,
+      "tiger": 0.1
+     },
+     {
+      "advanced_construction_vehicle": 0.3,
+      "negotiator": 0.05,
+      "poison_arrow": 0.15,
+      "tiger": 0.1
+     },
+     {
+      "advanced_construction_vehicle": 0.3,
+      "negotiator": 0.05,
+      "poison_arrow": 0.2,
+      "tiger": 0.1
+     }
+    ]
+   }
+  },
+  "air_lab": {
+   "bar": "corap",
+   "caretaker": 2,
+   "income_tier": [
+    30,
+    90
+   ],
+   "require_energy": true,
+   "tiers": {
+    "air": [
+     {
+      "construction_aircraft": 0.08,
+      "valiant": 0.3,
+      "whirlwind": 0.15
+     },
+     {
+      "construction_aircraft": 0.04,
+      "valiant": 0.4,
+      "whirlwind": 0.15
+     },
+     {
+      "construction_aircraft": 0.1,
+      "valiant": 0.01
+     }
+    ],
+    "land": [
+     {
+      "construction_aircraft": 0.1,
+      "whirlwind": 0.3
+     },
+     {
+      "construction_aircraft": 0.1,
+      "whirlwind": 0.3
+     },
+     {
+      "construction_aircraft": 0.1
+     }
+    ]
+   }
+  },
+  "bot_lab": {
+   "bar": "armlab",
+   "caretaker": 8,
+   "income_tier": [
+    2,
+    25,
+    35,
+    50,
+    100
+   ],
+   "require_energy": false,
+   "tiers": {
+    "air": [
+     {
+      "construction_bot": 0.25,
+      "tick": 0.3
+     },
+     {
+      "construction_bot": 0.25,
+      "tick": 0.2
+     },
+     {
+      "centurion": 0.3,
+      "construction_bot": 0.25,
+      "tick": 0.05
+     },
+     {
+      "centurion": 0.3,
+      "construction_bot": 0.25,
+      "tick": 0.05
+     },
+     {
+      "construction_bot": 0.35
+     },
+     {
+      "construction_bot": 0.5,
+      "tick": 0.1
+     }
+    ],
+    "land": [
+     {
+      "construction_bot": 0.25,
+      "tick": 0.3
+     },
+     {
+      "construction_bot": 0.25,
+      "tick": 0.3
+     },
+     {
+      "centurion": 0.1,
+      "construction_bot": 0.35,
+      "tick": 0.1
+     },
+     {
+      "centurion": 0.15,
+      "construction_bot": 0.35,
+      "tick": 0.1
+     },
+     {
+      "centurion": 0.1,
+      "construction_bot": 0.5,
+      "tick": 0.1
+     },
+     {
+      "construction_bot": 0.5,
+      "tick": 0.1
+     }
+    ]
+   }
+  },
+  "experimental_gantry": {
+   "bar": "corgant",
+   "caretaker": 30,
+   "income_tier": [
+    100,
+    200,
+    300,
+    400
+   ],
+   "require_energy": true,
+   "tiers": {
+    "land": [
+     {
+      "shiva": 0.5
+     },
+     {
+      "shiva": 0.3
+     },
+     {},
+     {
+      "behemoth": 0.2,
+      "juggernaut": 0.4
+     },
+     {
+      "behemoth": 0.2,
+      "juggernaut": 0.4
+     }
+    ],
+    "water": [
+     {
+      "shiva": 0.4
+     },
+     {
+      "shiva": 0.2
+     },
+     {
+      "shiva": 0.1
+     },
+     {
+      "behemoth": 0.2,
+      "juggernaut": 0.4,
+      "shiva": 0.1
+     },
+     {
+      "behemoth": 0.2,
+      "juggernaut": 0.4,
+      "shiva": 0.1
+     }
+    ]
+   }
+  },
+  "hovercraft_platform": {
+   "bar": "corhp",
+   "caretaker": 2,
+   "income_tier": [
+    20,
+    30,
+    40
+   ],
+   "require_energy": false,
+   "tiers": {
+    "land": [
+     {
+      "birdeater": 0.01,
+      "construction_hovercraft": 0.01,
+      "goon": 1.0
+     },
+     {
+      "birdeater": 0.01,
+      "construction_hovercraft": 0.01,
+      "goon": 0.3,
+      "halberd": 0.1
+     },
+     {
+      "birdeater": 0.01,
+      "construction_hovercraft": 0.01,
+      "goon": 0.1,
+      "halberd": 0.2
+     },
+     {
+      "birdeater": 0.01,
+      "construction_hovercraft": 0.01,
+      "goon": 0.1,
+      "halberd": 0.3
+     }
+    ]
+   }
+  },
+  "seaplane_platform": {
+   "bar": "corplat",
+   "caretaker": 2,
+   "income_tier": [
+    20
+   ],
+   "require_energy": false,
+   "tiers": {
+    "land": [
+     {
+      "bat": 0.05,
+      "construction_seaplane": 0.1,
+      "cutlass": 0.8,
+      "dam_buster": 0.2
+     },
+     {
+      "bat": 0.05,
+      "construction_seaplane": 0.1,
+      "cutlass": 0.8,
+      "dam_buster": 0.2
+     }
+    ],
+    "water": [
+     {
+      "bat": 0.2,
+      "construction_seaplane": 0.1,
+      "cutlass": 0.5,
+      "dam_buster": 0.1,
+      "monsoon": 0.2
+     },
+     {
+      "bat": 0.2,
+      "construction_seaplane": 0.1,
+      "cutlass": 0.5,
+      "dam_buster": 0.1,
+      "monsoon": 0.2
+     }
+    ]
+   }
+  },
+  "shipyard": {
+   "bar": "corsy",
+   "caretaker": 3,
+   "income_tier": [
+    20
+   ],
+   "require_energy": false,
+   "tiers": {
+    "land": [
+     {
+      "construction_ship": 0.1,
+      "herring": 0.1,
+      "oppressor": 0.01,
+      "orca": 0.4,
+      "riptide": 0.2,
+      "supporter": 0.5
+     },
+     {
+      "construction_ship": 0.15,
+      "herring": 0.1,
+      "oppressor": 0.2,
+      "orca": 0.2,
+      "riptide": 0.3,
+      "supporter": 0.3
+     }
+    ]
+   }
+  },
+  "vehicle_lab": {
+   "bar": "corvp",
+   "caretaker": 4,
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "require_energy": false,
+   "tiers": {
+    "air": [
+     {
+      "construction_vehicle": 0.2,
+      "incisor": 0.4,
+      "lasher": 0.2,
+      "rascal": 0.4
+     },
+     {
+      "construction_vehicle": 0.2,
+      "incisor": 0.64,
+      "lasher": 0.2,
+      "pounder": 0.06,
+      "rascal": 0.19
+     },
+     {
+      "brute": 0.3,
+      "construction_vehicle": 0.15,
+      "incisor": 0.31,
+      "lasher": 0.3,
+      "pounder": 0.16,
+      "rascal": 0.03,
+      "wolverine": 0.06
+     },
+     {
+      "brute": 0.4,
+      "construction_vehicle": 0.15,
+      "incisor": 0.01,
+      "lasher": 0.3,
+      "pounder": 0.43,
+      "rascal": 0.02,
+      "wolverine": 0.2
+     },
+     {
+      "construction_vehicle": 0.12
+     }
+    ],
+    "land": [
+     {
+      "brute": 0.3,
+      "construction_vehicle": 0.2,
+      "pounder": 0.3,
+      "rascal": 0.2
+     },
+     {
+      "brute": 0.2,
+      "construction_vehicle": 0.3,
+      "incisor": 0.5,
+      "pounder": 0.1,
+      "rascal": 0.2
+     },
+     {
+      "brute": 0.3,
+      "construction_vehicle": 0.3,
+      "incisor": 0.15,
+      "lasher": 0.1,
+      "pounder": 0.2,
+      "rascal": 0.05,
+      "wolverine": 0.1
+     },
+     {
+      "brute": 0.4,
+      "construction_vehicle": 0.3,
+      "incisor": 0.1,
+      "lasher": 0.1,
+      "pounder": 0.2,
+      "rascal": 0.02,
+      "wolverine": 0.1
+     },
+     {
+      "construction_vehicle": 0.25,
+      "incisor": 0.1
+     }
+    ],
+    "water": [
+     {
+      "incisor": 0.2,
+      "rascal": 0.2
+     },
+     {
+      "construction_vehicle": 0.1,
+      "garpike": 0.2,
+      "incisor": 0.64,
+      "lasher": 0.1,
+      "pounder": 0.06,
+      "rascal": 0.19
+     },
+     {
+      "brute": 0.32,
+      "construction_vehicle": 0.15,
+      "garpike": 0.2,
+      "incisor": 0.31,
+      "lasher": 0.1,
+      "pounder": 0.16,
+      "rascal": 0.03,
+      "wolverine": 0.06
+     },
+     {
+      "brute": 0.2,
+      "construction_vehicle": 0.15,
+      "garpike": 0.2,
+      "incisor": 0.01,
+      "lasher": 0.1,
+      "pounder": 0.43,
+      "rascal": 0.02,
+      "wolverine": 0.2
+     },
+     {
+      "construction_vehicle": 0.15
+     }
+    ]
+   }
+  }
+ },
+ "porcupine": {
+  "amount": {
+   "factor": [
+    48.0,
+    32.0
+   ],
+   "map": [
+    10,
+    20
+   ],
+   "offset": [
+    -2.0,
+    2.0
+   ]
+  },
+  "base": [
+   [
+    3,
+    420
+   ],
+   [
+    2,
+    520
+   ],
+   [
+    4,
+    760
+   ],
+   [
+    10,
+    1200
+   ],
+   [
+    14,
+    1250
+   ],
+   [
+    12,
+    1600
+   ],
+   [
+    22,
+    1800
+   ]
+  ],
+  "defenders": [
+   [
+    "guard"
+   ],
+   [
+    "urchin"
+   ],
+   [
+    "thistle"
+   ],
+   [
+    "twin_guard"
+   ],
+   [
+    "warden"
+   ],
+   [],
+   [],
+   [
+    "eradicator"
+   ],
+   [
+    "scorpion"
+   ],
+   [],
+   [],
+   [
+    "persecutor"
+   ],
+   [
+    "pulsar"
+   ],
+   [
+    "agitator"
+   ],
+   [
+    "prevailer"
+   ],
+   [],
+   [],
+   [
+    "energy_storage"
+   ],
+   [
+    "metal_storage"
+   ],
+   [
+    "advanced_solar_collector"
+   ],
+   [
+    "construction_turret"
+   ],
+   [],
+   [],
+   [
+    "hardened_energy_storage"
+   ],
+   [
+    "catalyst"
+   ],
+   [],
+   [
+    "fusion_reactor"
+   ],
+   [
+    "solar_collector"
+   ],
+   [
+    "overseer"
+   ],
+   [
+    "coral"
+   ]
+  ],
+  "land": [
+   0,
+   3,
+   5,
+   6,
+   4,
+   8,
+   10,
+   12
+  ],
+  "point_range": 600.0,
+  "prevent": 1
+ },
+ "quota": {
+  "aa_threat": [
+   [
+    8,
+    500.0
+   ],
+   [
+    24,
+    500.0
+   ]
+  ],
+  "anti_cap": 2.0,
+  "attack": 60.0,
+  "num_batch": 3,
+  "raid": [
+   6.0,
+   150.0
+  ],
+  "scout": 2,
+  "slack_mod": {
+   "all": 0.5,
+   "speed": [
+    0.75,
+    4.0
+   ],
+   "static": 1.0
+  },
+  "thr_mod": {
+   "attack": [
+    0.6,
+    0.8
+   ],
+   "comm": 0.003,
+   "defence": [
+    0.3,
+    0.5
+   ],
+   "mobile": 1.0,
+   "static": 1.0
+  }
+ },
+ "response": {
+  "_importance_mod_": 1.0,
+  "_weight_": 0.1,
+  "anti_air": {
+   "eps_step": 0.8,
+   "importance": [
+    100.0
+   ],
+   "max_percent": 0.2,
+   "ratio": [
+    1.0
+   ],
+   "vs": [
+    "air"
+   ]
+  },
+  "anti_heavy": {
+   "eps_step": 0.0,
+   "importance": [
+    10.0,
+    5.0,
+    20.0
+   ],
+   "max_percent": 0.4,
+   "ratio": [
+    0.3,
+    0.7,
+    1.5
+   ],
+   "vs": [
+    "static",
+    "skirmish",
+    "heavy"
+   ]
+  },
+  "anti_heavy_ass": {
+   "eps_step": 0.0,
+   "importance": [
+    10.0,
+    5.0,
+    20.0,
+    10.0
+   ],
+   "max_percent": 0.4,
+   "ratio": [
+    0.3,
+    0.4,
+    1.5,
+    1.0
+   ],
+   "vs": [
+    "static",
+    "skirmish",
+    "heavy",
+    "anti_heavy_ass"
+   ]
+  },
+  "anti_sub": {
+   "eps_step": 0.0,
+   "importance": [
+    5.0
+   ],
+   "max_percent": 0.3,
+   "ratio": [
+    0.8
+   ],
+   "vs": [
+    "sub"
+   ]
+  },
+  "artillery": {
+   "eps_step": -0.075,
+   "importance": [
+    5.0
+   ],
+   "max_percent": 0.2,
+   "ratio": [
+    0.3
+   ],
+   "vs": [
+    "static"
+   ]
+  },
+  "assault": {
+   "eps_step": 0.075,
+   "importance": [
+    5.0,
+    5.0,
+    5.0
+   ],
+   "max_percent": 0.8,
+   "ratio": [
+    0.3,
+    0.4,
+    0.4
+   ],
+   "vs": [
+    "static",
+    "skirmish",
+    "riot"
+   ]
+  },
+  "bomber": {
+   "eps_step": 0.0,
+   "importance": [
+    10.0
+   ],
+   "max_percent": 0.2,
+   "ratio": [
+    0.1
+   ],
+   "vs": [
+    "static"
+   ]
+  },
+  "builderT2": {
+   "eps_step": 0.0,
+   "importance": [
+    5.0,
+    5.0,
+    10.0
+   ],
+   "max_percent": 0.3,
+   "ratio": [
+    1.0,
+    1.0,
+    0.1
+   ],
+   "vs": [
+    "skirmish",
+    "heavy",
+    "super"
+   ]
+  },
+  "heavy": {
+   "eps_step": 0.0,
+   "importance": [
+    10.0,
+    10.0
+   ],
+   "max_percent": 0.5,
+   "ratio": [
+    2.0,
+    1.5
+   ],
+   "vs": [
+    "static",
+    "skirmish"
+   ]
+  },
+  "raider": {
+   "eps_step": 0.12,
+   "importance": [
+    20.0,
+    10.0,
+    5.0
+   ],
+   "max_percent": 0.6,
+   "ratio": [
+    2.0,
+    1.0,
+    0.1
+   ],
+   "vs": [
+    "scout",
+    "raider",
+    "artillery"
+   ]
+  },
+  "riot": {
+   "eps_step": 0.02,
+   "importance": [
+    5.0,
+    5.0
+   ],
+   "max_percent": 0.8,
+   "ratio": [
+    0.9,
+    0.4
+   ],
+   "vs": [
+    "raider",
+    "skirmish"
+   ]
+  },
+  "scout": {
+   "eps_step": 0.02,
+   "importance": [
+    20.0,
+    0.05,
+    0.0,
+    5.0,
+    5.0
+   ],
+   "max_percent": 0.1,
+   "ratio": [
+    1.0,
+    0.05,
+    0.0,
+    0.05,
+    0.05
+   ],
+   "vs": [
+    "scout",
+    "artillery",
+    "static",
+    "anti_heavy",
+    "anti_heavy_ass"
+   ]
+  },
+  "skirmish": {
+   "eps_step": 0.075,
+   "importance": [
+    5.0,
+    5.0,
+    10.0
+   ],
+   "max_percent": 0.8,
+   "ratio": [
+    0.8,
+    0.5,
+    0.7
+   ],
+   "vs": [
+    "assault",
+    "riot",
+    "skirmish"
+   ]
+  },
+  "sub": {
+   "eps_step": 0.0,
+   "importance": [
+    5.0,
+    5.0,
+    5.0,
+    5.0,
+    5.0
+   ],
+   "max_percent": 0.5,
+   "ratio": [
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5
+   ],
+   "vs": [
+    "skirmish",
+    "assault",
+    "riot",
+    "heavy",
+    "super"
+   ]
+  },
+  "super": {
+   "eps_step": 0.0,
+   "importance": [
+    20.0,
+    20.0,
+    40.0
+   ],
+   "max_percent": 0.8,
+   "ratio": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "vs": [
+    "heavy",
+    "static",
+    "super"
+   ]
+  },
+  "support": {
+   "eps_step": 0.0,
+   "importance": [
+    2.0,
+    2.0
+   ],
+   "max_percent": 0.2,
+   "ratio": [
+    0.1,
+    0.1
+   ],
+   "vs": [
+    "skirmish",
+    "assault"
+   ]
+  }
+ },
+ "retreat": {
+  "builder": [
+   0.85,
+   1.0
+  ],
+  "fighter": [
+   0.5,
+   1.0
+  ],
+  "shield": [
+   0.25,
+   0.275
+  ]
+ },
+ "select": {
+  "air_map": 100,
+  "map": [
+   8,
+   24
+  ],
+  "min_land": 75.0,
+  "no_air": 1,
+  "offset": [
+   -20,
+   20
+  ],
+  "speed": [
+   0,
+   40
+  ]
+ },
+ "source": "https://raw.githubusercontent.com/beyond-all-reason/Beyond-All-Reason/master/luarules/configs/BARb/stable/config/hard",
+ "units": {
+  "advanced_air_lab": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "coraap",
+   "build_speed": 10.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ],
+   "since": 420
+  },
+  "advanced_bot_lab": {
+   "bar": "coralab",
+   "build_speed": 15.0,
+   "limit": 1,
+   "midposoffset": [
+    0,
+    0,
+    -4
+   ],
+   "role": [
+    "static"
+   ]
+  },
+  "advanced_construction_aircraft": {
+   "bar": "coraca",
+   "build_speed": 5.0,
+   "income_tier": [
+    50
+   ],
+   "limit": 15,
+   "native_lab": "coraap",
+   "retreat": 0.6,
+   "role": [
+    "builder",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.1,
+     0.1
+    ],
+    "land": [
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "advanced_construction_bot": {
+   "attribute": [
+    "solo"
+   ],
+   "bar": "corack",
+   "build_speed": 9.0,
+   "income_tier": [
+    30,
+    60
+   ],
+   "limit": 10,
+   "native_lab": "coralab",
+   "role": [
+    "builderT2"
+   ],
+   "tiers": {
+    "land": [
+     0.3,
+     0.4,
+     0.4
+    ],
+    "water": [
+     0.3,
+     0.3,
+     0.3
+    ]
+   }
+  },
+  "advanced_construction_vehicle": {
+   "attribute": [
+    "solo"
+   ],
+   "bar": "coracv",
+   "build_speed": 12.5,
+   "income_tier": [
+    30,
+    60
+   ],
+   "limit": 15,
+   "native_lab": "coravp",
+   "role": [
+    "builderT2"
+   ],
+   "tiers": {
+    "air": [
+     0.3,
+     0.4,
+     0.3
+    ],
+    "land": [
+     0.3,
+     0.4,
+     0.4
+    ],
+    "water": [
+     0.2,
+     0.3,
+     0.3
+    ]
+   }
+  },
+  "advanced_metal_extractor": {
+   "bar": "cormoho",
+   "build_mod": 200,
+   "role": [
+    "static"
+   ]
+  },
+  "advanced_shipyard": {
+   "bar": "corasy",
+   "build_speed": 15.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ],
+   "since": 480
+  },
+  "advanced_vehicle_lab": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "coravp",
+   "build_speed": 15.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "aggravator": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corstorm",
+   "income_tier": [
+    20,
+    30,
+    70,
+    120
+   ],
+   "limit": 10,
+   "native_lab": "corlab",
+   "role": [
+    "artillery"
+   ],
+   "tiers": {
+    "air": [
+     0.01,
+     0.4,
+     0.4,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.01,
+     0.3,
+     0.15,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "agitator": {
+   "bar": "corpun",
+   "limit": 3,
+   "on": false,
+   "role": [
+    "static"
+   ],
+   "since": 600,
+   "threat": {
+    "air": 0.0,
+    "surf": 0.5,
+    "water": 0.1
+   }
+  },
+  "air_lab": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "corap",
+   "build_speed": 5.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "apocalypse": {
+   "bar": "corsilo",
+   "limit": 1,
+   "role": [
+    "super",
+    "static"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 0.1,
+    "water": 0.0
+   }
+  },
+  "arbiter": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corhrk",
+   "income_tier": [
+    30,
+    60
+   ],
+   "limit": 10,
+   "native_lab": "coralab",
+   "retreat": 0.8,
+   "role": [
+    "artillery"
+   ],
+   "threat": {
+    "surf": 0.5,
+    "vs": {
+     "artillery": 2.0,
+     "static": 2.0
+    }
+   },
+   "tiers": {
+    "land": [
+     0.0,
+     0.0,
+     0.05
+    ],
+    "water": [
+     0.05,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "arrow_storm": {
+   "bar": "corarch",
+   "income_tier": [
+    50,
+    100
+   ],
+   "limit": 5,
+   "native_lab": "corasy",
+   "role": [
+    "anti_air"
+   ],
+   "tiers": {
+    "land": [
+     0.01,
+     0.01,
+     0.01
+    ]
+   }
+  },
+  "banshee": {
+   "bar": "armkam",
+   "income_tier": [
+    10,
+    25,
+    35
+   ],
+   "limit": 40,
+   "native_lab": "armap",
+   "retreat": 0.8,
+   "role": [
+    "raider",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.3,
+     0.3,
+     0.2,
+     0.0
+    ],
+    "land": [
+     0.5,
+     0.4,
+     0.5,
+     0.0
+    ]
+   }
+  },
+  "bat": {
+   "bar": "corsfig",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corplat",
+   "tiers": {
+    "land": [
+     0.05,
+     0.05
+    ],
+    "water": [
+     0.2,
+     0.2
+    ]
+   }
+  },
+  "behemoth": {
+   "attribute": [
+    "melee"
+   ],
+   "bar": "corjugg",
+   "income_tier": [
+    100,
+    200,
+    300,
+    400
+   ],
+   "native_lab": "corgant",
+   "power": 1.5,
+   "retreat": 0.0,
+   "role": [
+    "super"
+   ],
+   "tiers": {
+    "land": [
+     0.0,
+     0.0,
+     0.0,
+     0.2,
+     0.2
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.0,
+     0.2,
+     0.2
+    ]
+   }
+  },
+  "birdeater": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "corah",
+   "income_tier": [
+    20,
+    30,
+    40
+   ],
+   "native_lab": "corhp",
+   "role": [
+    "anti_air"
+   ],
+   "tiers": {
+    "land": [
+     0.01,
+     0.01,
+     0.01,
+     0.01
+    ]
+   }
+  },
+  "black_hydra": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corblackhy",
+   "income_tier": [
+    50,
+    100
+   ],
+   "native_lab": "corasy",
+   "retreat": 0.5,
+   "role": [
+    "super"
+   ],
+   "tiers": {
+    "land": [
+     0.0,
+     0.2,
+     1.0
+    ]
+   }
+  },
+  "bot_lab": {
+   "bar": "armlab",
+   "build_speed": 5.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "brute": {
+   "bar": "corraid",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "native_lab": "corvp",
+   "role": [
+    "skirmish"
+   ],
+   "threat": {
+    "vs": {
+     "artillery": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.0,
+     0.0,
+     0.3,
+     0.4,
+     0.0
+    ],
+    "land": [
+     0.3,
+     0.2,
+     0.3,
+     0.4,
+     0.0
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.32,
+     0.2,
+     0.0
+    ]
+   }
+  },
+  "buccaneer": {
+   "bar": "corcrus",
+   "income_tier": [
+    50,
+    100
+   ],
+   "native_lab": "corasy",
+   "role": [
+    "skirmish"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.0,
+    "water": 0.5
+   },
+   "tiers": {
+    "land": [
+     0.4,
+     0.3,
+     0.2
+    ]
+   }
+  },
+  "catalyst": {
+   "bar": "cortron",
+   "limit": 1,
+   "role": [
+    "super",
+    "static"
+   ]
+  },
+  "centurion": {
+   "attribute": [
+    "melee"
+   ],
+   "bar": "armwar",
+   "income_tier": [
+    2,
+    25,
+    35,
+    50,
+    100
+   ],
+   "native_lab": "armlab",
+   "role": [
+    "riot"
+   ],
+   "threat": {
+    "air": 0.1,
+    "vs": {
+     "anti_air": 2.0,
+     "artillery": 2.0
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "air": [
+     0.0,
+     0.0,
+     0.3,
+     0.3,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.0,
+     0.1,
+     0.15,
+     0.1,
+     0.0
+    ]
+   }
+  },
+  "commander": {
+   "attribute": [
+    "commander"
+   ],
+   "bar": "armcom",
+   "build_speed": 10.0,
+   "power": 0.8,
+   "retreat": 0.6,
+   "role": [
+    "builder"
+   ],
+   "threat": {
+    "air": 0.3,
+    "default": 1.0,
+    "surf": 1.0,
+    "vs": {
+     "artillery": 0.5,
+     "assault": 0.8
+    },
+    "water": 0.1
+   }
+  },
+  "construction_aircraft": {
+   "attribute": [
+    "solo"
+   ],
+   "bar": "corca",
+   "build_speed": 3.0,
+   "income_tier": [
+    30,
+    90
+   ],
+   "limit": 15,
+   "native_lab": "corap",
+   "retreat": 0.6,
+   "role": [
+    "builder",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.08,
+     0.04,
+     0.1
+    ],
+    "land": [
+     0.1,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "construction_bot": {
+   "bar": "armck",
+   "build_speed": 4.0,
+   "income_tier": [
+    2,
+    25,
+    35,
+    50,
+    100
+   ],
+   "limit": 12,
+   "native_lab": "armlab",
+   "role": [
+    "builder"
+   ],
+   "tiers": {
+    "air": [
+     0.25,
+     0.25,
+     0.25,
+     0.25,
+     0.35,
+     0.5
+    ],
+    "land": [
+     0.25,
+     0.25,
+     0.35,
+     0.35,
+     0.5,
+     0.5
+    ]
+   }
+  },
+  "construction_hovercraft": {
+   "bar": "corch",
+   "build_speed": 6.0,
+   "income_tier": [
+    20,
+    30,
+    40
+   ],
+   "limit": 10,
+   "native_lab": "corhp",
+   "role": [
+    "builder"
+   ],
+   "tiers": {
+    "land": [
+     0.01,
+     0.01,
+     0.01,
+     0.01
+    ]
+   }
+  },
+  "construction_seaplane": {
+   "bar": "corcsa",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corplat",
+   "tiers": {
+    "land": [
+     0.1,
+     0.1
+    ],
+    "water": [
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "construction_ship": {
+   "bar": "corcs",
+   "build_speed": 6.0,
+   "income_tier": [
+    20
+   ],
+   "limit": 6,
+   "native_lab": "corsy",
+   "retreat": 0.6,
+   "role": [
+    "builder"
+   ],
+   "tiers": {
+    "land": [
+     0.1,
+     0.15
+    ]
+   }
+  },
+  "construction_turret": {
+   "bar": "armnanotc",
+   "build_speed": 10.0,
+   "role": [
+    "support"
+   ]
+  },
+  "construction_vehicle": {
+   "bar": "corcv",
+   "build_speed": 4.5,
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "limit": 10,
+   "native_lab": "corvp",
+   "role": [
+    "builder"
+   ],
+   "tiers": {
+    "air": [
+     0.2,
+     0.2,
+     0.15,
+     0.15,
+     0.12
+    ],
+    "land": [
+     0.2,
+     0.3,
+     0.3,
+     0.3,
+     0.25
+    ],
+    "water": [
+     0.0,
+     0.1,
+     0.15,
+     0.15,
+     0.15
+    ]
+   }
+  },
+  "coral": {
+   "bar": "corfhlt",
+   "limit": 3,
+   "role": [
+    "static"
+   ],
+   "since": 360
+  },
+  "cutlass": {
+   "bar": "corcut",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corplat",
+   "retreat": 0.8,
+   "role": [
+    "raider",
+    "air"
+   ],
+   "tiers": {
+    "land": [
+     0.8,
+     0.8
+    ],
+    "water": [
+     0.5,
+     0.5
+    ]
+   }
+  },
+  "dam_buster": {
+   "bar": "corsb",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corplat",
+   "tiers": {
+    "land": [
+     0.2,
+     0.2
+    ],
+    "water": [
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "despot": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corbats",
+   "income_tier": [
+    50,
+    100
+   ],
+   "native_lab": "corasy",
+   "role": [
+    "heavy"
+   ],
+   "tiers": {
+    "land": [
+     0.2,
+     0.2,
+     0.2
+    ]
+   }
+  },
+  "energy_converter": {
+   "bar": "cormakr",
+   "role": [
+    "static"
+   ],
+   "since": 300
+  },
+  "energy_storage": {
+   "bar": "armestor",
+   "limit": 1,
+   "role": [
+    "static"
+   ],
+   "since": 240
+  },
+  "eradicator": {
+   "bar": "corerad",
+   "role": [
+    "anti_air"
+   ],
+   "threat": {
+    "air": 2.0,
+    "surf": 0.0,
+    "water": 0.0
+   }
+  },
+  "experimental_gantry": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "corgant",
+   "build_speed": 1.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "fatboy": {
+   "bar": "armfboy",
+   "income_tier": [
+    1,
+    30,
+    60,
+    80
+   ],
+   "native_lab": "armalab",
+   "role": [
+    "heavy"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.5,
+    "vs": {
+     "anti_air": 2.0,
+     "artillery": 2.0,
+     "vy": 0.7
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "land": [
+     0.0,
+     0.05,
+     0.15,
+     0.3,
+     0.3
+    ],
+    "water": [
+     0.03,
+     0.03,
+     0.05,
+     0.12,
+     0.12
+    ]
+   }
+  },
+  "fusion_reactor": {
+   "bar": "corfus",
+   "build_mod": 4000,
+   "cooldown": 3,
+   "role": [
+    "static"
+   ]
+  },
+  "garpike": {
+   "bar": "corgarp",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "limit": 25,
+   "native_lab": "corvp",
+   "role": [
+    "raider"
+   ],
+   "threat": {
+    "vs": {
+     "artillery": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "water": [
+     0.0,
+     0.2,
+     0.2,
+     0.2,
+     0.0
+    ]
+   }
+  },
+  "goon": {
+   "bar": "corsh",
+   "income_tier": [
+    20,
+    30,
+    40
+   ],
+   "native_lab": "corhp",
+   "role": [
+    "raider"
+   ],
+   "tiers": {
+    "land": [
+     1.0,
+     0.3,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "graverobber": {
+   "bar": "cornecro",
+   "income_tier": [
+    20,
+    30,
+    70,
+    120
+   ],
+   "limit": 60,
+   "native_lab": "corlab",
+   "retreat": 0.6,
+   "role": [
+    "scout"
+   ],
+   "tiers": {
+    "air": [
+     0.09,
+     0.2,
+     0.2,
+     0.2,
+     0.2
+    ],
+    "land": [
+     0.15,
+     0.5,
+     0.5,
+     0.2,
+     0.2
+    ]
+   }
+  },
+  "grunt": {
+   "attribute": [
+    "scout"
+   ],
+   "bar": "corak",
+   "income_tier": [
+    20,
+    30,
+    70,
+    120
+   ],
+   "limit": 40,
+   "native_lab": "corlab",
+   "power": 0.9,
+   "role": [
+    "raider"
+   ],
+   "threat": {
+    "vs": {
+     "anti-heavy": 3.0,
+     "artillery": 4.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.6,
+     0.4,
+     0.2,
+     0.3,
+     0.0
+    ],
+    "land": [
+     0.55,
+     0.4,
+     0.2,
+     0.4,
+     0.0
+    ]
+   }
+  },
+  "guard": {
+   "bar": "corllt",
+   "build_mod": 300,
+   "midposoffset": [
+    0,
+    0,
+    2.38
+   ],
+   "role": [
+    "static"
+   ],
+   "since": 70,
+   "threat": {
+    "air": 0.2,
+    "default": 1.0,
+    "surf": 1.0,
+    "vs": {
+     "artillery": 0.3,
+     "assault": 0.8,
+     "raider": 1.3
+    },
+    "water": 0.1
+   }
+  },
+  "gunslinger": {
+   "bar": "armmav",
+   "income_tier": [
+    1,
+    30,
+    60,
+    80
+   ],
+   "native_lab": "armalab",
+   "retreat": 0.8,
+   "role": [
+    "riot"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.2,
+    "vs": {
+     "anti_air": 2.0,
+     "artillery": 2.0,
+     "heavy": 0.7
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "land": [
+     0.1,
+     0.3,
+     0.15,
+     0.0,
+     0.0
+    ],
+    "water": [
+     0.07,
+     0.07,
+     0.07,
+     0.05,
+     0.05
+    ]
+   }
+  },
+  "hailstorm": {
+   "bar": "corhurc",
+   "income_tier": [
+    50
+   ],
+   "native_lab": "coraap",
+   "retreat": 0.8,
+   "role": [
+    "bomber",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.2,
+     0.2
+    ],
+    "land": [
+     0.05,
+     0.2
+    ]
+   }
+  },
+  "halberd": {
+   "bar": "corhal",
+   "income_tier": [
+    20,
+    30,
+    40
+   ],
+   "native_lab": "corhp",
+   "role": [
+    "heavy",
+    "skirmish"
+   ],
+   "tiers": {
+    "land": [
+     0.0,
+     0.1,
+     0.2,
+     0.3
+    ]
+   }
+  },
+  "hardened_metal_storage": {
+   "bar": "coruwadvms",
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "herring": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corpt",
+   "income_tier": [
+    20
+   ],
+   "limit": 10,
+   "native_lab": "corsy",
+   "role": [
+    "anti_air"
+   ],
+   "tiers": {
+    "land": [
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "hovercraft_platform": {
+   "bar": "corhp",
+   "build_speed": 10.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "incisor": {
+   "attribute": [
+    "scout"
+   ],
+   "bar": "corgator",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "limit": 30,
+   "native_lab": "corvp",
+   "role": [
+    "raider"
+   ],
+   "threat": {
+    "vs": {
+     "artillery": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.4,
+     0.64,
+     0.31,
+     0.01,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.5,
+     0.15,
+     0.1,
+     0.1
+    ],
+    "water": [
+     0.2,
+     0.64,
+     0.31,
+     0.01,
+     0.0
+    ]
+   }
+  },
+  "janus": {
+   "bar": "armjanus",
+   "income_tier": [
+    20,
+    27,
+    35,
+    60,
+    110
+   ],
+   "native_lab": "armvp",
+   "role": [
+    "assault"
+   ],
+   "threat": {
+    "air": 0.0,
+    "vs": {
+     "anti_air": 2.0,
+     "artillery": 2.0
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "air": [
+     0.0,
+     0.06,
+     0.2,
+     0.01,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.1,
+     0.2,
+     0.2,
+     0.0,
+     0.0
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.1,
+     0.1,
+     0.1,
+     0.0
+    ]
+   }
+  },
+  "juggernaut": {
+   "attribute": [
+    "melee"
+   ],
+   "bar": "corkorg",
+   "income_tier": [
+    100,
+    200,
+    300,
+    400
+   ],
+   "native_lab": "corgant",
+   "power": 1.5,
+   "retreat": 0.0,
+   "role": [
+    "super"
+   ],
+   "tiers": {
+    "land": [
+     0.0,
+     0.0,
+     0.0,
+     0.4,
+     0.4
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.0,
+     0.4,
+     0.4
+    ]
+   }
+  },
+  "kraken": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corssub",
+   "income_tier": [
+    50,
+    100
+   ],
+   "native_lab": "corasy",
+   "role": [
+    "sub"
+   ],
+   "tiers": {
+    "land": [
+     0.0,
+     0.15,
+     0.15
+    ]
+   }
+  },
+  "lasher": {
+   "attribute": [
+    "support",
+    "siege"
+   ],
+   "bar": "cormist",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "native_lab": "corvp",
+   "role": [
+    "anti_air"
+   ],
+   "tiers": {
+    "air": [
+     0.2,
+     0.2,
+     0.3,
+     0.3,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.0,
+     0.1,
+     0.1,
+     0.0
+    ],
+    "water": [
+     0.0,
+     0.1,
+     0.1,
+     0.1,
+     0.0
+    ]
+   }
+  },
+  "liche": {
+   "bar": "armliche",
+   "income_tier": [
+    70
+   ],
+   "native_lab": "armaap",
+   "power": 0.5,
+   "retreat": 0.6,
+   "role": [
+    "bomber",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.0,
+     0.2
+    ],
+    "land": [
+     0.1,
+     0.2
+    ]
+   }
+  },
+  "mammoth": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "corsumo",
+   "income_tier": [
+    30,
+    60
+   ],
+   "native_lab": "coralab",
+   "role": [
+    "heavy"
+   ],
+   "threat": {
+    "air": 0.5
+   },
+   "tiers": {
+    "land": [
+     0.0,
+     0.1,
+     0.2
+    ],
+    "water": [
+     0.01,
+     0.05,
+     0.05
+    ]
+   }
+  },
+  "messenger": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "cormship",
+   "income_tier": [
+    50,
+    100
+   ],
+   "native_lab": "corasy",
+   "retreat": 0.5,
+   "role": [
+    "artillery"
+   ],
+   "tiers": {
+    "land": [
+     0.15,
+     0.2,
+     0.5
+    ]
+   }
+  },
+  "metal_extractor": {
+   "bar": "armmex",
+   "build_mod": 300,
+   "role": [
+    "static"
+   ]
+  },
+  "metal_storage": {
+   "bar": "armmstor",
+   "limit": 1,
+   "role": [
+    "static"
+   ],
+   "since": 500
+  },
+  "monsoon": {
+   "bar": "corseap",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corplat",
+   "tiers": {
+    "land": [
+     0.0,
+     0.0
+    ],
+    "water": [
+     0.2,
+     0.2
+    ]
+   }
+  },
+  "negotiator": {
+   "bar": "corvroc",
+   "income_tier": [
+    30,
+    60
+   ],
+   "native_lab": "coravp",
+   "retreat": 0.6,
+   "role": [
+    "artillery"
+   ],
+   "threat": {
+    "surf": 0.2,
+    "vs": {
+     "artillery": 5.0,
+     "static": 5.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.03,
+     0.03,
+     0.03
+    ],
+    "land": [
+     0.04,
+     0.1,
+     0.04
+    ],
+    "water": [
+     0.0,
+     0.05,
+     0.05
+    ]
+   }
+  },
+  "nighthawk": {
+   "bar": "corvamp",
+   "income_tier": [
+    50
+   ],
+   "native_lab": "coraap",
+   "retreat": 0.5,
+   "role": [
+    "anti_air",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.6,
+     0.6
+    ],
+    "land": [
+     0.2,
+     0.2
+    ]
+   }
+  },
+  "oppressor": {
+   "attribute": [
+    "siege",
+    "support"
+   ],
+   "bar": "corroy",
+   "income_tier": [
+    20
+   ],
+   "limit": 10,
+   "native_lab": "corsy",
+   "retreat": 0.5,
+   "role": [
+    "anti_sub"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.0,
+    "vs": {
+     "raider": 0.5,
+     "scout": 0.5
+    },
+    "water": 0.5
+   },
+   "tiers": {
+    "land": [
+     0.01,
+     0.2
+    ]
+   }
+  },
+  "orca": {
+   "bar": "corsub",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corsy",
+   "role": [
+    "raider",
+    "sub"
+   ],
+   "tiers": {
+    "land": [
+     0.4,
+     0.2
+    ]
+   }
+  },
+  "persecutor": {
+   "bar": "cortoast",
+   "on": false,
+   "role": [
+    "static"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.0,
+    "water": 0.1
+   }
+  },
+  "poison_arrow": {
+   "bar": "corparrow",
+   "income_tier": [
+    30,
+    60
+   ],
+   "native_lab": "coravp",
+   "role": [
+    "raider"
+   ],
+   "tiers": {
+    "air": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.05,
+     0.15
+    ],
+    "water": [
+     0.0,
+     0.15,
+     0.2
+    ]
+   }
+  },
+  "pounder": {
+   "bar": "corlevlr",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "native_lab": "corvp",
+   "retreat": 0.5,
+   "role": [
+    "riot"
+   ],
+   "threat": {
+    "surf": 1.2,
+    "vs": {
+     "raider": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.0,
+     0.06,
+     0.16,
+     0.43,
+     0.0
+    ],
+    "land": [
+     0.3,
+     0.1,
+     0.2,
+     0.2,
+     0.0
+    ],
+    "water": [
+     0.0,
+     0.06,
+     0.16,
+     0.43,
+     0.0
+    ]
+   }
+  },
+  "predator": {
+   "attribute": [
+    "anti_sub"
+   ],
+   "bar": "corshark",
+   "income_tier": [
+    50,
+    100
+   ],
+   "native_lab": "corasy",
+   "role": [
+    "anti_sub",
+    "sub"
+   ],
+   "tiers": {
+    "land": [
+     0.2,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "pulsar": {
+   "bar": "armanni",
+   "role": [
+    "static"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 0.5,
+    "vs": {
+     "heavy": 2.0,
+     "raider": 0.1,
+     "scout": 0.1,
+     "super": 2.0
+    },
+    "water": 0.1
+   }
+  },
+  "quaker": {
+   "bar": "cormart",
+   "income_tier": [
+    30,
+    60
+   ],
+   "native_lab": "coravp",
+   "retreat": 0.6,
+   "role": [
+    "artillery"
+   ],
+   "threat": {
+    "surf": 0.5,
+    "vs": {
+     "artillery": 2.0,
+     "static": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.2,
+     0.15,
+     0.0
+    ],
+    "land": [
+     0.2,
+     0.1,
+     0.0
+    ],
+    "water": [
+     0.1,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "rascal": {
+   "bar": "corfav",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "native_lab": "corvp",
+   "role": [
+    "scout"
+   ],
+   "threat": {
+    "vs": {
+     "artillery": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.4,
+     0.19,
+     0.03,
+     0.02,
+     0.0
+    ],
+    "land": [
+     0.2,
+     0.2,
+     0.05,
+     0.02,
+     0.0
+    ],
+    "water": [
+     0.2,
+     0.19,
+     0.03,
+     0.02,
+     0.0
+    ]
+   }
+  },
+  "recluse": {
+   "bar": "armsptk",
+   "income_tier": [
+    1,
+    30,
+    60,
+    80
+   ],
+   "native_lab": "armalab",
+   "role": [
+    "support"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.0,
+    "water": 0.0
+   },
+   "tiers": {
+    "land": [
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.05
+    ],
+    "water": [
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.02
+    ]
+   }
+  },
+  "riptide": {
+   "bar": "corpship",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corsy",
+   "role": [
+    "riot"
+   ],
+   "tiers": {
+    "land": [
+     0.2,
+     0.3
+    ]
+   }
+  },
+  "scorpion": {
+   "bar": "corvipe",
+   "role": [
+    "static"
+   ]
+  },
+  "screamer": {
+   "bar": "corscreamer",
+   "role": [
+    "anti_air"
+   ],
+   "threat": {
+    "air": 2.0,
+    "surf": 0.0,
+    "water": 0.0
+   }
+  },
+  "seaplane_platform": {
+   "bar": "corplat",
+   "build_speed": 10.0,
+   "limit": 1,
+   "role": [
+    "builder"
+   ],
+   "since": 420
+  },
+  "sharpshooter": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "armsnipe",
+   "income_tier": [
+    1,
+    30,
+    60,
+    80
+   ],
+   "native_lab": "armalab",
+   "retreat": 0.6,
+   "role": [
+    "anti_heavy_ass"
+   ],
+   "threat": {
+    "air": 0.0,
+    "vs": {
+     "raider": 0.5,
+     "scout": 0.5
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "land": [
+     0.0,
+     0.0,
+     0.2,
+     0.2,
+     0.2
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.05,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "shipyard": {
+   "bar": "corsy",
+   "build_speed": 8.0,
+   "limit": 1,
+   "role": [
+    "static"
+   ]
+  },
+  "shiva": {
+   "bar": "corshiva",
+   "income_tier": [
+    100,
+    200,
+    300,
+    400
+   ],
+   "native_lab": "corgant",
+   "retreat": 0.6,
+   "role": [
+    "assault",
+    "heavy"
+   ],
+   "tiers": {
+    "land": [
+     0.5,
+     0.3,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "water": [
+     0.4,
+     0.2,
+     0.1,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "solar_collector": {
+   "bar": "armsolar",
+   "build_mod": 300,
+   "role": [
+    "static"
+   ]
+  },
+  "starlight": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "armmanni",
+   "income_tier": [
+    40,
+    60,
+    100
+   ],
+   "native_lab": "armavp",
+   "role": [
+    "anti_heavy_ass"
+   ],
+   "threat": {
+    "air": 0.0,
+    "vs": {
+     "anti_air": 2.0,
+     "heavy": 2.0,
+     "raider": 0.5
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "air": [
+     0.03,
+     0.1,
+     0.2,
+     0.25
+    ],
+    "land": [
+     0.0,
+     0.2,
+     0.2,
+     0.25
+    ],
+    "water": [
+     0.0,
+     0.15,
+     0.15,
+     0.25
+    ]
+   }
+  },
+  "stiletto": {
+   "attribute": [
+    "support"
+   ],
+   "bar": "armstil",
+   "income_tier": [
+    70
+   ],
+   "native_lab": "armaap",
+   "power": 0.05,
+   "retreat": 0.6,
+   "role": [
+    "assault",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.0,
+     0.2
+    ],
+    "land": [
+     0.1,
+     0.2
+    ]
+   }
+  },
+  "sumo": {
+   "attribute": [
+    "melee"
+   ],
+   "bar": "corcan",
+   "income_tier": [
+    30,
+    60
+   ],
+   "native_lab": "coralab",
+   "role": [
+    "skirmish"
+   ],
+   "tiers": {
+    "land": [
+     0.0,
+     0.25,
+     0.1
+    ],
+    "water": [
+     0.05,
+     0.05,
+     0.05
+    ]
+   }
+  },
+  "supporter": {
+   "bar": "coresupp",
+   "income_tier": [
+    20
+   ],
+   "native_lab": "corsy",
+   "role": [
+    "scout"
+   ],
+   "tiers": {
+    "land": [
+     0.5,
+     0.3
+    ]
+   }
+  },
+  "thistle": {
+   "bar": "corrl",
+   "role": [
+    "anti_air"
+   ],
+   "threat": {
+    "air": 2.0,
+    "surf": 0.0,
+    "water": 0.0
+   }
+  },
+  "thor": {
+   "bar": "armthor",
+   "income_tier": [
+    100,
+    200,
+    300,
+    400
+   ],
+   "native_lab": "armshltx",
+   "power": 0.1,
+   "retreat": 0.4,
+   "role": [
+    "super"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 1.0,
+    "water": 0.0
+   },
+   "tiers": {
+    "land": [
+     0.0,
+     0.0,
+     0.25,
+     0.25,
+     0.25
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "thug": {
+   "bar": "corthud",
+   "income_tier": [
+    20,
+    30,
+    70,
+    120
+   ],
+   "native_lab": "corlab",
+   "role": [
+    "skirmish"
+   ],
+   "threat": {
+    "vs": {
+     "artillery": 2.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.08,
+     0.3,
+     0.5,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.4,
+     0.4,
+     0.4,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "tick": {
+   "bar": "armflea",
+   "income_tier": [
+    2,
+    25,
+    35,
+    50,
+    100
+   ],
+   "limit": 5,
+   "native_lab": "armlab",
+   "role": [
+    "scout"
+   ],
+   "threat": {
+    "air": 0.0,
+    "vs": {
+     "anti_air": 2.0,
+     "artillery": 2.0
+    },
+    "water": 0.0
+   },
+   "tiers": {
+    "air": [
+     0.3,
+     0.2,
+     0.05,
+     0.05,
+     0.0,
+     0.1
+    ],
+    "land": [
+     0.3,
+     0.3,
+     0.1,
+     0.1,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "tiger": {
+   "bar": "correap",
+   "income_tier": [
+    30,
+    60
+   ],
+   "native_lab": "coravp",
+   "role": [
+    "skirmish"
+   ],
+   "tiers": {
+    "air": [
+     0.4,
+     0.4,
+     0.4
+    ],
+    "land": [
+     0.35,
+     0.3,
+     0.25
+    ],
+    "water": [
+     0.1,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "trasher": {
+   "bar": "corcrash",
+   "income_tier": [
+    20,
+    30,
+    70,
+    120
+   ],
+   "limit": 10,
+   "native_lab": "corlab",
+   "role": [
+    "anti_air"
+   ],
+   "tiers": {
+    "air": [
+     0.1,
+     0.1,
+     0.1,
+     0.0,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.0,
+     0.01,
+     0.01,
+     0.01
+    ]
+   }
+  },
+  "twin_guard": {
+   "bar": "corhllt",
+   "role": [
+    "static"
+   ],
+   "threat": {
+    "air": 0.2,
+    "default": 1.0,
+    "surf": 1.0,
+    "vs": {
+     "artillery": 0.3,
+     "assault": 0.8
+    },
+    "water": 0.1
+   }
+  },
+  "urchin": {
+   "bar": "cortl",
+   "role": [
+    "static"
+   ],
+   "threat": {
+    "air": 0.0,
+    "surf": 2.0,
+    "vs": {
+     "comm": 10
+    },
+    "water": 1.0
+   }
+  },
+  "valiant": {
+   "bar": "corveng",
+   "income_tier": [
+    30,
+    90
+   ],
+   "native_lab": "corap",
+   "power": 0.5,
+   "retreat": 0.5,
+   "role": [
+    "anti_air",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.3,
+     0.4,
+     0.01
+    ],
+    "land": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "vanguard": {
+   "bar": "armvang",
+   "income_tier": [
+    100,
+    200,
+    300,
+    400
+   ],
+   "native_lab": "armshltx",
+   "role": [
+    "artillery"
+   ],
+   "threat": {
+    "air": 0.0,
+    "water": 0.0
+   },
+   "tiers": {
+    "land": [
+     0.45,
+     0.5,
+     0.4,
+     0.4,
+     0.4
+    ],
+    "water": [
+     0.2,
+     0.1,
+     0.1,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "vehicle_lab": {
+   "bar": "corvp",
+   "build_speed": 5.0,
+   "limit": 1,
+   "role": [
+    "builder"
+   ]
+  },
+  "wall": {
+   "bar": "armdrag",
+   "ignore": true,
+   "role": [
+    "static"
+   ]
+  },
+  "warden": {
+   "bar": "corhlt",
+   "role": [
+    "static"
+   ],
+   "threat": {
+    "air": 0.2,
+    "vs": {
+     "artillery": 0.5,
+     "assault": 0.8
+    },
+    "water": 0.1
+   }
+  },
+  "whirlwind": {
+   "bar": "corshad",
+   "income_tier": [
+    30,
+    90
+   ],
+   "native_lab": "corap",
+   "retreat": 0.5,
+   "role": [
+    "bomber",
+    "air"
+   ],
+   "tiers": {
+    "air": [
+     0.15,
+     0.15,
+     0.0
+    ],
+    "land": [
+     0.3,
+     0.3,
+     0.0
+    ]
+   }
+  },
+  "wolverine": {
+   "attribute": [
+    "siege"
+   ],
+   "bar": "corwolv",
+   "income_tier": [
+    1,
+    15,
+    25,
+    50
+   ],
+   "native_lab": "corvp",
+   "role": [
+    "artillery"
+   ],
+   "threat": {
+    "surf": 0.2,
+    "vs": {
+     "artillery": 5.0,
+     "static": 5.0
+    }
+   },
+   "tiers": {
+    "air": [
+     0.0,
+     0.0,
+     0.06,
+     0.2,
+     0.0
+    ],
+    "land": [
+     0.0,
+     0.0,
+     0.1,
+     0.1,
+     0.0
+    ],
+    "water": [
+     0.0,
+     0.0,
+     0.06,
+     0.2,
+     0.0
+    ]
+   }
+  }
+ }
+}

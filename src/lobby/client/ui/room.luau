@@ -85,6 +85,8 @@ local function Room(props: {
 			Settings = React.createElement(settings_panel.SettingsPanel, {
 				mode = lobby.match.mode,
 				visibility = lobby.visibility,
+				level_min = lobby.level_min,
+				level_max = lobby.level_max,
 				ally_griefing = lobby.match.ally_griefing,
 				end_mode = lobby.match.end_mode,
 				is_host = is_host,

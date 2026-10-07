@@ -84,7 +84,7 @@ local function draw_reach(info: ModeInfo, entries: { selected.Entry }, to: Vecto
 		end
 		local from = if queued then queue_paths.expected_end(entry.model) else world.position_of(entry.model)
 		local pool = if geometry.distance_2d(from, to) <= range then in_reach_pool else out_of_reach_pool
-		world_fx.lay_line(world_fx.ground_points(from, to, LINE_STEP), LINE_STYLE, colored(pool, info.color))
+		world_fx.lay_line(world_fx.ground_points(from, to, LINE_STEP, "surface"), LINE_STYLE, colored(pool, info.color))
 		drawn += 1
 		if drawn >= MOST_LINES then
 			return

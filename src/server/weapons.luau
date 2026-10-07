@@ -289,7 +289,7 @@ end
 
 -- Weapon `index` of a piloted `entity`, `weapon`, which its pilot has not chosen: it holds its fire, its reload runs
 -- on, and its turret turns back to rest.
-local function hold(entity: Entity, weapons: { Weapon }, index: number, frame: CFrame, delta: number)
+local function hold(entity: Entity, weapons: { Weapon }, index: number, frame: muzzles.Frame, delta: number)
 	local turret = weapons[index].turret
 	if turret ~= nil then
 		turrets.turn(entity, index, turret, muzzles.origin_of(entity, frame, index), nil, delta)
@@ -305,7 +305,7 @@ local function tick_weapon(
 	entity: Entity,
 	weapons: { Weapon },
 	index: number,
-	frame: CFrame,
+	frame: muzzles.Frame,
 	claimed: { EntityId },
 	pilot: pilots.Pilot?,
 	delta: number

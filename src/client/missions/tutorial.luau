@@ -25,7 +25,7 @@ type Guide = kit.Guide
 -- How close to where the move step asks the commander to be sent (the map's `first_move`) a right click, or the
 -- commander, has to be to count.
 local MOVE_TOLERANCE = 12
--- The keys that do not pan.
+-- W, A, S and D, which the keybinds may or may not pan with (in BAR's they do not).
 local WASD: { [Enum.KeyCode]: boolean } = table.freeze({
 	[Enum.KeyCode.W] = true,
 	[Enum.KeyCode.A] = true,
@@ -35,8 +35,19 @@ local WASD: { [Enum.KeyCode]: boolean } = table.freeze({
 -- How many solar collectors, and how many grunts, their steps ask for.
 local SOLARS = 3
 local GRUNTS = 5
--- How wide the ring round the pass's boulder is.
+-- How wide the ring round the pass's boulder is, and the one round your commander on the way to it.
 local BOULDER_RING = 26
+local COMMANDER_RING = 5
+
+-- Whether none of W, A, S and D pans.
+local function wasd_still(): boolean
+	for key in WASD do
+		if camera.pans(key) then
+			return false
+		end
+	end
+	return true
+end
 
 local function within_reach(position: Vector3): boolean
 	local target = mission_map.here "first_move"
@@ -69,8 +80,14 @@ local GUIDE: Guide = {
 					caption = "WASD does not move the camera",
 					mark = "cross",
 					picture = { kind = "wasd" },
+					shown = wasd_still,
 				},
-				{ id = "arrows", caption = "Use the arrow keys", mark = "check", picture = { kind = "arrows" } },
+				{
+					id = "arrows",
+					caption = "Use {key:camera_up} {key:camera_left} {key:camera_down} {key:camera_right}",
+					mark = "check",
+					picture = { kind = "arrows" },
+				},
 				{
 					id = "middle_drag",
 					caption = "Or hold the middle mouse button and drag",
@@ -79,11 +96,11 @@ local GUIDE: Guide = {
 				},
 			},
 			watch = function(complete: (card: string) -> ()): () -> ()
-				-- W, A, S and D only show that they do not pan here (the card watches them), rather than starting the
-				-- commands they are bound to: a layer over the rest takes them
+				-- W, A, S and D, those of them that do not pan, only show that they do not here (the card watches them),
+				-- rather than starting the commands they are bound to: a layer over the rest takes them
 				local unblock = input_router.push({
 					began = function(input: InputObject): boolean
-						return WASD[input.KeyCode] == true
+						return WASD[input.KeyCode] == true and camera.pans(input.KeyCode) == false
 					end,
 					ended = function() end,
 					exclusive = false,
@@ -250,25 +267,34 @@ local GUIDE: Guide = {
 			cards = {
 				{
 					id = "dgun",
-					caption = "Move your commander towards the boulder, then press D to use your Disintegrator Gun on the boulder.",
+					caption = "Move your commander towards the boulder, then press {key:mode_manual} to use your Disintegrator Gun on the boulder.",
 					mark = "check",
 					picture = { kind = "unit", def_name = "commander" },
 				},
 			},
-			-- Done once the boulder is gone, however that came about.
-			watch = kit.with_marker(
-				function(): Vector2
-					return mission_map.here "pass"
+			-- Done once the boulder is gone, however that came about. Your commander is marked too, so it can be found.
+			watch = kit.watch_all({
+				function(): () -> ()
+					local commander = kit.my_commander()
+					if commander == nil then
+						return function() end
+					end
+					return tutorial_marker.follow(commander, COMMANDER_RING)
 				end,
-				BOULDER_RING,
-				function(complete: (card: string) -> ()): () -> ()
-					return kit.every_check(function()
-						if boulder_standing() == false then
-							complete "dgun"
-						end
-					end)
-				end
-			),
+				kit.with_marker(
+					function(): Vector2
+						return mission_map.here "pass"
+					end,
+					BOULDER_RING,
+					function(complete: (card: string) -> ()): () -> ()
+						return kit.every_check(function()
+							if boulder_standing() == false then
+								complete "dgun"
+							end
+						end)
+					end
+				),
+			}),
 		},
 		{
 			id = "destroy",

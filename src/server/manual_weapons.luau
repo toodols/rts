@@ -29,19 +29,13 @@ type Entity = types.Entity
 -- the shooter is "unable" to, being dead, unfinished or without one.
 export type Result = "fired" | "waiting" | "blocked" | "unable"
 
--- Fires `shooter`'s manual weapon toward `aim`: straight ahead if it was aimed at the shooter itself.
-local function fire(shooter: Entity, aim: Vector3): Result
-	if shooter.alive == false or shooter.state ~= "active" then
-		return "unable"
-	end
+-- What a shot of `shooter`'s manual weapon toward `aim` would sweep away, as `fire` would fire it now, and whether an
+-- enemy commander in the way would block it; nil for something with no manual weapon.
+local function sweep(shooter: Entity, aim: Vector3): ({ Entity }?, boolean, Vector3)
 	local weapon = shooter.def.manual_weapon
 	if weapon == nil then
-		return "unable"
+		return nil, false, Vector3.zero
 	end
-	if shooter.manual_reload_remaining > 0 or control.can_act(shooter) == false then
-		return "waiting"
-	end
-
 	local direction = geometry.flatten(aim - shooter.position)
 	if direction.Magnitude < 1e-3 then
 		direction = Vector3.new(math.sin(shooter.facing), 0, math.cos(shooter.facing))
@@ -77,6 +71,22 @@ local function fire(shooter: Entity, aim: Vector3): Result
 			table.insert(inside, other)
 		end
 	end)
+	return inside, blocked, direction
+end
+
+-- Fires `shooter`'s manual weapon toward `aim`: straight ahead if it was aimed at the shooter itself.
+local function fire(shooter: Entity, aim: Vector3): Result
+	if shooter.alive == false or shooter.state ~= "active" then
+		return "unable"
+	end
+	local weapon = shooter.def.manual_weapon
+	if weapon == nil then
+		return "unable"
+	end
+	if shooter.manual_reload_remaining > 0 or control.can_act(shooter) == false then
+		return "waiting"
+	end
+	local inside, blocked, direction = sweep(shooter, aim)
 	if blocked then
 		return "blocked"
 	end
@@ -97,7 +107,7 @@ local function fire(shooter: Entity, aim: Vector3): Result
 		radius = weapon.radius,
 	})
 
-	for _, other in inside do
+	for _, other in inside :: { Entity } do
 		deaths.destroy(other, "disintegrated", shooter)
 	end
 	return "fired"
@@ -112,5 +122,6 @@ end
 
 return table.freeze({
 	fire = fire,
+	sweep = sweep,
 	reload = reload,
 })

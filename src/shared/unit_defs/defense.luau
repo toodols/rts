@@ -45,6 +45,17 @@ local function interceptor(coverage: number): Weapon
 				edge_effectiveness = 0.15,
 				-- not bar's: fmd_rocket's turnrate is 10000, conversions.turn_rate(10000)
 				turn_rate = 8,
+				-- a slim white missile on a blue-white flame, gone in a blink at this speed, so what shows is the
+				-- contrail and smoke it leaves hanging along the way it flew up to the nuke
+				look = {
+					size = Vector3.new(0.8, 0.8, 4),
+					color = Color3.fromRGB(235, 238, 242),
+					material = Enum.Material.Metal,
+					trail = { color = Color3.fromRGB(225, 240, 255), width = 1.6, lifetime = 3 },
+					flame = { color = Color3.fromRGB(150, 210, 255), size = 1.8, rate = 240, lifetime = 0.15 },
+					smoke = { color = Color3.fromRGB(215, 218, 222), size = 1.6, rate = 160, lifetime = 2.5 },
+					light = { color = Color3.fromRGB(160, 215, 255), range = 24, brightness = 4 },
+				},
 			}),
 		},
 	}

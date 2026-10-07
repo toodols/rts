@@ -135,6 +135,14 @@ local function init(slots: Slots)
 	handlers = table.freeze(table.clone(slots))
 end
 
+-- What runs once a step is over, before the next: a replay checking itself against the game it recorded (replay.luau).
+local stepped: { () -> () } = {}
+
+-- Runs `run` after every step from now on.
+local function on_stepped(run: () -> ())
+	table.insert(stepped, run)
+end
+
 local function step(delta: number)
 	local slots = handlers
 	assert(slots ~= nil, "the simulation's slots are handed in (simulation.init) before it steps")
@@ -152,9 +160,13 @@ local function step(delta: number)
 	-- what the step brought is told to the world outside it
 	outbox.deliver()
 	profiler.step_done()
+	for _, run in stepped do
+		run()
+	end
 end
 
 return table.freeze({
+	on_stepped = on_stepped,
 	init = init,
 	step = step,
 })

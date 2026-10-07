@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local React = require(ReplicatedStorage.Packages.react)
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
+local keybinds = require(ReplicatedStorage.Shared.keybinds)
 local def_catalog = require(ReplicatedStorage.Shared.def_catalog)
 local rarity = require(ReplicatedStorage.Shared.rarity)
 local types = require(ReplicatedStorage.Shared.types)
@@ -18,6 +19,7 @@ local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local art_icon = require(ReplicatedStorage.ClientShared.art_icon)
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
 
 local entry_link = require(script.Parent.entry_link)
@@ -169,14 +171,12 @@ local function WeaponCard(props: {
 				[React.Tag] = "weapon-figure weapon",
 				LayoutOrder = 4,
 				Text = `{props.dps} <font size="10">DPS</font>`,
-				RichText = true,
 			})
 			else nil,
 		Range = React.createElement("TextLabel", {
 			[React.Tag] = "weapon-figure",
 			LayoutOrder = 5,
 			Text = `{props.range} <font size="10">RANGE</font>`,
-			RichText = true,
 		}),
 	}
 	return React.createElement("Frame", {
@@ -338,6 +338,8 @@ local function EntryBody(props: {
 })
 	local def = props.def
 	local tips = unit_descriptions.tips_of(def.name)
+	-- the keys a tip names are the player's own
+	local bindings = keybind_state.use_bindings()
 	local children: { [string]: any } = {}
 	local order = 0
 	local function next_order(): number
@@ -356,7 +358,7 @@ local function EntryBody(props: {
 			children[`Tip{index}`] = React.createElement("TextLabel", {
 				[React.Tag] = "entry-tip",
 				LayoutOrder = next_order(),
-				Text = `›  {tip}`,
+				Text = `›  {keybinds.fill(tip, bindings)}`,
 			})
 		end
 	end

@@ -17,6 +17,7 @@ local spots = require(ReplicatedStorage.Shared.spots)
 local starts = require(ReplicatedStorage.Shared.starts)
 local order_kinds = require(ReplicatedStorage.Shared.order_kinds)
 local build_hotkeys = require(ReplicatedStorage.Shared.build_hotkeys)
+local keybinds = require(ReplicatedStorage.Shared.keybinds)
 local order_path = require(ReplicatedStorage.Shared.order_path)
 
 local state = require(ServerScriptService.Server.state)
@@ -931,7 +932,8 @@ local function rez_repair(args: Args): Findings
 end
 
 -- The build keys (shared/build_hotkeys.luau), which the key handler and the build menu both read: every building in a
--- category is one there is, it is in no other category, and no key picks two things in one category. What a category's
+-- category is one there is, it is in no other category, and no key of the default keybind profile picks two things in
+-- one category. What a category's
 -- own key places for a commander is its main building while that is unlocked; with the main building locked it is the
 -- first unlocked building in the category the commander can build, and the menu still shows the main building, locked.
 local function build_hotkeys_data(_args: Args): Findings
@@ -939,13 +941,15 @@ local function build_hotkeys_data(_args: Args): Findings
 	local in_two: { string } = {}
 	local repeated_keys: { string } = {}
 	local seen: { [string]: string } = {}
+	local bindings = keybinds.resolve(keybinds.fresh())
 	for _, category in build_hotkeys.categories do
 		local keys: { [string]: boolean } = {}
 		for _, pick in category.picks do
-			if keys[pick.key] then
-				table.insert(repeated_keys, `{category.name} {pick.key}`)
+			local key = bindings[pick.action]
+			if keys[key] then
+				table.insert(repeated_keys, `{category.name} {key}`)
 			end
-			keys[pick.key] = true
+			keys[key] = true
 		end
 		for _, def_name in category.defs do
 			local def = unit_defs.defs[def_name]
@@ -959,7 +963,28 @@ local function build_hotkeys_data(_args: Args): Findings
 		end
 	end
 
-	local economy = build_hotkeys.started_by "Z" :: build_hotkeys.Category
+	-- every lab's every unit has a key slot there, and the lab slots name only what the lab makes
+	local lab_keys_missing: { string } = {}
+	for name, def in unit_defs.defs do
+		if unit_defs.is_factory(def) == false then
+			continue
+		end
+		for _, unit in unit_defs.build_options(def) do
+			if build_hotkeys.lab_action(name, unit) == nil then
+				table.insert(lab_keys_missing, `{name}: {unit}`)
+			end
+		end
+	end
+	for lab, units in build_hotkeys.labs do
+		local def = unit_defs.defs[lab]
+		for unit in units do
+			if def == nil or table.find(unit_defs.build_options(def), unit) == nil then
+				table.insert(lab_keys_missing, `{lab} has no {unit}`)
+			end
+		end
+	end
+
+	local economy = build_hotkeys.started_by "build_economy" :: build_hotkeys.Category
 	local builds = unit_defs.build_options(unit_defs.get "commander")
 	local all_unlocked = build_hotkeys.entry(economy, builds, function(_: string): boolean
 		return true
@@ -980,6 +1005,7 @@ local function build_hotkeys_data(_args: Args): Findings
 		unknown = table.concat(unknown, ", "),
 		in_two_categories = table.concat(in_two, ", "),
 		repeated_keys = table.concat(repeated_keys, ", "),
+		lab_keys_missing = table.concat(lab_keys_missing, ", "),
 		economy_entry = all_unlocked,
 		entry_with_main_locked = locked_entry,
 		shown_with_main_locked = locked_shown,
@@ -987,6 +1013,7 @@ local function build_hotkeys_data(_args: Args): Findings
 	findings.pass = #unknown == 0
 		and #in_two == 0
 		and #repeated_keys == 0
+		and #lab_keys_missing == 0
 		and all_unlocked == "metal_extractor"
 		and locked_entry == expected_locked
 		and locked_entry ~= nil
@@ -1001,6 +1028,71 @@ local function build_hotkeys_data(_args: Args): Findings
 				end)
 			)
 			== "metal_extractor"
+	return findings
+end
+
+-- The keybinds (shared/keybinds.luau): in every profile no two actions that share a scope share a key; binding a key
+-- unbinds only what shares a scope with the action it goes to, and binding it back puts the profile's key back with
+-- nothing left rebound; a record read from anything keeps only what a record can hold; and a tip's key is filled in.
+local function keybinds_data(_args: Args): Findings
+	local clashes: { string } = {}
+	for _, profile in keybinds.profiles do
+		local bindings = keybinds.resolve({ profile = profile.id, custom = {} })
+		for index, each in keybinds.actions do
+			for other_index = index + 1, #keybinds.actions do
+				local other = keybinds.actions[other_index]
+				local binding = bindings[each.id]
+				if binding == "" or bindings[other.id] ~= binding then
+					continue
+				end
+				for _, scope in each.scopes do
+					if table.find(other.scopes, scope) ~= nil then
+						table.insert(clashes, `{profile.id}: {each.id} and {other.id} on {binding}`)
+						break
+					end
+				end
+			end
+		end
+	end
+
+	local fresh = keybinds.fresh()
+	local default = keybinds.DEFAULT_PROFILE
+	local fresh_bindings = keybinds.resolve(fresh)
+	-- G stops; given to Attack it unbinds Stop, but not the Mount a piloted unit calls with G
+	local moved, unbound = keybinds.bind(fresh, "mode_attack", "G")
+	local moved_bindings = keybinds.resolve(moved)
+	local back = keybinds.bind(keybinds.bind(moved, "mode_attack", fresh_bindings.mode_attack), "stop", "G")
+	local decoded = keybinds.decode({
+		profile = "nonsense",
+		custom = { [default] = { stop = "Ctrl+H", camera_up = "Ctrl+W", nothing = "A", select_same = "Escape" } },
+	})
+	local decoded_bindings = keybinds.resolve(decoded)
+
+	local findings: Findings = {
+		clashes = table.concat(clashes, "; "),
+		unbound = table.concat(unbound, ", "),
+		pilot_call_kept = moved_bindings.pilot_call,
+		back_to_profile = keybinds.same(back, fresh),
+		decoded_stop = decoded_bindings.stop,
+		decoded_camera_up = decoded_bindings.camera_up,
+		decoded_select_same = decoded_bindings.select_same,
+		filled = keybinds.fill("Press {key:shield}, {key:self_destruct}", keybinds.resolve(fresh)),
+	}
+	findings.pass = #clashes == 0
+		and #unbound == 1
+		and unbound[1] == "stop"
+		and moved_bindings.stop == ""
+		and moved_bindings.mode_attack == "G"
+		and moved_bindings.pilot_call == "G"
+		and back.custom[default] ~= nil
+		and next(back.custom[default]) == nil
+		and findings.back_to_profile == true
+		and decoded.profile == default
+		and decoded_bindings.stop == "Ctrl+H"
+		-- a held action takes no ctrl, and Escape is never bound
+		and decoded_bindings.camera_up == fresh_bindings.camera_up
+		and decoded_bindings.select_same == "Q"
+		and findings.filled == "Press K, Ctrl+B"
 	return findings
 end
 
@@ -1074,6 +1166,7 @@ local TESTS: { [string]: Test } = {
 	repair_while_reclaimed = { run = repair_while_reclaimed },
 	order_path_codec = { run = order_path_codec },
 	build_hotkeys = { run = build_hotkeys_data },
+	keybinds = { run = keybinds_data },
 	build_route = { run = build_route },
 	build_in_reach = { run = build_in_reach, defaults = { preset = "koth" } },
 	build_reach_edge = { run = build_reach_edge },

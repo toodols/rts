@@ -14,6 +14,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local piloting = require(ReplicatedStorage.Shared.piloting)
 local weapon_kinds = require(ReplicatedStorage.Shared.weapon_kinds)
 local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
+local keybinds = require(ReplicatedStorage.Shared.keybinds)
 
 local world = require(ReplicatedStorage.Client.world)
 local pilot = require(ReplicatedStorage.Client.pilot)
@@ -21,6 +22,7 @@ local use_team_resources = require(ReplicatedStorage.Client.ui.use_team_resource
 local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 
 local format = require(ReplicatedStorage.ClientShared.format)
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 type EntityId = types.EntityId
@@ -101,9 +103,10 @@ end
 -- One key's tile: the key in its corner and what it does across the middle; for a weapon that costs energy, what it
 -- costs along the bottom, and for one that reloads, a shade over the part of it not yet charged, which draws back down
 -- it as it charges. `lit` is for the weapon the trigger fires, or the order the army is under. It flashes whenever its
--- key is pressed (`pilot.pressed_at`), and the chosen weapon's whenever the trigger is.
+-- key is pressed (`pilot.pressed_at`), and the chosen weapon's whenever the trigger is. `action` is its key's keybind
+-- action, and the key shown is the player's own for it.
 local function Ability(props: {
-	keybind: string,
+	action: string,
 	name: string,
 	cost: string?,
 	charge: number?,
@@ -112,10 +115,11 @@ local function Ability(props: {
 	danger: boolean?,
 	LayoutOrder: number,
 })
-	local flash = use_flash(pilot.pressed_at(props.keybind))
+	local bindings = keybind_state.use_bindings()
+	local flash = use_flash(pilot.pressed_at(props.action))
 	local failure = pilot.last_failure()
 	local failed =
-		use_flash(if failure ~= nil and failure.key == props.keybind then failure.at else nil, FAILED_FLASH_SECONDS)
+		use_flash(if failure ~= nil and failure.action == props.action then failure.at else nil, FAILED_FLASH_SECONDS)
 	local charge = if props.charge ~= nil then props.charge else 1
 	local tags = "pilot-ability"
 	if props.large == true then
@@ -159,7 +163,7 @@ local function Ability(props: {
 			else nil,
 		Keybind = React.createElement("TextLabel", {
 			[React.Tag] = "pilot-ability-key",
-			Text = props.keybind,
+			Text = keybinds.label(bindings[props.action] or ""),
 		}),
 		Name = React.createElement("TextLabel", {
 			[React.Tag] = "pilot-ability-name",
@@ -192,7 +196,7 @@ local function WeaponAbility(props: {
 	local charge = use_number(props.model, entity_attrs.charge_name(props.index), 1)
 	local weapon = props.weapon
 	return React.createElement(Ability, {
-		keybind = tostring(props.index),
+		action = pilot.weapon_action(props.index),
 		name = weapon_kinds.get(weapon.kind).name,
 		cost = if weapon.energy_per_shot > 0 then `{weapon.energy_per_shot} E` else nil,
 		charge = charge,
@@ -449,7 +453,7 @@ local function PilotHud()
 	end
 	if manual ~= nil then
 		abilities.Dgun = React.createElement(Ability, {
-			keybind = "Q",
+			action = "pilot_dgun",
 			name = "DGUN",
 			cost = `{manual.energy_per_shot} E`,
 			charge = charge,
@@ -462,14 +466,14 @@ local function PilotHud()
 	if def ~= nil and def.transport ~= nil then
 		if cargo_used <= 0 then
 			abilities.Load = React.createElement(Ability, {
-				keybind = "J",
+				action = "pilot_load",
 				name = "LOAD",
 				charge = if can_load then 1 else 0,
 				LayoutOrder = order + 2,
 			})
 		else
 			abilities.Unload = React.createElement(Ability, {
-				keybind = "U",
+				action = "pilot_unload",
 				name = "UNLOAD",
 				charge = if can_unload then 1 else 0,
 				LayoutOrder = order + 2,
@@ -478,7 +482,7 @@ local function PilotHud()
 	elseif def ~= nil and def.weight_class ~= nil then
 		-- lit while the transport it called is on its way, and red for a moment if that is shot down
 		abilities.Call = React.createElement(Ability, {
-			keybind = "G",
+			action = "pilot_call",
 			name = if call_state == "coming" then "INBOUND" elseif call_state == "lost" then "LOST" else "MOUNT",
 			charge = if can_call or call_state == "coming" then 1 else 0,
 			lit = call_state == "coming",
@@ -487,19 +491,19 @@ local function PilotHud()
 		})
 	end
 	abilities.Hold = React.createElement(Ability, {
-		keybind = "X",
+		action = "pilot_hold",
 		name = "HOLD",
 		lit = command ~= nil and command.kind == "hold",
 		LayoutOrder = order + 3,
 	})
 	abilities.Follow = React.createElement(Ability, {
-		keybind = "C",
+		action = "pilot_follow",
 		name = "FOLLOW",
 		lit = command ~= nil and command.kind == "follow",
 		LayoutOrder = order + 4,
 	})
 	abilities.Attack = React.createElement(Ability, {
-		keybind = "V",
+		action = "pilot_attack",
 		name = "ATTACK",
 		lit = command ~= nil and command.kind == "attack",
 		LayoutOrder = order + 5,

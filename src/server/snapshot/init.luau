@@ -161,5 +161,6 @@ return table.freeze({
 	capture = capture,
 	restore = restore,
 	take = take,
+	checksum = checksum,
 	describe = describe,
 })

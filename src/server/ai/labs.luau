@@ -167,10 +167,18 @@ local function product_for(brain: Brain, census: Census, economy: Economy, facto
 	end
 
 	local aircraft = brain.field.enemy_air_count
+	local early = profile.early_anti_air > 0
+		and census.anti_air_units < profile.early_anti_air
+		and catalog.any_aircraft_lab(census.enemy_structures)
 	if
-		aircraft >= profile.air_threat_count
-		and #anti_air > 0
-		and census.anti_air_units < math.ceil(aircraft * profile.anti_air_per_aircraft)
+		#anti_air > 0
+		and (
+			early
+			or (
+				aircraft >= profile.air_threat_count
+				and census.anti_air_units < math.ceil(aircraft * profile.anti_air_per_aircraft)
+			)
+		)
 	then
 		return within_budget(anti_air[rng.stream(brain.stream):NextInteger(1, #anti_air)])
 	end

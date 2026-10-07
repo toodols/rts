@@ -163,10 +163,24 @@ local function forget(team_id: TeamId)
 	histories[team_id] = nil
 end
 
+-- The seconds the fight predictor took are the wall clock's, not the game's, and never the same twice, so they are not
+-- kept: a game put back keeps counting its own (0 in a game that had none), and two copies of a game still keep the
+-- same bytes (a replay checks itself by them, server/replay.luau).
 snapshot.keep("ai_inspect", function()
-	return { histories = histories }
+	local kept = {}
+	for team, history in histories do
+		local copy: any = table.clone(history)
+		copy.sim_seconds = nil
+		kept[team] = copy
+	end
+	return { histories = kept }
 end, function(saved)
+	local before = histories
 	histories = saved.histories
+	for team, history in histories do
+		local counted = before[team]
+		history.sim_seconds = if counted ~= nil then counted.sim_seconds else 0
+	end
 end)
 
 return table.freeze({

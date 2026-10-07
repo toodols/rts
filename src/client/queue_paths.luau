@@ -1,9 +1,9 @@
 --!strict
--- The queues of the selected units, drawn every frame: for each, a line from where it stands through each order still
--- in its queue, as the server published it (shared/order_path), a dot on each waypoint (or a glow under what it
--- guards), the see-through building each build order will put up, and the circle of each area order. Where each order
--- is drawn is its kind's (`order_kinds` `drawn_at`). Also where a unit is expected to end up once its queue is done
--- (`expected_end`), which what is aimed from the end of a queue starts from.
+-- The queues of the selected units (yours, or anyone's for a spectator), drawn every frame: for each, a line from where
+-- it stands through each order still in its queue, as the server published it (shared/order_path), a dot on each
+-- waypoint (or a glow under what it guards), the see-through building each build order will put up, and the circle of
+-- each area order. Where each order is drawn is its kind's (`order_kinds` `drawn_at`). Also where a unit is expected to
+-- end up once its queue is done (`expected_end`), which what is aimed from the end of a queue starts from.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local RunService = game:GetService "RunService"
@@ -69,10 +69,7 @@ local without_art: { [string]: boolean } = {}
 -- Where `point` is drawn for something of `def` that travels through it: on the water's surface if it rides it,
 -- and where the ground is otherwise.
 local function travelled(def: EntityDef?, point: Vector3): Vector3
-	if def ~= nil and unit_defs.rides_surface(def) then
-		return surface.position(def, point.X, point.Z)
-	end
-	return point
+	return world_fx.at(world_fx.footing_of(def), point.X, point.Z)
 end
 
 -- What `step` is aimed at, if it is aimed at something that is there.
@@ -210,7 +207,7 @@ end
 local function update()
 	for _, id in selection.get() do
 		local model = world.get(id)
-		if model == nil or world.is_mine(model) == false then
+		if model == nil or world.is_selectable(model) == false then
 			continue
 		end
 		local text = entity_attrs.text(model, "path")

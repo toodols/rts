@@ -1,5 +1,5 @@
 --!strict
--- The lobby's game mode, who may join it, whether allies' weapons hurt each other and, for a team game or a free for
+-- The lobby's game mode, who may join it and of what levels, whether allies' weapons hurt each other and, for a team game or a free for
 -- all, how it is won. The host changes them; everyone else sees them. A co-op lobby's mode is its campaign mission, and
 -- stays as the mission has it; its host still picks ally griefing.
 
@@ -12,6 +12,7 @@ local game_modes = require(ReplicatedStorage.Shared.game_modes)
 local protocol = require(ReplicatedStorage.Lobby.protocol)
 
 local controls = require(script.Parent.controls)
+local level_range = require(script.Parent.level_range)
 
 type Mode = game_modes.Mode
 
@@ -53,6 +54,8 @@ end
 local function SettingsPanel(props: {
 	mode: string,
 	visibility: protocol.Visibility,
+	level_min: number,
+	level_max: number,
 	ally_griefing: boolean,
 	end_mode: game_modes.EndMode,
 	is_host: boolean,
@@ -176,10 +179,24 @@ local function SettingsPanel(props: {
 				LayoutOrder = 2,
 			}),
 		}),
+		Levels = React.createElement(Group, {
+			label = "LEVEL",
+			LayoutOrder = 8,
+		}, {
+			Range = React.createElement(level_range.LevelRange, {
+				min = props.level_min,
+				max = props.level_max,
+				locked = locked,
+				on_change = function(min: number, max: number)
+					props.act("set_level_range", { min = min, max = max })
+				end,
+				LayoutOrder = 1,
+			}),
+		}),
 		-- off, a weapon only hurts its own team's things and its enemies': nobody disintegrates an ally's extractors
 		Griefing = React.createElement(Group, {
 			label = "ALLY GRIEFING",
-			LayoutOrder = 8,
+			LayoutOrder = 9,
 		}, {
 			Off = React.createElement(Chip, {
 				label = "Off",
@@ -203,7 +220,7 @@ local function SettingsPanel(props: {
 		Ends = if elimination
 			then React.createElement(Group, {
 				label = "GAME ENDS",
-				LayoutOrder = 9,
+				LayoutOrder = 10,
 			}, end_modes)
 			else nil,
 	})

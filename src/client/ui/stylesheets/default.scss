@@ -10,9 +10,12 @@
 @use "default/victory_screen";
 @use "default/unlock_reveal";
 @use "default/pause_overlay";
+@use "default/replay_seeker";
 @use "default/tooltip";
 @use "default/player_list";
 @use "default/notifications";
 @use "default/tutorial";
 @use "default/pilot_hud";
 @use "default/commander_hurt";
+@use "default/settings_panel";
+@use "../../../client_shared/stylesheets/keybinds";

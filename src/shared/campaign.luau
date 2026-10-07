@@ -62,6 +62,8 @@ export type Mission = {
 	-- nil for a mission that puts its enemy down
 	ai_profile: string?,
 	hard_mode_ai_profile: string?,
+	-- the highest tech level that enemy goes to, both ways (ai_profiles.up_to_tier); nil for any
+	ai_tier: number?,
 	-- How much of the HUD it shows: "simple" pares the selection panel down to a name, a team and a health bar (the
 	-- tutorial's); "full" is the usual. What its guide keeps off the HUD until a step has taught it is the guide's.
 	hud: "full" | "simple",
@@ -125,6 +127,7 @@ local MISSIONS: { Mission } = {
 		coop = 2,
 		coop_kind = "allied",
 		ai_profile = "passive",
+		ai_tier = 1,
 		hud = "full",
 	},
 	{
@@ -133,7 +136,8 @@ local MISSIONS: { Mission } = {
 		description = "Enemy Agitators hold the channel. Destroy them, land Garpikes and kill the enemy commander before time runs out.",
 		preset = "channel",
 		unlocks = { "urchin", "coral", "herring", "slingshot", "agitator" },
-		-- an Air Lab whose bombers raid the player, two Urchins off the shore, and less time (server/missions/channel.luau)
+		-- an Air Lab whose bombers raid the player, a Coral at each end of the east strait, and less time
+		-- (server/missions/channel.luau)
 		hard_mode = true,
 		hard_mode_description = "With an enemy Air Lab",
 		hard_mode_unlocks = { "oppressor" },
@@ -167,6 +171,17 @@ local lockable: { [string]: boolean } = {}
 for _, def in unit_defs.defs do
 	for _, option in unit_defs.build_options(def) do
 		lockable[option] = true
+	end
+end
+
+-- Everything a player can unlock, by the campaign or any other way of playing (a def some builder builds, bar the
+-- starting unlocks). A player's level (`level`) is how much of it they have.
+local earnable: { [string]: boolean } = {}
+local earnable_count = 0
+for name in lockable do
+	if table.find(STARTING_UNLOCKS, name) == nil then
+		earnable[name] = true
+		earnable_count += 1
 	end
 end
 
@@ -257,6 +272,21 @@ local function is_unlocked(unlocks: { [string]: boolean }, def_name: string): bo
 	return lockable[def_name] ~= true or unlocks[def_name] == true
 end
 
+-- The level of someone who has unlocked `unlocks`: the percentage of everything earnable (see `earnable`) they have,
+-- rounded down, 0 for a new player and 100 once there is nothing left to earn.
+local function level(unlocks: { [string]: boolean }): number
+	if earnable_count == 0 then
+		return 100
+	end
+	local have = 0
+	for name in earnable do
+		if unlocks[name] == true then
+			have += 1
+		end
+	end
+	return math.floor(have * 100 / earnable_count)
+end
+
 return table.freeze({
 	MISSIONS = MISSIONS,
 	STARTING_UNLOCKS = STARTING_UNLOCKS,
@@ -269,4 +299,5 @@ return table.freeze({
 	is_lockable = is_lockable,
 	starting_unlocks = starting_unlocks,
 	is_unlocked = is_unlocked,
+	level = level,
 })

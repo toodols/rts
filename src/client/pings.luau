@@ -1,8 +1,8 @@
 -- Pings: double click the middle mouse button to mark the spot under the cursor for yourself and your allies. The
 -- server passes it on to everyone allied with you (server/pings.luau), and each of them sees a column of light in your
 -- team's colour stand there for a few seconds, with flat pulses of light spreading out from its foot, and hears a
--- chirp. The pinging team's name floats over the column, or while it is off screen marks the edge of the screen the
--- way to it (ui/ping_markers.luau, which reads `active`).
+-- chirp. The name of the player who pinged floats over the column, or while it is off screen marks the edge of the
+-- screen the way to it (ui/ping_markers.luau, which reads `active`).
 --
 -- The middle button also drags the camera about (camera.luau), so a press only counts as a click if the cursor
 -- stays put while it is down, and two only make a double click if they land close together.
@@ -42,6 +42,8 @@ local RING_THICKNESS = 0.2
 export type Ping = {
 	at: Vector3,
 	team: types.TeamId,
+	-- the UserId and display name of the player who pinged
+	player: number,
 	name: string,
 	-- os.clock() when it is gone
 	ends: number,
@@ -144,9 +146,15 @@ end
 
 local function init()
 	input_router.push({ began = on_input_began, ended = on_input_ended, exclusive = false })
-	ping.OnClientEvent:Connect(function(message: { at: Vector3, team: types.TeamId, name: string })
+	ping.OnClientEvent:Connect(function(message: { at: Vector3, team: types.TeamId, player: number, name: string })
 		draw(message.at, message.team)
-		add({ at = message.at, team = message.team, name = message.name, ends = os.clock() + PING_SECONDS })
+		add({
+			at = message.at,
+			team = message.team,
+			player = message.player,
+			name = message.name,
+			ends = os.clock() + PING_SECONDS,
+		})
 		sounds.play_ui "notify"
 	end)
 end

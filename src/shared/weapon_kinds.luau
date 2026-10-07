@@ -4,7 +4,7 @@
 -- its kind, so nothing works out what a weapon is from the rest of it.
 --
 -- `anti_air`: dedicated anti-air, which does its full damage to aircraft where any other weapon does only
---   `NON_AA_AIR_DAMAGE_FRACTION` of it.
+--   `NON_AA_AIR_DAMAGE_FRACTION` of it, and which does no more than `AA_NON_AIR_DAMAGE` to anything else.
 -- `anti_nuke`: an interceptor, which shoots down nuclear missiles in flight and at nothing else.
 -- `nuclear`: a nuclear missile, which is what an interceptor goes after.
 -- `plasma`: a plasma shell, which a plasma deflector stops, and which is drawn glowing.
@@ -39,6 +39,10 @@ export type Info = {
 
 -- What is left of a weapon's damage when it hits an aircraft and the weapon is not dedicated anti air.
 local NON_AA_AIR_DAMAGE_FRACTION = 0.15
+-- The most a dedicated anti-air weapon's hit or blast does to anything that is not an aircraft. BAR gives its anti-air
+-- weapons damage against aircraft (`vtol`) and nothing else, and the engine does its default of 1 to the rest, so a
+-- missile that misses an aircraft on the ground and goes off among ground units hardly scratches them.
+local AA_NON_AIR_DAMAGE = 1
 
 local LASER = table.freeze({ name = "laser" :: FiringSound })
 local HEAT_RAY = table.freeze({ name = "heat_ray" :: FiringSound })
@@ -101,6 +105,7 @@ end
 
 return table.freeze({
 	NON_AA_AIR_DAMAGE_FRACTION = NON_AA_AIR_DAMAGE_FRACTION,
+	AA_NON_AIR_DAMAGE = AA_NON_AIR_DAMAGE,
 	get = get,
 	sound_of = sound_of,
 })

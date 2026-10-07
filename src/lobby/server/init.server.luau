@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
 
 local developers = require(ReplicatedStorage.Shared.developers)
+local campaign = require(ReplicatedStorage.Shared.campaign)
 local game_modes = require(ReplicatedStorage.Shared.game_modes)
 local places = require(ReplicatedStorage.Shared.places)
 
@@ -20,6 +21,7 @@ local protocol = require(ReplicatedStorage.Lobby.protocol)
 local lifecycle = require(ServerScriptService.ServerShared.lifecycle)
 local campaign_session = require(ServerScriptService.ServerShared.campaign_session)
 local skin_session = require(ServerScriptService.ServerShared.skin_session)
+local keybind_session = require(ServerScriptService.ServerShared.keybind_session)
 local developer_list = require(ServerScriptService.ServerShared.developer_list)
 local remotes = require(ServerScriptService.ServerShared.remotes)
 local teleports = require(ServerScriptService.ServerShared.teleports)
@@ -51,6 +53,25 @@ local function mark_dirty()
 	dirty = true
 end
 
+-- `player`'s level (campaign.level), from their campaign progress as it is now: a new player's until it is read.
+local function level_of(player: Player): number
+	return campaign.level(campaign_session.progress_of(player).unlocks)
+end
+
+-- The level of the player `user_id`, if they are on this server; a new player's if not.
+local function level_of_user(user_id: number): number
+	local player = Players:GetPlayerByUserId(user_id)
+	return if player ~= nil then level_of(player) else protocol.LEVEL_MIN
+end
+
+-- Why `player` may not join a lobby yet, while their level is not known.
+local function loading_refusal(player: Player): string?
+	if campaign_session.status(player) == "loading" then
+		return "Your campaign progress is still loading"
+	end
+	return nil
+end
+
 local function view_of(lobby: Lobby?): LobbyView?
 	if lobby == nil then
 		return nil
@@ -59,11 +80,18 @@ local function view_of(lobby: Lobby?): LobbyView?
 	for user_id in lobby.ready do
 		table.insert(ready, user_id)
 	end
+	local levels: { [string]: number } = {}
+	for _, seat in lobby.match.seats do
+		levels[tostring(seat.user_id)] = level_of_user(seat.user_id)
+	end
 	local ok, blocked = lobbies.can_start(lobby)
 	return {
 		id = lobby.id,
 		host = lobby.host,
 		visibility = lobby.visibility,
+		level_min = lobby.level_min,
+		level_max = lobby.level_max,
+		levels = levels,
 		match = game_modes.copy(lobby.match),
 		ready = ready,
 		starting = lobby.starting,
@@ -165,6 +193,10 @@ local function create_mission(player: Player, mission_id: string): (boolean, str
 end
 
 local function join(player: Player, key: string): (boolean, string?)
+	local loading = loading_refusal(player)
+	if loading ~= nil then
+		return false, loading
+	end
 	local here = string.match(key, "^(.-)/") == game.JobId
 	if here then
 		local lobby = lobbies.get(string.match(key, "/(.*)$") :: string)
@@ -174,7 +206,7 @@ local function join(player: Player, key: string): (boolean, string?)
 		if directory.may_join(player, lobby.host, lobby.visibility) == false then
 			return false, "That lobby is for the host's friends"
 		end
-		return lobbies.join(lobby.id, player.UserId, player.DisplayName)
+		return lobbies.join(lobby.id, player.UserId, player.DisplayName, level_of(player))
 	end
 	local summary = directory.find_remote(key)
 	if summary == nil then
@@ -185,6 +217,11 @@ local function join(player: Player, key: string): (boolean, string?)
 	end
 	if summary.players >= summary.capacity then
 		return false, "That lobby is full"
+	end
+	-- checked again on its server, as they arrive
+	local refused = lobbies.level_refusal(level_of(player), summary.level_min, summary.level_max)
+	if refused ~= nil then
+		return false, refused
 	end
 	return launch.go_to_lobby(player, summary.job_id, summary.lobby_id)
 end
@@ -211,6 +248,9 @@ local HANDLERS: { [string]: Handler } = {
 	end,
 	set_visibility = function(player: Player, visibility: string): (boolean, string?)
 		return lobbies.set_visibility(player.UserId, visibility)
+	end,
+	set_level_range = function(player: Player, range: { min: number, max: number }): (boolean, string?)
+		return lobbies.set_level_range(player.UserId, range.min, range.max, level_of_user)
 	end,
 	set_bonus = function(player: Player, bonus: { user_id: number, percent: number }): (boolean, string?)
 		if developers.is_developer(player) == false then
@@ -255,27 +295,37 @@ local function handle(player: Player, asked: unknown, sent: unknown): (boolean, 
 	return HANDLERS[action](player, argument)
 end
 
--- Someone sent here to join a lobby on this server is seated in it as they arrive, if it still has room for them.
+-- Seats `player`, sent here to join the lobby `lobby_id` on this server, in it, if it still has room for them and lets
+-- in their level.
+local function join_on_arrival(player: Player, lobby_id: string)
+	local lobby = lobbies.get(lobby_id)
+	if lobby ~= nil and directory.may_join(player, lobby.host, lobby.visibility) then
+		local ok, err = lobbies.join(lobby.id, player.UserId, player.DisplayName, level_of(player))
+		if ok == false then
+			notices[player] = err or "Couldn't join that lobby"
+		end
+	else
+		notices[player] = "That lobby is gone"
+	end
+end
+
+-- Someone sent here to join a lobby on this server is seated in it once their level is known.
 local function on_player_added(player: Player)
+	local data: any = player:GetJoinData().TeleportData
+	local joining = if typeof(data) == "table" and typeof(data.join) == "string" then data.join else nil
 	task.spawn(function()
 		local loaded = campaign_session.wait_loaded(player)
-		if loaded == false and player.Parent ~= nil then
+		if player.Parent == nil then
+			return
+		end
+		if loaded == false then
 			notices[player] = "Couldn't load your campaign progress; showing a new player's"
+		end
+		if joining ~= nil then
+			join_on_arrival(player, joining)
 		end
 		mark_dirty()
 	end)
-	local data: any = player:GetJoinData().TeleportData
-	if typeof(data) == "table" and typeof(data.join) == "string" then
-		local lobby = lobbies.get(data.join)
-		if lobby ~= nil and directory.may_join(player, lobby.host, lobby.visibility) then
-			local ok, err = lobbies.join(lobby.id, player.UserId, player.DisplayName)
-			if ok == false then
-				notices[player] = err or "Couldn't join that lobby"
-			end
-		else
-			notices[player] = "That lobby is gone"
-		end
-	end
 	mark_dirty()
 end
 
@@ -287,12 +337,13 @@ local function on_player_removing(player: Player)
 end
 
 -- What is done as each player joins and leaves, in order (server_shared/lifecycle.luau): whether they are a developer,
--- their campaign progress and their skin, each the new player's at once and then what is stored, their skin once
--- whether they are a developer is known, since only a developer wears a developer's skin.
+-- their campaign progress, their skin and their keybinds, each the new player's at once and then what is stored, their
+-- skin once whether they are a developer is known, since only a developer wears a developer's skin.
 local PLAYER_STAGES: { lifecycle.Stage } = {
 	{ joined = developer_list.joined, left = developer_list.left },
 	{ joined = campaign_session.joined, left = campaign_session.left },
 	{ joined = skin_session.joined, left = skin_session.left },
+	{ joined = keybind_session.joined, left = keybind_session.left },
 	{ joined = on_player_added, left = on_player_removing },
 	{ left = directory.forget },
 	{ left = teleports.forget },
@@ -305,6 +356,10 @@ local function init()
 	-- what they may choose and wear is pushed again once whether they are a developer, and their skin, are known
 	developer_list.on_published(mark_dirty)
 	skin_session.on_worn(mark_dirty)
+	-- and each player's level, shown in their lobby, once their progress is read or changes
+	campaign_session.on_published(function()
+		mark_dirty()
+	end)
 
 	remotes.answer(
 		lobby_request,
@@ -317,6 +372,7 @@ local function init()
 		end
 	)
 
+	keybind_session.init()
 	lifecycle.run(PLAYER_STAGES)
 
 	teleports.init()

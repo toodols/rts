@@ -15,21 +15,33 @@ local map_preview = require(ReplicatedStorage.LobbyClient.map_preview)
 local map_image = require(script.Parent.map_image)
 local controls = require(script.Parent.controls)
 local campaign_card = require(script.Parent.campaign_card)
+local rank = require(script.Parent.rank)
 
 local format = require(ReplicatedStorage.ClientShared.format)
+local campaign_standing = require(ReplicatedStorage.ClientShared.campaign_standing)
+
+local campaign = require(ReplicatedStorage.Shared.campaign)
 
 type Summary = protocol.Summary
 
-local function LobbyRow(props: {
-	summary: Summary,
-	act: (action: protocol.Action, argument: any?) -> (),
-	LayoutOrder: number,
-})
+local function LobbyRow(
+	props: {
+		summary: Summary,
+		-- the local player's level
+		level: number,
+		act: (action: protocol.Action, argument: any?) -> (),
+		LayoutOrder: number,
+	}
+)
 	local summary = props.summary
 	local map = map_presets.presets[summary.preset]
 	local full = summary.players >= summary.capacity
 	-- a lobby whose seats are taken can still be joined to watch, while it has room for that
 	local watch_only = full and (summary.spectators or 0) < game_modes.SPECTATOR_CAPACITY
+	local level_min = summary.level_min or protocol.LEVEL_MIN
+	local level_max = summary.level_max or protocol.LEVEL_MAX
+	local ranged = level_min > protocol.LEVEL_MIN or level_max < protocol.LEVEL_MAX
+	local out_of_range = props.level < level_min or props.level > level_max
 
 	return React.createElement("Frame", {
 		[React.Tag] = "lobby-row",
@@ -53,10 +65,29 @@ local function LobbyRow(props: {
 				LayoutOrder = 1,
 				Text = `{format.escape(summary.host_name)}'s lobby`,
 			}),
-			Visibility = React.createElement("TextLabel", {
-				[React.Tag] = if summary.visibility == "friends" then "tag friends" else "tag",
+			Badges = React.createElement("Frame", {
+				[React.Tag] = "lobby-badges",
 				LayoutOrder = 2,
-				Text = if summary.visibility == "friends" then "FRIENDS ONLY" else "PUBLIC",
+			}, {
+				Visibility = React.createElement("TextLabel", {
+					[React.Tag] = if summary.visibility == "friends" then "tag friends" else "tag",
+					LayoutOrder = 1,
+					Text = if summary.visibility == "friends" then "FRIENDS ONLY" else "PUBLIC",
+				}),
+				Levels = if ranged
+					then React.createElement("Frame", {
+						[React.Tag] = if out_of_range then "lobby-levels barred" else "lobby-levels",
+						LayoutOrder = 2,
+					}, {
+						Min = React.createElement(rank.Insignia, { level = level_min, small = true, LayoutOrder = 1 }),
+						To = React.createElement("TextLabel", {
+							[React.Tag] = "lobby-levels-to",
+							LayoutOrder = 2,
+							Text = "-",
+						}),
+						Max = React.createElement(rank.Insignia, { level = level_max, small = true, LayoutOrder = 3 }),
+					})
+					else nil,
 			}),
 		}),
 		Mode = React.createElement("TextLabel", {
@@ -89,8 +120,8 @@ local function LobbyRow(props: {
 		Join = React.createElement(controls.Button, {
 			kind = "button",
 			tag = "join",
-			label = if watch_only then "Watch" elseif full then "Full" else "Join",
-			locked = full and watch_only == false,
+			label = if out_of_range then "Join" elseif watch_only then "Watch" elseif full then "Full" else "Join",
+			locked = out_of_range or (full and watch_only == false),
 			on_press = function()
 				props.act("join", summary.key)
 			end,
@@ -105,10 +136,12 @@ local function Browser(props: {
 	act: (action: protocol.Action, argument: any?) -> (),
 	open_campaign: () -> (),
 })
+	local level = campaign.level(campaign_standing.use_standing().unlocks)
 	local rows: { [string]: any } = {}
 	for index, summary in props.lobbies do
 		rows[summary.key] = React.createElement(LobbyRow, {
 			summary = summary,
+			level = level,
 			act = props.act,
 			LayoutOrder = index,
 		})

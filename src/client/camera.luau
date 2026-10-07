@@ -1,6 +1,6 @@
--- A fixed-pitch RTS camera. It looks at a focus point on the ground, pans with the arrow keys or by
--- dragging with the middle mouse button, turns around the focus by dragging with the middle mouse
--- button while alt is held, and zooms by raising and lowering itself rather than changing angle. The
+-- A fixed-pitch RTS camera. It looks at a focus point on the ground, pans with its keys (Shared.keybinds: the arrow
+-- keys in the BAR profile) or by dragging with the middle mouse button, turns around the focus by dragging with the
+-- middle mouse button while alt is held, and zooms by raising and lowering itself rather than changing angle. The
 -- letter keys are left free for commands. Panning is told as it happens (Client.events).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -9,6 +9,8 @@ local UserInputService = game:GetService "UserInputService"
 local Workspace = game:GetService "Workspace"
 
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
+
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 
 local events = require(ReplicatedStorage.Client.events)
 local modifiers = require(ReplicatedStorage.Client.modifiers)
@@ -34,13 +36,15 @@ local height = CAMERA_HEIGHT
 -- focus looking north.
 local yaw = 0
 
-local KEY_DIRECTIONS: { [Enum.KeyCode]: Vector2 } = {
-	[Enum.KeyCode.Up] = Vector2.new(0, -1),
-	[Enum.KeyCode.Down] = Vector2.new(0, 1),
-	[Enum.KeyCode.Left] = Vector2.new(-1, 0),
-	[Enum.KeyCode.Right] = Vector2.new(1, 0),
+-- The keybind actions that pan (Shared.keybinds), and which way on the screen.
+local PAN_DIRECTIONS: { [string]: Vector2 } = {
+	camera_up = Vector2.new(0, -1),
+	camera_down = Vector2.new(0, 1),
+	camera_left = Vector2.new(-1, 0),
+	camera_right = Vector2.new(1, 0),
 }
 
+-- the keys held that this layer took
 local held: { [Enum.KeyCode]: boolean } = {}
 
 -- Set while something else has the camera, which the input router tells as its layer is covered (piloting a unit,
@@ -59,12 +63,23 @@ local last_drag_location: Vector2? = nil
 
 local function keyboard_pan(): Vector2
 	local total = Vector2.zero
-	for key, direction in KEY_DIRECTIONS do
-		if held[key] then
+	for action, direction in PAN_DIRECTIONS do
+		local key = keybind_state.key_of(action)
+		if key ~= nil and held[key] then
 			total += direction
 		end
 	end
 	return total
+end
+
+-- Whether `key` is bound to panning.
+local function pans(key: Enum.KeyCode): boolean
+	for action in PAN_DIRECTIONS do
+		if keybind_state.key_of(action) == key then
+			return true
+		end
+	end
+	return false
 end
 
 -- Turns a movement given in screen terms, x to the right and y down, into one across the ground in the
@@ -216,11 +231,11 @@ local function init()
 		camera.CameraType = Enum.CameraType.Scriptable
 	end
 
-	-- the arrow keys, held down, and the wheel, through the input router, which covers the layer while something else
+	-- the pan keys, held down, and the wheel, through the input router, which covers the layer while something else
 	-- has the camera
 	input_router.push({
 		began = function(input: InputObject, processed: boolean): boolean
-			if processed or KEY_DIRECTIONS[input.KeyCode] == nil then
+			if processed or pans(input.KeyCode) == false then
 				return false
 			end
 			held[input.KeyCode] = true
@@ -246,4 +261,5 @@ return table.freeze({
 	look_at = look_at,
 	glide_to = glide_to,
 	get_focus = get_focus,
+	pans = pans,
 })

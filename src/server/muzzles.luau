@@ -6,6 +6,10 @@
 -- of the piece's barrel, turned with the turret's aim (`Entity.weapon_aims`); any other weapon fires from its def's
 -- `offset`, in the entity's own frame, or with none from the usual spot just above its middle (`unit_defs.muzzle_of`).
 -- The model's art is only built to agree with a turret mount (tools/model_pipeline), so it never moves a shot.
+--
+-- It is all plain Vector3 arithmetic rather than CFrames: a CFrame's 32-bit insides are Roblox's own, which the headless
+-- arena (tools/ai_arena) cannot match to the last bit as it matches a Vector3's, and a muzzle a hair off made the two
+-- play a game differently (a turret's aim, from a replay's jump point, 12 seconds in).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -21,9 +25,13 @@ type Weapon = types.Weapon
 --   offset  at `offset` in the entity's frame
 --   middle  at the usual spot above its middle
 export type Mount =
-	{ kind: "turret", index: number, pivot: CFrame, point: Vector3, drop: CFrame }
+	{ kind: "turret", index: number, pivot: Vector3, point: Vector3, drop: Vector3 }
 	| { kind: "offset", offset: Vector3 }
 	| { kind: "middle" }
+
+-- Where an entity stands, which its weapons' origins are worked out in: its middle, and the way it faces, turned about
+-- the vertical from facing along +Z, as CFrame.Angles(0, facing, 0) turns.
+export type Frame = { position: Vector3, facing: number }
 
 local MIDDLE: Mount = { kind = "middle" }
 table.freeze(MIDDLE)
@@ -43,9 +51,9 @@ local function mount_of(def: types.EntityDef, index: number): Mount
 		found = {
 			kind = "turret",
 			index = index,
-			pivot = CFrame.new(turret.pivot),
+			pivot = turret.pivot,
 			point = turret.muzzle,
-			drop = CFrame.new(0, -unit_defs.collider_height(def) / 2, 0),
+			drop = Vector3.new(0, -unit_defs.collider_height(def) / 2, 0),
 		}
 	elseif weapon.offset ~= nil then
 		found = { kind = "offset", offset = weapon.offset }
@@ -57,21 +65,27 @@ local function mount_of(def: types.EntityDef, index: number): Mount
 	return mount
 end
 
+-- `point` turned `angle` about the vertical, as CFrame.Angles(0, angle, 0) turns it.
+local function turned(point: Vector3, angle: number): Vector3
+	local cos, sin = math.cos(angle), math.sin(angle)
+	return Vector3.new(point.X * cos + point.Z * sin, point.Y, point.Z * cos - point.X * sin)
+end
+
 -- Where weapon `index` of `entity`, standing in `frame`, fires from now.
-local function origin_of(entity: Entity, frame: CFrame, index: number): Vector3
+local function origin_of(entity: Entity, frame: Frame, index: number): Vector3
 	local mount = mount_of(entity.def, index)
 	if mount.kind == "turret" then
 		local aim = entity.weapon_aims[mount.index] or 0
-		return (frame * mount.drop * mount.pivot * CFrame.Angles(0, aim, 0)):PointToWorldSpace(mount.point)
+		return frame.position + turned(mount.drop + mount.pivot + turned(mount.point, aim), frame.facing)
 	elseif mount.kind == "offset" then
-		return frame:PointToWorldSpace(mount.offset)
+		return frame.position + turned(mount.offset, frame.facing)
 	end
 	return unit_defs.muzzle_of(entity.def, entity.position)
 end
 
 -- The frame `entity` stands in, which its weapons' origins are worked out in.
-local function frame_of(entity: Entity): CFrame
-	return CFrame.new(entity.position) * CFrame.Angles(0, entity.facing, 0)
+local function frame_of(entity: Entity): Frame
+	return { position = entity.position, facing = entity.facing }
 end
 
 return table.freeze({

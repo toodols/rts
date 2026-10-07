@@ -18,6 +18,7 @@ local signal = require(ReplicatedStorage.Shared.signal)
 
 local state = require(script.Parent.state)
 local outbox = require(script.Parent.outbox)
+local air = require(script.Parent.air)
 local match_stats = require(script.Parent.match_stats)
 local credit = require(script.Parent.credit)
 local snapshot = require(script.Parent.snapshot)
@@ -84,12 +85,14 @@ local function standing(entity: Entity): boolean
 	return entity.state == "active" and unit_defs.is_remains(entity.def) == false
 end
 
--- `entity`, finished, has gone and left no wreck: its pieces fly apart, harder the more violent its death (`severity`).
+-- `entity`, finished, has gone and left no wreck: its pieces fly apart, harder the more violent its death (`severity`),
+-- or, if it was an aircraft shot down in the air, it falls out of the sky and breaks up where it hits the ground.
 local function shatter(entity: Entity, severity: number)
 	outbox.shattered({
 		id = entity.id,
 		severity = severity,
 		velocity = entity.velocity,
+		falls = air.is_airborne(entity),
 	})
 end
 

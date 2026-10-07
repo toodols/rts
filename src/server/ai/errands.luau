@@ -12,6 +12,7 @@ local ServerScriptService = game:GetService "ServerScriptService"
 local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local geometry = require(ReplicatedStorage.Shared.geometry)
+local teams = require(ReplicatedStorage.Shared.teams)
 
 local state = require(ServerScriptService.Server.state)
 local orders = require(ServerScriptService.Server.orders)
@@ -19,6 +20,8 @@ local placement = require(ServerScriptService.Server.placement)
 local reclaim = require(ServerScriptService.Server.reclaim)
 local resurrection = require(ServerScriptService.Server.resurrection)
 local damage = require(ServerScriptService.Server.damage)
+local manual_weapons = require(ServerScriptService.Server.manual_weapons)
+local alliances = require(ServerScriptService.Server.alliances)
 
 local danger_field = require(script.Parent.danger_field)
 local brains = require(script.Parent.brains)
@@ -374,7 +377,113 @@ local function give_up_lost_build(brain: Brain, census: Census, builder: Entity)
 	end
 end
 
+-- With the profile's scrap_labs_for_advanced, while its line's advanced lab goes up every other lab it has is reclaimed
+-- into it: each that nobody is taking apart yet by the nearest builder free to (its commander or a constructor), which
+-- sees it through. Builders left over help the advanced lab, as `assist` has them help the biggest thing going up.
+local function scrap_old_labs(brain: Brain, census: Census)
+	if brain.profile.scrap_labs_for_advanced == false or brain.line == nil then
+		return
+	end
+	local advanced = catalog.LABS[brain.line :: Line].advanced
+	local going_up = false
+	for _, lab in censuses.buildings_of(census, advanced) do
+		if lab.state == "blueprint" then
+			going_up = true
+		end
+	end
+	if going_up == false then
+		return
+	end
+	local taken: { [EntityId]: boolean } = {}
+	for _, builder in census.builders do
+		local order = builder.orders[1]
+		if order ~= nil and order.kind == "reclaim" and order.target_id ~= nil then
+			taken[order.target_id] = true
+		end
+	end
+	for _, lab in census.factories do
+		if lab.def_name == advanced or taken[lab.id] == true then
+			continue
+		end
+		local best: Entity? = nil
+		local best_distance = math.huge
+		for _, builder in census.builders do
+			if is_available(brain, builder) == false or reclaim.can_reclaim(builder, lab) == false then
+				continue
+			end
+			local distance = geometry.distance_2d(builder.position, lab.position)
+			if distance < best_distance then
+				best = builder
+				best_distance = distance
+			end
+		end
+		if best == nil then
+			return
+		end
+		local chain = routes.waypoints(brain, best, lab.position, work_reach(best)) or {}
+		table.insert(chain, { kind = "reclaim", position = nil, target_id = lab.id })
+		orders.issue(best, chain, false, false)
+		assignments.release_from(brain, best.id, "assist")
+		taken[lab.id] = true
+	end
+end
+
+-- With the profile's uses_disintegrator, its commander fires its disintegrator at the enemy within its reach: at the
+-- one whose shot would destroy the most of the enemy's worth, when that is at least the profile's disintegrate_worth,
+-- nothing of its own or its allies' is in the way, no enemy commander blocks it, and it has the weapon ready and the
+-- energy for it. The shot goes ahead of whatever the commander was doing, which it then gets back to.
+local function disintegrate(brain: Brain, census: Census)
+	local commander = census.commander
+	if brain.profile.uses_disintegrator == false or commander == nil then
+		return
+	end
+	local weapon = commander.def.manual_weapon
+	local team = state.get_team(brain.team)
+	if
+		weapon == nil
+		or team == nil
+		or commander.manual_reload_remaining > 0
+		or team.energy < weapon.energy_per_shot
+		or (commander.orders[1] ~= nil and commander.orders[1].kind == "dgun")
+	then
+		return
+	end
+	local best: Vector3? = nil
+	local best_worth = brain.profile.disintegrate_worth
+	for _, list in { census.enemy_units, census.enemy_structures } do
+		for _, enemy in list do
+			if geometry.distance_2d(enemy.position, commander.position) > weapon.range then
+				continue
+			end
+			local inside, blocked = manual_weapons.sweep(commander, enemy.position)
+			if inside == nil or blocked then
+				continue
+			end
+			local worth = 0
+			local ours = false
+			for _, other in inside do
+				if alliances.are_allied(brain.team, other.team) then
+					ours = true
+					break
+				end
+				if other.team ~= teams.NEUTRAL then
+					worth += unit_defs.power(other.def)
+				end
+			end
+			if ours == false and worth > best_worth then
+				best = enemy.position
+				best_worth = worth
+			end
+		end
+	end
+	if best ~= nil then
+		orders.issue(commander, { { kind = "dgun", position = best } }, false, true)
+	end
+end
+
 local function run_builders(brain: Brain, census: Census, economy: Economy)
+	disintegrate(brain, census)
+	scrap_old_labs(brain, census)
 	for _, builder in census.builders do
 		local duty = censuses.duty_of(census, builder)
 		if assignments.job_of(brain, builder.id) ~= "flee" then

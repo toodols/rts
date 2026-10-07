@@ -1,6 +1,7 @@
 --!strict
--- Highlands: rolling hills with basins that dip below the sea in places, the map as it always was, generated from the
--- seed.
+-- Highlands: rolling hills with basins that dip below the sea in places, generated from the seed, and the same for
+-- both sides: its ground, starts and metal are turned half round about the middle (`kit.point_symmetric`,
+-- `Preset.symmetric`), so that neither start box is better off than the other.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -48,7 +49,8 @@ return table.freeze({
 	description = "Rolling hills and sunken basins",
 	source = "generated",
 	size = SIZE,
-	build = build,
+	build = kit.point_symmetric(build),
+	symmetric = true,
 	starts = kit.ring_starts(kit.RING_RADIUS),
 	start_boxes = BOXES,
 	metal_layers = nil,

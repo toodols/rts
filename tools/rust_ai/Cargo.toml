@@ -1,0 +1,18 @@
+[package]
+name = "rust_ai"
+version = "0.1.0"
+edition = "2021"
+description = "A computer player for the RTS, played headless in the AI arena through tools/rust_ai/bridge.luau"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+debug = false
+
+[profile.dev]
+opt-level = 1

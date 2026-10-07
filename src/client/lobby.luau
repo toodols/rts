@@ -99,7 +99,8 @@ local function lay_edge(edges: { Part }, from: Vector2, to: Vector2, parent: Ins
 	local points = world_fx.ground_points(
 		heightmap.ground_position(from.X, from.Y),
 		heightmap.ground_position(to.X, to.Y),
-		EDGE_STEP
+		EDGE_STEP,
+		"surface"
 	)
 	world_fx.lay_line(points, EDGE_STYLE, function(): Part
 		local piece = effect_part("StartBoxEdge", parent)

@@ -4,11 +4,13 @@
 -- everyone is in one list. Under them are the spectators, who come to the game only to watch: a player moves to
 -- watching by clicking the place left there, and a spectator back to playing by clicking an empty seat.
 --
--- Each player's row shows their resource bonus, which only a developer (shared/developers.luau) steps up and down;
--- anyone else sees it only when there is one. A player who is ready to start says so on their row.
+-- Each player's row shows their level, as a rank before their name (rank.luau), and their resource bonus, which only a
+-- developer (shared/developers.luau) changes; anyone else sees it only when there is one. A player who is
+-- ready to start says so on their row.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
+local UserInputService = game:GetService "UserInputService"
 
 local React = require(ReplicatedStorage.Packages.react)
 
@@ -17,7 +19,7 @@ local developers = require(ReplicatedStorage.Shared.developers)
 
 local protocol = require(ReplicatedStorage.Lobby.protocol)
 
-local controls = require(script.Parent.controls)
+local rank = require(script.Parent.rank)
 
 local format = require(ReplicatedStorage.ClientShared.format)
 
@@ -27,6 +29,11 @@ type LobbyView = protocol.LobbyView
 type Props = { [any]: any }
 
 local local_player = Players.LocalPlayer
+
+-- How far a press on a bonus has to move, in pixels, to be a drag rather than a click, and how far a drag moves it by
+-- one percent: the whole range is 200 pixels across.
+local DRAG_THRESHOLD = 3
+local PIXELS_PER_PERCENT = 1
 
 -- What a player's bonus can be changed with, passed down to where it is shown.
 type BonusProps = {
@@ -39,7 +46,160 @@ local function bonus_text(percent: number): string
 	return if percent > 0 then `+{percent}%` else `{percent}%`
 end
 
--- The bonus of the player `user_id`, with a step down and up either side of it for a developer. Nothing for anyone else
+local function tone(percent: number): string
+	return if percent > 0 then " up" elseif percent < 0 then " down" else ""
+end
+
+-- A bonus as a developer changes it: one small field, filled out from its middle as far as the bonus goes. Dragging
+-- across it scrubs the value in steps of game_modes.BONUS_STEP (by 1 with shift held), sent once it is let go; a click
+-- that does not drag types an exact one in; a right click sets it back to none.
+local function BonusField(props: { percent: number, on_set: (number) -> (), LayoutOrder: number })
+	-- the value being dragged to, shown in place of the bonus until it is let go
+	local preview: number?, set_preview = React.useState(nil :: number?)
+	local editing, set_editing = React.useState(false)
+	local box_ref = React.useRef(nil :: TextBox?)
+	local drag_ref = React.useRef(nil :: { RBXScriptConnection }?)
+
+	local function stop_drag()
+		local connections = drag_ref.current
+		drag_ref.current = nil
+		if connections ~= nil then
+			for _, connection in connections do
+				connection:Disconnect()
+			end
+		end
+	end
+
+	React.useEffect(function()
+		return stop_drag
+	end, {})
+
+	-- a drag let go shows where it went until the bonus it sent comes back
+	React.useEffect(function()
+		set_preview(nil)
+	end, { props.percent })
+
+	React.useEffect(function()
+		local box = box_ref.current
+		if editing and box ~= nil then
+			box:CaptureFocus()
+			box.CursorPosition = #box.Text + 1
+		end
+	end, { editing })
+
+	-- Sends `value` as the bonus, unless it already is. Returns whether it was sent.
+	local function set(value: number): boolean
+		local clamped = game_modes.clamp_bonus(value)
+		if clamped == props.percent then
+			return false
+		end
+		props.on_set(clamped)
+		return true
+	end
+
+	local function began(_field: GuiObject, input: InputObject)
+		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+			set(0)
+			return
+		end
+		local pointer = input.UserInputType
+		if (pointer ~= Enum.UserInputType.MouseButton1 and pointer ~= Enum.UserInputType.Touch) or editing then
+			return
+		end
+		stop_drag()
+		local start_x = input.Position.X
+		local start = props.percent
+		local moved = false
+		local value = start
+		drag_ref.current = {
+			UserInputService.InputChanged:Connect(function(change: InputObject)
+				if change.UserInputType ~= Enum.UserInputType.MouseMovement and change ~= input then
+					return
+				end
+				local dx = change.Position.X - start_x
+				moved = moved or math.abs(dx) >= DRAG_THRESHOLD
+				if not moved then
+					return
+				end
+				local fine = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+					or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+				local step = if fine then 1 else game_modes.BONUS_STEP
+				value = game_modes.clamp_bonus(math.round((start + dx / PIXELS_PER_PERCENT) / step) * step)
+				set_preview(value)
+			end),
+			UserInputService.InputEnded:Connect(function(ended: InputObject)
+				if ended.UserInputType ~= pointer then
+					return
+				end
+				stop_drag()
+				if moved then
+					if set(value) == false then
+						set_preview(nil)
+					end
+				else
+					set_editing(true)
+				end
+			end),
+		}
+	end
+
+	local shown = preview or props.percent
+	local tag = `bonus-field{tone(shown)}`
+	if editing then
+		tag ..= " editing"
+	elseif preview ~= nil then
+		tag ..= " scrubbing"
+	end
+	local reach = math.abs(shown) / (game_modes.BONUS_MAX - game_modes.BONUS_MIN)
+	return React.createElement(
+		"TextButton",
+		{
+			[React.Tag] = tag,
+			LayoutOrder = props.LayoutOrder,
+			Text = "",
+			AutoButtonColor = false,
+			[React.Event.InputBegan] = began,
+		} :: Props,
+		{
+			Fill = React.createElement("Frame", {
+				[React.Tag] = `bonus-fill{tone(shown)}`,
+				Position = UDim2.fromScale(if shown < 0 then 0.5 - reach else 0.5, 0),
+				Size = UDim2.fromScale(reach, 1),
+			}),
+			Middle = React.createElement("Frame", {
+				[React.Tag] = "bonus-middle",
+			}),
+			Value = if editing
+				then React.createElement(
+					"TextBox",
+					{
+						[React.Tag] = `bonus-text{tone(shown)}`,
+						Text = tostring(props.percent),
+						ClearTextOnFocus = false,
+						ref = box_ref,
+						[React.Event.FocusLost] = function(box: TextBox, _enter: boolean, cause: InputObject?)
+							set_editing(false)
+							if cause ~= nil and cause.KeyCode == Enum.KeyCode.Escape then
+								return
+							end
+							local typed = tonumber((string.gsub(box.Text, "[%s%%+]", "")))
+							if typed ~= nil then
+								set(typed)
+							end
+						end,
+					} :: Props
+				)
+				else React.createElement("TextLabel", {
+					[React.Tag] = `bonus-text{tone(shown)}`,
+					Text = bonus_text(shown),
+					-- presses go through it to the field
+					Interactable = false,
+				}),
+		}
+	)
+end
+
+-- The bonus of the player `user_id`: the field above for a developer, and for anyone else the value alone, nothing
 -- while it is none.
 local function Bonus(props: { user_id: number, bonus: BonusProps, LayoutOrder: number })
 	local bonus = props.bonus
@@ -54,53 +214,35 @@ local function Bonus(props: { user_id: number, bonus: BonusProps, LayoutOrder: n
 			Text = `BONUS {bonus_text(percent)}`,
 		})
 	end
-	local function step(by: number)
-		bonus.act("set_bonus", { user_id = props.user_id, percent = percent + by })
-	end
-	return React.createElement("Frame", {
-		[React.Tag] = "bonus",
+	return React.createElement(BonusField, {
+		percent = percent,
+		on_set = function(value: number)
+			bonus.act("set_bonus", { user_id = props.user_id, percent = value })
+		end,
 		LayoutOrder = props.LayoutOrder,
-	}, {
-		Down = React.createElement(controls.Button, {
-			kind = "chip",
-			tag = "step",
-			label = "-",
-			locked = percent <= game_modes.BONUS_MIN,
-			on_press = function()
-				step(-game_modes.BONUS_STEP)
-			end,
-			LayoutOrder = 1,
-		}),
-		Value = React.createElement("TextLabel", {
-			[React.Tag] = if percent > 0
-				then "bonus-value up"
-				elseif percent < 0 then "bonus-value down"
-				else "bonus-value",
-			LayoutOrder = 2,
-			Text = bonus_text(percent),
-		}),
-		Up = React.createElement(controls.Button, {
-			kind = "chip",
-			tag = "step",
-			label = "+",
-			locked = percent >= game_modes.BONUS_MAX,
-			on_press = function()
-				step(game_modes.BONUS_STEP)
-			end,
-			LayoutOrder = 3,
-		}),
 	})
 end
 
 -- `bonus` is given to a player's seat, not a spectator's.
-local function Seat(
-	props: { seat: game_modes.Seat, host: number, ready: boolean, bonus: BonusProps?, LayoutOrder: number }
-)
+local function Seat(props: {
+	seat: game_modes.Seat,
+	host: number,
+	ready: boolean,
+	level: number?,
+	bonus: BonusProps?,
+	LayoutOrder: number,
+})
 	local you = props.seat.user_id == local_player.UserId
 	return React.createElement("Frame", {
 		[React.Tag] = if you then "seat you" else "seat",
 		LayoutOrder = props.LayoutOrder,
 	}, {
+		Rank = if props.level ~= nil
+			then React.createElement(rank.Insignia, {
+				level = props.level,
+				LayoutOrder = 0,
+			})
+			else nil,
 		Name = React.createElement("TextLabel", {
 			[React.Tag] = "seat-name grow",
 			LayoutOrder = 1,
@@ -131,7 +273,7 @@ local function Seat(
 			then React.createElement(Bonus, {
 				user_id = props.seat.user_id,
 				bonus = props.bonus,
-				LayoutOrder = 5,
+				LayoutOrder = 6,
 			})
 			else nil,
 	})
@@ -161,6 +303,8 @@ local function Side(
 		host: number,
 		-- the user ids of the players who are ready
 		ready: { number },
+		-- each player's level, by user id as a string
+		levels: { [string]: number },
 		-- what shows and changes each seat's bonus, for players' sides
 		bonus: BonusProps?,
 		-- nil when nobody can move to this side
@@ -191,6 +335,7 @@ local function Side(
 			seat = seat,
 			host = props.host,
 			ready = table.find(props.ready, seat.user_id) ~= nil,
+			level = props.levels[tostring(seat.user_id)],
 			bonus = props.bonus,
 			LayoutOrder = index,
 		})
@@ -253,6 +398,7 @@ local function SeatsPanel(props: {
 				room = mode.per_side,
 				host = lobby.host,
 				ready = lobby.ready,
+				levels = lobby.levels or {},
 				bonus = bonus,
 				on_move = if side ~= my_side
 					then function()
@@ -269,6 +415,7 @@ local function SeatsPanel(props: {
 			room = mode.capacity,
 			host = lobby.host,
 			ready = lobby.ready,
+			levels = lobby.levels or {},
 			bonus = bonus,
 			-- a spectator takes whichever seat is free
 			on_move = if watching
@@ -324,6 +471,7 @@ local function SeatsPanel(props: {
 				open = if watching then 0 else 1,
 				host = lobby.host,
 				ready = lobby.ready,
+				levels = lobby.levels or {},
 				on_move = if watching
 					then nil
 					else function()

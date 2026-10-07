@@ -94,7 +94,8 @@ end
 
 -- `amount` of `weapon`'s harm lands on `target`, from the shot of the entity `attacker_id` of `attacker_team` (its team
 -- when it fired, since it may be gone by now, as a shell's shooter may). An aircraft takes only a fraction of it from a
--- weapon that is not dedicated anti-air (`unit_defs.damage_against`); an EMP weapon's is EMP (`stun`) and any other's
+-- weapon that is not dedicated anti-air, and anything else next to nothing from one that is
+-- (`unit_defs.damage_against`); an EMP weapon's is EMP (`stun`) and any other's
 -- damage (`apply`). What a weapon strikes `direct`ly, not only its blast or its sparks, answers slower for a moment
 -- after, if it moves.
 local function hit(

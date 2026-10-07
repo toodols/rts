@@ -23,6 +23,7 @@ local types = require(ReplicatedStorage.Shared.types)
 local lifecycle = require(ServerScriptService.ServerShared.lifecycle)
 local campaign_session = require(ServerScriptService.ServerShared.campaign_session)
 local skin_session = require(ServerScriptService.ServerShared.skin_session)
+local keybind_session = require(ServerScriptService.ServerShared.keybind_session)
 local developer_list = require(ServerScriptService.ServerShared.developer_list)
 local remotes = require(ServerScriptService.ServerShared.remotes)
 local teleports = require(ServerScriptService.ServerShared.teleports)
@@ -30,6 +31,7 @@ local teleports = require(ServerScriptService.ServerShared.teleports)
 local session_config = require(script.Parent.session_config)
 local state = require(script.Parent.state)
 local simulation = require(script.Parent.simulation)
+local replay = require(script.Parent.replay)
 local lighting = require(script.Parent.lighting)
 local wind = require(script.Parent.wind)
 local deformation = require(script.Parent.deformation)
@@ -168,6 +170,7 @@ local PLAYER_STAGES: { lifecycle.Stage } = {
 	{ joined = seat },
 	-- their team wears the skin they have equipped, before their commander is put down
 	{ joined = skin_session.joined, left = skin_session.left },
+	{ joined = keybind_session.joined, left = keybind_session.left },
 	{
 		joined = function(player: Player)
 			match.arrived(player.UserId)
@@ -218,6 +221,7 @@ local function start(session: Session)
 	damage.on_hurt(function(target: Entity, _amount: number, attacker_team: number?)
 		notifications.damaged(target, attacker_team)
 	end)
+	projectiles.on_nuke_launched(notifications.nuke_launched)
 	donuts.init()
 	lighting.init()
 	deformation.init()
@@ -231,6 +235,7 @@ local function start(session: Session)
 	wind.init()
 
 	teleports.init()
+	keybind_session.init()
 	commands.init()
 	possession.init()
 	pings.init()
@@ -247,6 +252,10 @@ local function start(session: Session)
 	end
 	ai.init(session.ai_opponents, session.ai_opponent_orders)
 	pregame.init(session.played == false)
+	-- a replay puts the game back to its first jump point, over whatever the map laid out
+	if session.replay then
+		replay.start()
+	end
 
 	lifecycle.run(PLAYER_STAGES)
 end

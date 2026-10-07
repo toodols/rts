@@ -2,7 +2,9 @@
 -- The lobby's whole screen: a header with the tabs, then the tab open: Play, the browser while this player is in no
 -- lobby (or the campaign screen, which the browser opens) and the lobby itself while they are in one; Skins, where they
 -- pick what their units wear (skins_tab.luau); the Encyclopedia, an entry for every unit and building (encyclopedia/),
--- which the campaign's missions link into; and Microtransactions (microtransactions_tab.luau). And a line along
+-- which the campaign's missions link into; Microtransactions (microtransactions_tab.luau); and Settings, the keybinds
+-- (ClientShared.keybind_settings). A player who has not finished the tutorial is met with a box urging them to play it
+-- (tutorial_prompt.luau). And a line along
 -- the bottom for anything that went wrong. All of it over the scene (see LobbyClient.scene), which the backdrop only darkens toward the edges, so the
 -- menus sit in a world rather than on a blank page.
 
@@ -16,6 +18,8 @@ local game_modes = require(ReplicatedStorage.Shared.game_modes)
 
 local protocol = require(ReplicatedStorage.Lobby.protocol)
 
+local campaign_standing = require(ReplicatedStorage.ClientShared.campaign_standing)
+local keybind_settings = require(ReplicatedStorage.ClientShared.keybind_settings)
 local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 local use_lobby = require(ReplicatedStorage.LobbyClient.use_lobby)
@@ -28,8 +32,12 @@ local controls = require(script.controls)
 local skins_tab = require(script.skins_tab)
 local encyclopedia = require(script.encyclopedia)
 local microtransactions_tab = require(script.microtransactions_tab)
+local tutorial_prompt = require(script.tutorial_prompt)
 
 local player = Players.LocalPlayer
+
+-- the mission the tutorial prompt starts
+local TUTORIAL = "tutorial"
 
 -- how long a notice stays up
 local NOTICE_SECONDS = 4
@@ -54,7 +62,7 @@ local function use_fit_scale(): number
 	return fit_scale(use_store.use_viewport_size())
 end
 
-type Tab = "play" | "skins" | "encyclopedia" | "microtransactions"
+type Tab = "play" | "skins" | "encyclopedia" | "microtransactions" | "settings"
 
 -- The tabs along the header, in order, and what each is labelled.
 local TABS: { { id: Tab, label: string } } = {
@@ -62,6 +70,7 @@ local TABS: { { id: Tab, label: string } } = {
 	{ id = "skins", label = "SKINS" },
 	{ id = "encyclopedia", label = "ENCYCLOPEDIA" },
 	{ id = "microtransactions", label = "MICROTRANSACTIONS" },
+	{ id = "settings", label = "SETTINGS" },
 }
 
 local function App()
@@ -73,6 +82,12 @@ local function App()
 	-- the encyclopedia entry another screen last asked to open
 	local focus: encyclopedia.Focus?, set_focus = React.useState(nil :: encyclopedia.Focus?)
 	local ui_scale = use_fit_scale()
+	local standing = campaign_standing.use_standing()
+	-- how many times the tutorial prompt has been put off (tutorial_prompt.PLEAS: once each is all it asks), until the
+	-- player next comes to the lobby
+	local put_off, set_put_off = React.useState(0)
+	-- whether they said they would play it
+	local agreed, set_agreed = React.useState(false)
 
 	local function show(message: string)
 		set_notice(message)
@@ -112,6 +127,13 @@ local function App()
 		scene.set_view(if wide then "room" else "browser")
 	end, { wide })
 
+	local prompting = standing.known
+		and standing.completed[TUTORIAL] ~= true
+		and not agreed
+		and put_off < tutorial_prompt.PLEAS
+		and current == nil
+		and state.mission == nil
+
 	local title = "LOBBY"
 	local subtitle = ""
 	if current ~= nil then
@@ -125,6 +147,8 @@ local function App()
 		title = "ENCYCLOPEDIA"
 	elseif tab == "microtransactions" then
 		title = "MICROTRANSACTIONS"
+	elseif tab == "settings" then
+		title = "SETTINGS"
 	end
 
 	local screen
@@ -134,6 +158,8 @@ local function App()
 		screen = React.createElement(encyclopedia.Encyclopedia, { focus = focus })
 	elseif tab == "microtransactions" then
 		screen = React.createElement(microtransactions_tab.MicrotransactionsTab)
+	elseif tab == "settings" then
+		screen = React.createElement(keybind_settings.KeybindSettings, { tag = "panel" })
 	elseif current ~= nil then
 		screen = React.createElement(room.Room, { lobby = current, act = act })
 	elseif campaign_open then
@@ -222,6 +248,21 @@ local function App()
 				Screen = screen,
 			}),
 		}),
+		Prompt = if prompting
+			then React.createElement(tutorial_prompt.TutorialPrompt, {
+				ui_scale = ui_scale,
+				plea = put_off + 1,
+				on_play = function()
+					set_agreed(true)
+					set_tab "play"
+					set_in_campaign(true)
+					act("play_mission", TUTORIAL)
+				end,
+				on_later = function()
+					set_put_off(put_off + 1)
+				end,
+			})
+			else nil,
 		Notice = if notice ~= nil
 			then React.createElement("TextLabel", {
 				[React.Tag] = "notice",

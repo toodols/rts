@@ -274,25 +274,30 @@ table.freeze(COUNTERATTACK_HARD_WAVES)
 -- (x, z). Floating defences stand on the channel's level floor, out past every shore's slope (nothing floats over a
 -- floor that falls away under it).
 --
--- Agitators hold the water (their shells reach 113 studs), each a little inland, so that a Riptide off the shore gets
--- within its own reach (43 studs) of one: three on the island's west side over the west strait, and three on the
--- enemy's shore over the east strait. They are far enough apart that a Riptide can stand to shell one where no other
--- reaches, so that the player can take them one at a time, the island's first. Ashore there is little, for Garpikes to
--- land against: a pair of guards behind the shore's Agitators, a Twin Guard by the enemy's commander, and power. Its
--- commander goes down
--- at its start, and an extractor on each of its metal spots ashore.
+-- The defences are on the water, and what is ashore is little. Agitators hold the water (their shells reach 113
+-- studs), each a little inland, so that a Riptide off the shore gets within its own reach (43 studs) of one: three on
+-- the island's west side over the west strait, and three on the enemy's shore over the east strait. Between them float
+-- Urchins, whose torpedoes find ships and a Garpike under the water alike, two in each strait, and a Coral in the east
+-- strait's middle. They are spread out, each over its own stretch of water, so that the player takes them one at a
+-- time, the island's first. Ashore there is only a Twin Guard by the enemy's commander, and power. Its commander goes
+-- down at its start, and an extractor on each of its metal spots ashore.
 local CHANNEL_ENEMY: { Thing } = {
 	-- the island's Agitators
 	{ def_name = "agitator", at = Vector2.new(-36, -125) },
 	{ def_name = "agitator", at = Vector2.new(-60, 0) },
 	{ def_name = "agitator", at = Vector2.new(-36, 125) },
+	-- the west strait's floating defences
+	{ def_name = "urchin", at = Vector2.new(-100, -60) },
+	{ def_name = "urchin", at = Vector2.new(-100, 60) },
 	-- the shore's Agitators
 	{ def_name = "agitator", at = Vector2.new(180, -124) },
 	{ def_name = "agitator", at = Vector2.new(182, 0) },
 	{ def_name = "agitator", at = Vector2.new(180, 124) },
+	-- the east strait's floating defences
+	{ def_name = "urchin", at = Vector2.new(110, -60) },
+	{ def_name = "coral", at = Vector2.new(95, 0) },
+	{ def_name = "urchin", at = Vector2.new(110, 60) },
 	-- ashore
-	{ def_name = "guard", at = Vector2.new(210, -60) },
-	{ def_name = "guard", at = Vector2.new(210, 60) },
 	{ def_name = "twin_guard", at = Vector2.new(240, -16) },
 	{ def_name = "energy_storage", at = Vector2.new(250, -30) },
 	{ def_name = "solar_collector", at = Vector2.new(296, -12) },
@@ -301,11 +306,11 @@ local CHANNEL_ENEMY: { Thing } = {
 	{ def_name = "solar_collector", at = Vector2.new(304, 4) },
 }
 
--- What Channel Crossing's enemy has besides in its hard mode: an Urchin each side of the water off the shore's middle
--- Agitator, and an Air Lab, whose bombers the mission makes and sends (CHANNEL_LAYOUT).
+-- What Channel Crossing's enemy has besides in its hard mode: a Coral at each end of the east strait, and an Air Lab,
+-- whose bombers the mission makes and sends (CHANNEL_LAYOUT).
 local CHANNEL_HARD_ENEMY: { Thing } = {
-	{ def_name = "urchin", at = Vector2.new(140, -30) },
-	{ def_name = "urchin", at = Vector2.new(140, 30) },
+	{ def_name = "coral", at = Vector2.new(110, -120) },
+	{ def_name = "coral", at = Vector2.new(110, 120) },
 	{ def_name = "air_lab", at = Vector2.new(285, 60) },
 }
 

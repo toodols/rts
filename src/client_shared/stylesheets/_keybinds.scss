@@ -1,0 +1,159 @@
+@use "sass:color";
+@use "theme" as *;
+@use "mixins" as *;
+
+// Keybinds -----------------------------------------------------------------------------------------------------------
+
+// The keybind settings (ClientShared.keybind_settings), the same in the lobby's Settings tab and the game's settings
+// panel: a header with the profiles and a reset, then every action under its section, each against its key.
+.keybinds {
+	width: 100%;
+	height: 100%;
+	@include stack(column, space(3));
+	padding: space(4);
+}
+
+.keybinds-header {
+	width: 100%;
+	height: auto;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.keybinds-title {
+	width: 0;
+	flex-grow: 1;
+	height: 20px;
+	font-family: Michroma;
+	font-weight: bold;
+	font-size: 14px;
+	text-align: left;
+}
+
+// A profile to choose, the reset and the close: flat cells, the profile in use lit with the accent.
+.keybinds-chip {
+	width: auto;
+	height: 28px;
+	@include cell;
+	@include stack(row, 0);
+	justify-content: center;
+	align-items: center;
+
+	&.active {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.16), veil(black, 0.2));
+		outline: 1px solid $accent;
+	}
+}
+
+.keybinds-chip-label {
+	width: auto;
+	height: 100%;
+	padding: 0 space(3);
+	color: var(--TextDim);
+	font-family: Michroma;
+	font-size: 11px;
+	font-weight: bold;
+
+	.keybinds-chip.active > & {
+		color: var(--Text);
+	}
+}
+
+.keybinds-notice {
+	width: 100%;
+	height: 16px;
+	color: var(--Caution);
+	font-size: 13px;
+	text-align: left;
+}
+
+.keybinds-list {
+	width: 100%;
+	height: 0;
+	flex-grow: 1;
+	background-color: transparent;
+	scrollbar-width: thin;
+	@include stack(column, space(1));
+}
+
+.keybinds-section {
+	width: 100%;
+	height: 26px;
+	padding-top: space(2);
+	color: var(--Accent);
+	font-family: Michroma;
+	font-size: 11px;
+	font-weight: bold;
+	text-align: left;
+}
+
+.keybinds-row {
+	width: 100%;
+	height: 26px;
+	@include stack(row, space(2));
+	align-items: center;
+	padding-right: space(3);
+}
+
+.keybinds-label {
+	width: 0;
+	flex-grow: 1;
+	height: 100%;
+	color: var(--TextDim);
+	font-size: 14px;
+	text-align: left;
+}
+
+// The key: a cell to click and press a new key on, lit while it waits for one.
+.keybinds-key {
+	width: 110px;
+	height: 24px;
+	@include cell;
+
+	&.capturing {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.16), veil(black, 0.2));
+		outline: 1px solid $accent;
+	}
+}
+
+// The build menu's key slots, laid out as a keyboard's rows are: each row starting a little further right.
+.keybinds-grid {
+	width: 100%;
+	height: auto;
+	@include stack(column, space(1));
+	padding: space(1) 0;
+}
+
+.keybinds-grid-row {
+	width: 100%;
+	height: 36px;
+	@include stack(row, space(1));
+
+	&.stagger-1 {
+		padding-left: space(5);
+	}
+
+	&.stagger-2 {
+		padding-left: space(10);
+	}
+}
+
+.keybinds-key.slot {
+	width: 56px;
+	height: 36px;
+}
+
+.keybinds-key-label {
+	width: 100%;
+	height: 100%;
+	color: var(--Text);
+	font-family: RobotoMono;
+	font-size: 13px;
+	font-weight: bold;
+
+	.keybinds-key.unbound > & {
+		color: var(--TextFaint);
+	}
+}

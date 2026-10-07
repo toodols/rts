@@ -12,11 +12,13 @@ local map_state = require(ReplicatedStorage.Shared.map_state)
 local terrain = require(script.Parent.terrain)
 
 -- Something finished that went without leaving a wreck, for the clients to fling its pieces apart (client/debris.luau),
--- harder the more violent its death.
+-- harder the more violent its death, or to bring it down out of the sky first if it `falls`, an aircraft shot down in
+-- the air.
 export type Shattered = {
 	id: number,
 	severity: number,
 	velocity: Vector3,
+	falls: boolean,
 }
 
 local unit_shattered: RemoteEvent = ReplicatedStorage.Shared.UnitShattered

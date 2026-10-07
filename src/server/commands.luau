@@ -263,8 +263,9 @@ local function on_queue_production(player: Player, sent: command_payloads.Queued
 		return
 	end
 	-- A factory's build orders always queue, whether or not shift was held.
+	local front = sent.front == true
 	for _ = 1, math.clamp(sent.count or 1, 1, MAX_QUEUE_COUNT) do
-		if production.enqueue(factory, sent.def_name) == false then
+		if production.enqueue(factory, sent.def_name, front) == false then
 			return
 		end
 	end
@@ -278,9 +279,9 @@ local function on_cancel_production(player: Player, sent: command_payloads.Cance
 	end
 end
 
-local function on_place_blueprint(player: Player, sent: command_payloads.PlacedBlueprint)
-	local team = players.team_of(player)
-	if team == nil or unit_defs.get(sent.def_name).kind ~= "building" then
+-- Puts down the building `sent` names for team `team`, if its builders may.
+local function place(team: TeamId, sent: command_payloads.PlacedBlueprint)
+	if unit_defs.get(sent.def_name).kind ~= "building" then
 		return
 	end
 
@@ -336,6 +337,13 @@ local function on_place_blueprint(player: Player, sent: command_payloads.PlacedB
 	end
 end
 
+local function on_place_blueprint(player: Player, sent: command_payloads.PlacedBlueprint)
+	local team = players.team_of(player)
+	if team ~= nil then
+		place(team, sent)
+	end
+end
+
 local function init()
 	remotes.listen(issue_order, { args = { ORDER }, rate = COMMAND_RATE }, on_issue_order)
 	remotes.listen(queue_production, { args = { PRODUCTION }, rate = COMMAND_RATE }, on_queue_production)
@@ -345,4 +353,8 @@ end
 
 return table.freeze({
 	init = init,
+	-- what a player's IssueOrder and PlaceBlueprint do, for a computer player outside the game that commands as a
+	-- player does (server/external_orders.luau)
+	issue = issue,
+	place = place,
 })

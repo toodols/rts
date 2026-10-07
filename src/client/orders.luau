@@ -5,7 +5,6 @@
 -- units' queues.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
-local UserInputService = game:GetService "UserInputService"
 
 local types = require(ReplicatedStorage.Shared.types)
 local order_kinds = require(ReplicatedStorage.Shared.order_kinds)
@@ -13,6 +12,8 @@ local order_routes = require(ReplicatedStorage.Shared.order_routes)
 local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 local order_path = require(ReplicatedStorage.Shared.order_path)
 local command_payloads = require(ReplicatedStorage.Shared.command_payloads)
+
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 
 local world = require(ReplicatedStorage.Client.world)
 local modifiers = require(ReplicatedStorage.Client.modifiers)
@@ -40,11 +41,12 @@ local cancel_production: RemoteEvent = ReplicatedStorage.Shared.CancelProduction
 -- An order that replaces whatever each unit was doing.
 local NOW: Queueing = table.freeze({ queue = false, front = false })
 
--- Where an order given from the map goes: shift queues it, and space, held as well, puts it at the front.
+-- Where an order given from the map goes: shift queues it, and the queue-first key (space in the BAR profile), held as
+-- well, puts it at the front.
 local function from_keys(): Queueing
 	return {
 		queue = modifiers.shift_held(),
-		front = UserInputService:IsKeyDown(Enum.KeyCode.Space),
+		front = keybind_state.is_down "queue_front",
 	}
 end
 
@@ -179,9 +181,10 @@ local function place(def_name: string, builders: { EntityId }, centers: { Vector
 	end
 end
 
--- Adds `count` of `def_name` to the back of the queue of the lab `factory_id`.
-local function queue(factory_id: EntityId, def_name: string, count: number)
-	local sent: command_payloads.QueuedProduction = { factory_id = factory_id, def_name = def_name, count = count }
+-- Adds `count` of `def_name` to the back of the queue of the lab `factory_id`, or with `front` to the front of it.
+local function queue(factory_id: EntityId, def_name: string, count: number, front: boolean)
+	local sent: command_payloads.QueuedProduction =
+		{ factory_id = factory_id, def_name = def_name, count = count, front = front }
 	queue_production:FireServer(sent)
 end
 

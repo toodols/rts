@@ -9,9 +9,12 @@
 @use "lobby/map";
 @use "lobby/settings";
 @use "lobby/seats";
+@use "lobby/rank";
 @use "lobby/actions";
 @use "lobby/campaign";
 @use "lobby/tabs";
 @use "lobby/skins";
 @use "lobby/encyclopedia";
 @use "lobby/microtransactions";
+@use "lobby/prompt";
+@use "../../../client_shared/stylesheets/keybinds";

@@ -1,6 +1,7 @@
 --!strict
 -- The pow commands every place has, on what every place keeps of a player the same way: the developers' list
--- (developer_list.luau), skins (skin_session.luau) and campaign progress (campaign_session.luau). Each place registers
+-- (developer_list.luau), skins (skin_session.luau) and campaign progress (campaign_session.luau): missions finished
+-- and what is unlocked. Each place registers
 -- them from its own server extension, handing in what only it knows of a player (`Place`), and adds its own commands.
 
 local Players = game:GetService "Players"
@@ -185,20 +186,92 @@ end
 local function mission_complete(): Command
 	return {
 		description = "Finishes a campaign mission for you, or for the player given, as winning it would: it is marked "
-			.. "done and what it unlocks is theirs, and that is saved.",
+			.. "done and what it unlocks is theirs, and that is saved. Its hard mode is its id with _hard after it "
+			.. "(overlook_hard), which finishes the normal mode too.",
 		permissions = { "admin" },
 		overloads = {
-			{ returns = "nil", args = { { name = "Mission", type = "mission" } } },
+			{ returns = "nil", args = { { name = "Mission", type = "mission_key" } } },
 			{
 				returns = "nil",
-				args = { { name = "Mission", type = "mission" }, { name = "Player", type = "player" } },
+				args = { { name = "Mission", type = "mission_key" }, { name = "Player", type = "player" } },
 			},
 		},
 		server_run = function(context: Context)
-			local id = context.args[1]
+			local key = context.args[1]
 			local target = target_player(context, 2)
-			local outcome, why = campaign_session.complete(target, id, false)
-			local kind, line = outcome_line(`Completed {id} for {target.Name}`, outcome, why)
+			local mission, hard = campaign.parse_key(key)
+			if mission == nil then
+				context:log({ type = "error", value = `There is no mission "{key}"` })
+				return
+			end
+			local outcome, why = campaign_session.complete(target, mission.id, hard)
+			local kind, line = outcome_line(`Completed {key} for {target.Name}`, outcome, why)
+			context:log({ type = kind, value = line })
+		end,
+	}
+end
+
+local function unlock_def(): Command
+	return {
+		description = "Unlocks a def in the campaign for you, or for the player given, saved. To unlock everything, "
+			.. "unlock_all.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = { { name = "Def", type = "unit" } } },
+			{ returns = "nil", args = { { name = "Def", type = "unit" }, { name = "Player", type = "player" } } },
+		},
+		server_run = function(context: Context)
+			local player = target_player(context, 2)
+			local wanted = context.args[1]
+			if unit_defs.defs[wanted] == nil then
+				context:log({ type = "error", value = `There is no def "{wanted}"` })
+				return
+			elseif campaign.is_lockable(wanted) == false then
+				context:log({ type = "info", value = `{wanted} is never locked: nothing builds it` })
+				return
+			end
+			local outcome, why = campaign_session.grant(player, { wanted }, true)
+			local kind, line = outcome_line(`Unlocked {wanted} for {player.Name}`, outcome, why)
+			context:log({ type = kind, value = line })
+		end,
+	}
+end
+
+local function unlock_all(): Command
+	return {
+		description = "Unlocks everything in the campaign for you, or for the player given, saved.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { { name = "Player", type = "player" } } },
+		},
+		server_run = function(context: Context)
+			local target = target_player(context, 1)
+			local _, names = split_unlocks({})
+			local outcome, why = campaign_session.grant(target, names, true)
+			local kind, line = outcome_line(`Unlocked all {#names} buildable defs for {target.Name}`, outcome, why)
+			context:log({ type = kind, value = line })
+		end,
+	}
+end
+
+local function unlock_reset(): Command
+	return {
+		description = "Takes you, or the player given, back to the campaign's starting unlocks, the missions finished "
+			.. "staying finished, saved.",
+		permissions = { "admin" },
+		overloads = {
+			{ returns = "nil", args = {} },
+			{ returns = "nil", args = { { name = "Player", type = "player" } } },
+		},
+		server_run = function(context: Context)
+			local target = target_player(context, 1)
+			local outcome, why = campaign_session.relock(target, true)
+			local kind, line = outcome_line(
+				`{target.Name} is back to the starting unlocks: {table.concat(campaign.STARTING_UNLOCKS, ", ")}`,
+				outcome,
+				why
+			)
 			context:log({ type = kind, value = line })
 		end,
 	}
@@ -248,10 +321,13 @@ local function unlock_list(): Command
 					else "not read, never saved"}):`,
 			}
 			for _, mission in campaign.MISSIONS do
+				local hard = if mission.hard_mode
+					then ` | [{if progress.completed[campaign.key(mission.id, true)] then "x" else " "}] hard`
+					else ""
 				table.insert(
 					lines,
 					`  [{if progress.completed[mission.id] then "x" else " "}] {mission.label} ({mission.id})`
-						.. ` unlocks: {list_or(mission.unlocks, "nothing")}`
+						.. ` unlocks: {list_or(mission.unlocks, "nothing")}{hard}`
 				)
 			end
 			table.insert(lines, `Unlocked ({#unlocked}): {list_or(unlocked, "nothing")}`)
@@ -305,9 +381,13 @@ local function register(commands: { [string]: Command }, place: Place)
 	commands.player_info = player_info(place)
 	commands.player_reset = player_reset()
 	commands.unlock_list = unlock_list()
+	commands.unlock_def = unlock_def()
+	commands.unlock_all = unlock_all()
+	commands.unlock_reset = unlock_reset()
 end
 
 return table.freeze({
 	split_unlocks = split_unlocks,
+	outcome_line = outcome_line,
 	register = register,
 })

@@ -4,7 +4,7 @@
 -- goes on by (a bomber's bombs fall through its own swarm), but its blast spares nobody but its shooter:
 -- a friend standing by what it strikes is caught in it. Anti-nuke interceptors are projectiles of their own kind, which
 -- strike nothing but the nuke they chase (server/interceptors.luau); what they need of a nuke is kept here, behind
--- `is_free_nuke`, `claim_nuke`, `free_nuke` and `catch_nuke`.
+-- `is_free_nuke`, `claim_nuke`, `free_nuke` and `catch_nuke`. Every nuke launched goes out through `on_nuke_launched`.
 --
 -- Clients are told about launches and impacts (shared/shot_events) and fly the same model themselves.
 
@@ -17,6 +17,7 @@ local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local projectile_mod = require(ReplicatedStorage.Shared.projectile)
 local weapon_kinds = require(ReplicatedStorage.Shared.weapon_kinds)
 local shot_events = require(ReplicatedStorage.Shared.shot_events)
+local signal = require(ReplicatedStorage.Shared.signal)
 
 local state = require(script.Parent.state)
 local deformation = require(script.Parent.deformation)
@@ -89,6 +90,10 @@ local HIT_STEP = 0.5
 -- takes to fly its weapon's range: long enough to come round once for something that got past it, not long enough
 -- to chase it for ever.
 local GUIDANCE_MARGIN = 2.5
+-- A shot that never comes down on its own (`projectile.runs_level`) may fly this many times as long as it takes to fly
+-- its weapon's range, or as far as it was aimed if that is further: a little slack for a torpedo that turns after what
+-- it is homing on, and no more, so that it cannot be sent on to strike something far past its reach.
+local LIFETIME_MARGIN = 1.25
 -- How far clear of its target's collider a missile fired to miss (shared/projectile.luau's HOMING_MISS_CHANCE) passes.
 local MISS_CLEARANCE = 1.5
 -- How big the burst is where a shield swallows a shell.
@@ -119,6 +124,8 @@ local projectiles: { Projectile } = {}
 -- The nuclear missiles among them, in the same order, for interceptors to look through (`nukes`).
 local nuke_list: { Projectile } = {}
 local next_projectile_id = 1
+-- every nuclear missile launched, with the team that launched it
+local nuke_launched = signal.new() :: signal.Signal<types.TeamId>
 
 -- A new projectile's id: one sequence for every kind, which the clients know them all by.
 local function new_id(): number
@@ -369,6 +376,11 @@ local function launch(
 		if homing then
 			guide(release, weapon, delivery, origin, at, target)
 		end
+		if projectile_mod.runs_level(delivery) then
+			local reach = math.max(weapon.range, (at - origin).Magnitude)
+			local lifetime = projectile_mod.time_to_reach(reach, delivery.projectile) * LIFETIME_MARGIN
+			release.shot.lifetime = math.max(lifetime, delivery.guidance_time or 0)
+		end
 	end
 
 	local homing_entity_id = if homing and target ~= nil then target.id else nil
@@ -395,6 +407,7 @@ local function launch(
 	table.insert(projectiles, projectile)
 	if projectile.nuke ~= nil then
 		table.insert(nuke_list, projectile)
+		nuke_launched.fire(owner.team)
 	end
 end
 
@@ -723,6 +736,13 @@ local function tick(delta: number)
 				finished = true
 				break
 			end
+			-- one that would fly on for ever is spent once it has flown as far as its weapon reaches
+			local lifetime = projectile.flight.shot.lifetime
+			if lifetime ~= nil and projectile.flight.age >= lifetime then
+				burst_harmlessly(projectile.id, at, 0, "spent")
+				finished = true
+				break
+			end
 			if projectile.flight.age > projectile_mod.max_age(projectile.delivery) then
 				detonate(projectile, at, nil, false)
 				finished = true
@@ -783,6 +803,7 @@ return table.freeze({
 	in_flight = in_flight,
 	in_the_air = in_the_air,
 	nukes = nukes,
+	on_nuke_launched = nuke_launched.subscribe,
 	is_free_nuke = is_free_nuke,
 	claim_nuke = claim_nuke,
 	free_nuke = free_nuke,

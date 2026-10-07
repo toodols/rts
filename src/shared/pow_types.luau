@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
 local skins = require(ReplicatedStorage.Shared.skins)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 -- What a pow extension module is called with: the types and commands it registers into.
 export type Extras = { types: { [string]: any }, commands: { [string]: any } }
@@ -46,14 +47,33 @@ local function named(type_name: string, description: string, names: { string }):
 	}
 end
 
--- The types every place's commands take: a skin, by name, and a campaign mission, by id.
+-- The types every place's commands take: a skin, by name; a campaign mission, by id; a mission or its hard mode, by
+-- key (campaign.key: "overlook", "overlook_hard"); and a def.
 local function register_common(extras: Extras)
 	local mission_ids: { string } = {}
+	local mission_keys: { string } = {}
 	for _, mission in campaign.MISSIONS do
 		table.insert(mission_ids, mission.id)
+		table.insert(mission_keys, mission.id)
+		if mission.hard_mode then
+			table.insert(mission_keys, campaign.key(mission.id, true))
+		end
 	end
 	extras.types.skin = named("skin", "A skin, by name", skins.names())
 	extras.types.mission = named("mission", "A campaign mission, by id", mission_ids)
+	extras.types.mission_key = named("mission_key", "A campaign mission, or its hard mode, by key", mission_keys)
+
+	local def_names: { string } = {}
+	for name in unit_defs.defs do
+		table.insert(def_names, name)
+	end
+	table.sort(def_names)
+	-- Any def, unit or building, by name. Only suggested: what is not one passes as it is, for each command to check.
+	extras.types.unit = {
+		name = "unit",
+		description = "A unit or building, by def name",
+		autocomplete_simple = def_names,
+	}
 end
 
 return table.freeze({

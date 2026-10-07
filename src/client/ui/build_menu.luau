@@ -20,6 +20,7 @@ local React = require(ReplicatedStorage.Packages.react)
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
 local build_hotkeys = require(ReplicatedStorage.Shared.build_hotkeys)
+local keybinds = require(ReplicatedStorage.Shared.keybinds)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local unit_descriptions = require(ReplicatedStorage.Shared.unit_descriptions)
 local unit_facts = require(ReplicatedStorage.Shared.unit_facts)
@@ -37,6 +38,7 @@ local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 
 local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
 local campaign_standing = require(ReplicatedStorage.ClientShared.campaign_standing)
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 local TutorialPointer = tutorial_pointer.TutorialPointer
@@ -69,6 +71,18 @@ local function use_unlocked(): (def_name: string) -> boolean
 	end
 end
 
+-- `tips` with the keys they name the player's own.
+local function fill_tips(tips: { string }?): { string }?
+	if tips == nil then
+		return nil
+	end
+	local filled = table.create(#tips)
+	for _, tip in tips do
+		table.insert(filled, keybind_state.fill(tip))
+	end
+	return filled
+end
+
 -- The card shown while a cell is hovered: what the thing is for and how to use it (unit_descriptions), then what it
 -- costs and what it brings (unit_facts). The menu is on the right of the screen, so the card opens to its left.
 local function def_tooltip(def_name: string, category: string?): tooltip.Content
@@ -80,7 +94,7 @@ local function def_tooltip(def_name: string, category: string?): tooltip.Content
 		tone = unit_facts.tone(def),
 		text = unit_descriptions.text_of(def),
 		rows = unit_facts.summary_rows(def),
-		notes = unit_descriptions.tips_of(def_name),
+		notes = fill_tips(unit_descriptions.tips_of(def_name)),
 	}
 end
 
@@ -310,34 +324,40 @@ local function Option(props: {
 	})
 end
 
--- One category on the first page: its name, its key, and the building that key places.
+-- One category on the first page: its name, the keybind action of its key, and the building that key places.
 type Row = {
 	category: string,
-	key: string,
+	action: string,
 	def_name: string,
 }
 
 type Page = {
-	-- the category it shows and the key that starts it, or nil for the first page
+	-- the category it shows and the keybind action that starts it, or nil for the first page
 	category: string?,
-	key: string?,
+	action: string?,
 	-- on the first page, one row per category
 	rows: { Row },
-	-- the cells of the grid, with the key that places each of them
+	-- the cells of the grid, with the keybind action that places each of them
 	defs: { string },
-	keys: { [string]: string },
+	actions: { [string]: string },
 }
+
+-- How the key of `action` is shown, nil for no action or no key.
+local function hotkey_of(bindings: keybinds.Bindings, action: string?): string?
+	local shown = if action ~= nil then keybinds.label(bindings[action] or "") else ""
+	return if shown == "" then nil else shown
+end
 
 -- The first page: one row for each category the builder can build from, showing the building its key places, which
 -- is what the key itself would place (build_hotkeys.entry); a category with nothing unlocked shows its building
 -- locked. Anything it can build that no category holds follows them in the grid.
 local function first_page(builds: { string }, is_unlocked: (def_name: string) -> boolean): Page
-	local page: Page = { category = nil, key = nil, rows = {}, defs = {}, keys = {} }
+	local page: Page = { category = nil, action = nil, rows = {}, defs = {}, actions = {} }
 	for _, category in build_hotkeys.categories do
 		local entry, shown = build_hotkeys.entry(category, builds, is_unlocked)
 		local def_name = entry or shown
 		if def_name ~= nil then
-			table.insert(page.rows, { category = category.name, key = category.key, def_name = def_name })
+			table.insert(page.rows, { category = category.name, action = category.action, def_name = def_name })
 		end
 	end
 	for _, def_name in builds do
@@ -357,11 +377,17 @@ local function category_page(builds: { string }, placing: string): Page?
 	end
 	local defs: { string } = {}
 	for _, def_name in builds do
-		if category.key_of[def_name] ~= nil then
+		if category.action_of[def_name] ~= nil then
 			table.insert(defs, def_name)
 		end
 	end
-	return { category = category.name, key = category.key, rows = {}, defs = defs, keys = category.key_of }
+	return {
+		category = category.name,
+		action = category.action,
+		rows = {},
+		defs = defs,
+		actions = category.action_of,
+	}
 end
 
 local function BuildMenu()
@@ -372,6 +398,7 @@ local function BuildMenu()
 	local is_unlocked = use_unlocked()
 	-- what the guide wants clicked, if anything
 	local wanted = use_tutorial.use_build_target()
+	local bindings = keybind_state.use_bindings()
 
 	local builder = selected.builder()
 	if builder == nil then
@@ -392,7 +419,7 @@ local function BuildMenu()
 			command_state.place(def_name)
 			return
 		end
-		orders.queue(builder.id, def_name, if modifiers.shift_held() then SHIFT_BATCH else 1)
+		orders.queue(builder.id, def_name, if modifiers.shift_held() then SHIFT_BATCH else 1, modifiers.alt_held())
 	end
 
 	-- A construction_bot's buildings are shown a category at a time, or they would fill the screen: the first page
@@ -405,7 +432,12 @@ local function BuildMenu()
 			break
 		end
 	end
-	local page: Page = { category = nil, key = nil, rows = {}, defs = builds, keys = {} }
+	-- a lab's units against their keys (Shared.build_hotkeys' lab slots)
+	local lab_actions: { [string]: string } = {}
+	for _, def_name in builds do
+		lab_actions[def_name] = build_hotkeys.lab_action(builder_def.name, def_name)
+	end
+	local page: Page = { category = nil, action = nil, rows = {}, defs = builds, actions = lab_actions }
 	if buildings_only then
 		page = (if placing ~= nil then category_page(builds, placing) else nil) or first_page(builds, is_unlocked)
 	end
@@ -422,7 +454,7 @@ local function BuildMenu()
 	for index, row in page.rows do
 		rows[row.category] = React.createElement(CategoryRow, {
 			category = row.category,
-			hotkey = row.key,
+			hotkey = hotkey_of(bindings, row.action) or "",
 			def_name = row.def_name,
 			team = team_color,
 			locked = is_unlocked(row.def_name) == false,
@@ -436,7 +468,7 @@ local function BuildMenu()
 	for index, def_name in page.defs do
 		options[`Option{index}`] = React.createElement(Option, {
 			def_name = def_name,
-			hotkey = page.keys[def_name],
+			hotkey = hotkey_of(bindings, page.actions[def_name]),
 			team = team_color,
 			locked = is_unlocked(def_name) == false,
 			pointed = leads_to_target(def_name, nil),
@@ -446,16 +478,17 @@ local function BuildMenu()
 	end
 
 	-- inside a category, a banner under the title says which, and how to get back out of it
+	local page_key = hotkey_of(bindings, page.action)
 	local banner = if page.category ~= nil
 		then React.createElement("Frame", {
 			[React.Tag] = "build-page-header",
 			LayoutOrder = 2,
 		}, {
-			Key = if page.key ~= nil
+			Key = if page_key ~= nil
 				then React.createElement("TextLabel", {
 					[React.Tag] = "build-page-key",
 					LayoutOrder = 1,
-					Text = page.key,
+					Text = page_key,
 				})
 				else nil,
 			Name = React.createElement("TextLabel", {

@@ -212,7 +212,6 @@ local defs: { [string]: EntityDef } = {
 	advanced_shipyard = {
 		name = "advanced_shipyard",
 		display_name = "Advanced Shipyard",
-		subtitle = "Advanced ship factory",
 		kind = "building",
 		category = "factories",
 		-- 186 x 78 x 183 elmos
@@ -247,7 +246,6 @@ local defs: { [string]: EntityDef } = {
 	seaplane_platform = {
 		name = "seaplane_platform",
 		display_name = "Seaplane Platform",
-		subtitle = "Seaplane factory",
 		kind = "building",
 		category = "factories",
 		-- no collision volume of its own; its wreck's is 117.5 x 41.25 x 112.5 elmos, in whole grid cells
@@ -291,7 +289,6 @@ local defs: { [string]: EntityDef } = {
 	advanced_air_lab = {
 		name = "advanced_air_lab",
 		display_name = "Advanced Air Lab",
-		subtitle = "Advanced aircraft factory",
 		kind = "building",
 		category = "factories",
 		collider = { shape = "box", width = cells(3), height = cells(2), length = cells(3) },

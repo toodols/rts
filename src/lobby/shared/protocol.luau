@@ -19,6 +19,11 @@ type Match = game_modes.Match
 -- Who may see and join a lobby: anyone, or only its host's friends.
 export type Visibility = "public" | "friends"
 
+-- The levels (campaign.level) a lobby's host may let in, from LEVEL_MIN to LEVEL_MAX in steps of LEVEL_STEP.
+local LEVEL_MIN = 0
+local LEVEL_MAX = 100
+local LEVEL_STEP = 10
+
 -- A lobby as the browser lists it.
 export type Summary = {
 	-- what the browser asks to join it by
@@ -35,6 +40,9 @@ export type Summary = {
 	capacity: number,
 	spectators: number,
 	visibility: Visibility,
+	-- the levels it lets in (see LEVEL_MIN)
+	level_min: number,
+	level_max: number,
 }
 
 -- The lobby a player is in, as they see it.
@@ -42,6 +50,11 @@ export type LobbyView = {
 	id: string,
 	host: number,
 	visibility: Visibility,
+	-- the levels it lets in (see LEVEL_MIN)
+	level_min: number,
+	level_max: number,
+	-- each player's level, by user id as a string
+	levels: { [string]: number },
 	-- the game it will start: its mode, map, seats and the rest
 	match: Match,
 	-- the user ids of the players who have said they are ready to start
@@ -80,6 +93,7 @@ export type Action =
 	| "set_map"
 	| "set_mode"
 	| "set_visibility"
+	| "set_level_range"
 	| "set_bonus"
 	| "set_ready"
 	| "set_ally_griefing"
@@ -106,6 +120,8 @@ local ACTIONS: { [Action]: decode.Decoder<any> } = table.freeze({
 	set_mode = decode.text,
 	-- a Visibility
 	set_visibility = decode.text,
+	-- `{ min = number, max = number }`: the levels it lets in. Refused if it would leave out anyone in it.
+	set_level_range = decode.record({ min = decode.number, max = decode.number }),
 	-- `{ user_id = number, percent = number }`: that player's resource bonus, from game_modes.BONUS_MIN to BONUS_MAX.
 	-- Only a developer's is heard (shared/developers.luau).
 	set_bonus = decode.record({ user_id = decode.number, percent = decode.number }),
@@ -148,6 +164,9 @@ local function read(action: unknown, argument: unknown): (Action?, any)
 end
 
 return table.freeze({
+	LEVEL_MIN = LEVEL_MIN,
+	LEVEL_MAX = LEVEL_MAX,
+	LEVEL_STEP = LEVEL_STEP,
 	ACTIONS = ACTIONS,
 	read = read,
 })

@@ -21,6 +21,9 @@ local serde = require "@lune/serde"
 local stdio = require "@lune/stdio"
 
 local session = require "../lib/session"
+local rust_bridge = require "../rust_ai/bridge"
+local nn_recorder = require "../nn_ai/recorder"
+local nn_bridge = require "../nn_ai/bridge"
 
 local function round(value: number, places: number): number
 	local scale = 10 ^ places
@@ -111,6 +114,174 @@ local function profile_of(side: { [string]: any }): any
 		profile = ai_profiles.with(ai_profiles.without(profile, left_out), overrides)
 	end
 	return profile
+end
+
+-- Every death of either side's units and buildings (`deaths`): when, where, whose, its metal, and the armed worth
+-- (unit_defs.power) of each side within FIGHT_REACH of it then, so that fights can be told apart and judged.
+local FIGHT_REACH = 50
+local function death_tracker(team_of: { [string]: number })
+	local side_of = {}
+	for side, team in team_of do
+		side_of[team] = side
+	end
+	local known: { [any]: any } = {}
+	local deaths = {}
+	local function step(at: number)
+		local armed = {}
+		local now_alive: { [any]: boolean } = {}
+		for id, entity in state.all() do
+			if (entity.kind ~= "unit" and entity.kind ~= "building") or side_of[entity.team] == nil then
+				continue
+			end
+			if entity.alive == false then
+				continue
+			end
+			now_alive[id] = true
+			local def = entity.def
+			if entity.state ~= "blueprint" and def.weapons ~= nil and #def.weapons > 0 then
+				table.insert(armed, { side = side_of[entity.team], x = entity.position.X, z = entity.position.Z, worth = unit_defs.power(def), name = def.name })
+			end
+			known[id] = { side = side_of[entity.team], x = entity.position.X, z = entity.position.Z, name = def.name, metal = def.metal_cost or 0, unit = entity.kind == "unit", done = entity.state ~= "blueprint" }
+		end
+		for id, last in known do
+			if now_alive[id] then
+				continue
+			end
+			known[id] = nil
+			if not last.done then
+				continue
+			end
+			local near = { a = 0, b = 0 }
+			-- the other side's armed units near, by name (what may have killed it)
+			local foes: { [string]: number } = {}
+			for _, u in armed do
+				if math.abs(u.x - last.x) <= FIGHT_REACH and math.abs(u.z - last.z) <= FIGHT_REACH then
+					near[u.side] += u.worth
+					if u.side ~= last.side then
+						foes[u.name] = (foes[u.name] or 0) + 1
+					end
+				end
+			end
+			table.insert(deaths, { t = at, side = last.side, name = last.name, metal = last.metal, unit = last.unit, x = math.round(last.x), z = math.round(last.z), a = math.round(near.a), b = math.round(near.b), foes = foes })
+		end
+	end
+	return step, deaths
+end
+
+-- Each side's first `limit` buildings in the order they were put down (the second it was first seen, its name), so
+-- openings can be compared.
+local function opening_tracker(team_of: { [string]: number }, limit: number)
+	local seen: { [any]: boolean } = {}
+	local order = { a = {}, b = {} }
+	local side_of = {}
+	for side, team in team_of do
+		side_of[team] = side
+	end
+	local function step(at: number)
+		if #order.a >= limit and #order.b >= limit then
+			return
+		end
+		for id, entity in state.all() do
+			if entity.kind ~= "building" or seen[id] then
+				continue
+			end
+			seen[id] = true
+			local side = side_of[entity.team]
+			if side ~= nil and #order[side] < limit then
+				table.insert(order[side], { t = at, name = entity.def.name, x = math.round(entity.position.X), z = math.round(entity.position.Z) })
+			end
+		end
+	end
+	return step, order
+end
+
+-- How well a side plays its economy, looked at every second of a duel, whoever plays it (server/ai or the Rust AI):
+-- - `float_seconds`: the metal it holds over its metal income, the seconds of income it sits on, on the mean;
+-- - `metal_full_share`: the share of seconds its metal storage is all but full (95%), income going to waste;
+-- - `energy_stall_share`: the share of seconds its energy is all but empty (under 2% of storage) while it spends;
+-- - `buildpower_per_income`: all its buildpower (builders, construction turrets, labs) over its metal income, on the
+--   mean: how much it could build against how much it has to build with;
+-- - `builder_idle_share`: the share of builder-seconds its mobile builders (the commander too) spend with no orders,
+--   and `lab_idle_share` the share of lab-seconds its finished labs spend with nothing queued.
+local function efficiency_tracker(team_of: { [string]: number })
+	local sums = {}
+	for side in team_of do
+		sums[side] = {
+			seconds = 0,
+			float = 0,
+			full = 0,
+			stall = 0,
+			bp_ratio = 0,
+			bp_seconds = 0,
+			builder_seconds = 0,
+			builder_idle = 0,
+			lab_seconds = 0,
+			lab_idle = 0,
+		}
+	end
+	local function step()
+		local buildpower: { [number]: number } = {}
+		local sides_of: { [number]: string } = {}
+		for side, team in team_of do
+			sides_of[team] = side
+			buildpower[team] = 0
+		end
+		for _, entity in state.all() do
+			local side = sides_of[entity.team]
+			if entity.alive == false or side == nil or entity.state ~= "active" then
+				continue
+			end
+			local builder = entity.def.builder
+			if builder == nil or builder.buildpower <= 0 then
+				continue
+			end
+			local s = sums[side]
+			buildpower[entity.team] += builder.buildpower
+			if unit_defs.is_factory(entity.def) then
+				s.lab_seconds += 1
+				if #entity.queue == 0 then
+					s.lab_idle += 1
+				end
+			elseif entity.kind == "unit" and #unit_defs.build_options(entity.def) > 0 and entity.def.air == nil then
+				s.builder_seconds += 1
+				if #entity.orders == 0 then
+					s.builder_idle += 1
+				end
+			end
+		end
+		for side, team in team_of do
+			local t = state.get_team(team)
+			if t == nil then
+				continue
+			end
+			local s = sums[side]
+			s.seconds += 1
+			s.float += t.metal / math.max(t.metal_income, 1)
+			if t.metal >= t.metal_capacity * 0.95 then
+				s.full += 1
+			end
+			if t.energy <= t.energy_capacity * 0.02 and t.energy_expense > 0 then
+				s.stall += 1
+			end
+			if t.metal_income > 0 then
+				s.bp_ratio += buildpower[team] / t.metal_income
+				s.bp_seconds += 1
+			end
+		end
+	end
+	local function result(side: string): { [string]: any }
+		local s = sums[side]
+		local seconds = math.max(1, s.seconds)
+		return {
+			float_seconds = round(s.float / seconds, 1),
+			metal_full_share = round(s.full / seconds, 3),
+			energy_stall_share = round(s.stall / seconds, 3),
+			buildpower_per_income = round(s.bp_ratio / math.max(1, s.bp_seconds), 1),
+			builder_idle_share = round(s.builder_idle / math.max(1, s.builder_seconds), 3),
+			lab_idle_share = round(s.lab_idle / math.max(1, s.lab_seconds), 3),
+		}
+	end
+	return step, result
 end
 
 -- What a team has, as the end of a duel reads it.
@@ -431,12 +602,22 @@ end
 -- A duel: side "a" and side "b", each `{"profile": ..., "overrides": ...}`; "a" is put down first (as team 1) at the
 -- map's first start unless `swap`, when "b" is. `line` makes both build from that line's labs. It ends once a
 -- commander is dead, the other's the winner (both at once is a draw), or at `seconds` (a draw, which the scores
--- settle). `every` seconds (none by default) the teams are looked at and kept in `timeline`.
+-- settle). `every` seconds (none by default) the teams are looked at and kept in `timeline`. With `record`, a folder,
+-- it is kept there as a replay (server/replay.luau): the game itself, taken (snapshot.take) just after the sides are put
+-- down and every `keyframe_every` seconds (300) after, each as kNNNNN.bin, the game's checksum every `check_every`
+-- seconds (60) in between, and manifest.json saying what they are, how the game ended and what it was played with
+-- (`code`, if the caller says). A recorded game is the game it plays from each jump point on, so it is not the same
+-- game as one played without recording. What the Rust AI's sides were told to do each second is kept too (orders.json,
+-- server/external_orders.luau), as a replay cannot run the Rust AI again.
 local function duel(): { [string]: any }
 	local seconds = args.seconds or 900
 	local every = args.every
 	local order = if args.swap then { "b", "a" } else { "a", "b" }
 	local team_of = {}
+	-- the sides the Rust AI plays (`"engine": "rust"`), and the line each is told; and those the neural network plays
+	-- (`"engine": "nn"`, tools/nn_ai)
+	local rust_lines: { [string]: string } = {}
+	local nn_sides: { [string]: boolean } = {}
 	for _, side in order do
 		local profile = profile_of(args[side] or {})
 		local team = ai.spawn_opponent(`AI {side}`, nil, nil, profile)
@@ -444,16 +625,143 @@ local function duel(): { [string]: any }
 		team_of[side] = team
 		-- a profile with a line of its own (and a roster to match) keeps it
 		local line = (args[side] or {}).line or (if profile.line == nil then args.line else nil)
-		if line == "bot" or line == "vehicle" then
+		if (args[side] or {}).engine == "rust" then
+			-- the Rust AI plays it (tools/rust_ai), not server/ai
+			ai.remove(team)
+			rust_lines[side] = (args[side] or {}).line or args.line
+		elseif (args[side] or {}).engine == "nn" then
+			ai.remove(team)
+			nn_sides[side] = true
+		elseif line == "bot" or line == "vehicle" then
 			ai.set_line(team, line)
 		end
+	end
+	local recording: string? = args.record
+	local keyframe_every = args.keyframe_every or 300
+	local check_every = args.check_every or 60
+	local keyframes = {}
+	local checks = {}
+	local snapshots = game.server "snapshot"
+	local function keyframe(at: number)
+		local data = snapshots.take()
+		local file = string.format("k%05d", at)
+		fs.writeFile(`{recording}/{file}.bin`, data)
+		table.insert(keyframes, { t = at, file = file, checksum = snapshots.checksum(data), bytes = buffer.len(data) })
+	end
+	if recording ~= nil then
+		if not fs.isDir(recording) then
+			fs.writeDir(recording)
+		end
+		keyframe(0)
+	end
+	local elapsed = 0
+	-- each second's commands of the Rust AI's sides, in the order they were carried out
+	local recorded_orders = {}
+	local rust = {}
+	for side, line in rust_lines do
+		local other = if side == "a" then "b" else "a"
+		local team = team_of[side]
+		rust[side] = rust_bridge.start(game, team, { team_of[other] }, {
+			root = root,
+			exe = (args[side] or {}).exe,
+			params = (args[side] or {}).params,
+			line = if line == "bot" or line == "vehicle" then line else nil,
+			log = (args[side] or {}).log,
+			on_commands = if recording ~= nil
+				then function(_, commands)
+					table.insert(recorded_orders, { t = elapsed, team = team, cmds = commands })
+				end
+				else nil,
+		})
+	end
+	-- a side the network plays: `server` (tools/nn_ai/serve.py's address), `policy` and `sample` (which of its networks
+	-- plays, and whether it picks its actions at random by their chances), `game` (a name for the game, unique among
+	-- those the server is playing) and `static` (where what does not change over a game on this map is kept)
+	local nn = {}
+	for side in nn_sides do
+		local other = if side == "a" then "b" else "a"
+		local team = team_of[side]
+		local given = args[side] or {}
+		nn[side] = nn_bridge.start(game, team, { team_of[other] }, {
+			server = given.server,
+			policy = given.policy,
+			sample = given.sample,
+			static = given.static
+				or `{root}/tools/nn_ai/runs/static/{args.preset or "highlands"}_{args.seed or 1337}.static.json`,
+			game = given.game or `{os.time()}-{os.clock()}`,
+			tag = given.tag,
+			on_commands = if recording ~= nil
+				then function(_, commands)
+					table.insert(recorded_orders, { t = elapsed, team = team, cmds = commands })
+				end
+				else nil,
+		})
+	end
+	-- a network's side with `expert` (`{"profile": ..., "windows": [[from, to], ...]}`, tools/nn_ai/dagger.py) is played
+	-- by server/ai, by that profile, from each window's first second to its last, and by the network the rest of the
+	-- time: what server/ai does about where the network has got the side to is what the network learns from next
+	local expert_windows: { [string]: { { number } } } = {}
+	local expert_on: { [string]: boolean } = {}
+	for side in nn_sides do
+		local expert = (args[side] or {}).expert
+		if expert ~= nil then
+			expert_windows[side] = expert.windows or {}
+		end
+	end
+	-- who plays each such side in the second from `at`, handing it over where that changes; the teams server/ai plays
+	local function hand_over(at: number): { number }
+		local experts = {}
+		for side, windows in expert_windows do
+			local on = false
+			for _, window in windows do
+				if at >= window[1] and at < window[2] then
+					on = true
+				end
+			end
+			local team = team_of[side]
+			if on and not expert_on[side] then
+				ai.add(team, profile_of(args[side].expert))
+				local line = args[side].expert.line or args.line
+				if line == "bot" or line == "vehicle" then
+					ai.set_line(team, line)
+				end
+			elseif expert_on[side] and not on then
+				ai.remove(team)
+			end
+			expert_on[side] = on
+			if on then
+				table.insert(experts, team)
+			end
+		end
+		return experts
+	end
+	local experts = hand_over(0)
+	-- with `nn_record` (`{"path": ..., "static": ..., "sides": ["a", "b"]}`), the game is kept for the neural network AI
+	-- to learn the recorded sides' play from (tools/nn_ai/recorder.luau)
+	local recorder = nil
+	if args.nn_record ~= nil then
+		local recorded_teams = {}
+		for _, side in args.nn_record.sides or { "a", "b" } do
+			table.insert(recorded_teams, team_of[side])
+		end
+		local static_path = args.nn_record.static or `{args.nn_record.path}.static.json`
+		recorder = nn_recorder.start(game, recorded_teams, args.nn_record.path, static_path, {
+			a = args.a or {},
+			b = args.b or {},
+			line = args.line,
+			team_of = team_of,
+		})
+		recorder.step(0, if next(expert_windows) ~= nil then experts else nil)
 	end
 	local started = os.clock()
 	local timeline = {}
 	local winner: string? = nil
 	local reason = "time"
-	local elapsed = 0
 	local next_look = every
+	local efficiency_step, efficiency_result = efficiency_tracker(team_of)
+	local opening_step, opening = opening_tracker(team_of, args.opening_count or 10)
+	opening_step(0)
+	local death_step, deaths = death_tracker(team_of)
 	local watch_step, watch_result = nil, nil
 	if args.watch == true then
 		watch_step, watch_result = watcher(team_of, args.watch_until or 600)
@@ -467,13 +775,38 @@ local function duel(): { [string]: any }
 	while elapsed < seconds do
 		game.advance(ticks_per_second)
 		elapsed += 1
+		experts = hand_over(elapsed)
+		for _, side in order do
+			if rust[side] ~= nil then
+				rust[side].think(game.time())
+			end
+			if nn[side] ~= nil then
+				nn[side].think(game.time(), not expert_on[side])
+			end
+		end
+		if recording ~= nil and elapsed % keyframe_every == 0 then
+			keyframe(elapsed)
+		elseif recording ~= nil and elapsed % check_every == 0 then
+			-- between jump points the game plays on from the last one put back, as a replay does, so a plain capture's
+			-- checksum is what the replay's has to be there
+			table.insert(checks, { t = elapsed, checksum = snapshots.checksum(snapshots.capture()) })
+		end
+		efficiency_step()
+		if recorder ~= nil then
+			recorder.step(elapsed, if next(expert_windows) ~= nil then experts else nil)
+		end
+		opening_step(elapsed)
+		if args.deaths == true then
+			death_step(elapsed)
+		end
 		if watch_step ~= nil then
 			watch_step(elapsed)
 		end
 		local out = evaluator.look(sides)
 		if out[1] or out[2] then
 			reason = "commander"
-			winner = if out[2] == false then "a" elseif out[1] == false then "b" else nil
+			-- `out` says who is out, so the side left standing wins
+			winner = if out[1] == false then "a" elseif out[2] == false then "b" else nil
 			break
 		end
 		if next_look ~= nil and elapsed >= next_look then
@@ -512,6 +845,41 @@ local function duel(): { [string]: any }
 		end
 		result.profile = rows
 	end
+	result.a.efficiency = efficiency_result "a"
+	result.a.opening = opening.a
+	result.b.opening = opening.b
+	if args.deaths == true then
+		result.deaths = deaths
+	end
+	result.b.efficiency = efficiency_result "b"
+	if recorder ~= nil then
+		recorder.finish({
+			preset = result.preset,
+			seed = result.seed,
+			swap = result.swap,
+			winner = winner,
+			reason = reason,
+			seconds = elapsed,
+			team_of = team_of,
+			a = result.a,
+			b = result.b,
+		})
+	end
+	for side, bridge in rust do
+		result[side .. "_rust"] = bridge.report()
+		bridge.close()
+	end
+	for side, bridge in nn do
+		result[side .. "_nn"] = bridge.report()
+		bridge.finish({
+			won = winner == side,
+			lost = winner ~= nil and winner ~= side,
+			reason = reason,
+			seconds = elapsed,
+			own = result[side],
+			enemy = result[if side == "a" then "b" else "a"],
+		})
+	end
 	if every ~= nil or watch_result ~= nil then
 		result.timeline = timeline
 		result.a_report = ai.report(team_of.a)
@@ -519,6 +887,30 @@ local function duel(): { [string]: any }
 	end
 	if watch_result ~= nil then
 		result.watch = watch_result()
+	end
+	if recording ~= nil then
+		local orders_file: string? = nil
+		if #recorded_orders > 0 then
+			orders_file = "orders.json"
+			fs.writeFile(`{recording}/orders.json`, serde.encode("json", recorded_orders))
+		end
+		fs.writeFile(
+			`{recording}/manifest.json`,
+			serde.encode("json", {
+				version = 1,
+				map = { preset = result.preset, seed = result.seed },
+				length = elapsed,
+				keyframe_every = keyframe_every,
+				keyframes = keyframes,
+				check_every = check_every,
+				checks = checks,
+				orders = orders_file,
+				sides = { a = args.a or {}, b = args.b or {}, line = args.line, random_seed = args.random_seed },
+				result = { winner = winner, reason = reason, a = result.a, b = result.b },
+				code = args.code,
+			}, true)
+		)
+		result.replay = recording
 	end
 	return result
 end
@@ -714,6 +1106,10 @@ local ok, result = pcall(function()
 		return { ok = true, defs = list }
 	elseif args.mode == "ai_match" then
 		return ai_match()
+	elseif args.mode == "rust_hello" then
+		-- what the Rust AI is told of the game when it starts (tools/rust_ai/bridge.luau), for its own tools: its
+		-- battle simulator held up against staged fights (`rust_ai --predict`)
+		return { ok = true, hello = rust_bridge.hello(game, 1, { 2 }, { root = root }) }
 	elseif args.mode == "reach" then
 		-- whether a construction bot and a construction vehicle could each walk from one AI's start to the other's
 		local first = ai.spawn_opponent "AI a"

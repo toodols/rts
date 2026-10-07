@@ -1,0 +1,162 @@
+@use "sass:color";
+@use "sass:map";
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// Ranks -------------------------------------------------------------------------------------------------------
+
+// A player's level worn as a rank (ui/rank.luau): a lit diamond in its tier's colour, a finer diamond set inside it, and
+// the level stamped over both.
+.rank {
+	position: relative;
+	width: 26px;
+	height: 26px;
+	flex-shrink: 0;
+
+	&.small {
+		width: 20px;
+		height: 20px;
+
+		.rank-diamond {
+			width: 14px;
+			height: 14px;
+		}
+
+		.rank-core {
+			width: 8px;
+			height: 8px;
+		}
+
+		.rank-number {
+			font-size: 9px;
+		}
+	}
+}
+
+.rank-diamond {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 18px;
+	height: 18px;
+	transform: translate(-50%, -50%) rotate(45deg);
+	border-radius: 2px;
+}
+
+.rank-core {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 11px;
+	height: 11px;
+	transform: translate(-50%, -50%);
+	background-color: veil($void, 0.35);
+	outline: 1px solid veil(white, 0.3);
+}
+
+.rank-number {
+	position: absolute;
+	z-index: 2;
+	width: 100%;
+	height: 100%;
+	color: white;
+	font-family: RobotoMono;
+	font-size: 10px;
+	font-weight: bold;
+	text-align: center;
+	-webkit-text-stroke: 1px veil($void, 0.9);
+}
+
+// Each tier's colour (the theme's $tiers): lit from above, burnt dark below, and edged a shade brighter.
+@each $name, $tone in $tiers {
+	.rank.#{$name} .rank-diamond {
+		background-color: $tone;
+		background-image: linear-gradient(
+			180deg,
+			color.mix($tone, white, 70%) 0%,
+			$tone 45%,
+			color.mix($tone, $void, 45%) 100%
+		);
+		outline: 1px solid color.adjust($tone, $lightness: 18%);
+	}
+}
+
+// The last rank, with nothing left to earn, is edged in gold as well.
+.rank.mythic .rank-diamond {
+	outline: 2px solid map.get($tiers, legendary);
+}
+
+// The level range slider (ui/level_range.luau) ----------------------------------------------------------------
+
+// Room either side for half a rank, so the ends of the track sit under its ranks' centres.
+.level-range {
+	width: 100%;
+	height: 32px;
+	padding: 0 14px;
+}
+
+.level-rail {
+	position: relative;
+	width: 100%;
+	height: 32px;
+	background-color: transparent;
+}
+
+// A tier's stretch of the track, dark in its colour.
+.level-band {
+	position: absolute;
+	width: 20%;
+	height: 6px;
+	transform: translateY(-50%);
+}
+
+@each $name, $tone in $tiers {
+	.level-band.#{$name} {
+		background-color: color.mix($tone, $void, 55%);
+	}
+}
+
+.level-tick {
+	position: absolute;
+	width: 1px;
+	height: 4px;
+	transform: translateX(-50%);
+	background-color: $edge;
+
+	&.major {
+		height: 7px;
+		background-color: $text-dim;
+	}
+}
+
+// Over the levels left out, darkening them. Luau sizes it.
+.level-shade {
+	position: absolute;
+	z-index: 2;
+	transform: translateY(-50%);
+	background-color: veil($void, 0.7);
+}
+
+// Around the levels let in. Luau sizes it.
+.level-window {
+	position: absolute;
+	z-index: 2;
+	transform: translateY(-50%);
+	background-color: veil(white, 0.08);
+	outline: 1px solid veil($text, 0.7);
+}
+
+.level-handle {
+	position: absolute;
+	width: 26px;
+	height: 26px;
+	transform: translate(-50%, -50%);
+
+	&.held .rank-diamond {
+		outline: 2px solid white;
+	}
+}
+
+.level-range.locked .level-window {
+	outline: 1px solid veil($text, 0.35);
+}

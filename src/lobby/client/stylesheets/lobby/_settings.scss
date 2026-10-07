@@ -3,16 +3,24 @@
 
 // Settings ----------------------------------------------------------------------------------------------------
 
+// Kept short, a line a setting, so the players below get the column's height.
 .settings-panel {
 	width: 100%;
 	height: auto;
-	@include stack(column, space(3));
+	@include stack(column, space(2));
 }
 
+// A setting's caption on the left of its choices.
 .group {
 	width: 100%;
 	height: auto;
-	@include stack(column, space(1));
+	@include stack(row, space(3));
+	align-items: center;
+
+	> .group-label {
+		width: 96px;
+		flex-shrink: 0;
+	}
 }
 
 .group-label {
@@ -23,9 +31,11 @@
 	font-size: 10px;
 }
 
+// What the caption leaves. `width: 0` stands in for `flex-basis: 0`, which outlass has no equivalent for.
 .chips {
-	width: 100%;
+	width: 0;
 	height: auto;
+	flex: 1 1 0;
 	@include stack(row, space(2));
 	flex-wrap: wrap;
 }

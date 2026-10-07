@@ -69,6 +69,8 @@ local function summarize(lobby: Lobby): Summary
 		capacity = mode.capacity,
 		spectators = game_modes.spectator_count(lobby.match.seats),
 		visibility = lobby.visibility,
+		level_min = lobby.level_min,
+		level_max = lobby.level_max,
 	}
 end
 
@@ -91,6 +93,8 @@ local function decode(key: string, value: any): Summary?
 		capacity = if typeof(value.capacity) == "number" then value.capacity else 0,
 		spectators = if typeof(value.spectators) == "number" then value.spectators else 0,
 		visibility = if value.visibility == "friends" then "friends" else "public",
+		level_min = if typeof(value.level_min) == "number" then value.level_min else protocol.LEVEL_MIN,
+		level_max = if typeof(value.level_max) == "number" then value.level_max else protocol.LEVEL_MAX,
 	}
 end
 

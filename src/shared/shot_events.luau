@@ -45,7 +45,8 @@ export type Launched = {
 	homing_projectile_id: number?,
 }
 
-export type ImpactHow = "burst" | "through" | "airburst"
+-- "spent" is a shot that has flown as long as it may (`projectile.Shot`'s `lifetime`) and is gone without going off.
+export type ImpactHow = "burst" | "through" | "airburst" | "spent"
 
 export type Impact = { kind: "impact", id: number, at: Vector3, radius: number, how: ImpactHow }
 

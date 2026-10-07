@@ -1,0 +1,102 @@
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// A replay's player (client/ui/replay_seeker.luau): a plate along the bottom of the screen, centred, with play and pause,
+// the time played, the track of the whole game, the time left and the speed in a row, and a line of status under it.
+// The fill, the head and the marks on the track are placed inline, where the time puts them.
+.replay-seeker {
+	position: absolute;
+	bottom: space(4);
+	left: 50%;
+	transform: translateX(-50%);
+	width: 720px;
+	height: auto;
+	@include plate;
+	@include stack(column, space(1));
+	align-items: stretch;
+	padding: space(2) space(3);
+	z-index: 85;
+}
+
+.replay-bar {
+	width: 100%;
+	height: 28px;
+	@include stack(row, space(3));
+	align-items: center;
+}
+
+.replay-button {
+	@include cell;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	width: 72px;
+	height: 26px;
+
+	&.disabled {
+		opacity: 0.5;
+	}
+}
+
+// The button's words, a label of their own so that the gradient on its face leaves them alone.
+.replay-button-label {
+	width: 100%;
+	height: 100%;
+	font-family: Michroma;
+	font-size: 12px;
+	font-weight: bold;
+	color: var(--Text);
+	text-align: center;
+}
+
+.replay-time {
+	width: 60px;
+	height: 20px;
+	font-family: Michroma;
+	font-size: 14px;
+	color: var(--Text);
+	text-align: center;
+}
+
+// The whole game: recessed, with what has been played lit.
+// Sized to what the plate has left beside its buttons and times (720 less its padding, two 72 buttons, two 60 times
+// and four gaps), since a full-width track would push the speed out past the plate's edge.
+.replay-track {
+	@include track(10px);
+	width: 380px;
+	overflow: visible;
+}
+
+// Sized inline, as the other fills are.
+.replay-fill {
+	@include meter($accent);
+	transition: none;
+}
+
+// A jump point: where a seek lands at once.
+.replay-mark {
+	width: 2px;
+	height: 100%;
+	background-color: $text-faint;
+	opacity: 0.6;
+	z-index: 2;
+}
+
+// Where it is now, on the track.
+.replay-head {
+	width: 14px;
+	height: 14px;
+	transform: translate(-50%, -50%);
+	background-color: $text;
+	outline: 2px solid $void;
+	z-index: 3;
+}
+
+.replay-status {
+	width: 100%;
+	height: 16px;
+	@include caption;
+	font-size: 12px;
+	text-align: center;
+}

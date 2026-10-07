@@ -13,19 +13,27 @@
 --   click on an entity             attack, reclaim, assist, guard or load, depending on what it is
 --   drag a line                    spread the selection evenly along the shape the drag traces
 --
+-- Every key below is the player's own (Shared.keybinds, as ClientShared.keybind_state has them); the ones named are the
+-- BAR profile's.
+--
 -- Shift queues an order after what each unit is doing, and space puts it at the front instead.
 --
 -- A mode's key (order_modes.luau) puts the cursor in it: the next left click gives its order, a right click cancels
--- it, and shift keeps it on for another. In a mode that gives an order at a spot, the left button (and the right) can
+-- it, and shift keeps it on for another, until shift is let go. In a mode that gives an order at a spot, the left button (and the right) can
 -- instead be dragged out into a line, and the units spread along it; in one that gives an area order, the left button
 -- drags out a circle, and every unit that can do the job is sent to do it to whatever turns up inside.
 --
 -- A building picked from the build menu, or by its key (shared/build_hotkeys.luau), is placed by a left click, or with
--- shift dragged out into a line, and with alt as well a grid; [ and ] turn it, and a right click puts it down.
+-- shift dragged out into a line, and with alt a grid; shift keeps it in hand for another, and letting go of shift at any
+-- point puts it down, as do a right click and Escape; [ and ] turn it.
+--
+-- While a lab is what the selection builds with, the keys of its units (the build key slots, shared/build_hotkeys.luau)
+-- queue them, ahead of anything else those keys mean, the camera's included; with shift a batch.
 --
 -- G stops everything selected, ctrl+B sets it to destroy itself, K switches its shields, Q selects everything on screen of
 -- the same kind, Tab selects your commanders in turn, T opens and closes the player list, P pilots a unit (pilot.luau),
--- and Escape closes the player list and ends whatever the cursor was doing.
+-- and Escape, which is never rebound, closes the player list and ends whatever the cursor was doing. A key bound with
+-- ctrl is heard ahead of the same key alone while ctrl is held.
 --
 -- A spectator commands nothing: the left button selects, to look at what it selects, and Q, T and Escape do what they
 -- do, and nothing else is heard.
@@ -39,8 +47,10 @@ local UserInputService = game:GetService "UserInputService"
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 local build_hotkeys = require(ReplicatedStorage.Shared.build_hotkeys)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 local campaign_standing = require(ReplicatedStorage.ClientShared.campaign_standing)
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 
 local cursor = require(ReplicatedStorage.Client.cursor)
 local modifiers = require(ReplicatedStorage.Client.modifiers)
@@ -66,11 +76,17 @@ local frame_profile = require(ReplicatedStorage.Client.frame_profile)
 type State = command_state.State
 type ModeInfo = order_modes.ModeInfo
 
+-- How many of a unit a lab's key queues with shift held, as many as a shift-click on the build menu does.
+local LAB_BATCH = 5
+
 -- A left-drag shorter than this, in pixels, is a click rather than a selection box.
 local SELECTION_DRAG_THRESHOLD = 6
 
 -- Set while an exclusive layer (piloting) is over this one: nothing is commanded, hovered or drawn.
 local covered = false
+
+-- Whether shift was held last frame, to tell when it is let go.
+local shift_was_held = false
 
 -- Mouse ---------------------------------------------------------------------------------------------------------------
 
@@ -111,7 +127,8 @@ local function on_left_down()
 			click_mode(info)
 		end
 	elseif state.kind == "placing" and state.from == nil then
-		if modifiers.shift_held() then
+		-- alt counts on its own, so that alt pressed before shift still makes a grid
+		if modifiers.shift_held() or modifiers.alt_held() then
 			-- shift starts a line, or with alt a grid, that the drag stretches and letting go places
 			local center = placing.under_cursor(state.def_name)
 			if center ~= nil then
@@ -207,37 +224,44 @@ local function can_build(def_name: string, builds: { string }): boolean
 	return campaign_standing.is_unlocked(def_name) and table.find(builds, def_name) ~= nil
 end
 
--- Handles `key` if it is a build key right now, and says whether it was. Within the category of what is being placed
--- its keys pick the buildings the menu shows them against, ahead of anything they mean otherwise (Q selecting
--- everything of a type, say). Outside one, a category's key places what the build menu's first page offers for it.
-local function press_build_key(key: string): boolean
+-- Handles `actions`, a key's, if one is a build action right now, and says whether one was. Within the category of
+-- what is being placed its picks' keys pick the buildings the menu shows them against, ahead of anything they mean
+-- otherwise (Q selecting everything of a type, say). Outside one, a category's key places what the build menu's first
+-- page offers for it.
+local function press_build_key(actions: { [string]: boolean }): boolean
 	local placing_now = command_state.placing()
 	local category = if placing_now ~= nil then build_hotkeys.category_of(placing_now) else nil
-	local candidates = if category ~= nil then build_hotkeys.pick(category, key) else nil
-	if candidates ~= nil then
-		local builds = selected.buildable()
-		for _, def_name in candidates do
-			if can_build(def_name, builds) then
-				command_state.place(def_name)
-				break
+	if category ~= nil then
+		for _, pick in category.picks do
+			if actions[pick.action] ~= true then
+				continue
 			end
+			local builds = selected.buildable()
+			for _, def_name in pick.defs do
+				if can_build(def_name, builds) then
+					command_state.place(def_name)
+					break
+				end
+			end
+			return true
 		end
-		return true
 	end
-	local started = build_hotkeys.started_by(key)
-	local entry = if started ~= nil
-		then build_hotkeys.entry(started, selected.buildable(), campaign_standing.is_unlocked)
-		else nil
-	if entry == nil then
-		return false
+	for _, each in build_hotkeys.categories do
+		if actions[each.action] ~= true then
+			continue
+		end
+		local entry = build_hotkeys.entry(each, selected.buildable(), campaign_standing.is_unlocked)
+		if entry ~= nil then
+			command_state.place(entry)
+			return true
+		end
 	end
-	command_state.place(entry)
-	return true
+	return false
 end
 
--- Puts the cursor in the first mode `key` starts that the selection can use, and says whether `key` starts any.
-local function press_mode_key(key: string): boolean
-	local modes = order_modes.for_key(key)
+-- Puts the cursor in the first mode `actions` starts that the selection can use, and says whether they start any.
+local function press_mode_key(actions: { [string]: boolean }): boolean
+	local modes = order_modes.for_actions(actions)
 	for _, info in modes do
 		if command_state.enter_mode(info.mode) then
 			break
@@ -246,54 +270,119 @@ local function press_mode_key(key: string): boolean
 	return #modes > 0
 end
 
-local KEYS: { [Enum.KeyCode]: () -> () } = table.freeze({
+-- The actions of their own, in the order a key bound to several of them tries them (Shared.keybinds keeps that to one).
+local KEYS: { { action: string, run: () -> () } } = table.freeze({
+	{ action = "self_destruct", run = commands.self_destruct },
 	-- a mode waiting for its click ends with the orders it would have given; a building being placed stays in hand
-	[Enum.KeyCode.G] = function()
-		if command_state.mode() ~= nil then
-			command_state.to_idle()
+	{
+		action = "stop",
+		run = function()
+			if command_state.mode() ~= nil then
+				command_state.to_idle()
+			end
+			commands.stop()
+		end,
+	},
+	{
+		action = "select_same",
+		run = function()
+			picking.select_same_type(false)
+		end,
+	},
+	{
+		action = "select_same_map",
+		run = function()
+			picking.select_same_type(true)
+		end,
+	},
+	{
+		action = "rotate_left",
+		run = function()
+			build_mode.rotate(1)
+		end,
+	},
+	{
+		action = "rotate_right",
+		run = function()
+			build_mode.rotate(-1)
+		end,
+	},
+	{ action = "player_list", run = hud_state.toggle_player_list },
+	{ action = "select_commander", run = picking.cycle_commander },
+	{ action = "pilot", run = pilot.take_selected },
+	{ action = "shield", run = commands.toggle_shield },
+})
+
+-- The actions a spectator has: those that select, or open and close the player list.
+local SPECTATOR_ACTIONS: { [string]: boolean } = table.freeze({
+	select_same = true,
+	select_same_map = true,
+	player_list = true,
+})
+
+-- Escape, which is never bound: it closes the player list and ends whatever the cursor was doing.
+local function escape()
+	hud_state.close_player_list()
+	command_state.to_idle()
+end
+
+-- Handles the actions of their own among `actions`, the first there is, and says whether there was one.
+local function press_own_key(actions: { [string]: boolean }, allowed: { [string]: boolean }?): boolean
+	for _, each in KEYS do
+		if actions[each.action] == true and (allowed == nil or allowed[each.action] == true) then
+			each.run()
+			return true
 		end
-		commands.stop()
-	end,
-	[Enum.KeyCode.Q] = picking.select_same_type,
-	[Enum.KeyCode.LeftBracket] = function()
-		build_mode.rotate(1)
-	end,
-	[Enum.KeyCode.RightBracket] = function()
-		build_mode.rotate(-1)
-	end,
-	[Enum.KeyCode.T] = hud_state.toggle_player_list,
-	[Enum.KeyCode.Escape] = function()
-		hud_state.close_player_list()
-		command_state.to_idle()
-	end,
-	[Enum.KeyCode.Tab] = picking.cycle_commander,
-	[Enum.KeyCode.P] = pilot.take_selected,
-	[Enum.KeyCode.K] = commands.toggle_shield,
-})
+	end
+	return false
+end
 
--- The keys a spectator has: those that select, or open and close the player list.
-local SPECTATOR_KEYS: { [Enum.KeyCode]: boolean } = table.freeze({
-	[Enum.KeyCode.Q] = true,
-	[Enum.KeyCode.T] = true,
-	[Enum.KeyCode.Escape] = true,
-})
+-- Queues the unit `actions` picks in the selected lab, if a lab is what the selection builds with, and says whether they
+-- picked one: a lab's keys come before anything else they mean, the camera's included. Shift queues a batch, as a click
+-- on the build menu does.
+local function press_lab_key(actions: { [string]: boolean }): boolean
+	local lab = selected.builder()
+	if lab == nil or unit_defs.is_factory(lab.def) == false then
+		return false
+	end
+	for action in actions do
+		local unit = build_hotkeys.lab_unit(lab.def.name, action)
+		if unit ~= nil and table.find(unit_defs.build_options(lab.def), unit) ~= nil then
+			if campaign_standing.is_unlocked(unit) then
+				orders.queue(lab.id, unit, if modifiers.shift_held() then LAB_BATCH else 1, modifiers.alt_held())
+			end
+			return true
+		end
+	end
+	return false
+end
 
--- Handles `key`, and says whether it means anything here. Build keys come first, then the keys of their own, then the
--- modes'.
+-- Handles `actions`, what a key is bound to, and says whether it means anything here. A selected lab's keys come first,
+-- then build keys, then the keys of their own, then the modes'.
+local function press(actions: { [string]: boolean }): boolean
+	return press_lab_key(actions) or press_build_key(actions) or press_own_key(actions) or press_mode_key(actions)
+end
+
+-- Handles `key`, and says whether it means anything here: what it is bound to with ctrl while ctrl is held, and
+-- failing anything, what it is bound to on its own.
 local function on_key(key: Enum.KeyCode): boolean
-	if key == Enum.KeyCode.B and modifiers.ctrl_held() then
-		commands.self_destruct()
+	if key == Enum.KeyCode.Escape then
+		escape()
 		return true
 	end
-	if press_build_key(key.Name) then
+	if modifiers.ctrl_held() and press(keybind_state.actions_for(key, true)) then
 		return true
 	end
-	local action = KEYS[key]
-	if action ~= nil then
-		action()
+	return press(keybind_state.actions_for(key, false))
+end
+
+-- What a spectator's `key` does, and whether it does anything.
+local function on_spectator_key(key: Enum.KeyCode): boolean
+	if key == Enum.KeyCode.Escape then
+		escape()
 		return true
 	end
-	return press_mode_key(key.Name)
+	return press_own_key(keybind_state.actions_for(key, false), SPECTATOR_ACTIONS)
 end
 
 -- Frames --------------------------------------------------------------------------------------------------------------
@@ -359,6 +448,12 @@ local function on_render()
 	if covered then
 		return
 	end
+	-- polled, since shift itself is taken by no layer and its letting go never comes here
+	local shift_now = modifiers.shift_held()
+	if shift_was_held and shift_now == false then
+		command_state.let_go_of_shift()
+	end
+	shift_was_held = shift_now
 	local state = command_state.get()
 	local placing_at = if state.kind == "placing" then placing.preview(state.def_name, state.from) else nil
 	hover.render(state, placing_at)
@@ -403,9 +498,8 @@ local function began(input: InputObject, processed: boolean): boolean
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			on_left_down()
 			return true
-		elseif input.UserInputType == Enum.UserInputType.Keyboard and SPECTATOR_KEYS[input.KeyCode] == true then
-			KEYS[input.KeyCode]()
-			return true
+		elseif input.UserInputType == Enum.UserInputType.Keyboard then
+			return on_spectator_key(input.KeyCode)
 		end
 		return false
 	end

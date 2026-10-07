@@ -2,7 +2,8 @@
 -- What there is to say about a def beyond its numbers: the build menu's tooltip text for what a builder or factory can
 -- make, an unlock's card, and its entry in the lobby's encyclopedia. A def's text is first what its def says outright
 -- that its figures do not make plain (`unit_facts.notes`: "Metal spots only.", "Air only.", "Manual fire."), then what
--- is written for it here, which is only what no field of its def says; `tips` are the only place for how to use it.
+-- is written for it here, which is only what no field of its def says; `tips` are the only place for how to use it. A
+-- tip names a key as `{key:<action>}` (Shared.keybinds), which whatever shows it fills with the player's own key.
 -- Anything missing here still gets a tooltip and an entry.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -23,8 +24,9 @@ local DESCRIPTIONS: { [string]: Description } = {
 
 	commander = {
 		tips = {
-			"Shift keeps a command on for another click.",
-			"Drag Attack, Reclaim, Repair or Resurrect for an area.",
+			"Commander is your lose condition. Don't let it die.",
+			"Keep it safe within your base or use it in the front lines, where its instant-kill disintegrator gun can change the tide of battle.",
+			"Press {key:shield} to enable a shield in emergencies. Warning: it is very expensive",
 		},
 	},
 	construction_bot = {
@@ -139,11 +141,11 @@ local DESCRIPTIONS: { [string]: Description } = {
 	-- Aircraft
 
 	hercules = {
-		tips = { "J to load, U to unload." },
+		tips = { "{key:mode_load} to load, {key:mode_unload} to unload." },
 	},
 	hephaestus = {
 		text = "Unarmed.",
-		tips = { "J to load, U to unload." },
+		tips = { "{key:mode_load} to load, {key:mode_unload} to unload." },
 	},
 	advanced_construction_aircraft = {
 		text = "Builds tier 2.",
@@ -155,7 +157,7 @@ local DESCRIPTIONS: { [string]: Description } = {
 		text = "Nuclear blast.",
 	},
 	stronghold = {
-		tips = { "J to load, U to unload." },
+		tips = { "{key:mode_load} to load, {key:mode_unload} to unload." },
 	},
 
 	-- Experimental

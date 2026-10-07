@@ -25,8 +25,8 @@ type FixedReclaimable = map_types.FixedReclaimable
 -- submarines, and shelves up to every shore.
 --
 -- It is 640 by 512 studs. Each strait is some 100 studs across, so that an Agitator (113 studs) a little inland on
--- either side of one reaches most of the way across it. None of it depends on the seed: the missions' forces stand where
--- they do against these shores.
+-- either side of one reaches most of the way across it. None of it depends on the seed: the missions' forces stand
+-- where they do against these shores.
 local CHANNEL_SIZE = Vector2.new(640, 512)
 -- The sea floor, and the tops of the shores and the island.
 local CHANNEL_FLOOR = -12
@@ -57,8 +57,8 @@ local BAY_FLOOR = -4
 local BAY_BACK = 12
 local BAY_MOUTH = 10
 -- The shoals, one under each of the metal spots on the channel's floor, two in each strait: a level top SHOAL_TOP deep
--- out to SHOAL_FLAT from its middle, shallow enough for an extractor (its footing's 20 elmos), falling away to the floor
--- by SHOAL_REACH.
+-- out to SHOAL_FLAT from its middle, shallow enough for an extractor (its footing's 20 elmos), falling away to the
+-- floor by SHOAL_REACH.
 local SHOALS = { Vector2.new(-135, -110), Vector2.new(-135, 150), Vector2.new(135, -110), Vector2.new(135, 150) }
 local SHOAL_TOP = -1
 local SHOAL_FLAT = 5
@@ -227,8 +227,8 @@ return table.freeze({
 		harbor = Vector2.new(-(SHORE_X + BAY_DEPTH / 2 - 4), BAY_Z),
 		island = Vector2.zero,
 		east_shore = Vector2.new(SHORE_X, 0),
-		-- a spot on each of the island's shores, gentle enough right by the water for a lab that a construction ship puts
-		-- down from off the shore
+		-- a spot on each of the island's shores, gentle enough right by the water for a lab that a construction ship
+		-- puts down from off the shore
 		island_west = Vector2.new(-62, -30),
 		island_east = Vector2.new(62, -30),
 		-- where a fleet comes in from the sea or goes out to it: each strait's two ends

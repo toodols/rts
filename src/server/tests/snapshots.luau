@@ -15,6 +15,7 @@ local ServerScriptService = game:GetService "ServerScriptService"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local switches = require(ReplicatedStorage.Shared.switches)
+local tick_rate = require(ReplicatedStorage.Shared.tick_rate)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local surface = require(ReplicatedStorage.Shared.surface)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
@@ -27,6 +28,7 @@ local shields = require(ServerScriptService.Server.shields)
 local self_destruct = require(ServerScriptService.Server.self_destruct)
 local snapshot = require(ServerScriptService.Server.snapshot)
 local pcg32 = require(ServerScriptService.Server.pcg32)
+local replay = require(ServerScriptService.Server.replay)
 
 local harness = require(script.Parent.harness)
 
@@ -290,7 +292,56 @@ local function pcg32_test(_args: Args): Findings
 	return { rolls = rolls, mismatches = mismatches, pass = #mismatches == 0 }
 end
 
+-- `replay_steps` (a diagnostic): the replay loaded into ServerStorage (server/replay.luau, as replay.py studio loads it)
+-- put back to its jump point `keyframe` (1 for the first) and played on `ticks` steps, with the Rust AI's recorded orders
+-- given after each step as the replay gives them (for a game it played); the game's checksum then, and the
+-- lines of it, as snapshot.describe lays it out, that have `filter` in them (200 at the most). The same game played
+-- headless is `lune run tools/ai_arena/replay_verify.luau <replay> --steps <keyframe> <ticks> [filter]`: the two have to
+-- agree, and where they first do not is where Studio and the arena play the game differently.
+local function replay_steps(args: Args): Findings
+	-- only where one has been loaded (replay.py studio), as there never is headless
+	if replay.available() == false then
+		return { diagnostic = true, loaded = false }
+	end
+	local index = arg(args, "keyframe", "number", 1)
+	local ticks = arg(args, "ticks", "number", 0)
+	snapshot.restore(replay.keyframe_data(index))
+	local orders_player = replay.load_orders()
+	local half_step = tick_rate.TICK_DELTA / 2
+	if orders_player ~= nil then
+		orders_player.rewind(state.now(), half_step)
+	end
+	for _ = 1, ticks do
+		advance(tick_rate.TICK_DELTA)
+		if orders_player ~= nil then
+			orders_player.at(state.now(), half_step)
+		end
+	end
+	local captured = snapshot.capture()
+	local lines: { string } = {}
+	local filter = args.filter
+	if typeof(filter) == "string" then
+		for _, line in snapshot.describe(captured) do
+			if string.find(line, filter, 1, true) ~= nil and #lines < 200 then
+				table.insert(lines, line)
+			end
+		end
+	end
+	-- a checksum of each part of the game (the first name of each line), to say which part two copies first differ in
+	local parts: { [string]: number } = {}
+	for _, line in snapshot.describe(captured) do
+		local part = string.match(line, "^[^.= ]+") or "?"
+		local sum = parts[part] or 0
+		for at = 1, #line do
+			sum = (sum * 31 + string.byte(line, at)) % 2147483647
+		end
+		parts[part] = sum
+	end
+	return { diagnostic = true, checksum = snapshot.checksum(captured), now = state.now(), lines = lines, parts = parts }
+end
+
 local TESTS: { [string]: Test } = {
+	replay_steps = { run = replay_steps },
 	snapshot_roundtrip = { run = snapshot_roundtrip },
 	snapshot_zoo = { run = snapshot_zoo },
 	pcg32 = { run = pcg32_test },

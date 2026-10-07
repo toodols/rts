@@ -9,7 +9,8 @@
 --
 -- A line laid over the ground, climbing the hills rather than cutting through them (an order's path, a range ring, a
 -- start box's edge), is a row of dashes from point to point (`lay_line`), through points along the ground
--- (`ground_points`, `arc_points`).
+-- (`ground_points`, `arc_points`). Every such line says how it meets water (`Footing`): it stops at it and runs along the
+-- water's surface, or it ignores it and runs along the ground beneath.
 
 local Debris = game:GetService "Debris"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -18,6 +19,9 @@ local Workspace = game:GetService "Workspace"
 
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local model_fit = require(ReplicatedStorage.Shared.model_fit)
+local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
+local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
+local types = require(ReplicatedStorage.Shared.types)
 
 local art_models = require(ReplicatedStorage.ClientShared.art_models)
 
@@ -126,6 +130,38 @@ local function release_rest(from: Pool)
 	from.used = 0
 end
 
+-- How a line over the ground meets water: "surface" stops at it and runs along the water's surface, as whatever marks
+-- the map (a ring, an aim, an edge) and the path of everything but what travels under the water; "ground" ignores it and
+-- runs along the ground beneath, as the path of what does (unit_defs.travels_underwater).
+export type Footing = "surface" | "ground"
+
+-- Where a line of `footing` passes over (x, z).
+local function at(footing: Footing, x: number, z: number): Vector3
+	local ground = heightmap.ground_position(x, z)
+	if footing == "surface" and ground.Y < ground_levels.WATER_LEVEL then
+		return Vector3.new(x, ground_levels.WATER_LEVEL, z)
+	end
+	return ground
+end
+
+-- `point` as a line of `footing` meets it: on a "surface" line, nothing is drawn under the water.
+local function lifted(footing: Footing, point: Vector3): Vector3
+	if footing == "surface" and point.Y < ground_levels.WATER_LEVEL then
+		return Vector3.new(point.X, ground_levels.WATER_LEVEL, point.Z)
+	end
+	return point
+end
+
+-- The footing of the path of something of `def` that travels: where it goes. Along the ground beneath the water for
+-- what travels under it (unit_defs.travels_underwater: whatever stands on the ground, and submarines), and on the
+-- water's surface for what floats, hovers or flies, or for nothing in particular.
+local function footing_of(def: types.EntityDef?): Footing
+	if def ~= nil and unit_defs.travels_underwater(def) then
+		return "ground"
+	end
+	return "surface"
+end
+
 -- Lays a line through `points` as one dash from each point to the next, drawn as `style` says, each a part that
 -- `next_dash` hands out (a fresh one, or one from a pool); when it hands out none the line stops there.
 local function lay_line(points: { Vector3 }, style: LineStyle, next_dash: () -> Part?)
@@ -147,35 +183,31 @@ local function lay_line(points: { Vector3 }, style: LineStyle, next_dash: () -> 
 	end
 end
 
--- The points of a leg from `from` to `to` over the ground, about `step` apart across it: `from` and `to` themselves at
--- the ends, and between them each where `place` puts its (x, z), on the ground without it.
-local function ground_points(
-	from: Vector3,
-	to: Vector3,
-	step: number,
-	place: ((x: number, z: number) -> Vector3)?
-): { Vector3 }
-	local put: (x: number, z: number) -> Vector3 = if place ~= nil then place else heightmap.ground_position
+-- The points of a leg of `footing` from `from` to `to` over the ground, about `step` apart across it: `from` and `to`
+-- themselves at the ends (raised to the water's surface on a "surface" leg), and between them each where the footing
+-- puts its (x, z).
+local function ground_points(from: Vector3, to: Vector3, step: number, footing: Footing): { Vector3 }
 	local run = Vector2.new(to.X - from.X, to.Z - from.Z).Magnitude
 	local steps = math.max(1, math.ceil(run / step))
 	local points = table.create(steps + 1)
-	points[1] = from
+	points[1] = lifted(footing, from)
 	for index = 1, steps - 1 do
 		local t = index / steps
-		points[index + 1] = put(from.X + (to.X - from.X) * t, from.Z + (to.Z - from.Z) * t)
+		points[index + 1] = at(footing, from.X + (to.X - from.X) * t, from.Z + (to.Z - from.Z) * t)
 	end
-	points[steps + 1] = to
+	points[steps + 1] = lifted(footing, to)
 	return points
 end
 
--- The points on the ground round `center` from bearing `from` to bearing `to` (measured the way entities face),
+-- The points of `footing` round `center` from bearing `from` to bearing `to` (measured the way entities face),
 -- `radius(direction)` out in each direction, `per_turn` of them to a whole turn.
 local function arc_points(
 	center: Vector3,
 	radius: (direction: Vector3) -> number,
 	from: number,
 	to: number,
-	per_turn: number
+	per_turn: number,
+	footing: Footing
 ): { Vector3 }
 	local steps = math.max(2, math.ceil(per_turn * (to - from) / (math.pi * 2)))
 	local points = table.create(steps + 1)
@@ -183,7 +215,7 @@ local function arc_points(
 		local bearing = from + (to - from) * index / steps
 		local direction = Vector3.new(math.sin(bearing), 0, math.cos(bearing))
 		local out = radius(direction)
-		points[index + 1] = heightmap.ground_position(center.X + direction.X * out, center.Z + direction.Z * out)
+		points[index + 1] = at(footing, center.X + direction.X * out, center.Z + direction.Z * out)
 	end
 	return points
 end
@@ -223,6 +255,8 @@ return table.freeze({
 	release_rest = release_rest,
 	lay_line = lay_line,
 	ground_points = ground_points,
+	at = at,
+	footing_of = footing_of,
 	arc_points = arc_points,
 	ghost_model = ghost_model,
 })

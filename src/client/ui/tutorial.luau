@@ -20,6 +20,7 @@ local UserInputService = game:GetService "UserInputService"
 local React = require(ReplicatedStorage.Packages.react)
 
 local campaign = require(ReplicatedStorage.Shared.campaign)
+local keybinds = require(ReplicatedStorage.Shared.keybinds)
 
 local missions = require(ReplicatedStorage.Client.missions)
 local input_router = require(ReplicatedStorage.Client.input_router)
@@ -29,6 +30,7 @@ local use_viewport = require(ReplicatedStorage.Client.ui.use_viewport)
 local wave_block = require(ReplicatedStorage.Client.ui.wave_block)
 
 local art_icon = require(ReplicatedStorage.ClientShared.art_icon)
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 local palette = require(ReplicatedStorage.ClientShared.palette)
 local unit_picture = require(ReplicatedStorage.ClientShared.unit_picture)
 local use_store = require(ReplicatedStorage.ClientShared.use_store)
@@ -53,15 +55,18 @@ local WASD_KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.S] = "key_s",
 	[Enum.KeyCode.D] = "key_d",
 }
-local ARROW_KEYS: { [Enum.KeyCode]: string } = {
-	[Enum.KeyCode.Up] = "key_up",
-	[Enum.KeyCode.Left] = "key_left",
-	[Enum.KeyCode.Down] = "key_down",
-	[Enum.KeyCode.Right] = "key_right",
+-- The arrows the arrow keys' picture lights, by the keybind action of the key that pans that way.
+local ARROW_GROUPS: { [string]: string } = {
+	camera_up = "key_up",
+	camera_left = "key_left",
+	camera_down = "key_down",
+	camera_right = "key_right",
 }
 local MIDDLE_BUTTON: { [Enum.UserInputType]: string } = {
 	[Enum.UserInputType.MouseButton3] = "wheel",
 }
+local NO_KEYS: { [Enum.KeyCode]: string } = {}
+local NO_BUTTONS: { [Enum.UserInputType]: string } = {}
 
 -- how long a card stays marked as refused after a key that does not work is pressed
 local REFUSED_SECONDS = 0.45
@@ -160,7 +165,7 @@ local function use_held(
 				end)
 			end
 		end)
-	end, {})
+	end, { keys, buttons } :: { any })
 
 	return held, presses
 end
@@ -476,7 +481,7 @@ end
 -- WASD: its keys light as they are pressed, and every press shakes it and flashes it red, since they do not move the
 -- camera.
 local function WasdPicture(props: PictureProps)
-	local held, presses = use_held(WASD_KEYS, {})
+	local held, presses = use_held(WASD_KEYS, NO_BUTTONS)
 	React.useEffect(function()
 		if presses > 0 then
 			props.on_refused()
@@ -500,21 +505,46 @@ local function WasdPicture(props: PictureProps)
 	})
 end
 
+-- Whether the player pans with W, A, S and D, each the way it points.
+local function pans_with_wasd(): boolean
+	return keybind_state.key_of "camera_up" == Enum.KeyCode.W
+		and keybind_state.key_of "camera_left" == Enum.KeyCode.A
+		and keybind_state.key_of "camera_down" == Enum.KeyCode.S
+		and keybind_state.key_of "camera_right" == Enum.KeyCode.D
+end
+
+-- The keys that pan, each lit while it is held: W, A, S and D when the player pans with those, and otherwise the arrow
+-- keys, each arrow lit by the player's key for panning that way.
 local function ArrowsPicture(_props: PictureProps)
-	local held = use_held(ARROW_KEYS, {})
+	local bindings = keybind_state.use_bindings()
+	local wasd = pans_with_wasd()
+	local keys = React.useMemo(function(): { [Enum.KeyCode]: string }
+		if wasd then
+			return WASD_KEYS
+		end
+		local found: { [Enum.KeyCode]: string } = {}
+		for action, group in ARROW_GROUPS do
+			local key = keybind_state.key_of(action)
+			if key ~= nil then
+				found[key] = group
+			end
+		end
+		return found
+	end, { bindings })
+	local held = use_held(keys, NO_BUTTONS)
 	return React.createElement(ArtIcon, {
-		name = "tutorial_arrows",
+		name = if wasd then "tutorial_wasd" else "tutorial_arrows",
 		view = "above",
 		lit = held,
 		pressed = held,
-		fallback = "↑\n← ↓ →",
+		fallback = if wasd then "W\nA S D" else "↑\n← ↓ →",
 		tag = "tutorial-card-art",
 		LayoutOrder = 1,
 	})
 end
 
 local function MousePicture(_props: PictureProps)
-	local held = use_held({}, MIDDLE_BUTTON)
+	local held = use_held(NO_KEYS, MIDDLE_BUTTON)
 	return React.createElement(ArtIcon, {
 		name = "tutorial_mouse",
 		view = "above",
@@ -597,6 +627,8 @@ local function CardView(props: {
 	LayoutOrder: number,
 })
 	local card = props.card
+	-- the keys a caption names are the player's own
+	local bindings = keybind_state.use_bindings()
 	-- when a key that does not work was last pressed on this card, to mark it refused for a moment
 	local refused, set_refused = React.useState(0)
 	-- whether one of those keys is held right now, which keeps it marked for as long as it is
@@ -649,7 +681,7 @@ local function CardView(props: {
 		Caption = React.createElement("TextLabel", {
 			[React.Tag] = "tutorial-caption",
 			LayoutOrder = 3,
-			Text = card.caption,
+			Text = keybinds.fill(card.caption, bindings),
 		}),
 		-- how far along a card that counts is, like 2/3, or an income against its goal
 		Progress = if card.rate ~= nil
@@ -667,6 +699,8 @@ end
 local function Tutorial()
 	local state = use_tutorial.use_tutorial()
 	local ui_scale = use_viewport.use_ui_scale()
+	-- a card may be shown only for some keybinds
+	keybind_state.use_bindings()
 	-- hooks, so called on every render, whether or not there is a step to take them from
 	local hint = use_store.use_store(tutorial.hint, tutorial.subscribe_hint)
 	-- nil outside a mission with waves, or with a time limit
@@ -766,6 +800,9 @@ local function Tutorial()
 	local cards = {}
 	local checks = 0
 	for index, card in step.cards do
+		if card.shown ~= nil and card.shown() == false then
+			continue
+		end
 		if card.mark == "check" then
 			checks += 1
 		end

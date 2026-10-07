@@ -1,7 +1,8 @@
 --!strict
 -- The developers' list (see shared/developers.luau): a record of its own in a DataStore, so that it is the same in every
 -- place of the experience and can be changed while the game runs, with pow's `developer` command. Besides those listed,
--- the experience's owner always is one, and in Studio everyone is.
+-- the experience's owner always is one, and in Studio whoever is at the keyboard is (not Player2 and on of a local
+-- server test, who stand in for everyone else).
 --
 -- A server reads the list for each player as they join (`joined`, a lifecycle stage of its own, lifecycle.luau) and
 -- publishes whether they are on it on them (developers.publish); what has to know first waits for that
@@ -48,10 +49,16 @@ local function is_owner(user_id: number): boolean
 	return game.CreatorType == Enum.CreatorType.User and game.CreatorId == user_id
 end
 
+-- In Studio, whoever is at the keyboard: their own account in Play Solo, or Player1 of a local server test. Player2 and
+-- on stand in for everyone else, so they are not.
+local function is_studio_user(player: Player): boolean
+	return RunService:IsStudio() and (player.UserId > 0 or player.UserId == -1)
+end
+
 local function publish(player: Player, ids: { number })
 	developers.publish(
 		player,
-		RunService:IsStudio() or is_owner(player.UserId) or table.find(ids, player.UserId) ~= nil
+		is_studio_user(player) or is_owner(player.UserId) or table.find(ids, player.UserId) ~= nil
 	)
 	published.fire(player)
 end

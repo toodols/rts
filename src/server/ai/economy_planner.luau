@@ -8,7 +8,9 @@
 -- - Energy, when it is stalling: what the commander can build (wind turbines), what a constructor can build once the
 --   team makes the profile's constructor_energy_income (advanced solar collectors), and what an advanced constructor
 --   can build once it makes its advanced_energy_income and has one (fusion reactors); the cheapest of each.
--- - Its line's advanced lab, once it makes the profile's advanced_lab_income metal.
+-- - Its line's advanced lab, once it makes the profile's advanced_lab_income metal or has played its
+--   advanced_lab_seconds.
+-- - An air lab, once it makes the profile's air_lab_income metal or has played its air_lab_seconds.
 -- - Construction turrets beside its labs, now and then as its income grows.
 -- - Metal extractors on the free spots out on the map, each builder that goes out of the base with an escort.
 -- - Energy, to keep up with its metal (the profile's energy factor, `energy_per_metal`).
@@ -153,7 +155,14 @@ end
 local function extractor_task(brain: Brain, census: Census, builder: Entity, max_distance: number?): Task?
 	local def_name = catalog.PLAIN_EXTRACTOR
 	if brains.can_build(builder, def_name) == false then
-		return nil
+		-- an advanced constructor takes a free spot with an advanced extractor, for a profile that has it do so
+		if
+			brain.profile.advanced_expands == false
+			or brains.can_build(builder, catalog.ADVANCED_EXTRACTOR) == false
+		then
+			return nil
+		end
+		def_name = catalog.ADVANCED_EXTRACTOR
 	end
 	local safe = brain.profile.safe_danger
 	local builder_def = builder.def
@@ -551,6 +560,12 @@ local WANTS: { Want } = {
 		end,
 		task = function(context: Context): Task?
 			local brain, census = context.brain, context.census
+			if
+				brain.profile.scrap_labs_for_advanced
+				and censuses.count_of(census, catalog.LABS[brain.line :: Line].advanced) > 0
+			then
+				return nil
+			end
 			local lab = catalog.LABS[brain.line :: Line].first
 			-- a lab past the first waits for the income to keep it busy
 			local labs = censuses.count_of(census, lab)
@@ -573,13 +588,29 @@ local WANTS: { Want } = {
 	{
 		name = "advanced_lab",
 		gate = function(context: Context): boolean
-			return context.brain.line ~= nil
-				and context.economy.metal_income >= context.brain.profile.advanced_lab_income
+			local brain = context.brain
+			local profile = brain.profile
+			return brain.line ~= nil
+				and (context.economy.metal_income >= profile.advanced_lab_income or brains.now() - brain.started >= profile.advanced_lab_seconds)
 				and #context.census.factories > 0
 		end,
 		task = function(context: Context): Task?
 			local brain = context.brain
 			return lab_task(brain, context.census, context.builder, catalog.LABS[brain.line :: Line].advanced, 1)
+		end,
+	},
+	{
+		name = "air_lab",
+		gate = function(context: Context): boolean
+			local brain = context.brain
+			local profile = brain.profile
+			return (
+				context.economy.metal_income >= profile.air_lab_income
+				or brains.now() - brain.started >= profile.air_lab_seconds
+			) and #context.census.factories > 0
+		end,
+		task = function(context: Context): Task?
+			return lab_task(context.brain, context.census, context.builder, catalog.AIR_LAB, 1)
 		end,
 	},
 	{
@@ -669,7 +700,11 @@ local WANTS: { Want } = {
 				wanted = math.floor(wanted * profile.air_defense)
 			end
 			local have = #census.air_defenses + in_progress_all(census, catalog.AIR_DEFENSES)
-			return aircraft >= profile.air_threat_count and have < wanted
+			local early = profile.early_anti_air > 0 and catalog.any_aircraft_lab(census.enemy_structures)
+			if early then
+				wanted = math.max(wanted, profile.early_anti_air)
+			end
+			return (aircraft >= profile.air_threat_count or early) and have < wanted
 		end,
 		task = function(context: Context): Task?
 			return air_defense_task(context.brain, context.census, context.builder, context.economy)
@@ -686,6 +721,28 @@ local WANTS: { Want } = {
 	},
 }
 
+-- WANTS for a profile that upgrades its extractors first (upgrades_first): the upgrade comes straight after the labs
+-- and an energy stall, before anything else.
+local UPGRADES_FIRST: { Want } = {}
+do
+	local upgrade: Want? = nil
+	for _, want in WANTS do
+		if want.name == "extractor_upgrade" then
+			upgrade = want
+		end
+	end
+	for _, want in WANTS do
+		if want == upgrade then
+			continue
+		end
+		table.insert(UPGRADES_FIRST, want)
+		if want.name == "air_lab" then
+			table.insert(UPGRADES_FIRST, upgrade :: Want)
+		end
+	end
+	assert(#UPGRADES_FIRST == #WANTS, "the extractor upgrade has to come after the air lab")
+end
+
 -- Something for `builder` to build, the first that is wanted of what it can build (WANTS), where it may go (its duty,
 -- census.luau's `Duty`): what keeps to the base builds only there, and nothing is built at the end of a dangerous way.
 local function choose_task(brain: Brain, census: Census, economy: Economy, builder: Entity): Task?
@@ -699,7 +756,8 @@ local function choose_task(brain: Brain, census: Census, economy: Economy, build
 		builders = #census.builders,
 		reach = duty.reach,
 	}
-	for _, want in WANTS do
+	local wants: { Want } = if profile.upgrades_first then UPGRADES_FIRST else WANTS
+	for _, want in wants do
 		if want.gate(context) == false then
 			continue
 		end

@@ -17,7 +17,9 @@ local pilot_hud = require(ReplicatedStorage.Client.ui.pilot_hud)
 local lobby_panel = require(ReplicatedStorage.Client.ui.lobby_panel)
 local victory_screen = require(ReplicatedStorage.Client.ui.victory_screen)
 local pause_overlay = require(ReplicatedStorage.Client.ui.pause_overlay)
+local replay_seeker = require(ReplicatedStorage.Client.ui.replay_seeker)
 local player_list = require(ReplicatedStorage.Client.ui.player_list)
+local settings_panel = require(ReplicatedStorage.Client.ui.settings_panel)
 local notifications = require(ReplicatedStorage.Client.ui.notifications)
 local commander_hurt = require(ReplicatedStorage.Client.ui.commander_hurt)
 local tooltip = require(ReplicatedStorage.Client.ui.tooltip)
@@ -71,7 +73,9 @@ local function Main()
 		Notifications = React.createElement(notifications.Notifications),
 		LobbyPanel = React.createElement(lobby_panel.LobbyPanel),
 		PauseOverlay = React.createElement(pause_overlay.PauseOverlay),
+		ReplaySeeker = React.createElement(replay_seeker.ReplaySeeker),
 		VictoryScreen = React.createElement(victory_screen.VictoryScreen),
+		Settings = React.createElement(settings_panel.SettingsPanel),
 	})
 end
 

@@ -50,7 +50,8 @@ def side(profile: Any) -> dict[str, Any]:
     table of overrides over default."""
     if isinstance(profile, str):
         return {"profile": profile}
-    if "profile" in profile or "overrides" in profile:
+    # the Rust AI (tools/rust_ai): {"engine": "rust", "params": {...}}
+    if "profile" in profile or "overrides" in profile or "engine" in profile:
         return profile
     return {"profile": "default", "overrides": profile}
 

@@ -137,6 +137,11 @@ local function completed_of(player: Player): Set
 	return set_of(COMPLETED.get(player))
 end
 
+-- Whether a server has published `player`'s progress on them yet: until it has, they look like a new player.
+local function is_published(player: Player): boolean
+	return COMPLETED.get(player) ~= nil
+end
+
 -- Calls `listener` whenever what is published of `player`'s progress changes, until the returned function is called.
 local function changed(player: Player, listener: () -> ()): () -> ()
 	local stop_unlocks = UNLOCKS.changed(player, listener)
@@ -165,6 +170,7 @@ return table.freeze({
 	relock = relock,
 	unlocks_of = unlocks_of,
 	completed_of = completed_of,
+	is_published = is_published,
 	changed = changed,
 	publish = publish,
 })

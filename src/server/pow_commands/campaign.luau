@@ -1,7 +1,6 @@
--- The pow commands of the campaign: unlocking what it keeps locked, or locking it again, for this session only, which
--- is never saved (see server_shared/campaign_session.luau), and re-timing the mission being played, for a mission
--- that can be (its handler's `retime`, server/missions/kit.luau). What finishing a mission does, which is saved, is
--- mission_complete (server_shared/pow_common.luau).
+-- The game's own pow command of the campaign: re-timing the mission being played, for a mission that can be (its
+-- handler's `retime`, server/missions/kit.luau). Finishing a mission and unlocking or relocking defs are every place's
+-- (server_shared/pow_common.luau).
 --
 -- pow calls its extension modules to let them register commands, so this one returns a function rather than the
 -- dictionary RULES.md asks of every other module.
@@ -9,83 +8,16 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
 
-local campaign = require(ReplicatedStorage.Shared.campaign)
 local pow_types = require(ReplicatedStorage.Shared.pow_types)
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
-local campaign_session = require(ServerScriptService.ServerShared.campaign_session)
 local pow_builders = require(ServerScriptService.ServerShared.pow_builders)
-local pow_common = require(ServerScriptService.ServerShared.pow_common)
 
 local missions = require(ServerScriptService.Server.missions)
 
 type Context = pow_builders.Context
 
--- Every def that can be locked in the campaign.
-local function lockable_defs(): { string }
-	local _, locked = pow_common.split_unlocks({})
-	return locked
-end
-
 return function(extras: pow_types.Extras)
 	local commands = extras.commands
-
-	commands.unlock_def = {
-		description = "Unlocks a def in the campaign for you, or for the player given, for this session only: it is "
-			.. "not saved. To unlock everything, unlock_all.",
-		permissions = { "admin" },
-		overloads = {
-			{ returns = "nil", args = { { name = "Def", type = "unit" } } },
-			{ returns = "nil", args = { { name = "Def", type = "unit" }, { name = "Player", type = "player" } } },
-		},
-		server_run = function(context: Context)
-			local player = pow_builders.target_player(context, 2)
-			local wanted = context.args[1]
-			if unit_defs.defs[wanted] == nil then
-				context:log({ type = "error", value = `There is no def "{wanted}"` })
-				return
-			elseif campaign.is_lockable(wanted) == false then
-				context:log({ type = "info", value = `{wanted} is never locked: nothing builds it` })
-				return
-			end
-			campaign_session.grant(player, { wanted }, false)
-			context:log({ type = "info", value = `Unlocked {wanted} for {player.Name}` })
-		end,
-	}
-
-	commands.unlock_all = {
-		description = "Unlocks everything in the campaign for you, or for the player given, for this session only: it "
-			.. "is not saved.",
-		permissions = { "admin" },
-		overloads = {
-			{ returns = "nil", args = {} },
-			{ returns = "nil", args = { { name = "Player", type = "player" } } },
-		},
-		server_run = function(context: Context)
-			local target = pow_builders.target_player(context, 1)
-			local names = lockable_defs()
-			campaign_session.grant(target, names, false)
-			context:log({ type = "info", value = `Unlocked all {#names} buildable defs for {target.Name}` })
-		end,
-	}
-
-	commands.unlock_reset = {
-		description = "Takes you, or the player given, back to the campaign's starting unlocks, for this session only: "
-			.. "it is not saved.",
-		permissions = { "admin" },
-		overloads = {
-			{ returns = "nil", args = {} },
-			{ returns = "nil", args = { { name = "Player", type = "player" } } },
-		},
-		server_run = function(context: Context)
-			local target = pow_builders.target_player(context, 1)
-			campaign_session.relock(target, false)
-			context:log({
-				type = "info",
-				value = `{target.Name} is back to the starting unlocks: {table.concat(campaign.STARTING_UNLOCKS, ", ")}`,
-			})
-		end,
-	}
 
 	commands.mission_timing = {
 		description = "Re-times the mission being played, if it has anything timed (the counterattack's waves): the "

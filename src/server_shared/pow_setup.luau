@@ -31,7 +31,8 @@ local PERMISSION = "owner"
 
 -- The rank `player` has in pow, if any: the owner's (or Studio's), or a developer's.
 local function rank_of(player: Player): number?
-	if developer_list.is_owner(player.UserId) or player.UserId < 0 then
+	-- Player1 of a local server test; Player2 and on stand in for everyone else
+	if developer_list.is_owner(player.UserId) or player.UserId == -1 then
 		return OWNER_RANK
 	end
 	return if developers.is_developer(player) then DEVELOPER_RANK else nil

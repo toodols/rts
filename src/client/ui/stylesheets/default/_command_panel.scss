@@ -9,11 +9,24 @@
 	padding: space(3);
 }
 
+// The title, a button that opens and closes the list: how many commands there are, and a chevron the way it opens.
 .command-title {
 	width: 100%;
-	height: auto;
+	height: 30px;
+	@include cell;
 	@include stack(row, space(2));
 	align-items: center;
+	padding: 0 space(2);
+}
+
+.command-chevron {
+	width: 14px;
+	height: 14px;
+	background-color: transparent;
+}
+
+.command-chevron-arm {
+	background-color: var(--Accent);
 }
 
 // One command: its name, and the key that starts it. The one whose mode is on is lit.

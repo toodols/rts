@@ -112,13 +112,11 @@ local function UnitCard(props: {
 				[React.Tag] = "unit-card-stats",
 				LayoutOrder = 5,
 				Text = costs,
-				RichText = true,
 			}),
 			Fight = React.createElement("TextLabel", {
 				[React.Tag] = "unit-card-stats",
 				LayoutOrder = 6,
 				Text = fight,
-				RichText = true,
 			}),
 		}
 	)

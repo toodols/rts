@@ -139,10 +139,10 @@ local FFA_CAPACITY = 8
 local DEFAULT_SEED = 1337
 
 -- The resource bonus a developer may give each player, in percent: what their extractors and generators make is scaled
--- by 1 + bonus / 100, so +100 doubles it and -100 leaves nothing. It is picked in steps of BONUS_STEP.
+-- by 1 + bonus / 100, so +100 doubles it and -100 leaves nothing. Dragging it moves in steps of BONUS_STEP.
 local BONUS_MIN = -100
 local BONUS_MAX = 100
-local BONUS_STEP = 10
+local BONUS_STEP = 5
 
 -- Where a started match waits for its server, and how long it waits.
 local MATCH_STORE = "matches"

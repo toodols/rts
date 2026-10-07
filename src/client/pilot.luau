@@ -2,7 +2,8 @@
 -- Piloting a unit (see shared/piloting.luau), for a developer. P, among the commands (command_input.luau), takes the
 -- first selected unit that can be piloted (`take_selected`), and P or Escape lets it go. While it is held every key,
 -- button and turn of the wheel is its own, an exclusive layer of the input router (which covers the RTS camera's), and
--- nothing is commanded:
+-- nothing is commanded. Its keys are the player's own (Shared.keybinds' piloting actions); the ones below are the BAR
+-- profile's:
 --
 --   mouse          looks about, and the unit turns to face where the view does
 --   W A S D        walk, relative to the view, at the unit's own top speed
@@ -17,6 +18,7 @@
 --   U              for a transport, set what it carries down, once it is low enough
 --   G              for something that can be carried, call the nearest transport of its side to pick it up, and pilot
 --                  the transport once it has; setting down what the pilot rode in on puts them back in it
+--   K              switches its shield
 --   mouse wheel    backs the view out from the unit's eyes to over its shoulder, and back in
 --
 -- The army and what X, C and V tell it are client/pilot_army.luau's. The server says what is piloted: the camera is
@@ -40,6 +42,8 @@ local developers = require(ReplicatedStorage.Shared.developers)
 local projectile = require(ReplicatedStorage.Shared.projectile)
 local entity_attrs = require(ReplicatedStorage.Shared.entity_attrs)
 
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
+
 local world = require(ReplicatedStorage.Client.world)
 local camera_mod = require(ReplicatedStorage.Client.camera)
 local selection = require(ReplicatedStorage.Client.selection)
@@ -54,8 +58,9 @@ type EntityDef = types.EntityDef
 
 -- The last order given the army, and when (`os.clock()`), for the HUD to show it.
 export type Command = { kind: "hold" | "follow" | "attack", at: number }
--- A key pressed for something that cannot be done yet: it is not sent, and its tile flashes red with why.
-export type Failure = { key: string, reason: string, at: number }
+-- A key pressed for something that cannot be done yet: it is not sent, and its tile flashes red with why. `action` is
+-- the key's keybind action.
+export type Failure = { action: string, reason: string, at: number }
 -- What a piloted unit, anyone's, last said (a name from `piloting.PHRASES`) and when, while it is still shown.
 export type Callout = { phrase: string, at: number }
 
@@ -78,8 +83,8 @@ type Session = {
 	-- which of its weapons the trigger fires, by index, chosen with the number keys
 	weapon: number?,
 	command: Command?,
-	-- when each key that has a tile on the HUD was last pressed (`os.clock()`), by what the tile shows: "1" for the
-	-- first weapon, "Q", "X", "C"; firing presses the chosen weapon's
+	-- when each key that has a tile on the HUD was last pressed (`os.clock()`), by its keybind action: "pilot_weapon_1"
+	-- for the first weapon, "pilot_dgun", "pilot_hold"; firing presses the chosen weapon's
 	presses: { [string]: number },
 	failure: Failure?,
 }
@@ -103,18 +108,8 @@ local ZOOM_STEP = 0.75
 local MAX_ZOOM = 8
 -- How far out the crosshair finds what it is on.
 local AIM_RANGE = 3000
--- The number keys that choose a weapon, the first weapon's first.
-local WEAPON_KEYS: { [Enum.KeyCode]: number } = {
-	[Enum.KeyCode.One] = 1,
-	[Enum.KeyCode.Two] = 2,
-	[Enum.KeyCode.Three] = 3,
-	[Enum.KeyCode.Four] = 4,
-	[Enum.KeyCode.Five] = 5,
-	[Enum.KeyCode.Six] = 6,
-	[Enum.KeyCode.Seven] = 7,
-	[Enum.KeyCode.Eight] = 8,
-	[Enum.KeyCode.Nine] = 9,
-}
+-- The most weapons the keys choose between, each with a keybind action of its own (`weapon_action`).
+local WEAPON_KEYS = 9
 
 -- The unit piloted, while one is.
 local session: Session? = nil
@@ -142,8 +137,14 @@ local function last_command(): Command?
 	return if session ~= nil then session.command else nil
 end
 
-local function pressed_at(key: string): number?
-	return if session ~= nil then session.presses[key] else nil
+-- The keybind action that chooses weapon `index`.
+local function weapon_action(index: number): string
+	return `pilot_weapon_{index}`
+end
+
+-- When the key of the keybind action `action` was last pressed, while a unit is piloted.
+local function pressed_at(action: string): number?
+	return if session ~= nil then session.presses[action] else nil
 end
 
 -- The last key pressed for something that could not be done, and why.
@@ -165,20 +166,20 @@ local function notify()
 	changed.fire()
 end
 
-local function press(now: Session, key: string)
-	now.presses[key] = os.clock()
+local function press(now: Session, action: string)
+	now.presses[action] = os.clock()
 	notify()
 end
 
-local function fail(now: Session, key: string, reason: string)
-	now.failure = { key = key, reason = reason, at = os.clock() }
+local function fail(now: Session, action: string, reason: string)
+	now.failure = { action = action, reason = reason, at = os.clock() }
 	notify()
 end
 
--- The army was given `kind` of order, and the HUD shows it.
-local function commanded(now: Session, kind: "hold" | "follow" | "attack", key: string)
+-- The army was given `kind` of order, with the key of `action`, and the HUD shows it.
+local function commanded(now: Session, kind: "hold" | "follow" | "attack", action: string)
 	now.command = { kind = kind, at = os.clock() }
-	press(now, key)
+	press(now, action)
 	pilot_say:FireServer(kind)
 end
 
@@ -285,12 +286,12 @@ local function reaches_aim(now: Session, model: Model, def: EntityDef): boolean
 	return geometry.distance_2d(from, aim_point) <= reach
 end
 
--- Which way an aircraft that hovers is taken: 1 up while Space is held, -1 down while Shift is.
+-- Which way an aircraft that hovers is taken: 1 up while its climb key is held, -1 down while Shift is.
 local function lift(): number
 	if UserInputService:GetFocusedTextBox() ~= nil then
 		return 0
 	end
-	local up = if UserInputService:IsKeyDown(Enum.KeyCode.Space) then 1 else 0
+	local up = if keybind_state.is_down "pilot_up" then 1 else 0
 	local down = if modifiers.shift_held() then 1 else 0
 	return up - down
 end
@@ -298,19 +299,17 @@ end
 local function steer(now: Session): Vector3
 	local forward, right = flat_axes(now)
 	local way = Vector3.zero
-	if UserInputService:GetFocusedTextBox() == nil then
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-			way += forward
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-			way -= forward
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-			way += right
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-			way -= right
-		end
+	if keybind_state.is_down "pilot_forward" then
+		way += forward
+	end
+	if keybind_state.is_down "pilot_back" then
+		way -= forward
+	end
+	if keybind_state.is_down "pilot_right" then
+		way += right
+	end
+	if keybind_state.is_down "pilot_left" then
+		way -= right
 	end
 	return if way.Magnitude > 1e-3 then way.Unit else Vector3.zero
 end
@@ -387,12 +386,12 @@ local function fire_manual(now: Session, model: Model)
 	if manual == nil or now.aim_point == nil then
 		return
 	elseif cooldown ~= nil and cooldown > 0 then
-		fail(now, "Q", "Reloading")
+		fail(now, "pilot_dgun", "Reloading")
 	elseif team_state.get().energy < manual.energy_per_shot then
-		fail(now, "Q", "Not enough energy")
+		fail(now, "pilot_dgun", "Not enough energy")
 	else
 		pilot_ability:FireServer(now.aim_point)
-		press(now, "Q")
+		press(now, "pilot_dgun")
 	end
 end
 
@@ -404,12 +403,12 @@ local function cargo(now: Session, model: Model, loading: boolean)
 	if def == nil or def.transport == nil or loading == carrying then
 		return
 	elseif loading and entity_attrs.flag(model, piloting.LOAD_ATTRIBUTE) ~= true then
-		fail(now, "J", "Nothing in reach")
+		fail(now, "pilot_load", "Nothing in reach")
 	elseif loading == false and entity_attrs.flag(model, piloting.UNLOAD_ATTRIBUTE) ~= true then
-		fail(now, "U", "Too high to unload")
+		fail(now, "pilot_unload", "Too high to unload")
 	else
 		pilot_cargo:FireServer(if loading then "load" else "unload")
-		press(now, if loading then "J" else "U")
+		press(now, if loading then "pilot_load" else "pilot_unload")
 	end
 end
 
@@ -419,10 +418,10 @@ local function call_mount(now: Session, model: Model)
 	if def == nil or def.transport ~= nil or def.weight_class == nil then
 		return
 	elseif entity_attrs.flag(model, piloting.CALL_ATTRIBUTE) ~= true then
-		fail(now, "G", "No mount available")
+		fail(now, "pilot_call", "No mount available")
 	else
 		pilot_cargo:FireServer "call"
-		press(now, "G")
+		press(now, "pilot_call")
 	end
 end
 
@@ -436,35 +435,41 @@ local function choose_weapon(now: Session, model: Model, index: number)
 		now.weapon = index
 		send(now)
 	end
-	press(now, tostring(index))
+	press(now, weapon_action(index))
 end
 
-local function on_key(now: Session, model: Model, key: Enum.KeyCode)
-	if key == Enum.KeyCode.Q then
+-- Does what `actions`, the piloting actions a key is bound to, say: the first of them there is.
+local function on_key(now: Session, model: Model, actions: { [string]: boolean })
+	if actions.pilot_dgun then
 		fire_manual(now, model)
-	elseif key == Enum.KeyCode.X then
+	elseif actions.pilot_hold then
 		local forward, right = flat_axes(now)
 		pilot_army.hold(model, now.id, forward, right)
-		commanded(now, "hold", "X")
-	elseif key == Enum.KeyCode.C then
+		commanded(now, "hold", "pilot_hold")
+	elseif actions.pilot_follow then
 		pilot_army.follow(now.id)
-		commanded(now, "follow", "C")
-	elseif key == Enum.KeyCode.V then
+		commanded(now, "follow", "pilot_follow")
+	elseif actions.pilot_attack then
 		local aim_point = now.aim_point
 		if aim_point == nil then
-			fail(now, "V", "No target")
+			fail(now, "pilot_attack", "No target")
 		else
 			pilot_army.attack(now.id, aim_point)
-			commanded(now, "attack", "V")
+			commanded(now, "attack", "pilot_attack")
 		end
-	elseif key == Enum.KeyCode.J or key == Enum.KeyCode.U then
-		cargo(now, model, key == Enum.KeyCode.J)
-	elseif key == Enum.KeyCode.G then
+	elseif actions.pilot_load or actions.pilot_unload then
+		cargo(now, model, actions.pilot_load == true)
+	elseif actions.pilot_call then
 		call_mount(now, model)
-	elseif key == Enum.KeyCode.K then
+	elseif actions.pilot_shield then
 		orders.send("shield", { now.id }, { aim = "none" }, orders.NOW)
-	elseif WEAPON_KEYS[key] ~= nil then
-		choose_weapon(now, model, WEAPON_KEYS[key])
+	else
+		for index = 1, WEAPON_KEYS do
+			if actions[weapon_action(index)] then
+				choose_weapon(now, model, index)
+				return
+			end
+		end
 	end
 end
 
@@ -480,20 +485,24 @@ local function on_input_began(input: InputObject, processed: boolean): boolean
 		now.firing = true
 		send(now)
 		if now.weapon ~= nil then
-			press(now, tostring(now.weapon))
+			press(now, weapon_action(now.weapon))
 		end
 		return true
 	end
 	if processed or UserInputService:GetFocusedTextBox() ~= nil then
 		return true
 	end
-	if input.KeyCode == Enum.KeyCode.P or input.KeyCode == Enum.KeyCode.Escape then
+	if input.UserInputType ~= Enum.UserInputType.Keyboard then
+		return true
+	end
+	local actions = keybind_state.actions_for(input.KeyCode, false)
+	if actions.pilot or input.KeyCode == Enum.KeyCode.Escape then
 		possess:FireServer(nil)
 		return true
 	end
 	local model = world.get(now.id)
 	if model ~= nil then
-		on_key(now, model, input.KeyCode)
+		on_key(now, model, actions)
 	end
 	return true
 end
@@ -603,6 +612,7 @@ return table.freeze({
 	is_on_target = is_on_target,
 	last_command = last_command,
 	pressed_at = pressed_at,
+	weapon_action = weapon_action,
 	last_failure = last_failure,
 	army = army,
 	take_selected = take_selected,

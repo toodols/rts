@@ -5,9 +5,6 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
-local surface = require(ReplicatedStorage.Shared.surface)
-local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local geometry = require(ReplicatedStorage.Shared.geometry)
 
 local world = require(ReplicatedStorage.Client.world)
@@ -15,6 +12,7 @@ local selection = require(ReplicatedStorage.Client.selection)
 local cursor = require(ReplicatedStorage.Client.cursor)
 local markers = require(ReplicatedStorage.Client.markers)
 local selected = require(ReplicatedStorage.Client.selected)
+local world_fx = require(ReplicatedStorage.Client.world_fx)
 
 type Entry = selected.Entry
 
@@ -26,17 +24,21 @@ local FORMATION_DRAG_THRESHOLD = 8
 -- the drag going on now, from where it began
 local trace: { Vector3 } = {}
 
--- Where a waypoint at (x, z) sits for what is selected: on the water's surface if a selected unit that moves rides it
--- there, a ship or a hovercraft, and on the ground otherwise, so a ship's path is drawn on the sea and not on the sea
--- floor beneath it.
+-- Where a waypoint at (x, z) sits for what is selected: on the ground beneath the water only when every selected unit
+-- that moves travels under it (world_fx.footing_of), and on the water's surface otherwise, so a ship's path is drawn
+-- on the sea and not on the sea floor beneath it.
 local function waypoint_ground(x: number, z: number): Vector3
+	local movers = 0
 	for _, id in selection.get() do
 		local def = world.def_of_id(id)
-		if def ~= nil and def.max_speed ~= nil and unit_defs.rides_surface(def) then
-			return surface.position(def, x, z)
+		if def ~= nil and def.max_speed ~= nil then
+			movers += 1
+			if world_fx.footing_of(def) == "surface" then
+				return world_fx.at("surface", x, z)
+			end
 		end
 	end
-	return heightmap.ground_position(x, z)
+	return world_fx.at(if movers > 0 then "ground" else "surface", x, z)
 end
 
 local function begin(point: Vector3)

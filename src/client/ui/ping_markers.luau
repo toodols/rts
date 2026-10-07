@@ -1,4 +1,4 @@
--- The name of the team that pinged, over each ping an ally or you made (client/pings.luau). While a ping is off
+-- The name of the player who pinged, over each ping an ally or you made (client/pings.luau). While a ping is off
 -- screen its name sits at the edge of the screen instead, the side it is on, behind an arrow pointing the way to it.
 --
 -- Like the world bars, everything is styled from the stylesheet by tag but for what it cannot know: the team's
@@ -190,7 +190,7 @@ local function PingMarkers()
 	local children = {}
 	for _, ping_info in shown do
 		-- keyed by when it ends and whose it is, which no two pings share
-		children[`{ping_info.ends}_{ping_info.team}`] = React.createElement(Marker, { ping = ping_info })
+		children[`{ping_info.ends}_{ping_info.player}`] = React.createElement(Marker, { ping = ping_info })
 	end
 	return React.createElement(React.Fragment, {}, children)
 end

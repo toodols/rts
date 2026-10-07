@@ -1,6 +1,6 @@
 --!strict
--- What of the HUD the player has opened with a key: the player list (ui/player_list.luau), which T opens and closes and
--- Escape closes (command_input.luau).
+-- What of the HUD the player has opened with a key: the player list (ui/player_list.luau), which its key (T in the BAR
+-- keybind profile) opens and closes and Escape closes (command_input.luau).
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 

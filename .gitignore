@@ -37,3 +37,7 @@ tools/sound_pipeline/build/
 
 # the AI arena's match logs and search checkpoints (tools/ai_arena), which grow large
 tools/ai_arena/runs/
+
+# the Rust AI's build output and its search runs (tools/rust_ai)
+tools/rust_ai/target*/
+tools/rust_ai/runs/

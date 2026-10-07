@@ -10,6 +10,7 @@ local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 
 type EntityDef = types.EntityDef
+type Entity = types.Entity
 type Line = ai_profiles.Line
 
 -- What a def is, to the AI.
@@ -176,6 +177,48 @@ local function labs_of(line: Line): Labs
 end
 local LABS: { [Line]: Labs } = table.freeze({ bot = labs_of "bot", vehicle = labs_of "vehicle" })
 
+-- The lab of the first tier whose constructor flies: where its aircraft come from.
+local AIR_LAB: string = (function(): string
+	for _, name in
+		defs_where(function(def: EntityDef): boolean
+			return unit_defs.is_factory(def)
+		end)
+	do
+		for _, option in unit_defs.build_options(unit_defs.get(name)) do
+			local def = unit_defs.get(option)
+			if def.category == "aircraft" and def.builder ~= nil and (def.tech_level or 1) == 1 then
+				return name
+			end
+		end
+	end
+	error "no lab makes a flying constructor"
+end)()
+
+-- The labs that make aircraft, as a set.
+local AIRCRAFT_LABS: { [string]: boolean } = {}
+for _, name in
+	defs_where(function(def: EntityDef): boolean
+		return unit_defs.is_factory(def)
+	end)
+do
+	for _, option in unit_defs.build_options(unit_defs.get(name)) do
+		if unit_defs.is_air(unit_defs.get(option)) then
+			AIRCRAFT_LABS[name] = true
+		end
+	end
+end
+table.freeze(AIRCRAFT_LABS)
+
+-- Whether any of `structures` is a lab that makes aircraft.
+local function any_aircraft_lab(structures: { Entity }): boolean
+	for _, structure in structures do
+		if AIRCRAFT_LABS[structure.def_name] == true then
+			return true
+		end
+	end
+	return false
+end
+
 local roles: { [string]: Role } = {}
 
 local function role_of(def_name: string): Role
@@ -238,6 +281,9 @@ return table.freeze({
 	ADVANCED_EXTRACTOR = ADVANCED_EXTRACTOR,
 	LINES = LINES,
 	LABS = LABS,
+	AIR_LAB = AIR_LAB,
+	AIRCRAFT_LABS = AIRCRAFT_LABS,
+	any_aircraft_lab = any_aircraft_lab,
 	ENERGY_DEFS = ENERGY_DEFS,
 	ENERGY_TIERS = ENERGY_TIERS,
 	CONVERTER_DEFS = CONVERTER_DEFS,

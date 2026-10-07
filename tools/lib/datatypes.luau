@@ -68,9 +68,20 @@ function vector_methods.Dot(value: any, other: any): number
 	end
 	return value:Dot(other)
 end
+-- Roblox's Vector3:Cross rounds each product to 32 bits and then the difference. vector.cross does too where Luau calls
+-- it as a fast built-in, but a module compiled at optimization level 0, as the arena compiles the game's (loader.luau),
+-- calls the library's, which rounds only the difference: a hair off, and a homing missile lost its lock a step apart
+-- from Studio's (2026-09-27, held up against Studio over 100,000 of them).
+local function cross32(a: vector, b: vector): vector
+	return vcreate(
+		round32(round32(a.y * b.z) - round32(a.z * b.y)),
+		round32(round32(a.z * b.x) - round32(a.x * b.z)),
+		round32(round32(a.x * b.y) - round32(a.y * b.x))
+	)
+end
 function vector_methods.Cross(value: any, other: any): any
 	if type(value) == "vector" then
-		return vector.cross(value, other)
+		return cross32(value, other)
 	end
 	return value:Cross(other)
 end
@@ -115,7 +126,10 @@ local vector2_methods = {}
 
 -- Roblox's Vector2 holds 32-bit floats and works in them, as a Vector3 does; with 64-bit ones the wind (a Vector2)
 -- blew a hair differently, the turbines made a hair more, and a game drifted off Studio's within a couple of minutes.
--- Each component and each answer is rounded to 32 bits, as a lone +, -, *, / or square root in 32 bits would give.
+-- Each component and each answer is rounded to 32 bits, as a lone +, -, *, / or square root in 32 bits would give. A
+-- number it is multiplied or divided by is a 32-bit float too, first, and dividing by one is multiplying by its 32-bit
+-- reciprocal, as Roblox does it: held up against Studio over 100,000 of each (2026-09-27), when with the number left 64
+-- bits the wind drifted off Studio's, and a replay with it, in a couple of minutes.
 local function f32(x: number): number
 	return vcreate(x, 0, 0).x
 end
@@ -150,15 +164,18 @@ Vector2Meta.__sub = function(a, b)
 end
 Vector2Meta.__mul = function(a, b)
 	if type(a) == "number" then
-		return new_vector2(a * b.X, a * b.Y)
+		local scale = f32(a)
+		return new_vector2(scale * b.X, scale * b.Y)
 	elseif type(b) == "number" then
-		return new_vector2(a.X * b, a.Y * b)
+		local scale = f32(b)
+		return new_vector2(a.X * scale, a.Y * scale)
 	end
 	return new_vector2(a.X * b.X, a.Y * b.Y)
 end
 Vector2Meta.__div = function(a, b)
 	if type(b) == "number" then
-		return new_vector2(a.X / b, a.Y / b)
+		local inverse = f32(1 / f32(b))
+		return new_vector2(a.X * inverse, a.Y * inverse)
 	elseif type(a) == "number" then
 		return new_vector2(a / b.X, a / b.Y)
 	end

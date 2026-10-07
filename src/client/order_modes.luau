@@ -1,8 +1,9 @@
 --!strict
 -- The modes the cursor can be put in to give an order with the next click, as data: one entry per mode, each saying
--- which key starts it, who among the selection can take part, and what a click, a dragged line or a dragged circle
--- sends (as order kinds, shared/order_kinds.luau). Everything that handles a mode reads it from here: the keys and
--- clicks (command_input.luau), what the cursor lights, the command panel's rows and the badge on the cursor.
+-- which keybind action (Shared.keybinds) starts it, who among the selection can take part, and what a click, a dragged
+-- line or a dragged circle sends (as order kinds, shared/order_kinds.luau). Everything that handles a mode reads it
+-- from here: the keys and clicks (command_input.luau), what the cursor lights, the command panel's rows and the badge
+-- on the cursor.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
@@ -37,8 +38,8 @@ export type Click = "attack" | "spot" | "entity" | "manual"
 export type ModeInfo = {
 	mode: Mode,
 	label: string,
-	-- the key that starts it, as its KeyCode's name
-	key: string,
+	-- the keybind action that starts it (Shared.keybinds)
+	action: string,
 	-- the order a click gives, at an entity; an "attack" click gives `attack_ground` at the ground instead
 	order: Command,
 	click: Click,
@@ -75,13 +76,13 @@ local function carries(def: EntityDef): boolean
 	return def.transport ~= nil
 end
 
--- Every mode, in the order the command panel lists them. D starts the disintegrator, or failing anything selected
--- having one, launch, the first of the two the selection can use.
+-- Every mode, in the order the command panel lists them. The disintegrator and launch share an action, which starts
+-- the disintegrator, or failing anything selected having one, launch, the first of the two the selection can use.
 local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "attack",
 		label = "Attack",
-		key = "A",
+		action = "mode_attack",
 		order = "attack",
 		click = "attack",
 		line = "attack_ground",
@@ -97,7 +98,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "fight",
 		label = "Fight",
-		key = "F",
+		action = "mode_fight",
 		order = "fight",
 		click = "spot",
 		line = "fight",
@@ -110,7 +111,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "reclaim",
 		label = "Reclaim",
-		key = "E",
+		action = "mode_reclaim",
 		order = "reclaim",
 		click = "entity",
 		area = "area_reclaim",
@@ -123,7 +124,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "repair",
 		label = "Repair",
-		key = "R",
+		action = "mode_repair",
 		order = "repair",
 		click = "entity",
 		area = "area_repair",
@@ -136,7 +137,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "resurrect",
 		label = "Resurrect",
-		key = "W",
+		action = "mode_resurrect",
 		order = "resurrect",
 		click = "entity",
 		area = "area_resurrect",
@@ -149,7 +150,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "load",
 		label = "Load",
-		key = "J",
+		action = "mode_load",
 		order = "load",
 		click = "entity",
 		launch = false,
@@ -160,7 +161,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "unload",
 		label = "Unload",
-		key = "U",
+		action = "mode_unload",
 		order = "unload",
 		click = "spot",
 		line = "unload",
@@ -172,7 +173,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "guard",
 		label = "Guard",
-		key = "O",
+		action = "mode_guard",
 		order = "guard",
 		click = "entity",
 		launch = false,
@@ -186,7 +187,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "disintegrator",
 		label = "Disintegrator",
-		key = "D",
+		action = "mode_manual",
 		order = "dgun",
 		click = "manual",
 		launch = false,
@@ -200,7 +201,7 @@ local MODES: { ModeInfo } = table.freeze({
 	table.freeze({
 		mode = "launch",
 		label = "Launch",
-		key = "D",
+		action = "mode_manual",
 		order = "attack",
 		click = "attack",
 		line = "attack_ground",
@@ -224,11 +225,11 @@ local function get(mode: Mode): ModeInfo
 	return BY_MODE[mode]
 end
 
--- The modes key `key` (a KeyCode's name) starts, in the order it tries them.
-local function for_key(key: string): { ModeInfo }
+-- The modes any of `actions` (a set of keybind actions) starts, in the order they are tried.
+local function for_actions(actions: { [string]: boolean }): { ModeInfo }
 	local found = {}
 	for _, info in MODES do
-		if info.key == key then
+		if actions[info.action] == true then
 			table.insert(found, info)
 		end
 	end
@@ -238,6 +239,6 @@ end
 return table.freeze({
 	all = MODES,
 	get = get,
-	for_key = for_key,
+	for_actions = for_actions,
 	can_go = can_go,
 })

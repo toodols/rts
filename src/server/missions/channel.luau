@@ -1,13 +1,13 @@
 --!strict
--- Channel Crossing, the fifth mission, on the "channel" map (shared/map_designs/channel.luau): the player's commander on
--- the west shore, and across the channel the enemy's, its Agitators on the island and on its own shore holding the water
--- (mission_forces.CHANNEL_ENEMY). Nobody plays the enemy: it builds nothing and never comes over, and its defences and
--- commander fight whatever comes near them. The player sinks the Agitators with ships and lands Garpikes. The mission
--- is won once the enemy's commander is dead, and lost once the player's is, or once the time limit
+-- Channel Crossing, the fifth mission, on the "channel" map (shared/map_designs/channel.luau): the player's commander
+-- on the west shore, and across the channel the enemy's, its Agitators on the island and on its own shore holding the
+-- water (mission_forces.CHANNEL_ENEMY). Nobody plays the enemy: it builds nothing and never comes over, and its
+-- defences and commander fight whatever comes near them. The player sinks the Agitators with ships and lands Garpikes.
+-- The mission is won once the enemy's commander is dead, and lost once the player's is, or once the time limit
 -- (mission_forces.CHANNEL_LAYOUT) has run out, which counts from the player's commander going down: less time in the
 -- hard mode.
 --
--- In the hard mode the enemy has two Urchins and an Air Lab besides (CHANNEL_HARD_ENEMY). The mission keeps the lab
+-- In the hard mode the enemy has two more Corals and an Air Lab besides (CHANNEL_HARD_ENEMY). The mission keeps the lab
 -- making Whirlwinds, from a while in (CHANNEL_LAYOUT.air_lab_delay), and sends them in raids at whatever the player has
 -- built nearest them, once enough wait by the lab.
 

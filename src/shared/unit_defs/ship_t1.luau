@@ -561,7 +561,8 @@ local defs: { [string]: EntityDef } = {
 				reload = 30,
 				range = studs(20000),
 				energy_per_shot = 0,
-				stockpile = { limit = 10, build_time = 140, metal = 1000, energy = 125000 },
+				-- divergence from BAR: nuclear missiles are wildly useful in this game because you know where the anti nukes are
+				stockpile = { limit = 10, build_time = 200, metal = 3000, energy = 375000 },
 				manual_fire = true,
 				launches_underwater = true,
 				-- from the hatches on its back, behind the sail

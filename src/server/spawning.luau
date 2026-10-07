@@ -119,6 +119,13 @@ local function taken_places(): { Vector3 }
 			table.insert(places, other.position)
 		end
 	end
+	-- and what was made this step but has not joined the world yet: two AIs put down in the same step, as the game's
+	-- opponents are, otherwise saw the same empty map and took the same start
+	for _, other in state.pending() do
+		if other.team ~= teams.NEUTRAL then
+			table.insert(places, other.position)
+		end
+	end
 	for _, player in Players:GetPlayers() do
 		if players.team_of(player) == nil then
 			continue
@@ -225,6 +232,7 @@ return table.freeze({
 	free_start = free_start,
 	box_start = box_start,
 	set_start = set_start,
+	start_position = start_position,
 	give_starting_force = give_starting_force,
 	can_start_at = can_start_at,
 	owns_anything = owns_anything,

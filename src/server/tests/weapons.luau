@@ -820,8 +820,8 @@ local function anti_nuke(args: Args): Findings
 			)
 		end
 		local most_in_flight = 0
-		-- the leg of its flight each nuke was on when an interceptor was first seen going after it: it should have
-		-- climbed to its cruising height by then
+		-- the leg of its flight each nuke was on when an interceptor was first seen going after it: as in BAR, one goes
+		-- up while the nuke is still climbing out of its silo
 		local nuke_phase_at_launch: { string } = {}
 		local seen_interceptors: { [number]: boolean } = {}
 		advance(args.seconds or 40, function()
@@ -1590,7 +1590,7 @@ local function weapon_mounts(_args: Args): Findings
 					else nil
 				if turns_at == nil then
 					table.insert(pieceless, `{name} {index}`)
-				elseif (mount.pivot.Position - turns_at).Magnitude > 0.01 then
+				elseif (mount.pivot - turns_at).Magnitude > 0.01 then
 					table.insert(elsewhere, `{name} {index}`)
 				end
 			elseif piece ~= nil then

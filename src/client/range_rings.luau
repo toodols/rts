@@ -7,7 +7,6 @@
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
-local ground_levels = require(ReplicatedStorage.Shared.ground_levels)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local projectile = require(ReplicatedStorage.Shared.projectile)
@@ -50,8 +49,7 @@ end
 
 -- The ground at (x, z), or the water's surface over it.
 local function surface_at(x: number, z: number): Vector3
-	local ground = heightmap.ground_position(x, z)
-	return Vector3.new(x, math.max(ground.Y, ground_levels.WATER_LEVEL), z)
+	return world_fx.at("surface", x, z)
 end
 
 -- An arrow on the ground pointing out of the front of something of `def` standing at `center`, turned to `facing`.

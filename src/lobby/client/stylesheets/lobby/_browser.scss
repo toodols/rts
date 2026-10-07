@@ -135,3 +135,31 @@
 	font-family: Michroma;
 	font-size: 14px;
 }
+
+// Under the host's name: who may join, and the ranks it lets in, if not all of them.
+.lobby-badges {
+	width: 100%;
+	height: 20px;
+	@include stack(row, space(2));
+	align-items: center;
+}
+
+.lobby-levels {
+	width: auto;
+	height: 20px;
+	@include stack(row, space(1));
+	align-items: center;
+
+	// ranks this player is not among
+	&.barred .lobby-levels-to {
+		color: $danger;
+	}
+}
+
+.lobby-levels-to {
+	width: auto;
+	height: 14px;
+	color: var(--TextDim);
+	font-family: RobotoMono;
+	font-size: 11px;
+}

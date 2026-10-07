@@ -9,7 +9,6 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 local map_presets = require(ReplicatedStorage.Shared.map_presets)
 local pow_types = require(ReplicatedStorage.Shared.pow_types)
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 return function(extras: pow_types.Extras)
 	pow_types.register_common(extras)
@@ -26,17 +25,4 @@ return function(extras: pow_types.Extras)
 	extras.types.ai_line = pow_types.named("ai_line", "bot, vehicle or any labs", { "bot", "vehicle", "any" })
 	-- One of shared/ai_profiles' profiles, by name: how an AI plays.
 	extras.types.ai_profile = pow_types.named("ai_profile", "An AI profile, by name", ai_profiles.names())
-
-	local def_names: { string } = {}
-	for name in unit_defs.defs do
-		table.insert(def_names, name)
-	end
-	table.sort(def_names)
-
-	-- Any def, unit or building, by name. Only suggested: what is not one passes as it is, for each command to check.
-	extras.types.unit = {
-		name = "unit",
-		description = "A unit or building, by def name",
-		autocomplete_simple = def_names,
-	}
 end

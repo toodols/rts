@@ -1,7 +1,16 @@
 # rts
 
-A Total Annihilation style RTS for Roblox: 3D, server-authoritative, built on a heightmap world
-with metal / energy / buildpower economics.
+A semi port of BAR in roblox
+- Deformable heightmap terrain
+- Simulated projectiles
+- T1, T2, T3, Seaplane, Hovercraft tech tree
+- Nuclear missiles :D
+- Almost all unit stats are stolen
+- Scripts are ai generated
+- Tests are ai generated
+- Sounds are ai generated
+- Models are also ai generated
+- Does not have stealth/los/fog of war
 
 ## Getting started
 
@@ -86,8 +95,8 @@ you, a missing `[team]` your team, and a switch with no argument flips.
 | `player_info [player]` / `player_reset [player]` | everything about a player / wipe what is saved for them |
 | `developer_list` / `developer_set <user id> <listed>` | who is a developer / add or remove one |
 | `skin_list` / `skin_equip [skin] [player]` | every skin and who wears it / equip one, golden too, saved as the lobby's Skins tab saves it |
-| `mission_load <mission> [hard]` / `mission_complete <mission> [player]` / `mission_timing [prep pace]` | play a mission here / finish one, saved / re-time the one playing (game only, but for `mission_complete`) |
-| `unlock_list [player]` / `unlock_def <def> [player]` / `unlock_all [player]` / `unlock_reset [player]` | campaign progress / unlock one or all, or go back to the starting unlocks, this session only (game only, but for `unlock_list`) |
+| `mission_load <mission> [hard]` / `mission_complete <mission>[_hard] [player]` / `mission_timing [prep pace]` | play a mission here / finish one (`overlook_hard` finishes its hard mode too), saved / re-time the one playing (game only, but for `mission_complete`) |
+| `unlock_list [player]` / `unlock_def <def> [player]` / `unlock_all [player]` / `unlock_reset [player]` | campaign progress / unlock one or all, or go back to the starting unlocks, saved |
 | `lobby_list` | the lobby only: every lobby on this server |
 | **Donuts** (the pool skin) | |
 | `donut_pop` / `donut_fly` / `donut_float` / `donut_regen` (`[team]`) | pop donuts, throw them off, float them off to the surface, or put new ones on at once: on your selected units, or your team's with none selected, or the team given. Every player sees it |
@@ -746,6 +755,9 @@ The server rejects a placement that is not on it.
 
 ### Controls
 
+The keys below are the BAR keybind profile's. The Default profile, which a new player has, pans with W / A / S / D and
+moves what BAR has there (Settings lists every key).
+
 | Input | Effect |
 | --- | --- |
 | Left click empty ground | clear selection |
@@ -764,6 +776,7 @@ The server rejects a placement that is not on it.
 | J with transports selected | load mode: the next left click on a friendly unit sends them to pick it up (shift queues and stays in the mode), right click / Esc cancels |
 | U with transports selected | unload mode: the next left click on the ground sends them there to set everything aboard down (shift queues and stays in the mode), right click / Esc cancels |
 | Q | select everything of yours on the screen of the same type as what is selected (while placing an economy building, Q picks the energy storage instead) |
+| Ctrl + W (Default: Ctrl + A) | the same, anywhere on the map |
 | Tab | select your commander and pan the camera to it; with several, each press moves to the next and wraps round |
 | D with a commander selected | aim its disintegrator (a red rectangle from the commander toward the cursor, as long as its range, that destroys everything in it): the next left click gives it a `dgun` order at that spot, an order like any other: the commander closes in until the spot is in range, fires once its weapon is ready and has the energy, and moves on to the next order. Shift queues it behind what the commander is doing and keeps aiming, space puts it at the front. Allies and your own units in the rectangle go with everything else, but a shot that an enemy commander is in the way of is dropped. Right click / Esc cancels |
 | A with armed units selected | attack mode: the next left click attacks an enemy under the cursor, or the spot of ground if there is none (shift queues and stays in the mode), right click / Esc cancels |

@@ -40,7 +40,6 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
 
 local types = require(ReplicatedStorage.Shared.types)
-local heightmap = require(ReplicatedStorage.Shared.heightmap)
 local starts = require(ReplicatedStorage.Shared.starts)
 local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 
@@ -133,6 +132,16 @@ local function think(brain: Brain)
 		brain.opened = true
 	end
 	economy_planner.resolve_line(brain, census)
+	-- what changes of its profile once its advanced lab is finished, once
+	local once = brain.profile.once_advanced
+	if once ~= nil and brain.line ~= nil then
+		for _, lab in censuses.buildings_of(census, catalog.LABS[brain.line].advanced) do
+			if lab.state == "active" then
+				brain.profile = ai_profiles.with(ai_profiles.without(brain.profile, { "once_advanced" }), once)
+				break
+			end
+		end
+	end
 
 	labs.run_factories(brain, census, economy)
 	errands.run_builders(brain, census, economy)
@@ -144,14 +153,17 @@ local function think(brain: Brain)
 	sorties.fronts(brain, #groups.fronts(brain, nil))
 end
 
--- Where the team's commander stands, or its start if it has none.
+-- Where the team's commander stands, or its start if it has none. A commander put down this step has not joined the
+-- world yet (the game's AI opponents are all put down in one), so what is pending counts as well.
 local function home_of(team_id: TeamId): Vector3
-	for _, entity in state.all() do
-		if entity.alive and entity.team == team_id and catalog.role_of(entity.def_name).commander then
-			return entity.position
+	for _, list in { state.all(), state.pending() } do
+		for _, entity in list do
+			if entity.alive and entity.team == team_id and catalog.role_of(entity.def_name).commander then
+				return entity.position
+			end
 		end
 	end
-	return heightmap.ground_position(starts.center(team_id).X, starts.center(team_id).Y)
+	return spawning.start_position(team_id)
 end
 
 -- Hands team `team_id`, which should already have its commander, to the AI, playing by `profile` (the default if not

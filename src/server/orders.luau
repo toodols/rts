@@ -69,10 +69,16 @@ local VACATE_GAP = 4
 -- For a unit whose last look found no way round: how long it had been held up when it looked. It looks again only once
 -- it has been held up REROUTE_RETRY longer than that, and forgets it once it is not held up at all.
 local looked_in_vain: { [types.EntityId]: number } = {}
+-- Told of every order given (`issue`) before it is given, for the AI arena's recorder (tools/nn_ai) to learn the AI's
+-- play from; nothing listens in a real game.
+local listener: ((entity: Entity, orders: { Order }, queue: boolean, front: boolean) -> ())? = nil
 
 -- Gives `entity` new orders. By default they replace its queue; `queue` adds them to the back, and
 -- `front` puts them at the front, pushing whatever it was doing and everything after it back.
 local function issue(entity: Entity, orders: { Order }, queue: boolean, front: boolean)
+	if listener ~= nil then
+		listener(entity, orders, queue, front)
+	end
 	if front then
 		for index, order in orders do
 			table.insert(entity.orders, index, order)
@@ -1026,6 +1032,10 @@ end)
 return table.freeze({
 	forget = forget,
 	issue = issue,
+	-- sets (or with nil, clears) what is told of every order given
+	listen = function(callback: ((entity: Entity, orders: { Order }, queue: boolean, front: boolean) -> ())?)
+		listener = callback
+	end,
 	push_move = push_move,
 	vacate = vacate,
 	tick = tick,

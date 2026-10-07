@@ -58,7 +58,11 @@ local function intruders(brain: Brain, census: Census): { Entity }
 	local found: { Entity } = {}
 	for _, enemy in census.enemy_units do
 		local role = catalog.role_of(enemy.def_name)
-		if role.hits_ground == false or role.commander or unit_defs.is_air(enemy.def) then
+		if
+			role.hits_ground == false
+			or (role.commander and brain.profile.hunts_commanders == false)
+			or unit_defs.is_air(enemy.def)
+		then
 			continue
 		end
 		local inside = geometry.distance_2d(enemy.position, brain.home) <= brain.profile.base_radius + radius

@@ -12,6 +12,7 @@ local session_config = require(script.session_config)
 local bootstrap = require(script.bootstrap)
 local instances = require(script.instances)
 local warp = require(script.warp)
+local pace = require(script.pace)
 local profiler = require(script.profiler)
 local pregame = require(script.pregame)
 local roblox_teams = require(script.roblox_teams)
@@ -72,7 +73,8 @@ local function run_steps(delta: number): number
 		end
 		return steps
 	end
-	accumulator += delta
+	-- the game's own time runs at the pace set for it: faster only for a replay being watched (pace.luau)
+	accumulator += delta * pace.get()
 	while accumulator >= tick_rate.TICK_DELTA and steps < MAX_CATCHUP_STEPS do
 		accumulator -= tick_rate.TICK_DELTA
 		steps += 1
@@ -95,7 +97,7 @@ local function on_heartbeat(delta: number)
 
 	local warping = warp.is_warping()
 	local steps = run_steps(delta)
-	publish_sim_rate(if warping and delta > 0 then steps * tick_rate.TICK_DELTA / delta else 1)
+	publish_sim_rate(if warping and delta > 0 then steps * tick_rate.TICK_DELTA / delta else pace.get())
 	if steps > 0 then
 		profiler.mark "instances_sync"
 		instances.sync()

@@ -17,6 +17,7 @@ local React = require(ReplicatedStorage.Packages.react)
 
 local seating = require(ReplicatedStorage.Shared.seating)
 local types = require(ReplicatedStorage.Shared.types)
+local keybinds = require(ReplicatedStorage.Shared.keybinds)
 
 local hud_state = require(ReplicatedStorage.Client.hud_state)
 local input_router = require(ReplicatedStorage.Client.input_router)
@@ -24,6 +25,7 @@ local input_router = require(ReplicatedStorage.Client.input_router)
 local use_viewport = require(script.Parent.use_viewport)
 
 local format = require(ReplicatedStorage.ClientShared.format)
+local keybind_state = require(ReplicatedStorage.ClientShared.keybind_state)
 local use_store = require(ReplicatedStorage.ClientShared.use_store)
 
 type Relation = types.RosterRelation
@@ -391,6 +393,7 @@ local function PlayerList()
 	local open = use_open()
 	local roster = use_roster()
 	local ui_scale = use_viewport.use_ui_scale()
+	local bindings = keybind_state.use_bindings()
 	if open == false then
 		return nil
 	end
@@ -430,7 +433,7 @@ local function PlayerList()
 			Key = React.createElement("TextLabel", {
 				[React.Tag] = "roster-key",
 				LayoutOrder = 2,
-				Text = "T",
+				Text = keybinds.label(bindings.player_list),
 			}),
 		}),
 	}

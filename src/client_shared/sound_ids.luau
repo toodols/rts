@@ -11,4 +11,6 @@ return table.freeze({
 	laser = "rbxassetid://109742071750414",
 	notify = "rbxassetid://124115317599599",
 	pulsar = "rbxassetid://95119478653746",
+	torpedo = "rbxassetid://115950814625886",
+	torpedo_hit = "rbxassetid://133219628450420",
 })

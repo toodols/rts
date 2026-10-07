@@ -15,6 +15,7 @@ local order_kinds = require(ReplicatedStorage.Shared.order_kinds)
 local state = require(ServerScriptService.Server.state)
 local orders = require(ServerScriptService.Server.orders)
 local movement = require(ServerScriptService.Server.movement)
+local damage = require(ServerScriptService.Server.damage)
 
 local harness = require(script.Parent.harness)
 
@@ -26,6 +27,8 @@ local round = harness.round
 local spawn = harness.spawn
 local unkillable = harness.unkillable
 local damage_to = harness.damage_to
+local shots_of = harness.shots_of
+local spawn_resting = harness.spawn_resting
 
 type Entity = types.Entity
 type TeamId = types.TeamId
@@ -526,12 +529,46 @@ local function gunship_ring(args: Args): Findings
 	}
 end
 
+-- Anti-air missiles and the ground units round a landing aircraft: a Thistle within reach of an enemy Whirlwind
+-- `args.lift` studs (20 by default) over the ground, which it fires at and which then settles among four Thugs packed
+-- round it, for `args.seconds` (20 by default); and one Thistle missile's full damage landed straight on a Thug. As in
+-- BAR, whose anti-air weapons do damage only to aircraft, a Thug should take no more than weapon_kinds'
+-- AA_NON_AIR_DAMAGE from each missile, whether it is hit or the missile goes off beside it.
+local function aa_ground_splash(args: Args): Findings
+	local launcher = spawn("thistle", OWN, 0, 0)
+	local plane = unkillable(spawn_resting("whirlwind", ENEMY, -50, 0))
+	plane.position += Vector3.new(0, args.lift or 20, 0)
+	local thugs: { Entity } = {}
+	for _, offset in { Vector2.new(4, 0), Vector2.new(-4, 0), Vector2.new(0, 4), Vector2.new(0, -4) } do
+		table.insert(thugs, unkillable(spawn("thug", ENEMY, -50 + offset.X, offset.Y)))
+	end
+	local struck = unkillable(spawn("thug", ENEMY, 120, 0))
+	advance(tick_rate.TICK_DELTA)
+	advance(args.seconds or 20)
+	local fired = shots_of(launcher.id, 1)
+	local worst = 0
+	for _, thug in thugs do
+		worst = math.max(worst, damage_to(thug))
+	end
+	local weapon = (unit_defs.get("thistle").weapons :: { types.Weapon })[1]
+	damage.hit(struck, weapon.damage, weapon, launcher.id, OWN, true)
+	return {
+		fired = fired,
+		plane_landed = plane.position.Y < heightmap.height_at(plane.position.X, plane.position.Z) + 3,
+		damage_to_plane = round(damage_to(plane), 1),
+		most_to_a_thug = round(worst, 1),
+		direct_hit_on_thug = round(damage_to(struck), 1),
+		pass = damage_to(struck) <= 1 and worst <= math.max(fired, 1),
+	}
+end
+
 local TESTS: { [string]: Test } = {
 	fighter = { run = fighter },
 	wing_edges = { run = wing_edges, defaults = { preset = "hooked" } },
 	hit_control = { run = hit_control },
 	air_ring = { run = air_ring },
 	gunship_ring = { run = gunship_ring },
+	aa_ground_splash = { run = aa_ground_splash },
 }
 
 return table.freeze(TESTS)

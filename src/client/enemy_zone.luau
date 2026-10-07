@@ -84,7 +84,8 @@ local function rebuild()
 	local edge = world_fx.ground_points(
 		heightmap.ground_position(zone_x, -half_z),
 		heightmap.ground_position(zone_x, half_z),
-		LINE_STEP
+		LINE_STEP,
+		"surface"
 	)
 	world_fx.lay_line(edge, LINE_STYLE, function(): Part
 		local dash = make_part("Edge", model)

@@ -1,6 +1,6 @@
 -- Pings: a player marks a spot on the map (a double click of the middle mouse button, see client/pings.luau), and it
--- is shown to them and to everyone on a team allied with theirs, and to nobody else, with the name of the team that
--- pinged. A player on no team, one only watching, cannot ping, but sees everyone's.
+-- is shown to them and to everyone on a team allied with theirs, and to nobody else, with the name of the player who
+-- pinged, in their team's colour. A player on no team, one only watching, cannot ping, but sees everyone's.
 
 local Players = game:GetService "Players"
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
@@ -29,8 +29,7 @@ local PING_RATE = { per_second = 2, burst = 1 }
 local function on_ping(player: Player, point: Vector3)
 	local x, z = point.X, point.Z
 	local team = players.team_of(player)
-	local owner = if team ~= nil then state.get_team(team) else nil
-	if team == nil or owner == nil then
+	if team == nil or state.get_team(team) == nil then
 		return
 	end
 
@@ -40,7 +39,11 @@ local function on_ping(player: Player, point: Vector3)
 		local other_team = players.team_of(other)
 		local watching = other_team == nil and seating.is_spectator(other)
 		if watching or (other_team ~= nil and alliances.are_allied(other_team, team)) then
-			remotes.tell(ping, other, { at = at, team = team :: TeamId, name = owner.name })
+			remotes.tell(
+				ping,
+				other,
+				{ at = at, team = team :: TeamId, player = player.UserId, name = player.DisplayName }
+			)
 		end
 	end
 end

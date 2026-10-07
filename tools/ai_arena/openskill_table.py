@@ -64,6 +64,11 @@ def side_name(side: dict[str, Any], names: dict[str, str]) -> str:
     key = json.dumps(side, sort_keys=True)
     if key in names:
         return names[key]
+    # the neural network (tools/nn_ai) by the network playing, and the Rust AI
+    if side.get("engine") == "nn":
+        return side.get("name") or side.get("policy") or "nn"
+    if side.get("engine") == "rust":
+        return "rust"
     if side.get("overrides"):
         return side.get("profile", "default") + "+" + json.dumps(side["overrides"], sort_keys=True)
     return side.get("profile", "default")

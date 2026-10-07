@@ -10,6 +10,8 @@
 --   BASE_QUIET_SECONDS before. It says where, as a base under attack does.
 -- - Enemy aircraft: the first time a team not allied with yours has an aircraft, finished or still a blueprint. Once a
 --   game.
+-- - Enemy atomic bomber: likewise, the first time a team not allied with yours has an atomic bomber (ATOMIC_BOMBERS).
+-- - Nuclear launch: a team not allied with yours has launched a nuclear missile (server/projectiles.luau). Every time.
 --
 -- Another module may send its players notices through `to_team`, as the third campaign mission does
 -- (server/missions/counterattack.luau). Every kind of notice is one of `types.NoticeKind`, which the client has a text
@@ -48,6 +50,8 @@ local BASE_QUIET_SECONDS = 10
 local REQUEST_RATE = { per_second = 1 / 3, burst = 1 }
 -- How often the map is looked over for enemy aircraft, in seconds of game.
 local AIR_SCAN_SECONDS = 1
+-- The aircraft that carry a nuclear weapon, told of on their own.
+local ATOMIC_BOMBERS: { [string]: true } = { liche = true }
 
 -- Seconds of game played, by this module's own count.
 local now = 0
@@ -56,8 +60,9 @@ local next_air_scan = 0
 local base_hurt_at: { [TeamId]: number } = {}
 -- when an enemy last hurt one of each team's commanders
 local commander_hurt_at: { [TeamId]: number } = {}
--- the teams already told of enemy aircraft
+-- the teams already told of enemy aircraft, and of an enemy atomic bomber
 local air_told: { [TeamId]: true } = {}
+local atomic_told: { [TeamId]: true } = {}
 -- every notice sent, with the team it is for
 local sent = signal.new() :: signal.Signal<TeamId, Notice>
 
@@ -144,27 +149,46 @@ local function damaged(target: Entity, attacker_team: TeamId?)
 	end
 end
 
--- Tells every team not yet told that an enemy has an aircraft, if one has.
-local function scan_for_air()
-	local owners: { [TeamId]: true } = {}
-	for _, entity in state.all() do
-		if entity.alive and entity.team ~= teams.NEUTRAL and unit_defs.is_air(entity.def) then
-			owners[entity.team] = true
-		end
-	end
+-- Sends `kind` to every team not yet in `told` that is not allied with one of `owners`, and puts it in `told`.
+local function tell_enemies_once(owners: { [TeamId]: true }, told: { [TeamId]: true }, kind: types.NoticeKind)
 	if next(owners) == nil then
 		return
 	end
 	for team_id in state.all_teams() do
-		if teams.is_playable(team_id) == false or air_told[team_id] ~= nil then
+		if teams.is_playable(team_id) == false or told[team_id] ~= nil then
 			continue
 		end
 		for owner in owners do
 			if alliances.are_allied(owner, team_id) == false then
-				air_told[team_id] = true
-				to_team(team_id, { kind = "air_detected" })
+				told[team_id] = true
+				to_team(team_id, { kind = kind })
 				break
 			end
+		end
+	end
+end
+
+-- Tells every team not yet told that an enemy has an aircraft, and that an enemy has an atomic bomber, if one has.
+local function scan_for_air()
+	local owners: { [TeamId]: true } = {}
+	local atomic_owners: { [TeamId]: true } = {}
+	for _, entity in state.all() do
+		if entity.alive and entity.team ~= teams.NEUTRAL and unit_defs.is_air(entity.def) then
+			owners[entity.team] = true
+			if ATOMIC_BOMBERS[entity.def_name] ~= nil then
+				atomic_owners[entity.team] = true
+			end
+		end
+	end
+	tell_enemies_once(owners, air_told, "air_detected")
+	tell_enemies_once(atomic_owners, atomic_told, "atomic_bomber_detected")
+end
+
+-- Team `launcher` has launched a nuclear missile: every team not allied with it is told.
+local function nuke_launched(launcher: TeamId)
+	for team_id in state.all_teams() do
+		if teams.is_playable(team_id) and alliances.are_allied(launcher, team_id) == false then
+			to_team(team_id, { kind = "nuke_launched" })
 		end
 	end
 end
@@ -184,6 +208,7 @@ local function reset()
 	table.clear(base_hurt_at)
 	table.clear(commander_hurt_at)
 	table.clear(air_told)
+	table.clear(atomic_told)
 end
 
 local function init()
@@ -202,6 +227,7 @@ snapshot.keep("notifications", function()
 		base_hurt_at = base_hurt_at,
 		commander_hurt_at = commander_hurt_at,
 		air_told = air_told,
+		atomic_told = atomic_told,
 	}
 end, function(saved)
 	now = saved.now
@@ -209,6 +235,7 @@ end, function(saved)
 	base_hurt_at = saved.base_hurt_at
 	commander_hurt_at = saved.commander_hurt_at
 	air_told = saved.air_told
+	atomic_told = saved.atomic_told or {}
 end)
 
 return table.freeze({
@@ -219,5 +246,6 @@ return table.freeze({
 	metal_sent = metal_sent,
 	request_metal = request_metal,
 	damaged = damaged,
+	nuke_launched = nuke_launched,
 	reset = reset,
 })

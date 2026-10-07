@@ -1426,6 +1426,50 @@ local function progress_transitions(_args: Args): Findings
 	}
 end
 
+-- A player's level (campaign.level): 0 for a new player, 100 with everything any builder builds unlocked, a unit only
+-- got outside the campaign (the Syracusia) counting like any other, the first mission raising it, and something nobody
+-- builds (a commander) not counting.
+local function campaign_level(_args: Args): Findings
+	local everything: { [string]: boolean } = {}
+	local earnable = 0
+	for name in unit_defs.defs do
+		if campaign.is_lockable(name) then
+			everything[name] = true
+			if table.find(campaign.STARTING_UNLOCKS, name) == nil then
+				earnable += 1
+			end
+		end
+	end
+	local fresh = campaign.level(campaign.starting_unlocks())
+	local complete = campaign.level(everything)
+	local first = campaign.MISSIONS[2]
+	local after_first = campaign.level(campaign_progress.complete(campaign_progress.new(), first.id, false).unlocks)
+	local without_syracusia: { [string]: boolean } = {}
+	for name in everything do
+		if name ~= "syracusia" then
+			without_syracusia[name] = true
+		end
+	end
+	local missing_one = campaign.level(without_syracusia)
+	local with_commander = campaign.starting_unlocks()
+	with_commander.commander = true
+	local commander_level = campaign.level(with_commander)
+	return {
+		earnable = earnable,
+		fresh = fresh,
+		complete = complete,
+		after_first = after_first,
+		missing_syracusia = missing_one,
+		commander_level = commander_level,
+		pass = fresh == 0
+			and complete == 100
+			and after_first > 0
+			and missing_one < 100
+			and campaign.is_lockable "syracusia"
+			and commander_level == 0,
+	}
+end
+
 -- How many of `team`'s units and buildings stand, of `def_name` if it is given.
 local function standing_of(team: TeamId, def_name: string?): number
 	local count = 0
@@ -1454,8 +1498,9 @@ end
 -- Prairie Skirmish (server/missions/skirmish.luau, on the prairie map), loaded as the mission_load command would, with
 -- the player's commander put down at the first start box's usual start, as a player choosing there would. Before
 -- anything steps the enemy should have nothing on the field (`enemy_before`, 0); a second later the AI should play it
--- (`is_ai`) by the mission's profile (`profile`, "passive"), with one commander (`enemy_commanders`) far from the
--- player's (`apart`, over 100 studs), and the game still going. After `args.seconds` (60) it should have built something
+-- (`is_ai`) by the mission's profile (`profile`, "passive"), held to the first tier (`first_tier`: its roster has the
+-- bot and vehicle labs and neither advanced one), with one commander (`enemy_commanders`) far from the player's
+-- (`apart`, over 100 studs), and the game still going. After `args.seconds` (60) it should have built something
 -- besides (`enemy_things` over 1). Killing its commander should then win: the game ended, won, with the enemy among no
 -- winners. Loading the tutorial afterwards should leave the AI no longer playing the old enemy (`released`).
 local function prairie_skirmish(args: Args): Findings
@@ -1468,6 +1513,12 @@ local function prairie_skirmish(args: Args): Findings
 	advance(1)
 
 	local profile = ai.profile_of(enemy)
+	local roster = if profile ~= nil then profile.roster else nil
+	local first_tier = roster ~= nil
+		and roster.bot_lab == true
+		and roster.vehicle_lab == true
+		and roster.advanced_bot_lab == nil
+		and roster.advanced_vehicle_lab == nil
 	local enemy_commander = harness.commander_of(enemy)
 	local apart = if enemy_commander ~= nil
 		then geometry.distance_2d(enemy_commander.position, commander.position)
@@ -1494,6 +1545,7 @@ local function prairie_skirmish(args: Args): Findings
 		enemy_before = enemy_before,
 		is_ai = profile ~= nil,
 		profile = if profile ~= nil then profile.name else nil,
+		first_tier = first_tier,
 		enemy_commanders = enemy_commanders,
 		apart = round(apart, 1),
 		phase_seated = phase_seated,
@@ -1507,6 +1559,7 @@ local function prairie_skirmish(args: Args): Findings
 		pass = enemy_before == 0
 			and profile ~= nil
 			and profile.name == "passive"
+			and first_tier
 			and enemy_commanders == 1
 			and apart > 100
 			and phase_seated == "playing"
@@ -1641,6 +1694,7 @@ end
 
 local TESTS: { [string]: Test } = {
 	progress_transitions = { run = progress_transitions },
+	campaign_level = { run = campaign_level },
 	prairie_skirmish = { run = prairie_skirmish },
 	hard_modes = { run = hard_modes },
 	tutorial_boulder = { run = tutorial_boulder },

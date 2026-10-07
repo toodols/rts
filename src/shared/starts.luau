@@ -55,8 +55,27 @@ end
 local function initialize(preset: Preset)
 	table.clear(centers)
 	boxes = preset.start_boxes
+	-- on a symmetric map a start's twin is where it would be turned half round, so the ground has to fit at both
+	local accept = if preset.symmetric == true
+		then function(x: number, z: number): boolean
+			return fits(x, z) and fits(-x, -z)
+		end
+		else fits
 	for slot, wanted in preset.starts do
-		local found = search(wanted.X, wanted.Y, fits)
+		local twin: Vector2? = nil
+		if preset.symmetric == true then
+			for earlier = 1, slot - 1 do
+				local other = preset.starts[earlier]
+				if math.abs(other.X + wanted.X) < 0.5 and math.abs(other.Y + wanted.Y) < 0.5 then
+					twin = -centers[earlier]
+				end
+			end
+		end
+		if twin ~= nil then
+			centers[slot] = twin
+			continue
+		end
+		local found = search(wanted.X, wanted.Y, accept)
 		if found == nil then
 			warn(`no dry level ground within {SEARCH_RADIUS} studs of start {slot}; it stays where the map puts it`)
 		end

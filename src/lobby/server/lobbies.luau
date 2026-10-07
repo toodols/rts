@@ -22,6 +22,10 @@
 -- has it on, as BAR always does. And how a team game or a free for all is won (its `end_mode`); a new lobby has BAR's
 -- default, a side is out once its commanders are dead. A scavenger game ignores it.
 --
+-- The host may also let in only players of some levels (campaign.level), a range from protocol.LEVEL_MIN to LEVEL_MAX
+-- which a new lobby has all of. Someone outside it cannot join, and it cannot be set to leave out anyone already in.
+-- A player's level is the caller's to say.
+--
 -- A co-op lobby (`create_mission`) plays a campaign mission together: its mode is the mission's campaign mode (its
 -- hard mode's, for a hard mode's key), which seats everyone on one side, and its map the mission's. Neither can be
 -- changed, and nor can the end mode, which a mission has its own of. Everything else about it, ally griefing, who may
@@ -44,6 +48,9 @@ export type Lobby = {
 	id: string,
 	host: number,
 	visibility: Visibility,
+	-- the levels it lets in (see the top of this file)
+	level_min: number,
+	level_max: number,
 	-- the game it will start, as it is set now; its seats are in the order the players joined
 	match: Match,
 	-- the players who have said they are ready, by user id
@@ -170,6 +177,8 @@ local function create(host: number, host_name: string, developer: boolean, missi
 		id = tostring(made),
 		host = host,
 		visibility = "public",
+		level_min = protocol.LEVEL_MIN,
+		level_max = protocol.LEVEL_MAX,
 		match = match,
 		ready = {},
 		starting = false,
@@ -180,7 +189,16 @@ local function create(host: number, host_name: string, developer: boolean, missi
 	return lobby, nil
 end
 
-local function join(id: string, user_id: number, name: string): (boolean, string?)
+-- Whether someone of `level` may join a lobby that lets in `level_min` to `level_max`, and why not if not.
+local function level_refusal(level: number, level_min: number, level_max: number): string?
+	if level < level_min or level > level_max then
+		return `That lobby is for levels {level_min}-{level_max}`
+	end
+	return nil
+end
+
+-- `level` is the joiner's (campaign.level).
+local function join(id: string, user_id: number, name: string, level: number): (boolean, string?)
 	local lobby = lobbies[id]
 	if lobby == nil then
 		return false, "That lobby is gone"
@@ -190,6 +208,10 @@ local function join(id: string, user_id: number, name: string): (boolean, string
 	end
 	if lobby.starting then
 		return false, "That game is already starting"
+	end
+	local refused = level_refusal(level, lobby.level_min, lobby.level_max)
+	if refused ~= nil then
+		return false, refused
 	end
 	local mode = game_modes.get(lobby.match.mode) :: Mode
 	local side = open_side(lobby, mode)
@@ -301,6 +323,37 @@ local function set_visibility(user_id: number, visibility: string): (boolean, st
 		return false, "There is no such setting"
 	end
 	lobby.visibility = visibility
+	return true, nil
+end
+
+-- Lets in only levels `min` to `max`, stepped to protocol.LEVEL_STEP and kept within the bounds. `level_of` says the
+-- level of each user id in the lobby.
+local function set_level_range(
+	user_id: number,
+	min: number,
+	max: number,
+	level_of: (user_id: number) -> number
+): (boolean, string?)
+	local lobby, err = hosted(user_id)
+	if lobby == nil then
+		return false, err
+	end
+	local function stepped(value: number): number
+		local step = protocol.LEVEL_STEP
+		return math.clamp(math.round(value / step) * step, protocol.LEVEL_MIN, protocol.LEVEL_MAX)
+	end
+	local low, high = stepped(min), stepped(max)
+	if low > high then
+		return false, "The lowest level has to be at most the highest"
+	end
+	for _, seat in lobby.match.seats do
+		local level = level_of(seat.user_id)
+		if level < low or level > high then
+			return false, `{seat.name} is level {level}`
+		end
+	end
+	lobby.level_min = low
+	lobby.level_max = high
 	return true, nil
 end
 
@@ -485,6 +538,8 @@ return table.freeze({
 	set_mode = set_mode,
 	set_map = set_map,
 	set_visibility = set_visibility,
+	set_level_range = set_level_range,
+	level_refusal = level_refusal,
 	set_bonus = set_bonus,
 	set_ready = set_ready,
 	set_ally_griefing = set_ally_griefing,

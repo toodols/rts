@@ -132,7 +132,7 @@ local GUIDE: Guide = {
 			cards = {
 				{
 					id = "resurrect_mode",
-					caption = "Press W or click Resurrect",
+					caption = "Press {key:mode_resurrect} or click Resurrect",
 					mark = "check",
 					picture = { kind = "resurrect_mode" },
 				},

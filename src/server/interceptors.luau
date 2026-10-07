@@ -36,18 +36,14 @@ local interceptors: { Interceptor } = {}
 
 -- The enemy nuke an anti-nuke of `team` at `position` launches at, if there is one: as in BAR, one that is coming down
 -- within its `coverage` (its weapon's range), wherever the nuke is now, and that no interceptor is chasing yet. The one
--- that will land nearest it goes first. A nuke still climbing out of its silo is left alone until it levels off at its
--- cruising height, so the interceptor meets it up there rather than over the silo it was fired from.
+-- that will land nearest it goes first. As in BAR it goes up as soon as the nuke has left its silo, and the interceptor,
+-- far faster, catches it wherever it has got to, climbing or not.
 local function pick_nuke(position: Vector3, team: types.TeamId, coverage: number): Projectile?
 	local nearest: Projectile? = nil
 	local nearest_distance = coverage
 	for _, candidate in projectiles.nukes() do
 		local nuke = candidate.nuke :: projectiles.Nuke
-		if
-			candidate.flight.phase ~= "climb"
-			and projectiles.is_free_nuke(candidate)
-			and alliances.are_allied(candidate.team, team) == false
-		then
+		if projectiles.is_free_nuke(candidate) and alliances.are_allied(candidate.team, team) == false then
 			local distance = Vector2.new(nuke.aim.X - position.X, nuke.aim.Z - position.Z).Magnitude
 			if distance <= nearest_distance then
 				nearest = candidate

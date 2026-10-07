@@ -208,10 +208,10 @@ local function missing(expected: { [string]: number }, found: { [string]: number
 end
 
 -- Channel Crossing (server/missions/channel.luau) played for `args.seconds` (120): its enemy should stand as the
--- mission lays it out, every Agitator within PLACED_SLACK of where it says, with its commander and no AI playing it;
--- the HUD should show the time limit counting down from the layout's; and in that time the enemy should build nothing
--- and nothing of its should come over to the player's shore. Then, with the time limit cut to just past what has gone,
--- the mission should be lost with "Time ran out".
+-- mission lays it out, every Agitator and floating defence within PLACED_SLACK of where it says, with its commander and
+-- no AI playing it; the HUD should show the time limit counting down from the layout's; and in that time the enemy
+-- should build nothing and nothing of its should come over to the player's shore. Then, with the time limit cut to just
+-- past what has gone, the mission should be lost with "Time ran out".
 local function channel_crossing(args: Args): Findings
 	local enemy = start_mission("channel", false)
 	local seconds = args.seconds or 120
@@ -220,7 +220,7 @@ local function channel_crossing(args: Args): Findings
 	local at_start = census(enemy)
 	local placed_off: { string } = {}
 	for _, each in mission_forces.CHANNEL_ENEMY do
-		if each.def_name ~= "agitator" then
+		if each.def_name ~= "agitator" and unit_defs.get(each.def_name).footing.water ~= "float" then
 			continue
 		end
 		local nearest = math.huge
@@ -313,8 +313,8 @@ local function channel_victory(_args: Args): Findings
 end
 
 -- Channel Crossing's hard mode, played for `args.seconds` (450): its enemy should have what the hard mode adds as well
--- (two Urchins and an Air Lab), and the hard mode's time limit on the clock. The Air Lab should make Whirlwinds, and the
--- first raid should go at the player's base once raid_bombers of them wait by it; the raids that follow grow.
+-- (two more Corals and an Air Lab), and the hard mode's time limit on the clock. The Air Lab should make Whirlwinds,
+-- and the first raid should go at the player's base once raid_bombers of them wait by it; the raids that follow grow.
 local function channel_hard(args: Args): Findings
 	local enemy = start_mission("channel", true)
 	local expected = tally(mission_forces.CHANNEL_ENEMY)
@@ -496,52 +496,50 @@ local function blockade(args: Args): Findings
 	return findings
 end
 
--- Channel Crossing's Agitators, one at a time: `args.riptides` (5) Riptides, some 2,100 metal, sail to a point off
--- Agitator `args.target` (3, the island's south one, the nearest to the harbour; they are numbered as
--- mission_forces.CHANNEL_ENEMY has them, 1 to 3 on the island and 4 to 6 on the shore) that none of the others reaches,
--- and turn in at it. They set out from the harbour for one on the island, and from the south end of the east strait for
--- one on the shore, whose island's Agitators are gone first. Those `args.gone` numbers are gone first as well, and
--- with `args.alone` every other Agitator. They
--- fight for `args.seconds` (120). The Agitator should be gone with something of the fleet left, and some of the others
--- still standing, so that they are taken one at a time.
+-- Channel Crossing's defences, one at a time: `args.riptides` (5) Riptides, some 2,100 metal, sail to a point off
+-- defence `args.target` (3, the island's south Agitator, the nearest to the harbour; numbered as
+-- mission_forces.CHANNEL_ENEMY has them) and turn in at it. They set out from the harbour for one west of the middle,
+-- and from the south end of the east strait for one east of it, every defence west of the middle being gone first.
+-- Those `args.gone` numbers are gone first as well, and with `args.alone` every other defence. They fight for
+-- `args.seconds` (120). The defence should be gone with at least two of the fleet left.
 local function channel_agitator(args: Args): Findings
-	local enemy = start_mission("channel", false)
+	local enemy = start_mission("channel", args.hard == true)
 	advance(2)
-	local laid: { Vector2 } = {}
+	-- what stands of each of CHANNEL_ENEMY's things, by its number there: the enemy's nearest of that def to where it
+	-- was laid
+	local things: { Entity } = {}
 	for _, each in mission_forces.CHANNEL_ENEMY do
-		if each.def_name == "agitator" then
-			table.insert(laid, each.at)
-		end
-	end
-	local agitators: { Entity } = {}
-	for _, at in laid do
+		local at = Vector3.new(each.at.X, 0, each.at.Y)
 		local nearest: Entity? = nil
 		for _, entity in state.all() do
 			if
 				entity.alive
 				and entity.team == enemy
-				and entity.def_name == "agitator"
+				and entity.def_name == each.def_name
 				and (
 					nearest == nil
-					or geometry.distance_2d(entity.position, Vector3.new(at.X, 0, at.Y))
-						< geometry.distance_2d(nearest.position, Vector3.new(at.X, 0, at.Y))
+					or geometry.distance_2d(entity.position, at) < geometry.distance_2d(nearest.position, at)
 				)
 			then
 				nearest = entity
 			end
 		end
-		table.insert(agitators, nearest :: Entity)
+		table.insert(things, nearest :: Entity)
 	end
-	local target = agitators[args.target or 3]
-	assert(target ~= nil, "there is no such Agitator")
+	local function is_defence(entity: Entity): boolean
+		return entity.def_name == "agitator" or entity.def_name == "urchin" or entity.def_name == "coral"
+	end
+	local target = things[args.target or 3]
+	assert(target ~= nil and is_defence(target), "there is no such defence")
 	local on_island = target.position.X < 0
 	local gone: { number } = args.gone or {}
-	for index, agitator in agitators do
+	for index, thing in things do
 		if
-			agitator ~= target
-			and (args.alone or table.find(gone, index) ~= nil or (on_island == false and agitator.position.X < 0))
+			thing ~= target
+			and is_defence(thing)
+			and (args.alone or table.find(gone, index) ~= nil or (on_island == false and thing.position.X < 0))
 		then
-			damage.apply(agitator, 1e9, nil)
+			damage.apply(thing, 1e9, nil)
 		end
 	end
 	-- the point the fleet sails to first: in the strait, beyond the target from the middle of its line
@@ -594,8 +592,8 @@ local function channel_agitator(args: Args): Findings
 		orders_left += #unit.orders
 	end
 	local each_fired: { string } = {}
-	for index, agitator in agitators do
-		if agitator ~= target and agitator.alive then
+	for index, agitator in things do
+		if agitator ~= target and is_defence(agitator) and agitator.alive then
 			others += 1
 			table.insert(each_fired, `{index}:{harness.shots_of(agitator.id, 1)}`)
 		end
@@ -618,14 +616,18 @@ local function channel_agitator(args: Args): Findings
 	return findings
 end
 
--- Channel Crossing's landing: every Agitator gone, `args.garpikes` (8) Garpikes, some 1,800 metal, drive under the east
--- strait from off the island to the enemy's shore and fight their way to its commander, for `args.seconds` (150). The
--- enemy's commander should be dead, and the mission won.
+-- Channel Crossing's landing: every Agitator, Urchin and Coral gone, `args.garpikes` (8) Garpikes, some 1,800 metal,
+-- drive under the east strait from off the island to the enemy's shore and fight their way to its commander, for
+-- `args.seconds` (150). The enemy's commander should be dead, and the mission won.
 local function channel_landing(args: Args): Findings
 	local enemy = start_mission("channel", false)
 	advance(2)
 	for _, entity in state.all() do
-		if entity.alive and entity.team == enemy and entity.def_name == "agitator" then
+		if
+			entity.alive
+			and entity.team == enemy
+			and (entity.def_name == "agitator" or entity.def_name == "urchin" or entity.def_name == "coral")
+		then
 			damage.apply(entity, 1e9, nil)
 		end
 	end

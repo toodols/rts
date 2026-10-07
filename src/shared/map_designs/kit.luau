@@ -103,6 +103,19 @@ local function ring_point(slot: number, radius: number): Vector2
 end
 
 -- The ring's four starts, `radius` studs out.
+-- `build`'s ground made the same turned half round about the middle: the height at (x, z) is the mean of `build`'s
+-- there and at (-x, -z), so that what one side has, the side across from it has too.
+local function point_symmetric(
+	build: (seed: number) -> (x: number, z: number) -> number
+): (seed: number) -> (x: number, z: number) -> number
+	return function(seed: number): (x: number, z: number) -> number
+		local height = build(seed)
+		return function(x: number, z: number): number
+			return (height(x, z) + height(-x, -z)) / 2
+		end
+	end
+end
+
 local function ring_starts(radius: number): { Vector2 }
 	local out: { Vector2 } = {}
 	for slot = 1, RING_SLOTS do
@@ -243,6 +256,7 @@ end
 
 return table.freeze({
 	GENERATED_SIZE = GENERATED_SIZE,
+	point_symmetric = point_symmetric,
 	RING_RADIUS = RING_RADIUS,
 	SEA_FLOOR = SEA_FLOOR,
 	COAST_FREQUENCY = COAST_FREQUENCY,

@@ -19,6 +19,7 @@
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
+local types = require(ReplicatedStorage.Shared.types)
 local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
 
 -- Which kind of lab an AI builds its army from.
@@ -45,8 +46,32 @@ export type Profile = {
 	-- for every lab it has.
 	labs: number,
 	metal_per_extra_lab: number,
-	-- Its line's advanced lab goes up once it makes this much metal a second.
+	-- Its line's advanced lab goes up once it makes this much metal a second, or once it has played
+	-- advanced_lab_seconds, whichever comes first.
 	advanced_lab_income: number,
+	advanced_lab_seconds: number,
+	-- An air lab goes up beside its line's labs once it makes air_lab_income metal a second, or once it has played
+	-- air_lab_seconds, whichever comes first; its labs then make aircraft as they make the rest of its army.
+	air_lab_income: number,
+	air_lab_seconds: number,
+	-- Going to the second tier all at once: while its line's advanced lab is going up, every other lab it has is
+	-- reclaimed, its metal going into the advanced one, and no lab of the first tier is built again while it has one.
+	scrap_labs_for_advanced: boolean,
+	-- What of the profile changes once its advanced lab is finished, as `with` would change it; nil for nothing.
+	once_advanced: { [string]: any }?,
+	-- Its advanced constructors upgrade its extractors before anything but a lab or an energy stall.
+	upgrades_first: boolean,
+	-- Its advanced constructors take free metal spots too, with advanced extractors, as its plain ones do with plain.
+	advanced_expands: boolean,
+	-- An enemy commander that comes into its territory is hunted like any other armed intruder.
+	hunts_commanders: boolean,
+	-- Its commander fires its disintegrator at the enemy within its reach, when nothing of its own is in the way and
+	-- what it would destroy is worth at least disintegrate_worth (as unit_defs.power counts it).
+	uses_disintegrator: boolean,
+	disintegrate_worth: number,
+	-- Once the enemy has a lab that makes aircraft, it keeps this many anti-air defences and this many anti-air units,
+	-- before a single aircraft comes; 0 for none until enough of them do.
+	early_anti_air: number,
 	-- Its labs field what costs no more than this many seconds of its metal income, so fewer seconds is a cheaper and
 	-- bigger army (5 to 60), and not what is worth less than fodder_share of the dearest of that.
 	afford_seconds: number,
@@ -323,6 +348,7 @@ local OPTIONAL: { [string]: string } = table.freeze({
 	escorted_builders = "number",
 	escort_seconds = "number",
 	army_share = "number",
+	once_advanced = "table",
 	hunt_groups = "number",
 	strike_groups = "number",
 	spread = "number",
@@ -361,7 +387,18 @@ local DEFAULT: Profile = table.freeze({
 	line = nil,
 	labs = 1,
 	metal_per_extra_lab = 10,
-	advanced_lab_income = 40,
+	advanced_lab_income = 20,
+	advanced_lab_seconds = 600,
+	air_lab_income = 25,
+	air_lab_seconds = 720,
+	scrap_labs_for_advanced = false,
+	once_advanced = nil,
+	upgrades_first = false,
+	advanced_expands = false,
+	hunts_commanders = false,
+	uses_disintegrator = false,
+	disintegrate_worth = 60,
+	early_anti_air = 0,
 	afford_seconds = 20,
 	fodder_share = 0.15,
 	army_share = nil,
@@ -465,6 +502,10 @@ local DEFAULT: Profile = table.freeze({
 local RANGES: { [string]: Range } = {
 	labs = { low = 1, high = 3, scale = "int" },
 	afford_seconds = { low = 5, high = 60, scale = "log" },
+	advanced_lab_income = { low = 10, high = 60, scale = "linear" },
+	advanced_lab_seconds = { low = 240, high = 1200, scale = "linear" },
+	air_lab_income = { low = 10, high = 80, scale = "linear" },
+	air_lab_seconds = { low = 300, high = 1500, scale = "linear" },
 	army_share = { low = 0.1, high = 1, scale = "linear", absent_at = "top", absent_share = 0.2 },
 	opening_extractors = { low = 0, high = 6, scale = "int" },
 	extractor_builders = { low = 0.25, high = 1, scale = "linear" },
@@ -585,6 +626,44 @@ local function without(base: Profile, keys: { string }): Profile
 	end
 	validate(result)
 	return table.freeze(result) :: any
+end
+
+-- What tech level `def` is of, by the defs' own tech levels (1 where one has none): a unit its own; a lab that of the
+-- most advanced thing it makes; any other building that of the least advanced unit that builds it, and math.huge if no
+-- unit does.
+local function tier_of(def: types.EntityDef): number
+	if def.kind == "unit" then
+		return def.tech_level or 1
+	end
+	if unit_defs.is_factory(def) then
+		local tier = 1
+		for _, option in unit_defs.build_options(def) do
+			local made = unit_defs.defs[option]
+			if made ~= nil then
+				tier = math.max(tier, made.tech_level or 1)
+			end
+		end
+		return tier
+	end
+	local tier = math.huge
+	for _, builder in unit_defs.defs do
+		if builder.kind == "unit" and table.find(unit_defs.build_options(builder), def.name) ~= nil then
+			tier = math.min(tier, builder.tech_level or 1)
+		end
+	end
+	return tier
+end
+
+-- `base` held to what is of tech level `tier` or below (`tier_of`), on top of its own roster if it has one: a profile
+-- of 1 never builds an advanced lab, and so never gets past the first tier.
+local function up_to_tier(base: Profile, tier: number): Profile
+	local roster: { [string]: boolean } = {}
+	for name, def in unit_defs.defs do
+		if tier_of(def) <= tier and (base.roster == nil or base.roster[name] == true) then
+			roster[name] = true
+		end
+	end
+	return with(base, { roster = table.freeze(roster) })
 end
 
 validate(DEFAULT :: any)
@@ -741,6 +820,31 @@ PROFILES.sim_barb = with(PROFILES.barb, {
 	guard_income = 0,
 })
 
+-- sim_barb's play, but for the second tier, which it goes to all at once, when sim_barb would: while its advanced lab
+-- goes up it reclaims its first-tier labs into it, and once it is finished its waves go out smaller, sooner and at worse
+-- odds, to press the advantage. Its advanced constructors upgrade its extractors before building anything else; it hunts
+-- down an enemy commander that walks into its territory, fires its own commander's disintegrator, and puts up anti-air
+-- as soon as the enemy has an air lab rather than once its aircraft arrive. (Arena, 2026-09-27: going to the second
+-- tier earlier, at 15 metal a second or eight minutes, and advanced constructors taking free spots with advanced
+-- extractors each played worse against sim_barb, so neither is in it; the switches are there to try again.)
+PROFILES.scrapper = with(PROFILES.sim_barb, {
+	name = "scrapper",
+	scrap_labs_for_advanced = true,
+	once_advanced = {
+		wave_base = 450,
+		wave_income_seconds = 20,
+		attack_superiority = 1.2,
+		sim_attack_margin = 0.2,
+		regroup_seconds = 20,
+		wave_growth = 0.2,
+		wave_cap_seconds = 90,
+	},
+	upgrades_first = true,
+	hunts_commanders = true,
+	uses_disintegrator = true,
+	early_anti_air = 2,
+})
+
 -- The profile called `name`, if there is one.
 local function get(name: string): Profile?
 	return PROFILES[name]
@@ -763,4 +867,5 @@ return table.freeze({
 	names = names,
 	with = with,
 	without = without,
+	up_to_tier = up_to_tier,
 })

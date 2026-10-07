@@ -113,6 +113,10 @@ export type Preset = {
 	geo_spots: (() -> { Vector2 })?,
 	-- A vent beside every start, for a map that does not say where its vents are.
 	geo_at_starts: boolean?,
+	-- Whether the map is laid out the same for every side, turned half round about its middle: its ground (`build`
+	-- is taken at (x, z) and at (-x, -z) and the two blended), its starts and its metal spots laid out from the seed,
+	-- each paired with its twin across the middle, so that no side starts better off than another.
+	symmetric: boolean?,
 	-- The reclaimables the map starts with, where the map says, in place of any laid out from the seed; nil to lay them
 	-- out. Read only when asked for, since only the server needs them and a map can have thousands.
 	reclaimables: (() -> { FixedReclaimable })?,

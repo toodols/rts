@@ -1,0 +1,47 @@
+@use "sass:color";
+@use "../../../../client_shared/stylesheets/theme" as *;
+@use "../../../../client_shared/stylesheets/mixins" as *;
+
+// The game's settings (ui/settings_panel.luau): a button at the top left, and the keybinds (ClientShared's
+// _keybinds.scss) on a plate in the middle of the screen while it is open.
+.settings-button {
+	position: absolute;
+	top: space(2);
+	left: space(2);
+	width: auto;
+	height: 26px;
+	@include cell;
+	@include stack(row, 0);
+	justify-content: center;
+	align-items: center;
+
+	&.active {
+		background-color: color.adjust($accent, $lightness: -30%);
+		background-image: linear-gradient(180deg, veil(white, 0.16), veil(black, 0.2));
+		outline: 1px solid $accent;
+	}
+}
+
+.settings-button-label {
+	width: auto;
+	height: 100%;
+	padding: 0 space(3);
+	color: var(--TextDim);
+	font-family: Michroma;
+	font-size: 11px;
+	font-weight: bold;
+
+	.settings-button.active > & {
+		color: var(--Text);
+	}
+}
+
+.settings-panel {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 560px;
+	height: 640px;
+	@include plate;
+}

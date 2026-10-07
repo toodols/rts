@@ -16,8 +16,6 @@ local ReplicatedStorage = game:GetService "ReplicatedStorage"
 
 local types = require(ReplicatedStorage.Shared.types)
 local world_scale = require(ReplicatedStorage.Shared.world_scale)
-local unit_defs = require(ReplicatedStorage.Shared.unit_defs)
-local surface = require(ReplicatedStorage.Shared.surface)
 
 local world_fx = require(ReplicatedStorage.Client.world_fx)
 local order_colors = require(ReplicatedStorage.Client.order_colors)
@@ -93,12 +91,8 @@ local function draw_leg(
 	traveller: types.EntityDef?,
 	most: number?
 )
-	local place = if traveller ~= nil and unit_defs.rides_surface(traveller)
-		then function(x: number, z: number): Vector3
-			return surface.position(traveller, x, z)
-		end
-		else nil
-	world_fx.lay_line(world_fx.ground_points(from, to, PATH_STEP, place), PATH_STYLE, dashes_from(pool, color, most))
+	local footing: world_fx.Footing = world_fx.footing_of(traveller)
+	world_fx.lay_line(world_fx.ground_points(from, to, PATH_STEP, footing), PATH_STYLE, dashes_from(pool, color, most))
 end
 
 -- An arc round `center` from bearing `from` to bearing `to`, `radius(direction)` out in each direction, laid on the
@@ -111,7 +105,7 @@ local function draw_arc(
 	from: number,
 	to: number
 ): (Vector3, Vector3)
-	local points = world_fx.arc_points(center, radius, from, to, RING_SEGMENTS)
+	local points = world_fx.arc_points(center, radius, from, to, RING_SEGMENTS, "surface")
 	world_fx.lay_line(points, PATH_STYLE, dashes_from(pool, color))
 	return points[1], points[#points]
 end

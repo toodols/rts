@@ -213,7 +213,6 @@ local defs: { [string]: EntityDef } = {
 		acceleration = studs_per_second_squared(0.018),
 		max_speed = studs(39),
 		footing = footing.ship("UBOAT4", studs(20), studs(80)),
-		stealth = true,
 		weapons = {
 			-- armserp_weapon
 			{

@@ -3,8 +3,8 @@
 -- an `ai_profile`. The players choose their starts in their start box as in any game (its map names no PLAYER_START,
 -- mission_map.player_start), and once the game has begun the enemy is handed to the AI (server/ai), playing by the
 -- mission's profile, or in its hard mode by its `hard_mode_ai_profile` if it has one, with a commander put down at the
--- start furthest from everyone (spawning.free_start). It is played to the commanders end mode both ways: the enemy is
--- beaten once its commander is dead, as the players are once theirs are.
+-- start furthest from everyone (spawning.free_start), held to the mission's `ai_tier` if it has one. It is played to the
+-- commanders end mode both ways: the enemy is beaten once its commander is dead, as the players are once theirs are.
 
 local ReplicatedStorage = game:GetService "ReplicatedStorage"
 local ServerScriptService = game:GetService "ServerScriptService"
@@ -38,6 +38,9 @@ local function setup(enemy: TeamId, playing: kit.Playing)
 		warn(`{mission.id}'s AI profile "{name}" is not one there is`)
 		waiting = nil
 		return
+	end
+	if mission.ai_tier ~= nil then
+		profile = ai_profiles.up_to_tier(profile, mission.ai_tier)
 	end
 	waiting = { team = enemy, profile = profile }
 end

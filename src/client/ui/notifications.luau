@@ -36,6 +36,8 @@ local TONES: types.PerNoticeKind<string> = {
 	base_attacked = "danger",
 	commander_attacked = "danger",
 	air_detected = "caution",
+	atomic_bomber_detected = "danger",
+	nuke_launched = "danger",
 	enemy_zone = "caution",
 	wave = "danger",
 	final_wave = "danger",
@@ -97,6 +99,12 @@ local TEXTS: types.PerNoticeKind<(Notice) -> string> = {
 	end,
 	air_detected = function(): string
 		return "Enemy aircraft detected"
+	end,
+	atomic_bomber_detected = function(): string
+		return "Atomic bomber detected"
+	end,
+	nuke_launched = function(): string
+		return "Nuclear launch detected"
 	end,
 	enemy_zone = function(): string
 		return "Enemy zone: destroyed when the enemy arrives"

@@ -98,6 +98,7 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=os.cpu_count() or 8)
     parser.add_argument("--out", help="write every match's result here as it comes in, as JSON lines; matches already there are not played again")
     parser.add_argument("--every", type=int, help="look at the game every so many seconds (for --caps)")
+    parser.add_argument("--deaths", action="store_true", help="record every death with what was near it (arena.luau's death_tracker)")
     parser.add_argument("--caps", help="comma-separated earlier time limits to rank by too, from the same games")
     options = parser.parse_args()
 
@@ -122,6 +123,8 @@ def main() -> None:
     owners: list[int] = []
     for index, (_, a, _, b) in enumerate(pairs):
         for match in duels(a, b, plays, options.seconds, options.every):
+            if options.deaths:
+                match["deaths"] = True
             jobs.append(match)
             owners.append(index)
     # Each result goes to --out as it comes in, and a match already there is not played again, so a run that was

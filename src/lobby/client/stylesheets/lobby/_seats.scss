@@ -107,20 +107,75 @@
 	text-overflow: ellipsis;
 }
 
-// A player's resource bonus: a developer's small stepper, a step down and up either side of the value, or the value alone
-// for everyone else. Green above none and red below it, so a handicap reads at a glance.
-.bonus {
-	width: auto;
-	height: auto;
-	@include stack(row, space(1));
-	align-items: center;
+// A player's resource bonus: for a developer host, a small recessed field filled out from its middle as far as the bonus
+// goes (ui/seats_panel.luau places the fill), or the value alone for everyone else. Green above none and red below it,
+// so a handicap reads at a glance.
+.bonus-field {
+	width: 60px;
+	height: 20px;
 	flex-shrink: 0;
+	background-color: $void;
+	outline: 1px solid color.adjust($edge, $lightness: -25%);
+	overflow: hidden;
+
+	&:hover {
+		outline: 1px solid $edge;
+	}
+
+	&.scrubbing,
+	&.editing {
+		outline: 1px solid $accent;
+	}
 }
 
-.chip.step {
-	width: 22px;
-	height: 22px;
-	padding: 0;
+.bonus-fill {
+	position: absolute;
+	z-index: 1;
+	background-color: transparent;
+	pointer-events: none;
+
+	&.up {
+		background-color: veil($gain, 0.3);
+	}
+
+	&.down {
+		background-color: veil($danger, 0.3);
+	}
+}
+
+.bonus-middle {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	width: 1px;
+	height: 100%;
+	z-index: 2;
+	background-color: color.adjust($edge, $lightness: -15%);
+	pointer-events: none;
+}
+
+.bonus-text {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	background-color: transparent;
+	color: var(--Text);
+	font-family: RobotoMono;
+	font-size: 11px;
+	font-weight: bold;
+	text-align: center;
+	white-space: nowrap;
+
+	&.up {
+		color: $gain;
+	}
+
+	&.down {
+		color: $danger;
+	}
 }
 
 .bonus-value {

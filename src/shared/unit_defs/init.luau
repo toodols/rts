@@ -434,10 +434,14 @@ local function intercept_range(def: EntityDef): number?
 end
 
 -- What `amount` of a weapon's damage comes to against something of `target`. An aircraft shrugs off
--- anything that is not a dedicated anti air weapon, taking only a fraction of the damage.
+-- anything that is not a dedicated anti air weapon, taking only a fraction of the damage, and a dedicated anti air
+-- weapon all but shrugs off anything that is not an aircraft.
 local function damage_against(anti_air: boolean, target: EntityDef, amount: number): number
 	if target.air ~= nil and anti_air == false then
 		return amount * weapon_kinds.NON_AA_AIR_DAMAGE_FRACTION
+	end
+	if target.air == nil and anti_air then
+		return math.min(amount, weapon_kinds.AA_NON_AIR_DAMAGE)
 	end
 	return amount
 end
@@ -557,6 +561,17 @@ end
 -- Whether it is a submarine: a ship that rides under the water's surface (`Footing.waterline`).
 local function is_submarine(def: EntityDef): boolean
 	return def.footing.waterline > 0
+end
+
+-- Whether it travels under the water where there is water: what stands on the ground (its footing's water is
+-- "ground"), which goes along the bottom of whatever water its footing lets it into, and a submarine. What floats,
+-- hovers or flies does not. Only these have their paths drawn along the ground beneath the water
+-- (client/world_fx.luau's `footing_of`).
+local function travels_underwater(def: EntityDef): boolean
+	if def.air ~= nil then
+		return false
+	end
+	return def.footing.water == "ground" or is_submarine(def)
 end
 
 -- How far under the surface something's underside has to be for it to count as in the water, so that one
@@ -748,6 +763,7 @@ return table.freeze({
 	floats = floats,
 	rides_surface = rides_surface,
 	is_submarine = is_submarine,
+	travels_underwater = travels_underwater,
 	in_water = in_water,
 	submerged = submerged,
 	is_vehicle = is_vehicle,

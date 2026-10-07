@@ -112,10 +112,10 @@ local function select_click(adding: boolean)
 	events.selected.fire("click", { id })
 end
 
--- Q: everything of yours on the screen that is the same kind of thing as anything selected. A selection of one grunt
--- becomes every grunt in view, and a mix of grunts and construction bots every grunt and construction bot in view.
--- Blueprints count as what they will become.
-local function select_same_type()
+-- Everything of yours on the screen, or for `whole_map` anywhere, that is the same kind of thing as anything selected.
+-- A selection of one grunt becomes every grunt in view, and a mix of grunts and construction bots every grunt and
+-- construction bot in view. Blueprints count as what they will become.
+local function select_same_type(whole_map: boolean?)
 	local camera = Workspace.CurrentCamera
 	if camera == nil then
 		return
@@ -138,8 +138,7 @@ local function select_same_type()
 		if world.is_selectable(model) == false or world.is_remains(model) then
 			continue
 		end
-		local _, on_screen = camera:WorldToViewportPoint(world.position_of(model))
-		if on_screen then
+		if whole_map == true or select(2, camera:WorldToViewportPoint(world.position_of(model))) then
 			table.insert(ids, id)
 		end
 	end

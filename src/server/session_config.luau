@@ -11,7 +11,8 @@
 --    whoever joins first (match_sources.for_mission); or
 --    `MapPreset`, a map's name from map_presets, to play that map. With `Spectate` set, whoever joins only watches,
 --    with no team, as a spectator the lobby sent would, and the game begins at once without waiting for them: to watch
---    the AIs play each other.
+--    the AIs play each other. With `Replay` set, the replay loaded into ServerStorage (server/replay.luau) is played
+--    back instead, on its own map, and whoever joins watches it, ahead of any of the others.
 -- 4. Otherwise MAP_PRESET, from MAP_SEED, with no match: the game anyone who joins a public server plays.
 --
 -- Computer opponents are put down in any game but a test's or a campaign mission's (which has its own enemy) as the
@@ -38,6 +39,7 @@ local ai_profiles = require(ReplicatedStorage.Shared.ai_profiles)
 local switches = require(ReplicatedStorage.Shared.switches)
 
 local match_sources = require(script.Parent.match_sources)
+local replay = require(script.Parent.replay)
 local test_request = require(script.Parent.test_request)
 -- The tests are only loaded into a session a Studio test was started in, never into a live server.
 local tests = if test_request.request ~= nil then require(script.Parent.tests) else nil
@@ -73,6 +75,8 @@ export type Session = {
 	random_seed: number?,
 	-- the test this session runs, with what it was started with (tests/init.luau), if it runs one
 	test: { [string]: any }?,
+	-- whether it plays back the replay loaded into ServerStorage (server/replay.luau)
+	replay: boolean,
 }
 
 -- What a session nobody plays in is started with (`unplayed`).
@@ -103,6 +107,7 @@ local OPPONENTS_INPUT = "AiOpponents"
 local LINES_INPUT = "AiLines"
 local PROFILES_INPUT = "AiProfiles"
 local SPECTATE_INPUT = "Spectate"
+local REPLAY_INPUT = "Replay"
 
 -- `preset` if it is a map here, or else map_presets.DEFAULT.
 local function available(preset: string): string
@@ -198,6 +203,7 @@ local function unplayed(given: Unplayed): Session
 		scenery = given.scenery == true,
 		random_seed = given.random_seed or (if given.seeded == true then seed else nil),
 		test = given.test,
+		replay = false,
 	}
 end
 
@@ -210,6 +216,28 @@ local function resolve(): Session
 	end
 
 	local match = match_sources.from_reservation()
+	-- a replay played back in Studio: its own map, watched by whoever joins, the game put back from its jump points
+	if
+		match == nil
+		and RunService:IsStudio()
+		and Workspace:GetAttribute(REPLAY_INPUT) == true
+		and replay.available()
+	then
+		local manifest = replay.read_manifest()
+		return {
+			match = nil,
+			map = { preset = available(manifest.map.preset), seed = manifest.map.seed, mission = nil, hard = false },
+			ai_opponents = 0,
+			ai_opponent_orders = {},
+			played = false,
+			spectate = true,
+			scavengers = false,
+			scenery = false,
+			random_seed = nil,
+			test = nil,
+			replay = true,
+		}
+	end
 	local studio_mission = studio_string(STUDIO_MISSION_INPUT)
 	if match == nil and studio_mission ~= nil and campaign.parse_key(studio_mission) ~= nil then
 		match = match_sources.for_mission(studio_mission)
@@ -234,6 +262,7 @@ local function resolve(): Session
 		scenery = true,
 		random_seed = nil,
 		test = nil,
+		replay = false,
 	}
 end
 

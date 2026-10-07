@@ -20,6 +20,7 @@ pow_setup.start(ServerScriptService.Server.pow, {
 		commands.campaign,
 		commands.status,
 		commands.donuts,
+		commands.replay,
 	},
 	client = { ReplicatedStorage.Client.pow_client_ext },
 })

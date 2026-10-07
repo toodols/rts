@@ -102,6 +102,16 @@ local function add_metal(x: number, z: number, multiplier: number)
 	add("metal", snapped_x, snapped_z, multiplier)
 end
 
+-- Whether the map being laid out is symmetric (`Preset.symmetric`): then each spot laid out from the seed goes down
+-- with its twin at (-x, -z), and only where both fit.
+local mirrored = false
+
+-- Where a spot laid out from the seed at (x, z) goes, and its twin on a symmetric map: snapped to the grid first, so
+-- that the twin is exactly the spot turned half round.
+local function snapped(x: number, z: number): (number, number)
+	return geometry.snap_center(x, z, METAL_HALF_EXTENTS, world_scale.CELL_STUDS)
+end
+
 -- Whether some spot of `kind` is within `distance` of (x, z).
 local function any_within(kind: SpotKind, x: number, z: number, distance: number): boolean
 	local here = Vector2.new(x, z)
@@ -151,6 +161,35 @@ local function metal_fits(x: number, z: number, spacing: number, underwater: boo
 	return true
 end
 
+-- Tries to lay a spot out from the seed at (x, z), which `accept` has to take, with its twin across the middle on a
+-- symmetric map (both taken, and far enough apart); returns how many went down: 0, 1, or 2 for a pair.
+local function lay_spot(
+	x: number,
+	z: number,
+	multiplier: number,
+	spacing: number,
+	accept: (x: number, z: number) -> boolean
+): number
+	local sx, sz = snapped(x, z)
+	if mirrored == false then
+		if accept(sx, sz) == false then
+			return 0
+		end
+		add("metal", sx, sz, multiplier)
+		return 1
+	end
+	-- a spot at the middle, or so near it that its twin would overlap it, cannot have one
+	if sx * sx + sz * sz < (spacing / 2) ^ 2 then
+		return 0
+	end
+	if accept(sx, sz) == false or accept(-sx, -sz) == false then
+		return 0
+	end
+	add("metal", sx, sz, multiplier)
+	add("metal", -sx, -sz, multiplier)
+	return 2
+end
+
 -- A map that is laid out in layers puts each layer's own number of spots on ground at that layer's height, and
 -- nowhere else, which keeps them off the ramps between layers.
 local function add_layers(random: Random, layers: { MetalLayer })
@@ -164,14 +203,11 @@ local function add_layers(random: Random, layers: { MetalLayer })
 			local x = random:NextNumber(-half_x, half_x)
 			local z = random:NextNumber(-half_z, half_z)
 			local height = heightmap.height_at(x, z)
-			if
-				height >= layer.min_height
-				and height <= layer.max_height
-				and (layer.clear_of_starts == false or clear_of_starts(x, z))
-				and metal_fits(x, z, layer.spacing, layer.underwater)
-			then
-				add_metal(x, z, layer.multiplier or DEFAULT_MULTIPLIER)
-				placed += 1
+			if height >= layer.min_height and height <= layer.max_height then
+				placed += lay_spot(x, z, layer.multiplier or DEFAULT_MULTIPLIER, layer.spacing, function(at_x, at_z)
+					return (layer.clear_of_starts == false or clear_of_starts(at_x, at_z))
+						and metal_fits(at_x, at_z, layer.spacing, layer.underwater)
+				end)
 			end
 		end
 		if placed < layer.count then
@@ -191,8 +227,23 @@ local function lay_out_metal(preset: Preset, seed: number)
 	end
 
 	local random = Random.new(seed + SEED_OFFSET)
+	mirrored = preset.symmetric == true
+	-- on a symmetric map a start's home spots are laid out with its twin's, so a start whose twin came earlier has them
+	local homed: { Vector2 } = {}
 	for slot = 1, starts.count() do
 		local home = starts.center(slot)
+		local done = false
+		if mirrored then
+			for _, other in homed do
+				if (other + home).Magnitude < 0.5 then
+					done = true
+				end
+			end
+		end
+		if done then
+			continue
+		end
+		table.insert(homed, home)
 		local placed = 0
 		for _ = 1, MAX_ATTEMPTS do
 			if placed >= HOME_SPOT_COUNT then
@@ -202,8 +253,12 @@ local function lay_out_metal(preset: Preset, seed: number)
 			local radius = random:NextNumber(HOME_MIN_RADIUS, HOME_MAX_RADIUS)
 			local x = home.X + math.cos(angle) * radius
 			local z = home.Y + math.sin(angle) * radius
-			if metal_fits(x, z, HOME_SPACING, false) then
-				add_metal(x, z, DEFAULT_MULTIPLIER)
+			-- a pair counts once here: each is one of its own start's home spots
+			if
+				lay_spot(x, z, DEFAULT_MULTIPLIER, HOME_SPACING, function(at_x, at_z)
+					return metal_fits(at_x, at_z, HOME_SPACING, false)
+				end) > 0
+			then
 				placed += 1
 			end
 		end
@@ -223,11 +278,16 @@ local function lay_out_metal(preset: Preset, seed: number)
 		end
 		local x = random:NextNumber(-half_x, half_x)
 		local z = random:NextNumber(-half_z, half_z)
-		if clear_of_starts(x, z) and metal_fits(x, z, MIDDLE_SPACING, false) then
-			local rich = placed % RICH_EVERY == RICH_EVERY - 1
-			add_metal(x, z, if rich then map_types.RICH_MULTIPLIER else DEFAULT_MULTIPLIER)
-			placed += 1
-		end
+		local rich = placed % RICH_EVERY == RICH_EVERY - 1
+		placed += lay_spot(
+			x,
+			z,
+			if rich then map_types.RICH_MULTIPLIER else DEFAULT_MULTIPLIER,
+			MIDDLE_SPACING,
+			function(at_x, at_z)
+				return clear_of_starts(at_x, at_z) and metal_fits(at_x, at_z, MIDDLE_SPACING, false)
+			end
+		)
 	end
 	local wanted = starts.count() * HOME_SPOT_COUNT + MIDDLE_SPOT_COUNT
 	if #metal_spots < wanted then
@@ -242,10 +302,9 @@ local function lay_out_metal(preset: Preset, seed: number)
 		end
 		local x = random:NextNumber(-half_x, half_x)
 		local z = random:NextNumber(-half_z, half_z)
-		if metal_fits(x, z, MIDDLE_SPACING, true) then
-			add_metal(x, z, DEFAULT_MULTIPLIER)
-			sunk += 1
-		end
+		sunk += lay_spot(x, z, DEFAULT_MULTIPLIER, MIDDLE_SPACING, function(at_x, at_z)
+			return metal_fits(at_x, at_z, MIDDLE_SPACING, true)
+		end)
 	end
 end
 
@@ -297,9 +356,23 @@ local function lay_out_vents(preset: Preset)
 		return
 	end
 	if preset.geo_at_starts == true then
+		-- on a symmetric map a start whose twin came earlier takes the twin's vent turned half round
+		local vented: { [number]: Vector2 } = {}
 		for slot = 1, starts.count() do
-			local at = vent_beside(starts.center(slot))
+			local home = starts.center(slot)
+			local at: Vector2? = nil
+			if preset.symmetric == true then
+				for earlier, vent in vented do
+					if (starts.center(earlier) + home).Magnitude < 0.5 then
+						at = -vent
+					end
+				end
+			end
+			if at == nil then
+				at = vent_beside(home)
+			end
 			if at ~= nil then
+				vented[slot] = at
 				add("geo", at.X, at.Y, 1)
 			else
 				warn(`found no room for a geothermal vent beside start {slot}`)
